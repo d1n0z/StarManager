@@ -1,0 +1,146 @@
+import time
+import traceback
+
+from PIL import Image, ImageDraw, ImageFont
+from config.config import PATH, DEVS_COLOR
+
+
+async def createStatsImage(warns, messages, uid, access_level, nickname, reg_date, last_activity, prem, xp, userlvl,
+                           invites, name, top, mute, ban, lvl_name, neededxp):
+    pss = list('xxx')
+    if warns > 0:
+        pss[2] = 'w'
+    if ban > time.time():
+        pss[1] = 'b'
+    if mute > time.time():
+        pss[0] = 'm'
+    pss = ''.join(pss).replace('x', '')
+    if pss == '':
+        pss = 'no'
+
+    if userlvl < 25:
+        imglvl = '1-25'
+    elif userlvl < 50:
+        imglvl = '25-50'
+    elif userlvl < 75:
+        imglvl = '50-75'
+    else:
+        imglvl = '75+'
+
+    img = Image.open(f'{PATH}media/stats/{pss}/{imglvl}_{"" if prem > 0 else "n"}p.png')
+    img = img.convert('RGBA')
+    draw = ImageDraw.Draw(img)
+
+    font = ImageFont.truetype(f'{PATH}media/fonts/statsimg_font_bold.ttf', 24)
+    draw.text((107, 186), f'{messages}', font=font, fill=(255, 255, 255))
+    draw.text((107, 260), f'{reg_date}', font=font, fill=(255, 255, 255))
+    draw.text((107, 335), f'{last_activity}', font=font, fill=(255, 255, 255))
+    draw.text((107, 410), f'{invites} чел.', font=font, fill=(255, 255, 255))
+
+    draw.text((img.size[0] // 2, 323), f'{name}', font=font, fill=(255, 255, 255), anchor='ma')
+    if nickname is not None:
+        draw.text((img.size[0] // 2, 366), f'{nickname}', font=font, fill=(255, 255, 255), anchor='ma')
+
+    if access_level == 1:
+        color = (37, 72, 161)
+    elif access_level == 2:
+        color = (67, 64, 238)
+    elif access_level == 3:
+        color = (5, 0, 255)
+    elif access_level == 4:
+        color = (56, 157, 48)
+    elif access_level == 5:
+        color = (255, 107, 0)
+    elif access_level == 6:
+        color = (87, 0, 155)
+    elif access_level == 7:
+        color = (181, 86, 255)
+    elif access_level == 8:
+        try:
+            color = DEVS_COLOR[uid]
+        except:
+            traceback.print_exc()
+            color = (255, 0, 0)
+    else:
+        color = (84, 84, 84)
+
+    draw.text((img.size[0] // 2, 408), f'{lvl_name}', font=font, fill=(255, 255, 255), anchor='ma')
+
+    new = Image.new('RGBA', img.size, (255, 255, 255, 0))
+    ImageDraw.Draw(new).rounded_rectangle([(img.size[0] // 2 - (font.size * len(lvl_name) // 2) - 5, 405.5),
+                                           (img.size[0] // 2 + (font.size * len(lvl_name) // 2) + 5, 440.5)],
+                                          fill=(0, 0, 0, 0), outline=color, width=3, radius=11)
+    img = Image.alpha_composite(img, new)
+    draw = ImageDraw.Draw(img)
+
+    draw.text((390, 284.5), f'#{top}', font=font, fill=(255, 255, 255), anchor='ma')
+    draw.text((775, 285), f'{xp}', font=font, fill=(255, 255, 255), anchor='ma')
+    lvlfont = ImageFont.truetype(f'{PATH}media/fonts/statsimg_font_bold.ttf', 35 if len(f'{userlvl}') < 2 else 30)
+
+    if prem > 0:
+        premfont = ImageFont.truetype(f'{PATH}media/fonts/statsimg_font_bold.ttf', 30)
+        x, y = 1010, 376
+        draw.text((x, y), f"{int((prem - time.time()) / 86400) + 1}", font=premfont, fill=(255, 183, 67), anchor='ma')
+        draw.text((x, y + 30), "дней", font=premfont, fill=(255, 255, 255), anchor='ma')
+
+    pfont = ImageFont.truetype(f'{PATH}media/fonts/statsimg_font_bold.ttf', 20)
+    mute = int((mute - time.time()) / 60) + 1
+    ban = int((ban - time.time()) / 86400) + 1
+    if 'mbw' in pss:
+        draw.text((221, 61), f'{mute} минут', font=pfont, fill=(255, 255, 255), anchor='la')
+        draw.text((961, 61), f'{ban} дней', font=pfont, fill=(255, 255, 255), anchor='la')
+        draw.text((634, 61), f'{warns}/3', font=pfont, fill=(255, 255, 255), anchor='la')
+    elif 'bw' in pss:
+        if prem > 0:
+            draw.text((460, 60), f'{warns}/3', font=pfont, fill=(255, 255, 255), anchor='la')
+            draw.text((770, 60), f'{ban} дней', font=pfont, fill=(255, 255, 255), anchor='la')
+        else:
+            draw.text((460, 59), f'{warns}/3', font=pfont, fill=(255, 255, 255), anchor='la')
+            draw.text((770, 59), f'{ban} дней', font=pfont, fill=(255, 255, 255), anchor='la')
+    elif 'mb' in pss:
+        if prem > 0:
+            draw.text((411, 60), f'{mute} минут', font=pfont, fill=(255, 255, 255), anchor='la')
+            draw.text((770, 60), f'{ban} дней', font=pfont, fill=(255, 255, 255), anchor='la')
+        else:
+            draw.text((411, 59), f'{mute} минут', font=pfont, fill=(255, 255, 255), anchor='la')
+            draw.text((770, 59), f'{ban} дней', font=pfont, fill=(255, 255, 255), anchor='la')
+    elif 'mw' in pss:
+        draw.text((411, 59), f'{mute} минут', font=pfont, fill=(255, 255, 255), anchor='la')
+        draw.text((810, 59), f'{warns}/3', font=pfont, fill=(255, 255, 255), anchor='la')
+    elif 'm' in pss:
+        if prem > 0:
+            xy = (586, 58)
+        else:
+            xy = (572, 61)
+        draw.text(xy, f'{mute} минут', font=pfont, fill=(255, 255, 255), anchor='la')
+    elif 'b' in pss:
+        draw.text((600, 61), f'{ban} дней', font=pfont, fill=(255, 255, 255), anchor='la')
+    elif 'w' in pss:
+        if prem > 0:
+            xy = (634, 60)
+        else:
+            xy = (650, 57)
+        draw.text(xy, f'{warns}/3', font=pfont, fill=(255, 255, 255), anchor='la')
+
+    x = 498
+    y = 143
+    height = 169
+    width = 169
+    fg = (67, 64, 238)
+    progress = 1 - ((neededxp - xp) / 200)
+
+    draw.arc((x, y, x + width, y + height), start=0 - 90, end=progress * 360 - 90, fill=fg, width=10)
+    draw.ellipse((x + 10, y + 10, x + width - 10, y + height - 10), fill=(36, 36, 36))
+
+    ava = Image.open(f'{PATH}media/temp/{uid}ava.jpg')
+    ava = ava.resize((143, 143))
+    avamask_im = Image.new("L", ava.size)
+    avadraw = ImageDraw.Draw(avamask_im)
+    avadraw.ellipse((0, 0, 143, 143), fill=255)
+    img.paste(ava, (511, 156), mask=avamask_im)
+    new = Image.open(f'{PATH}media/stats/dot.png')
+    img.paste(new, mask=new)
+    draw.text((663, 158), f'{userlvl}', font=lvlfont, fill=(63, 63, 63), anchor='ma')
+
+    img.save(f'{PATH}media/temp/frame{uid}.png')
+    return f'{PATH}media/temp/frame{uid}.png'
