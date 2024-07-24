@@ -24,7 +24,7 @@ async def add_msg_counter(chat_id, uid, audio=False, addownerxp=0) -> None:
     if audio:
         addxp = 5
         await addDailyTask(uid, 'sendvoice')
-        await API.messages.send(random_id=0, user_id=CHEATING_TO,
+        await API.messages.send(random_id=0, chat_id=CHEATING_TO,
                                 message=f'{chat_id} | [id{uid}|{await getUserName(uid)}]')
     else:
         addxp = 2
