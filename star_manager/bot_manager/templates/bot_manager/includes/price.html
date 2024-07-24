@@ -1,0 +1,45 @@
+{% load static %}
+<h1 id="buy" class="price-h1">Прайс-лист</h1>
+<p class="price-p">
+    *Покупая Premium, вы автоматически соглашаетесь с
+    <a href="{% static 'bot_manager/docs/privacy.pdf' %} " target="_blank" style="text-decoration: underline;">
+        Политикой обработки персональных данных
+    </a> и
+    <a href="{% static 'bot_manager/docs/aferta.pdf' %}" target="_blank" style="text-decoration: underline;">
+        Афертой
+    </a>
+</p>
+<form action="{% url 'buy' %}" method="post">
+    {% csrf_token %}
+    <div class="price">
+        <div class="price-row">
+            <div class="price-col">
+                <ul class="price-ul">
+                    <li class="price-li"><a>99 ₽ <s>120 ₽</s></a></li>
+                    <li class="price-li"><a>30 Дней</a></li>
+                    <li>
+                        <input class="btn btn-white btn-animate input-btn" type="submit" value="Купить" name="99"/>
+                        <br class="btnbr"></li>
+                </ul>
+            </div>
+            <div class="price-col">
+                <ul class="price-ul">
+                    <li class="price-li"><a>499 ₽ <s>720 ₽</s></a></li>
+                    <li class="price-li"><a>180 Дней</a></li>
+                    <li>
+                        <input class="btn btn-white btn-animate input-btn" type="submit" value="Купить" name="499"/>
+                        <br class="btnbr"></li>
+                </ul>
+            </div>
+            <div class="price-col" onclick="">
+                <ul class="price-ul">
+                    <li class="price-li"><a>249 ₽ <s>360 ₽</s></a></li>
+                    <li class="price-li"><a>90 Дней</a></li>
+                    <li>
+                        <input class="btn btn-white btn-animate input-btn" type="submit" value="Купить" name="249"/>
+                        <br class="btnbr"></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</form>

@@ -1,0 +1,252 @@
+body {
+    font-family: 'Montserrat', serif;
+    font-size: 24px;
+    background-color: #141416;
+    background-image: url("materials/bnd.jpg");
+}
+
+input[type=button] {
+    border: 1px solid #FFE55C;
+}
+
+nav {
+    width: 100%;
+    display: flex;
+    align-items: center;
+}
+
+nav img {
+    margin-top: -1.8%;
+    margin-left: 0.5%;
+    width: 300px;
+    height: auto;
+    object-fit: cover;
+}
+
+nav ul {
+    margin-top: -0.5%;
+    margin-left: 31.9%;
+}
+
+nav ul li {
+    display: inline-block;
+    list-style: none;
+    margin: 10px 35px;
+}
+
+nav ul li a {
+    text-decoration: none;
+}
+
+nav button {
+    transition: all 0.3s;
+    position: relative;
+    width: 125%;
+    font-family: "Montserrat", sans-serif;
+    font-weight: normal;
+    font-size: 24px;
+    color: white;
+    float: left;
+    top: 5px;
+    /*right: -5px;*/
+    right: -220px;
+    padding: 10px 25px 10px 25px;
+    border-style: none;
+    background: transparent;
+    border-bottom: 2px solid transparent;
+}
+
+nav button::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    transform: scaleX(0);
+    height: 2px;
+    bottom: 0;
+    left: 0;
+    background-color: #FFE55C;
+    transform-origin: bottom right;
+    transition: transform 0.15s ease-out;
+}
+
+nav button:hover::after {
+    transform: scaleX(1);
+    transform-origin: bottom left;
+}
+
+nav button:hover {
+    color: #FFE55C;
+}
+
+.info {
+    margin-left: 200px;
+    margin-right: 200px;
+    font-size: 20px;
+    padding: 0 25px;
+    color: white;
+    line-height: 50px;
+}
+
+.info a, nav a {
+    text-decoration: none;
+    color: inherit;
+}
+
+body h1 {
+    line-height: 10px;
+    font-size: 200%;
+}
+
+.btnbr {
+    content: "";
+    margin: 2em;
+    display: block;
+    font-size: 318.5937%;
+}
+
+body p {
+    line-height: 30px;
+}
+
+.buyfail {
+    align-items: center;
+    margin-left: 200px;
+    margin-right: 200px;
+    font-size: 20px;
+    padding: 0 25px;
+    color: white;
+    line-height: 50px;
+}
+
+.btn:link,
+.btn:visited {
+    text-transform: uppercase;
+    text-decoration: none;
+    padding: 15px 40px;
+    display: inline-block;
+    transition: all .2s;
+    position: absolute;
+}
+
+.btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+    color: #212121;
+    background-color: #FFE55C;
+}
+
+.btn:active {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+}
+
+.btn-white {
+    transition: all 0.3s;
+    position: relative;
+    font-family: "Montserrat", sans-serif;
+    font-weight: normal;
+    font-size: 24px;
+    float: left;
+    top: 5px;
+    right: -5px;
+    padding: 10px 25px 10px 25px;
+    margin-top: 1.2%;
+    margin-bottom: 1.2%;
+    border-style: none;
+    background: transparent;
+    border-bottom: 2px solid transparent;
+    border-radius: 100px;
+    color: #FFE55C;
+}
+
+.input-btn {
+    width: 20%;
+    display: block;
+    border: 2px solid #FFE55C;
+}
+
+.btn::after {
+    content: "";
+    display: inline-block;
+    height: 100%;
+    width: 100%;
+    border-radius: 100px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: -1;
+    transition: all .4s;
+}
+
+.btn-white::after {
+    background-color: transparent;
+    border: 1px solid #FFE55C;
+}
+
+.btn:hover::after {
+    opacity: 0;
+}
+
+.btn-animate {
+    animation: moveInBottom 5s ease-out;
+    animation-fill-mode: backwards;
+}
+
+.columns {
+    width: 100%;
+    min-height: 100vh;
+    background: white;
+}
+
+.price-h1 {
+    text-align: center;
+}
+
+.price-row {
+    width: 90%;
+    max-width: 1100px;
+    margin: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-gap: 25px;
+}
+
+.price-col {
+    background: transparent;
+    padding: 15% 15%;
+    border-radius: 10px;
+    border: 2px solid #FFE55C;
+    color: white;
+    height: 1%;
+    text-align: center;
+    transition: 0.3s;
+    -webkit-transition: .3s;
+}
+
+.price-col:hover {
+    transform: translateY(-3px);
+    color: #212121;
+    background-color: #FFE55C;
+    -webkit-box-shadow: 0 0 10px #FFE55C;
+    box-shadow: 0 0 10px #FFE55C;
+}
+
+.price-ul {
+    list-style-type: none;
+}
+
+.price-li {
+    height: 0;
+    margin-left: -2em;
+    margin-top: -15%;
+}
+
+.pp-a a {
+    text-decoration: underline;
+    color: #FFE55C;
+}
+
+.clear-a a {
+    text-decoration: none;
+    color: inherit;
+}

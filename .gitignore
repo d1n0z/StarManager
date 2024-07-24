@@ -1,0 +1,8 @@
+.p
+.idea
+.__pycache__
+.config
+venv
+test.py
+requirements.txt
+site
