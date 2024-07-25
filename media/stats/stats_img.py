@@ -2,7 +2,7 @@ import time
 import traceback
 
 from PIL import Image, ImageDraw, ImageFont
-from config.config import PATH, DEVS_COLOR
+from config.config import PATH, DEVS_COLORS
 
 
 async def createStatsImage(warns, messages, uid, access_level, nickname, reg_date, last_activity, prem, xp, userlvl,
@@ -57,7 +57,7 @@ async def createStatsImage(warns, messages, uid, access_level, nickname, reg_dat
         color = (181, 86, 255)
     elif access_level == 8:
         try:
-            color = DEVS_COLOR[uid]
+            color = DEVS_COLORS[uid]
         except:
             traceback.print_exc()
             color = (255, 0, 0)

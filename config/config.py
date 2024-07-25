@@ -1,11 +1,17 @@
+from ast import literal_eval
+
 from vk_api import vk_api
 from vkbottle import API
+from configparser import ConfigParser
 
-VK_TOKEN_GROUP = ''
-GROUP_ID = 0
-VK_TOKEN_IMPLICIT_FLOW = ''
-VK_APP_ID = ''
-VK_APP_SECRET = ''
+config = ConfigParser()
+config.read('./config/config.ini')
+
+VK_TOKEN_GROUP = config['VK']['VK_TOKEN_GROUP']
+GROUP_ID = int(config['VK']['GROUP_ID'])  # without "-"
+VK_TOKEN_IMPLICIT_FLOW = config['VK']['VK_TOKEN_IMPLICIT_FLOW']
+VK_APP_ID = config['VK']['VK_APP_ID']
+VK_APP_SECRET = config['VK']['VK_APP_SECRET']
 
 LVL_NAMES = ["Обычный Пользователь", "Смотрящий", "Модератор", "Старший Модератор", "Администратор",
              "Спец администратор", "Руководитель", "Владелец", "DEV"]
@@ -38,7 +44,7 @@ COMMANDS = {
     "statuslist": 8, "cmdcount": 8, "infban": 8, "infunban": 8, "getlink": 8, "backup": 8, "gps": 8, "checkleaved": 8,
     "reportwarn": 8, "reboot": 8, "sudo": 8, "givexp": 8, "reimport": 8, "resetlvl": 8, "getuserchats": 8, "helpdev": 8,
     "getchats": 8, "gettransferhistory": 8, "gettransferhistoryto": 8, "gettransferhistoryfrom": 8,
-    "getmessageshistory": 8
+    "getmessageshistory": 8, "lvlban": 8, "lvlunban": 8, "lvlbanlist": 8
 }
 COMMANDS_DESC = {
     "task": "/task - Открыть меню заданий.",
@@ -132,10 +138,11 @@ COMMANDS_DESC = {
     "purge": "/purge - очищает беседу от ненужной информации."
 }
 
-DAILY_TO = 0
-BACKUPS_TO = 0
-REPORT_TO = 0
-CHEATING_TO = 0
+# chat ids
+DAILY_TO = int(config['SERVICE']['DAILY_TO'])
+BACKUPS_TO = int(config['SERVICE']['BACKUPS_TO'])
+REPORT_TO = int(config['SERVICE']['REPORT_TO'])
+CHEATING_TO = int(config['SERVICE']['CHEATING_TO'])
 
 REPORT_CD = 300  # cooldown in seconds
 
@@ -169,27 +176,29 @@ PREMIUM_TASKS_WEEKLY = {
 
 TASKS_LOTS = {5: 1, 20: 5, 40: 10, 80: 3}
 
-DEVS = [746110579, 697163236]
-ADMINS = [697163236, 746110579]
-MAIN_DEV = [746110579]
-DEVS_COLOR = {746110579: (0, 255, 166), 697163236: (255, 0, 0)}
+DEVS = literal_eval(config['SERVICE']['DEVS'])
+ADMINS = literal_eval(config['SERVICE']['ADMINS'])
+MAIN_DEVS = literal_eval(config['SERVICE']['MAIN_DEVS'])
+DEVS_COLORS = literal_eval(config['SERVICE']['DEVS_COLORS'])
 
 PREFIX = ["/", "!", ".", "+"]
 
-PATH = "/root/StarManager/"
+PATH = config['SERVICE']['PATH']
 
 GWARN_TIME_LIMIT = 10
 GWARN_PUNISHMENT = 10  # in seconds
 GWARN_PUNISHMENTS_NAMES = ["5 минут", "30 минут", "48 часов", "30 дней"]
+
+LVL_BANNED_COMMANDS = ['task', 'bonus', 'transfer', 'duel']
 
 SETTINGS_STANDARD = {"setKick": 1, "setDuel": 1}
 
 TASKS = []
 
 FARM_CD = 7200  # in seconds
-FARM_POST_ID = 0
+FARM_POST_ID = int(config['SERVICE']['FARM_POST_ID'])
 
-PREMIUM_BONUS_POST_ID = 0
+PREMIUM_BONUS_POST_ID = int(config['SERVICE']['PREMIUM_BONUS_POST_ID'])
 PREMIUM_BONUS_DAYS = 5
 
 
@@ -205,25 +214,25 @@ VK_API_IMPLICIT_SESSION = vk_api.VkApi(token=VK_TOKEN_IMPLICIT_FLOW, api_version
 
 PREMIUM_COST = {30: 99, 90: 249, 180: 499}
 
-USER = ""
-PASSWORD = ""
-DATABASE = "starmanager"
+USER = config['DATABASE']['USER']
+PASSWORD = config['DATABASE']['PASSWORD']
+DATABASE = config['DATABASE']['DATABASE']
 
-TG_TOKEN = ""
-TG_CHAT_ID = ""
-TG_FREEKASSA_THREAD_ID = ""
-TG_API_HASH = ''
-TG_API_ID = ''
+TG_TOKEN = config['TELEGRAM']['TG_TOKEN']
+TG_CHAT_ID = config['TELEGRAM']['TG_CHAT_ID']
+TG_FREEKASSA_THREAD_ID = config['TELEGRAM']['TG_FREEKASSA_THREAD_ID']
+TG_API_HASH = config['TELEGRAM']['TG_API_HASH']
+TG_API_ID = config['TELEGRAM']['TG_API_ID']
 
-YOOKASSA_MERCHANT_ID = 0
-YOOKASSA_TOKEN = ''
+YOOKASSA_MERCHANT_ID = int(config['YOOKASSA']['YOOKASSA_MERCHANT_ID'])
+YOOKASSA_TOKEN = config['YOOKASSA']['YOOKASSA_TOKEN']
 
-MEGA_LOGIN = ""
-MEGA_PASSWORD = ''
+MEGA_LOGIN = config['MEGA']['MEGA_LOGIN']
+MEGA_PASSWORD = config['MEGA']['MEGA_PASSWORD']
 
 data = {
-    'email': 'vk.star.manager@gmail.com',
-    'vk': 'https://vk.com/star_manager',
-    'vk_preminfo': 'https://vk.cc/crO0a5',
-    'tg': 'https://t.me/star_manager_news',
+    'email': config['SOCIALS']['email'],
+    'vk': config['SOCIALS']['vk'],
+    'vk_preminfo': config['SOCIALS']['vk_preminfo'],
+    'tg': config['SOCIALS']['tg'],
 }

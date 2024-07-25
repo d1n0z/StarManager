@@ -1,4 +1,3 @@
-import asyncio
 import locale
 import traceback
 from ast import literal_eval
@@ -12,7 +11,7 @@ from vkbottle.bot import Bot
 from config.config import API, VK_API_SESSION, VK_TOKEN_GROUP, GROUP_ID, SETTINGS_STANDARD, TASKS_DAILY, \
     PREMIUM_TASKS_DAILY, PREMIUM_TASKS_DAILY_TIERS, TASKS_WEEKLY, PREMIUM_TASKS_WEEKLY
 from db import CMDNames, UserNames, ChatNames, GroupNames, AccessLevel, LastMessageDate, Nickname, Mute, Warn, Ban, \
-    XP, Premium, PremMenu, CMDLevels, Messages, DuelWins, Settings, TasksDaily, TasksWeekly, Coins
+    XP, Premium, PremMenu, CMDLevels, Messages, DuelWins, Settings, TasksDaily, TasksWeekly, Coins, LvlBanned
 
 
 def namesAsCommand(cmd, uid) -> list:
@@ -341,6 +340,8 @@ async def getUserMessages(uid, chat_id, none=0) -> int:
 
 
 async def addUserXP(uid, addxp):
+    if not await getULvlBanned(uid):
+        return
     u = XP.get_or_create(uid=uid, defaults={'xp': 0})[0]
     ul = await getUserLVL(u.xp)
     u.xp += addxp
@@ -382,6 +383,8 @@ async def setUserAccessLevel(uid, chat_id, access_level):
 
 
 async def addDailyTask(uid, task, count=1):
+    if not await getULvlBanned(uid):
+        return
     t = TasksDaily.get_or_create(uid=uid, task=task)[0]
     t.count += count
     t.save()
@@ -397,6 +400,8 @@ async def addDailyTask(uid, task, count=1):
 
 
 async def addWeeklyTask(uid, task, count=1):
+    if not await getULvlBanned(uid):
+        return
     t = TasksWeekly.get_or_create(uid=uid, task=task)[0]
     t.count += count
     t.save()
@@ -458,3 +463,10 @@ def pointWords(value, words):
 def chunks(li, n):
     for i in range(0, len(li), n):
         yield li[i:i + n]
+
+
+async def getULvlBanned(uid) -> int:
+    ban = LvlBanned.get_or_none(LvlBanned.uid == uid)
+    if ban is not None:
+        return 0
+    return 1

@@ -4,8 +4,8 @@ import traceback
 import messages
 from Bot.global_warn_handler import global_warn_handle
 from Bot.utils import getUserAccessLevel, getUserPremium, getUserLastMessage, getUserMute
-from config.config import COMMANDS, API, PREFIX, DEVS, MAIN_DEV
-from db import GlobalWarns, CMDLevels, Prefixes, Ignore, InfBanned, SilenceMode, ChatLimit, CMDNames
+from config.config import COMMANDS, API, PREFIX, DEVS, MAIN_DEVS, LVL_BANNED_COMMANDS
+from db import GlobalWarns, CMDLevels, Prefixes, Ignore, InfBanned, SilenceMode, ChatLimit, CMDNames, LvlBanned
 
 
 async def isAdmin(cmd, chat_id) -> bool:
@@ -59,6 +59,13 @@ async def getUInfBanned(uid, chat_id) -> int:
     return 1
 
 
+async def getULvlBanned(uid) -> int:
+    ban = LvlBanned.get_or_none(LvlBanned.uid == uid)
+    if ban is not None:
+        return 0
+    return 1
+
+
 async def getSilence(chat_id) -> int:
     sm = SilenceMode.get_or_none(SilenceMode.chat_id == chat_id)
     if sm is not None:
@@ -101,7 +108,11 @@ async def checkCMD(message, chat_id, fixing=False, accesstoalldevs=False, return
             return False
         cmd = cmd.cmd
 
-    accessed = DEVS if accesstoalldevs else MAIN_DEV
+    if cmd in LVL_BANNED_COMMANDS and not await getULvlBanned(uid):
+        await message.reply(messages.lvlbanned())
+        return False
+
+    accessed = DEVS if accesstoalldevs else MAIN_DEVS
     if fixing and uid not in accessed:
         msg = messages.inprogress()
         await message.reply(disable_mentions=1, message=msg)

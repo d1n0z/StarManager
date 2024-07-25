@@ -532,3 +532,11 @@ class MessagesHistory(Model):
     class Meta:
         database = dbhandle
         db_table = f'messageshistory'
+
+
+class LvlBanned(Model):
+    uid = IntegerField(default=0, unique=True, index=True)
+
+    class Meta:
+        database = dbhandle
+        db_table = f'lvlbanned'

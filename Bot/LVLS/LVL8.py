@@ -17,7 +17,7 @@ from Bot.rules import SearchCMD
 from Bot.utils import getUserName, getIDFromMessage, getUserNickname, sendMessage, addUserXP, getChatName, editMessage
 from config.config import API, GROUP_ID
 from db import AllChats, Blacklist, Premium, InfBanned, ReportWarns, Reboot, XP, Coins, Messages, TransferHistory, \
-    MessagesHistory
+    MessagesHistory, LvlBanned
 
 bl = BotLabeler()
 
@@ -304,13 +304,13 @@ async def statuslist(message: Message):
 @bl.chat_message(SearchCMD('infban'))
 async def infban(message: Message):
     data = message.text.lower().split()
-
-    if len(data) != 3 or data[1] not in ['group', 'user'] or not data[2].isdigit():
+    id = await getIDFromMessage(message, 3)
+    if len(data) != 3 or data[1] not in ['group', 'user'] or not id:
         msg = messages.infban_hint()
         await message.reply(msg)
         return
 
-    InfBanned.get_or_create(uid=data[2], type=data[1])
+    InfBanned.get_or_create(uid=id, type=data[1])
 
     msg = messages.infban()
     await message.reply(msg)
@@ -319,13 +319,13 @@ async def infban(message: Message):
 @bl.chat_message(SearchCMD('infunban'))
 async def infunban(message: Message):
     data = message.text.lower().split()
-
-    if len(data) != 3 or data[1] not in ['group', 'user'] or not data[2].isdigit():
+    id = await getIDFromMessage(message, 3)
+    if len(data) != 3 or data[1] not in ['group', 'user'] or not id:
         msg = messages.infunban_hint()
         await message.reply(msg)
         return
 
-    ib = InfBanned.get_or_none(InfBanned.uid == data[2], InfBanned.type == data[1])
+    ib = InfBanned.get_or_none(InfBanned.uid == id, InfBanned.type == data[1])
     if ib is None:
         msg = messages.infunban_noban()
         await message.reply(msg)
@@ -338,17 +338,15 @@ async def infunban(message: Message):
 
 @bl.chat_message(SearchCMD('inflist'))
 async def inflist(message: Message):
-    msg = f'⚛ Список пользователей в inf бота (Всего : %c)\n\n'
-    c = 0
-    for user in InfBanned.select().iterator():
+    infarr = InfBanned.select()
+    msg = f'⚛ Список пользователей в inf бота (Всего : {len(infarr)})\n\n'
+    for user in infarr:
         if user.type == 'user':
             name = await getUserName(user.uid)
             msg += f"➖ user {user.uid} : | {name}\n"
         else:
             name = await getChatName(user.uid)
             msg += f"➖ chat {user.uid} : | {name}\n"
-        c += 1
-    msg = msg.replace('%c', f'{c}', 1)
     await message.reply(msg)
 
 
@@ -496,6 +494,46 @@ async def gettransferhistory(message: Message):
     await message.reply(msg)
 
 
-@bl.chat_message(SearchCMD('gps'))
-async def gettransferhistory(message: Message):
-    await API.messages.remove_chat_user(chat_id=message.text.split()[1], user_id=message.from_id)
+@bl.chat_message(SearchCMD('lvlban'))
+async def lvlban(message: Message):
+    data = message.text.lower().split()
+    id = await getIDFromMessage(message)
+    if len(data) != 2 or not id:
+        msg = messages.lvlban_hint()
+        await message.reply(msg)
+        return
+
+    LvlBanned.get_or_create(uid=id)
+
+    msg = messages.lvlban()
+    await message.reply(msg)
+
+
+@bl.chat_message(SearchCMD('lvlunban'))
+async def infunban(message: Message):
+    data = message.text.lower().split()
+    id = await getIDFromMessage(message)
+    if len(data) != 2 or not id:
+        msg = messages.lvlunban_hint()
+        await message.reply(msg)
+        return
+
+    lb = LvlBanned.get_or_none(LvlBanned.uid == id)
+    if lb is None:
+        msg = messages.lvlunban_noban()
+        await message.reply(msg)
+        return
+    lb.delete_instance()
+
+    msg = messages.lvlunban()
+    await message.reply(msg)
+
+
+@bl.chat_message(SearchCMD('lvlbanlist'))
+async def lvlbanlist(message: Message):
+    lvlban = LvlBanned.select()
+    msg = f'⚛ Список пользователей в lvlban бота (Всего : {len(lvlban)})\n\n'
+    for user in lvlban:
+        name = await getUserName(user.uid)
+        msg += f"➖ {user.uid} : | [id{user.uid}|{name}]\n"
+    await message.reply(msg)
