@@ -13,7 +13,7 @@ import messages
 from Bot.rules import SearchPayloadCMD
 from Bot.utils import sendMessageEventAnswer, editMessage, getUserAccessLevel, getUserXP, getUserPremium, addUserXP, \
     getUserName, getUserNickname, getChatSetting, turnChatSetting, kickUser, getXPTop, getChatName, addWeeklyTask, \
-    addDailyTask, getUserBan, getUserWarns, getUserMute
+    addDailyTask, getUserBan, getUserWarns, getUserMute, getULvlBanned
 from config.config import API, COMMANDS, DEVS, TASKS_LOTS, TASKS_DAILY, PREMIUM_TASKS_DAILY
 from db import AccessLevel, JoinedDate, DuelWins, ReportAnswers, PremMenu, Nickname, Mute, Warn, Ban, Premium, \
     GPool, ChatGroups, Messages, Notifs, TypeQueue, CMDLevels, ReportWarns, CMDNames, Coins, XP, TasksWeekly, \
@@ -85,7 +85,7 @@ async def duel(message: MessageEvent):
         duelxp = int(payload['xp'])
         id = int(message.user_id)
         uid = int(payload['uid'])
-        if id == uid:
+        if id == uid or not await getULvlBanned(id):
             return
 
         xp = await getUserXP(id)

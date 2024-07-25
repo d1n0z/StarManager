@@ -12,7 +12,8 @@ import messages
 from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserName, getRegDate, kickUser, getUserNickname, getUserAccessLevel, \
     getUserLastMessage, getUserMute, getUserBan, getUserXP, getUserLVL, getUserNeededXP, getUserPremium, getXPTop, \
-    uploadImage, addUserXP, isChatAdmin, getUserWarns, getUserMessages, setUserAccessLevel, getChatName, addWeeklyTask
+    uploadImage, addUserXP, isChatAdmin, getUserWarns, getUserMessages, setUserAccessLevel, getChatName, addWeeklyTask, \
+    getULvlBanned
 from config.config import API, LVL_NAMES, PATH, REPORT_CD, REPORT_TO, COMMANDS, DEVS, PREMIUM_TASKS_DAILY, TASKS_DAILY
 from db import Messages, AccessNames, Referral, Reports, ReportWarns, CMDLevels, Bonus, Prefixes, CMDNames, PremMenu, \
     Settings, TasksDaily, Coins, TasksStreak, TransferHistory
@@ -482,6 +483,10 @@ async def transfer(message: Message):
         return
     if uid == id:
         msg = messages.transfer_myself()
+        await message.reply(disable_mentions=1, message=msg)
+        return
+    if not await getULvlBanned(id):
+        msg = messages.user_lvlbanned()
         await message.reply(disable_mentions=1, message=msg)
         return
 
