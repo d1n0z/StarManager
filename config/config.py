@@ -5,7 +5,7 @@ from vkbottle import API
 from configparser import ConfigParser
 
 config = ConfigParser()
-config.read('./config/config.ini')
+config.read('/root/StarManager/config/config.ini')  # write existing path here
 
 VK_TOKEN_GROUP = config['VK']['VK_TOKEN_GROUP']
 GROUP_ID = int(config['VK']['GROUP_ID'])  # without "-"
