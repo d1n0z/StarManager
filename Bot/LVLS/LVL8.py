@@ -392,7 +392,7 @@ async def reboot(message: Message):
     Reboot.create(chat_id=message.chat_id, time=time.time(), sended=0)
     msg = messages.reboot()
     await message.reply(msg)
-    os.system('pkill python && /root/startupstarmanager.sh')
+    os.system('sudo reboot')
 
 
 @bl.chat_message(SearchCMD('sudo'))
