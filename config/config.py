@@ -19,7 +19,7 @@ LVL_NAMES = ["Обычный Пользователь", "Смотрящий", "�
 COMMANDS = {
     "start": 0, "help": 0, "id": 0, "stats": 0, "report": 0, "mtop": 0, "q": 0, "premium": 0, "bonus": 0, "transfer": 0,
     "duel": 0, "cmd": 0, "premmenu": 0, "test": 0, "addprefix": 0, "task": 0, "delprefix": 0, "getdev": 0,
-    "listprefix": 0,
+    "listprefix": 0, "anon": 0, "chatid": 0,
 
     "kick": 1, "mute": 1, "warn": 1, "clear": 1, "staff": 1, "olist": 1, "getnick": 1, "snick": 1, "rnick": 1,
     "nlist": 1, "check": 1, "mkick": 1,
@@ -46,6 +46,9 @@ COMMANDS = {
     "getchats": 8, "gettransferhistory": 8, "gettransferhistoryto": 8, "gettransferhistoryfrom": 8,
     "getmessageshistory": 8, "lvlban": 8, "lvlunban": 8, "lvlbanlist": 8
 }
+PM_COMMANDS = [
+    "anon", "deanon",
+]
 COMMANDS_DESC = {
     "task": "/task - Открыть меню заданий.",
     "kick": "/kick - Исключить пользователя.",
@@ -191,7 +194,96 @@ GWARN_PUNISHMENTS_NAMES = ["5 минут", "30 минут", "48 часов", "30
 
 LVL_BANNED_COMMANDS = ['task', 'bonus', 'transfer', 'duel']
 
-SETTINGS_STANDARD = {"setKick": 1, "setDuel": 1}
+
+def SETTINGS():
+    return {
+        "main": {
+            "kickInvitedByNoAccess": 1,
+            "kickLeaving": 1,
+            "kickBlockingViolator": 0,
+            "deleteAccessAndNicknameOnLeave": 0,
+            "nightmode": 0,
+        },
+        "entertaining": {
+            "allowDuel": 1,
+            "allowTransfer": 1,
+            "allowTask": 1,
+            "allowAnon": 1,
+        },
+        "antispam": {
+            "messagesPerMinute": 0,
+            "maximumCharsInMessage": 0,
+            "disallowLinks": 0,
+            "disallowNSFW": 0,
+        },
+        "protect": {
+            "enable": 0
+        }
+    }
+
+
+SETTINGS_POSITIONS = {
+    "main": {
+        "kickInvitedByNoAccess": ["Выкл.", "Вкл."],
+        "kickLeaving": ["Выкл.", "Вкл."],
+        "kickBlockingViolator": ["Удалить сообщ.", "Исключить"],
+        "deleteAccessAndNicknameOnLeave": ["Выкл.", "Вкл."],
+        "nightmode": ["Выкл.", "Вкл."],
+    },
+    "entertaining": {
+        "allowDuel": ["Выкл.", "Вкл."],
+        "allowTransfer": ["Выкл.", "Вкл."],
+        "allowTask": ["Выкл.", "Вкл."],
+        "allowAnon": ["Выкл.", "Вкл."],
+    },
+    "antispam": {
+        "messagesPerMinute": ["Выкл.", "Вкл."],
+        "maximumCharsInMessage": ["Выкл.", "Вкл."],
+        "disallowLinks": ["Выкл.", "Вкл."],
+        "disallowNSFW": ["Выкл.", "Вкл."],
+    },
+    "protect": {
+        "enable": ["Выкл.", "Вкл."],
+    }
+}
+SETTINGS_COUNTABLE = [
+    "messagesPerMinute", "maximumCharsInMessage", "disallowLinks", "disallowNSFW", "nightmode",
+]
+SETTINGS_COUNTABLE_TWO_ARGUMENTS = [
+    "nightmode",
+]
+SETTINGS_COUNTABLE_NO_PUNISHMENT = [
+    "nightmode",
+]
+SETTINGS_COUNTABLE_CHANGEMENU = {
+    "messagesPerMinute": [
+        {"action": "turn", "button": ["Включить", "Выключить"]},
+        {"action": "set", "button": "Количество"},
+        {"action": "setPunishment", "button": "Наказание"},
+    ],
+    "nightmode": [
+        {"action": "turn", "button": ["Включить", "Выключить"]},
+        {"action": "set", "button": "Установить время"},
+    ],
+    "maximumCharsInMessage": [
+        {"action": "turn", "button": ["Включить", "Выключить"]},
+        {"action": "set", "button": "Количество"},
+        {"action": "setPunishment", "button": "Наказание"},
+    ],
+    "disallowLinks": [
+        {"action": "turn", "button": ["Включить", "Выключить"]},
+        {"action": "setPunishment", "button": "Наказание"},
+        {"action": "setWhitelist", "button": "Исключения"},
+    ],
+    "disallowNSFW": [
+        {"action": "turn", "button": ["Включить", "Выключить"]},
+        {"action": "setPunishment", "button": "Наказание"},
+    ],
+}
+SETTINGS_COUNTABLE_CHANGEPUNISHMENTMESSAGE = {
+    "mute": "мут на {count} минут",
+    "ban": "бан на {count} дней",
+}
 
 TASKS = []
 
@@ -200,6 +292,14 @@ FARM_POST_ID = int(config['SERVICE']['FARM_POST_ID'])
 
 PREMIUM_BONUS_POST_ID = int(config['SERVICE']['PREMIUM_BONUS_POST_ID'])
 PREMIUM_BONUS_DAYS = 5
+
+NSFW_CATEGORIES = [
+    "BUTTOCKS_EXPOSED",
+    "FEMALE_BREAST_EXPOSED",
+    "FEMALE_GENITALIA_EXPOSED",
+    "ANUS_EXPOSED",
+    "MALE_GENITALIA_EXPOSED",
+]
 
 
 def PREMIUM_BONUS_POST_WORKS_TIL():
@@ -229,6 +329,7 @@ YOOKASSA_TOKEN = config['YOOKASSA']['YOOKASSA_TOKEN']
 
 MEGA_LOGIN = config['MEGA']['MEGA_LOGIN']
 MEGA_PASSWORD = config['MEGA']['MEGA_PASSWORD']
+print(MEGA_LOGIN, MEGA_PASSWORD)
 
 data = {
     'email': config['SOCIALS']['email'],
