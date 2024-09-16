@@ -6,8 +6,7 @@ from vkbottle.framework.labeler import BotLabeler
 import keyboard
 import messages
 from Bot.rules import SearchCMD
-from Bot.utils import getIDFromMessage, getUserAccessLevel, getUserNickname, getUserMute, getUserName, setChatMute, \
-    getUserWarns
+from Bot.utils import getIDFromMessage, getUserAccessLevel, getUserNickname, getUserMute, getUserName, setChatMute
 from config.config import API, MAIN_DEVS
 from db import Mute, Warn, AccessLevel
 
@@ -64,7 +63,7 @@ async def mutelist(message: Message):
     res = Mute.select().where(Mute.chat_id == chat_id, Mute.mute > int(time.time()))
     muted_count = len(res)
     res = res.limit(30)[::-1]
-    names = await API.users.get([i.uid for i in res])
+    names = await API.users.get(user_ids=[i.uid for i in res])
     msg = await messages.mutelist(res, names, muted_count)
     kb = keyboard.mutelist(uid, 0)
     await message.reply(disable_mentions=1, message=msg, keyboard=kb)
@@ -118,7 +117,7 @@ async def warnlist(message: Message):
     res = Warn.select().where(Warn.warns > 0, Warn.chat_id == chat_id)
     count = len(res)
     res = res.limit(30)[::-1]
-    names = await API.users.get([f'{i.uid}' for i in res])
+    names = await API.users.get(user_ids=[f'{i.uid}' for i in res])
     msg = await messages.warnlist(res, names, count)
     kb = keyboard.warnlist(uid, 0)
     await message.reply(disable_mentions=1, message=msg, keyboard=kb)

@@ -364,7 +364,7 @@ async def ignorelist(message: Message):
     for i in ign:
         ids.append(str(i.uid))
 
-    raw_names = await API.users.get(','.join(ids))
+    raw_names = await API.users.get(user_ids=','.join(ids))
     names = []
     for i in raw_names:
         names.append(f'{i.first_name} {i.last_name}')
@@ -477,7 +477,7 @@ async def notif(message: Message):
 async def purge(message: Message):
     chat_id = message.peer_id - 2000000000
 
-    users = [i.member_id for i in (await API.messages.get_conversation_members(message.peer_id)).items]
+    users = [i.member_id for i in (await API.messages.get_conversation_members(peer_id=message.peer_id)).items]
     dtdnicknames = 0
     dtdaccesslevels = 0
     for i in Nickname.select().where(Nickname.chat_id == chat_id).iterator():

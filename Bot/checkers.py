@@ -12,7 +12,7 @@ async def isAdmin(cmd, chat_id) -> bool:
     if cmd not in COMMANDS:
         return True
     try:
-        await API.messages.get_conversation_members(chat_id + 2000000000)
+        await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
         return True
     except:
         return False

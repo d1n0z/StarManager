@@ -2,7 +2,7 @@ import time
 from ast import literal_eval
 from datetime import datetime
 
-from vkbottle_types.events import MessageNew
+from vkbottle_types.events.bot_events import MessageNew
 from vkbottle_types.objects import MessagesMessageAttachmentType
 
 import keyboard

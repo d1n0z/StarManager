@@ -16,7 +16,7 @@ from Bot.utils import getIDFromMessage, getUserName, getRegDate, kickUser, getUs
     getULvlBanned, getChatSettings, HiddenPrints
 from config.config import API, LVL_NAMES, PATH, REPORT_CD, REPORT_TO, COMMANDS, DEVS, PREMIUM_TASKS_DAILY, TASKS_DAILY
 from db import Messages, AccessNames, Referral, Reports, ReportWarns, CMDLevels, Bonus, Prefixes, CMDNames, PremMenu, \
-    TasksDaily, Coins, TasksStreak, TransferHistory
+    TasksDaily, Coins, TasksStreak, TransferHistory, SpecCommandsCooldown
 from media.stats.stats_img import createStatsImage
 
 bl = BotLabeler()
@@ -44,7 +44,7 @@ async def id(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    user = await API.users.get(id)
+    user = await API.users.get(user_ids=id)
     if user[0].deactivated:
         msg = messages.id_deleted()
         await message.reply(disable_mentions=1, message=msg)
@@ -89,12 +89,12 @@ async def premium(message: Message):
 async def mtop(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    members = await API.messages.get_conversation_members(chat_id + 2000000000)
+    members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = [int(i.member_id) for i in members.items]
 
     msgs = Messages.select().where(Messages.uid > 0, Messages.messages > 0, Messages.chat_id == chat_id,
                                    Messages.uid << members).order_by(Messages.messages.desc()).limit(10)
-    names = await API.users.get([i.uid for i in msgs])
+    names = await API.users.get(user_ids=[i.uid for i in msgs])
 
     kb = keyboard.mtop(chat_id, uid)
     msg = messages.mtop(msgs, names)
@@ -137,7 +137,7 @@ async def stats(message: Message):
     else:
         lvl_name = LVL_NAMES[acc]
 
-    user = await API.users.get(id, fields='photo_max_orig')
+    user = await API.users.get(user_ids=id, fields='photo_max_orig')
     r = requests.get(user[0].photo_max_orig)
     with open(PATH + f'media/temp/{id}ava.jpg', "wb") as f:
         f.write(r.content)
@@ -438,6 +438,14 @@ async def duel(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
 
+    if s := SpecCommandsCooldown.get_or_none(SpecCommandsCooldown.uid == uid,
+                                             SpecCommandsCooldown.time > time.time() - 10):
+        s: SpecCommandsCooldown
+        msg = messages.speccommandscooldown(int(10 - (time.time() - s.time) + 1))
+        await message.reply(disable_mentions=1, message=msg)
+        return
+    SpecCommandsCooldown.create(time=time.time(), uid=uid)
+
     if not (await getChatSettings(chat_id))['entertaining']['allowDuel']:
         msg = messages.duel_not_allowed()
         await message.reply(disable_mentions=1, message=msg)
@@ -481,6 +489,15 @@ async def transfer(message: Message):
         await message.reply(messages.transfer_not_allowed())
         return
     uid = message.from_id
+
+    if s := SpecCommandsCooldown.get_or_none(SpecCommandsCooldown.uid == uid,
+                                             SpecCommandsCooldown.time > time.time() - 10):
+        s: SpecCommandsCooldown
+        msg = messages.speccommandscooldown(int(10 - (time.time() - s.time) + 1))
+        await message.reply(disable_mentions=1, message=msg)
+        return
+    SpecCommandsCooldown.create(time=time.time(), uid=uid)
+
     id = await getIDFromMessage(message)
     if id < 0:
         msg = messages.transfer_community()

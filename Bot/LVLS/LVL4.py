@@ -768,7 +768,7 @@ async def gzov(message: Message):
         u_acc = await getUserAccessLevel(uid, chat_id)
         if not await haveAccess('gzov', chat_id, u_acc):
             continue
-        members = await API.messages.get_conversation_members(chat_id + 2000000000)
+        members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
         members = members.items
         u_name = await getUserName(uid)
         u_nickname = await getUserNickname(uid, chat_id)

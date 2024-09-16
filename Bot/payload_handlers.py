@@ -39,7 +39,7 @@ async def join(message: MessageEvent):
             return
 
         try:
-            members = await API.messages.get_conversation_members(chat_id + 2000000000)
+            members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
             members = members.items
         except:
             msg = messages.notadmin()
@@ -63,7 +63,7 @@ async def join(message: MessageEvent):
         await editMessage(msg, peer_id, message.conversation_message_id)
         return
     elif cmd == 'rejoin' and payload['activate'] == 1:
-        members = await API.messages.get_conversation_members(peer_id)
+        members = await API.messages.get_conversation_members(peer_id=peer_id)
         if (await getUserAccessLevel(uid, chat_id) >= 7 or
                 uid in [i.member_id for i in members.items if i.is_admin or i.is_owner]):
             msg = messages.rejoin_activate()
@@ -152,7 +152,7 @@ async def answer_report(message: MessageEvent):
 
         msg = messages.report_answering(repid)
         await editMessage(msg, peer_id, message.conversation_message_id)
-        await API.messages.mark_as_important(message.conversation_message_id, 1)
+        await API.messages.mark_as_important(message_ids=message.conversation_message_id, important=1)
 
     await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
 
@@ -371,12 +371,12 @@ async def nicklist(message: MessageEvent):
     chat_id = peer_id - 2000000000
 
     if cmd == 'nicklist' and sender == uid:
-        members = await API.messages.get_conversation_members(chat_id + 2000000000)
+        members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
         members = members.items
         members_uid = [i.member_id for i in members]
         res = Nickname.select().where(Nickname.uid > 0, Nickname.uid << members_uid, Nickname.chat_id == chat_id,
                                       Nickname.nickname.is_null(False)).order_by(Nickname.nickname)
-        names = await API.users.get([f'{i.uid}' for i in res])
+        names = await API.users.get(user_ids=[f'{i.uid}' for i in res])
         msg = messages.nlist(res, names)
         kb = keyboard.nlist(uid, 0)
         await editMessage(msg, peer_id, message.conversation_message_id, kb)
@@ -406,14 +406,14 @@ async def page_nlist(message: MessageEvent):
 
     if (cmd == 'prev_page_nlist' or cmd == 'next_page_nlist') and sender == uid:
         if page >= 0:
-            members = await API.messages.get_conversation_members(chat_id + 2000000000)
+            members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
             members = members.items
             members_uid = [i.member_id for i in members]
             res = Nickname.select().where(Nickname.uid > 0, Nickname.uid << members_uid, Nickname.chat_id == chat_id,
                                           Nickname.nickname.is_null(False)).order_by(Nickname.nickname)
             offset = page * 30
             if len(res) > 0:
-                names = await API.users.get([i.uid for i in res])
+                names = await API.users.get(user_ids=[i.uid for i in res])
                 msg = messages.nlist(res, names, offset)
                 kb = keyboard.nlist(uid, page)
                 await editMessage(msg, peer_id, message.conversation_message_id, kb)
@@ -438,10 +438,10 @@ async def nonicklist(message: MessageEvent):
     if cmd == 'nonicklist' and sender == uid:
         res = Nickname.select().where(Nickname.uid > 0, Nickname.chat_id == chat_id, Nickname.nickname.is_null(False))
         nickmembers = [i.uid for i in res]
-        members = await API.messages.get_conversation_members(chat_id + 2000000000)
+        members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
         members = members.items
         members_uid = [i.member_id for i in members if i.member_id not in nickmembers][:30]
-        names = await API.users.get([f'{i}' for i in members_uid])
+        names = await API.users.get(user_ids=[f'{i}' for i in members_uid])
         msg = messages.nnlist(names)
         kb = keyboard.nnlist(uid, 0)
         await editMessage(msg, peer_id, message.conversation_message_id, kb)
@@ -473,11 +473,11 @@ async def page_nnlist(message: MessageEvent):
         if page >= 0:
             res = Nickname.select().where(Nickname.uid > 0, Nickname.chat_id == chat_id)
             nickmembers = [i.uid for i in res]
-            members = await API.messages.get_conversation_members(chat_id + 2000000000)
+            members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
             members = members.items
             members = [i for i in members if i.member_id not in nickmembers][page * 30: page * 30 + 30]
             if len(members) > 0:
-                members = await API.users.get([f'{i.member_id}' for i in members])
+                members = await API.users.get(user_ids=[f'{i.member_id}' for i in members])
                 msg = messages.nnlist(members, page)
                 kb = keyboard.nnlist(uid, page)
                 await editMessage(msg, peer_id, message.conversation_message_id, kb)
@@ -512,7 +512,7 @@ async def page_mutelist(message: MessageEvent):
             if len(res) > 0:
                 muted_count = len(res)
                 res = res.offset(page * 30).limit(30)
-                names = await API.users.get([i.uid for i in res])
+                names = await API.users.get(user_ids=[i.uid for i in res])
                 msg = await messages.mutelist(res, names, muted_count)
                 kb = keyboard.mutelist(uid, page)
                 await editMessage(msg, peer_id, message.conversation_message_id, kb)
@@ -547,7 +547,7 @@ async def page_warnlist(message: MessageEvent):
             if len(res) > 0:
                 muted_count = len(res)
                 res = res.offset(page * 30).limit(30)
-                names = await API.users.get([i.uid for i in res])
+                names = await API.users.get(user_ids=[i.uid for i in res])
                 msg = await messages.warnlist(res, names, muted_count)
                 kb = keyboard.warnlist(uid, page)
                 await editMessage(msg, peer_id, message.conversation_message_id, kb)
@@ -581,7 +581,7 @@ async def page_banlist(message: MessageEvent):
             if len(res) > 0:
                 banned_count = len(res)
                 res = res.offset(page * 30).limit(30)
-                names = await API.users.get([i.uid for i in res])
+                names = await API.users.get(user_ids=[i.uid for i in res])
                 msg = await messages.banlist(res, names, banned_count)
                 kb = keyboard.banlist(uid, page)
                 await editMessage(msg, peer_id, message.conversation_message_id, kb)
@@ -614,7 +614,7 @@ async def page_statuslist(message: MessageEvent):
         if page >= 0:
             premium_pool = Premium.select().where(Premium.time >= time.time())
             if len(premium_pool) > 0:
-                names = await API.users.get([i.uid for i in premium_pool])
+                names = await API.users.get(user_ids=[i.uid for i in premium_pool])
                 msg = messages.statuslist(names, premium_pool)
                 kb = keyboard.statuslist(uid, 0)
                 await editMessage(msg, peer_id, message.conversation_message_id, kb)
@@ -660,13 +660,13 @@ async def demote_accept(message: MessageEvent):
     if cmd == 'demote_accept' and sender == uid:
         option = payload['option']
         if option == 'all':
-            members = await API.messages.get_conversation_members(chat_id + 2000000000)
+            members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
             members = members.items
             for i in members:
                 if not i.is_admin and i.member_id > 0:
                     await kickUser(i.member_id, chat_id)
         elif option == 'lvl':
-            members = await API.messages.get_conversation_members(chat_id + 2000000000)
+            members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
             members = members.items
             kicking = []
             for i in members:
@@ -778,14 +778,14 @@ async def mtop(message: MessageEvent):
     chat_id = peer_id - 2000000000
 
     if cmd == 'mtop' and sender == uid:
-        members = await API.messages.get_conversation_members(chat_id + 2000000000)
+        members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
         members = [int(i.member_id) for i in members.items]
 
         res = Messages.select().where(Messages.uid > 0, Messages.messages > 0, Messages.uid << members,
                                       Messages.chat_id == chat_id).order_by(Messages.messages.desc()).limit(10)
         ids = [i.uid for i in res]
 
-        names = await API.users.get(ids)
+        names = await API.users.get(user_ids=ids)
 
         kb = keyboard.mtop(chat_id, uid)
         msg = messages.mtop(res, names)
@@ -810,7 +810,7 @@ async def top_lvls(message: MessageEvent):
 
     if cmd == 'top_lvls' and sender == uid:
         top = await getXPTop('lvl', 10)
-        names = await API.users.get([int(x) for x in list(top.keys())])
+        names = await API.users.get(user_ids=[int(x) for x in list(top.keys())])
 
         msg = messages.top_lvls(names, top)
         kb = keyboard.top_lvls(chat_id, uid)
@@ -834,12 +834,12 @@ async def top_lvls_in_group(message: MessageEvent):
     chat_id = peer_id - 2000000000
 
     if cmd == 'top_lvls_in_group' and sender == uid:
-        members = await API.messages.get_conversation_members(chat_id + 2000000000)
+        members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
         members = members.items
         all_members = [i.member_id for i in members]
         top = await getXPTop('lvl', 10, all_members)
 
-        names = await API.users.get([int(x) for x in list(top.keys())])
+        names = await API.users.get(user_ids=[int(x) for x in list(top.keys())])
 
         msg = messages.top_lvls(names, top, 'в беседе')
         kb = keyboard.top_lvls_in_group(chat_id, uid)
@@ -866,7 +866,7 @@ async def top_duels(message: MessageEvent):
         lvln = {i.uid: i.wins for i in DuelWins.select().order_by(DuelWins.wins.desc()) if int(i.uid) > 0}
         lvln = dict(list(lvln.items())[:10])
 
-        names = await API.users.get([int(x) for x in list(lvln.keys())])
+        names = await API.users.get(user_ids=[int(x) for x in list(lvln.keys())])
 
         msg = messages.top_duels(names, lvln)
         kb = keyboard.top_duels(chat_id, uid)
@@ -890,14 +890,14 @@ async def top_duels_in_group(message: MessageEvent):
     chat_id = peer_id - 2000000000
 
     if cmd == 'top_duels_in_group' and sender == uid:
-        members = await API.messages.get_conversation_members(chat_id + 2000000000)
+        members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
         members = members.items
         all_members = [i.member_id for i in members]
         lvln = {i.uid: i.wins for i in DuelWins.select().order_by(DuelWins.wins.desc()) if
                 int(i.uid) > 0 and int(i.uid) in all_members}
         lvln = dict(list(lvln.items())[:10])
 
-        names = await API.users.get([int(x) for x in list(lvln.keys())])
+        names = await API.users.get(user_ids=[int(x) for x in list(lvln.keys())])
 
         msg = messages.top_duels(names, lvln, 'в беседе')
         kb = keyboard.top_duels_in_group(chat_id, uid)
@@ -1016,7 +1016,7 @@ async def kick_nonick(message: MessageEvent):
 
         res = Nickname.select().where(Nickname.uid > 0, Nickname.chat_id == chat_id, Nickname.nickname.is_null(False))
         nickmembers = [i.uid for i in res]
-        members = await API.messages.get_conversation_members(chat_id + 2000000000)
+        members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
         members = members.items
         members_uid = [i.member_id for i in members if i.member_id not in nickmembers and i.member_id > 0]
 
@@ -1078,8 +1078,8 @@ async def kick_banned(message: MessageEvent):
         uname = await getUserName(uid)
 
         kicked = 0
-        lst = await API.messages.get_conversation_members(peer_id)
-        lst = await API.users.get([i.member_id for i in lst.items])
+        lst = await API.messages.get_conversation_members(peer_id=peer_id)
+        lst = await API.users.get(user_ids=[i.member_id for i in lst.items])
         for i in lst:
             if i.deactivated:
                 kicked += await kickUser(i.id, chat_id)

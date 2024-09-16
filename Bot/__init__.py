@@ -1,10 +1,10 @@
+import asyncio
 import sys
 import threading
 import traceback
 
 from loguru import logger
-from vkbottle import Bot, GroupEventType, GroupTypes, VKAPIError
-from vkbottle.bot import MessageReactionEvent
+from vkbottle import Bot, GroupEventType, GroupTypes, VKAPIError, LoopWrapper
 from vkbottle.framework.labeler import BotLabeler
 
 from Bot.exception_handler import exception_handle
@@ -21,7 +21,9 @@ from db import Reboot
 class VkBot:
     def __init__(self):
         try:
-            self.bot = Bot(VK_TOKEN_GROUP)
+            w = LoopWrapper()
+            w.loop = asyncio.new_event_loop()
+            self.bot = Bot(VK_TOKEN_GROUP, loop_wrapper=w)
         except Exception as e:
             print(e)
 
@@ -30,16 +32,15 @@ class VkBot:
         logger.add(sys.stderr, level='INFO')
 
         from Bot import scheduler
-        # threading.Thread(target=scheduler.run, args=(self.bot.loop)).start()
-        scheduler.run(self.bot.loop)
+        self.bot.loop_wrapper.add_task(scheduler.run())
 
         from Bot.notifications import run_notifications
         threading.Thread(target=run_notifications).start()
 
         labeler = BotLabeler()
 
-        @labeler.raw_event(GroupEventType.MESSAGE_REACTION_EVENT, dataclass=MessageReactionEvent)
-        async def start(event: MessageReactionEvent):
+        @labeler.raw_event(GroupEventType.MESSAGE_REACTION_EVENT, dataclass=GroupTypes.MessageReactionEvent)
+        async def start(event: GroupTypes.MessageReactionEvent):
             await reaction_handle(event)
 
         @labeler.raw_event(GroupEventType.MESSAGE_NEW, dataclass=GroupTypes.MessageNew, blocking=False)

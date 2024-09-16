@@ -1,6 +1,6 @@
 from vkbottle import ABCRule
 from vkbottle.bot import Message
-from vkbottle_types.events import MessageNew
+from vkbottle_types.events.bot_events import MessageNew
 
 from Bot.checkers import getUserPrefixes
 from Bot.utils import addDailyTask, getUserPremium

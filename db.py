@@ -1,8 +1,4 @@
-import time
-from datetime import datetime
-
-from peewee import PostgresqlDatabase, Model, IntegerField, BigIntegerField, TextField, BooleanField, TimestampField, \
-    DateTimeField
+from peewee import PostgresqlDatabase, Model, IntegerField, BigIntegerField, TextField, BooleanField
 from config.config import USER, PASSWORD, DATABASE
 
 dbhandle = PostgresqlDatabase(DATABASE, user=USER, password=PASSWORD, host='localhost')
@@ -15,7 +11,7 @@ class AccessLevel(Model):
 
     class Meta:
         database = dbhandle
-        db_table = 'accesslvl'
+        table_name = 'accesslvl'
 
 
 class Warn(Model):
@@ -29,7 +25,7 @@ class Warn(Model):
 
     class Meta:
         database = dbhandle
-        db_table = 'warn'
+        table_name = 'warn'
 
 
 class Mute(Model):
@@ -43,7 +39,7 @@ class Mute(Model):
 
     class Meta:
         database = dbhandle
-        db_table = 'mute'
+        table_name = 'mute'
 
 
 class Ban(Model):
@@ -57,7 +53,7 @@ class Ban(Model):
 
     class Meta:
         database = dbhandle
-        db_table = 'ban'
+        table_name = 'ban'
 
 
 class Messages(Model):
@@ -67,7 +63,7 @@ class Messages(Model):
 
     class Meta:
         database = dbhandle
-        db_table = 'messages'
+        table_name = 'messages'
 
 
 class Nickname(Model):
@@ -77,7 +73,7 @@ class Nickname(Model):
 
     class Meta:
         database = dbhandle
-        db_table = 'nickname'
+        table_name = 'nickname'
 
 
 class LastMessageDate(Model):
@@ -87,7 +83,7 @@ class LastMessageDate(Model):
 
     class Meta:
         database = dbhandle
-        db_table = 'lastmessagedate'
+        table_name = 'lastmessagedate'
 
 
 class SilenceMode(Model):
@@ -96,7 +92,7 @@ class SilenceMode(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'silencemode'
+        table_name = f'silencemode'
 
 
 class GPool(Model):
@@ -105,7 +101,7 @@ class GPool(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'gpool'
+        table_name = f'gpool'
 
 
 class ChatGroups(Model):
@@ -115,7 +111,7 @@ class ChatGroups(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'chatgroups'
+        table_name = f'chatgroups'
 
 
 class Filters(Model):
@@ -124,7 +120,7 @@ class Filters(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'filters'
+        table_name = f'filters'
 
 
 class CMDLevels(Model):
@@ -134,7 +130,7 @@ class CMDLevels(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'commandlevels'
+        table_name = f'commandlevels'
 
 
 class Blacklist(Model):
@@ -142,7 +138,7 @@ class Blacklist(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'blacklist'
+        table_name = f'blacklist'
 
 
 class Premium(Model):
@@ -151,7 +147,7 @@ class Premium(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'premium'
+        table_name = f'premium'
 
 
 class Bonus(Model):
@@ -160,7 +156,7 @@ class Bonus(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'bonus'
+        table_name = f'bonus'
 
 
 class Settings(Model):
@@ -173,7 +169,7 @@ class Settings(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'settings'
+        table_name = f'settings'
 
 
 class Welcome(Model):
@@ -182,7 +178,7 @@ class Welcome(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'welcome'
+        table_name = f'welcome'
 
 
 class JoinedDate(Model):
@@ -191,7 +187,7 @@ class JoinedDate(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'botjoineddate'
+        table_name = f'botjoineddate'
 
 
 class UserJoinedDate(Model):
@@ -201,7 +197,7 @@ class UserJoinedDate(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'userjoineddate'
+        table_name = f'userjoineddate'
 
 
 class XP(Model):
@@ -211,7 +207,7 @@ class XP(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'xp'
+        table_name = f'xp'
 
 
 class PremMenu(Model):
@@ -221,7 +217,7 @@ class PremMenu(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'premmenu'
+        table_name = f'premmenu'
 
 
 class Prefixes(Model):
@@ -230,7 +226,7 @@ class Prefixes(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'prefix'
+        table_name = f'prefix'
 
 
 class AccessNames(Model):
@@ -240,7 +236,7 @@ class AccessNames(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'accessnames'
+        table_name = f'accessnames'
 
 
 class Ignore(Model):
@@ -249,7 +245,7 @@ class Ignore(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'ignore'
+        table_name = f'ignore'
 
 
 class ChatLimit(Model):
@@ -258,7 +254,7 @@ class ChatLimit(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'chatlimit'
+        table_name = f'chatlimit'
 
 
 class Payments(Model):
@@ -268,7 +264,7 @@ class Payments(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'payments'
+        table_name = f'payments'
 
 
 class CMDNames(Model):
@@ -278,7 +274,7 @@ class CMDNames(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'cmdnames'
+        table_name = f'cmdnames'
 
 
 class DuelWins(Model):
@@ -287,7 +283,7 @@ class DuelWins(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'duelwins'
+        table_name = f'duelwins'
 
 
 class Referral(Model):
@@ -297,7 +293,7 @@ class Referral(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'refferal'
+        table_name = f'refferal'
 
 
 class LastFiveCommands(Model):
@@ -307,7 +303,7 @@ class LastFiveCommands(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'lastfivecommands'
+        table_name = f'lastfivecommands'
 
 
 class GlobalWarns(Model):
@@ -317,7 +313,7 @@ class GlobalWarns(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'globalwarns'
+        table_name = f'globalwarns'
 
 
 class Reports(Model):
@@ -327,7 +323,7 @@ class Reports(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'reports'
+        table_name = f'reports'
 
 
 class ReportAnswers(Model):
@@ -339,7 +335,7 @@ class ReportAnswers(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'reportanswers'
+        table_name = f'reportanswers'
 
 
 class Comments(Model):
@@ -348,7 +344,7 @@ class Comments(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'comments'
+        table_name = f'comments'
 
 
 class Likes(Model):
@@ -357,7 +353,7 @@ class Likes(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'likes'
+        table_name = f'likes'
 
 
 class InfBanned(Model):
@@ -366,7 +362,7 @@ class InfBanned(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'infbanned'
+        table_name = f'infbanned'
 
 
 class LeavedChats(Model):
@@ -375,7 +371,7 @@ class LeavedChats(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'leavedchats'
+        table_name = f'leavedchats'
 
 
 class CompletedRewards(Model):
@@ -384,7 +380,7 @@ class CompletedRewards(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'completedrewards'
+        table_name = f'completedrewards'
 
 
 class Notifs(Model):
@@ -399,7 +395,7 @@ class Notifs(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'notifications'
+        table_name = f'notifications'
 
 
 class TypeQueue(Model):
@@ -410,7 +406,7 @@ class TypeQueue(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'typequeue'
+        table_name = f'typequeue'
 
 
 class ReportWarns(Model):
@@ -419,7 +415,7 @@ class ReportWarns(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'reportwarns'
+        table_name = f'reportwarns'
 
 
 class Reboot(Model):
@@ -429,7 +425,7 @@ class Reboot(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'reboots'
+        table_name = f'reboots'
 
 
 class AllChats(Model):
@@ -437,7 +433,7 @@ class AllChats(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'allchats'
+        table_name = f'allchats'
 
 
 class AllUsers(Model):
@@ -445,7 +441,7 @@ class AllUsers(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'allusers'
+        table_name = f'allusers'
 
 
 class UserNames(Model):
@@ -454,7 +450,7 @@ class UserNames(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'usernames'
+        table_name = f'usernames'
 
 
 class ChatNames(Model):
@@ -463,7 +459,7 @@ class ChatNames(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'chatnames'
+        table_name = f'chatnames'
 
 
 class GroupNames(Model):
@@ -472,7 +468,7 @@ class GroupNames(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'groupnames'
+        table_name = f'groupnames'
 
 
 class TasksDaily(Model):
@@ -482,7 +478,7 @@ class TasksDaily(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'tasksdaily'
+        table_name = f'tasksdaily'
 
 
 class TasksWeekly(Model):
@@ -492,7 +488,7 @@ class TasksWeekly(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'tasksweekly'
+        table_name = f'tasksweekly'
 
 
 class Coins(Model):
@@ -501,7 +497,7 @@ class Coins(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'coins'
+        table_name = f'coins'
 
 
 class TasksStreak(Model):
@@ -510,7 +506,7 @@ class TasksStreak(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'tasksstreak'
+        table_name = f'tasksstreak'
 
 
 class TransferHistory(Model):
@@ -522,7 +518,7 @@ class TransferHistory(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'transferhistory'
+        table_name = f'transferhistory'
 
 
 class MessagesHistory(Model):  # unused
@@ -535,7 +531,7 @@ class MessagesHistory(Model):  # unused
 
     class Meta:
         database = dbhandle
-        db_table = f'messageshistory'
+        table_name = f'messageshistory'
 
 
 class LvlBanned(Model):
@@ -543,7 +539,7 @@ class LvlBanned(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'lvlbanned'
+        table_name = f'lvlbanned'
 
 
 class BotMessages(Model):
@@ -552,7 +548,7 @@ class BotMessages(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'botmessages'
+        table_name = f'botmessages'
 
 
 class AnonMessages(Model):
@@ -562,7 +558,7 @@ class AnonMessages(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'anonmessages'
+        table_name = f'anonmessages'
 
 
 class AntispamMessages(Model):
@@ -573,7 +569,7 @@ class AntispamMessages(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'antispammessages'
+        table_name = f'antispammessages'
 
 
 class AntispamURLExceptions(Model):
@@ -582,4 +578,13 @@ class AntispamURLExceptions(Model):
 
     class Meta:
         database = dbhandle
-        db_table = f'antispamurlexceptions'
+        table_name = f'antispamurlexceptions'
+
+
+class SpecCommandsCooldown(Model):
+    uid = IntegerField()
+    time = BigIntegerField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'speccommandscooldown'

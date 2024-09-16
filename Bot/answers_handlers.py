@@ -4,7 +4,7 @@ import traceback
 from ast import literal_eval
 
 import validators
-from vkbottle_types.events import MessageNew
+from vkbottle_types.events.bot_events import MessageNew
 
 import keyboard
 import messages
@@ -20,9 +20,9 @@ async def report_handler(event: MessageNew):
         return False
     answering_name = await getUserName(repansi.answering_id)
     name = await getUserName(repansi.uid)
-    await sendMessage(repansi.chat_id, messages.report_answer(
+    await sendMessage(repansi.chat_id + 2000000000, messages.report_answer(
         repansi.answering_id, answering_name, repansi.repid, event.object.message.text, repansi.uid, name))
-    await sendMessage(REPORT_TO, messages.report_answered(
+    await sendMessage(REPORT_TO + 2000000000, messages.report_answered(
         repansi.answering_id, answering_name, repansi.repid, event.object.message.text, repansi.report_text, 
         repansi.uid, name, repansi.chat_id, await getChatName(repansi.chat_id)))
     repansi.delete_instance()

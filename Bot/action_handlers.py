@@ -1,5 +1,5 @@
 import time
-from vkbottle_types.events import MessageNew
+from vkbottle_types.events.bot_events import MessageNew
 
 import keyboard
 import messages

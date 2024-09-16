@@ -121,6 +121,14 @@ def settings(uid):
     return kb.get_json()
 
 
+def settings_goto(uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('⚙️ Настройки беседы', {"uid": uid, "cmd": "settings_menu"}))
+
+    return kb.get_json()
+
+
 def settings_category(uid, category, settings):
     kb = Keyboard(inline=True)
     c = 1

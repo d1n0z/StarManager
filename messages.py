@@ -2057,16 +2057,16 @@ def cmdlist(cmdnames, page, cmdlen):
 
 
 def listasync(chats, total):
-    msg = get('listasync')
-
+    msg = ''
     for k, i in enumerate(chats[:10]):
         if i["name"] is not None:
             msg += f'\n➖ ID: {i["id"]} | Название: {i["name"]}'
         else:
             total -= 1
-    msg = msg.format(total=total)
     if total <= 0:
         msg = get('listasync_not_found')
+    else:
+        msg = get('listasync', total=total) + msg
     return msg
 
 
@@ -2741,3 +2741,7 @@ def nightmode_start(start, end):
 
 def nightmode_end():
     return get('nightmode_end')
+
+
+def speccommandscooldown(time):
+    return get('speccommandscooldown', time=pointWords(time, ['секунду', 'секунды', 'секунд']))

@@ -103,7 +103,7 @@ async def mkick(message: Message):
         msg = messages.mkick_error()
         await message.reply(disable_mentions=1, message=msg)
         return
-    names = await API.users.get(strids)
+    names = await API.users.get(user_ids=strids)
     uname = await getUserName(uid)
     u_acc = await getUserAccessLevel(uid, chat_id)
     msg = f'💬 Пользователь [id{uid}|{uname}] исключил ' \
@@ -147,7 +147,7 @@ async def mute(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    user = await API.users.get(id)
+    user = await API.users.get(user_ids=id)
     if user[0].deactivated:
         msg = messages.id_deleted()
         await message.reply(disable_mentions=1, message=msg)
@@ -326,7 +326,7 @@ async def clear(message: Message):
         msg = messages.clear_hint()
         await message.reply(disable_mentions=1, message=msg)
         return
-    name = await API.users.get(u_ids)
+    name = await API.users.get(user_ids=u_ids)
     u_name = await getUserName(uid)
     names = []
     for i in name:
@@ -453,12 +453,12 @@ async def rnick(message: Message):
 async def nlist(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    members = await API.messages.get_conversation_members(chat_id + 2000000000)
+    members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = members.items
     members_uid = [i.member_id for i in members]
     res = Nickname.select().where(Nickname.chat_id == chat_id, Nickname.uid > 0, Nickname.uid << members_uid,
                                   Nickname.nickname.is_null(False)).order_by(Nickname.nickname)
-    names = await API.users.get([f'{i.uid}' for i in res])
+    names = await API.users.get(user_ids=[f'{i.uid}' for i in res])
     msg = messages.nlist(res, names)
     kb = keyboard.nlist(uid, 0)
     await message.reply(disable_mentions=1, message=msg, keyboard=kb)
@@ -476,8 +476,8 @@ async def getnick(message: Message):
     res = Nickname.select().where(Nickname.uid > 0, Nickname.chat_id == chat_id,
                                   Nickname.nickname.contains(query)).order_by(Nickname.nickname).limit(30)
     lres = len(res)
-    names = await API.users.get([f'{i.uid}' for i in res])
-    members = await API.messages.get_conversation_members(chat_id + 2000000000)
+    names = await API.users.get(user_ids=[f'{i.uid}' for i in res])
+    members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = members.items
     if lres > 0:
         msg = messages.getnick(res, names, members, query)
@@ -491,7 +491,7 @@ async def staff(message: Message):
     chat_id = message.peer_id - 2000000000
     res = AccessLevel.select().where(AccessLevel.uid > 0, AccessLevel.access_level > 0,
                                      AccessLevel.chat_id == chat_id).order_by(AccessLevel.access_level)
-    names = await API.users.get([f'{i.uid}' for i in res])
+    names = await API.users.get(user_ids=[f'{i.uid}' for i in res])
     msg = await messages.staff(res, names, chat_id)
     await message.reply(disable_mentions=1, message=msg)
 
@@ -499,10 +499,10 @@ async def staff(message: Message):
 @bl.chat_message(SearchCMD('olist'))
 async def olist(message: Message):
     chat_id = message.peer_id - 2000000000
-    members = await API.messages.get_conversation_members(chat_id + 2000000000)
+    members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = members.items
     members = [f'{i.member_id}' for i in members]
-    members = await API.users.get(members, fields='online')
+    members = await API.users.get(user_ids=members, fields='online')
     members_online = {}
     for i in members:
         if i.online:

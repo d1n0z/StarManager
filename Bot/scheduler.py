@@ -8,16 +8,15 @@ from datetime import datetime
 from zipfile import ZipFile
 
 import aiocron
-from dateutil.relativedelta import relativedelta
 
 import messages
 from Bot.megadrive import mega_drive
 from Bot.tgbot import getTGBot
-from Bot.utils import sendMessage, getUserName, chunks, getUserLVL
+from Bot.utils import sendMessage, chunks
 from config.config import DATABASE, PASSWORD, USER, TG_CHAT_ID, REPORT_TO, NEWSEASON_REWARDS, TASKS_DAILY, \
-    PREMIUM_TASKS_DAILY, DAILY_TO, API, IMPLICIT_API, GROUP_ID, PATH
+    PREMIUM_TASKS_DAILY, DAILY_TO, API, IMPLICIT_API, GROUP_ID
 from db import UserNames, ChatNames, GroupNames, Premium, Reboot, XP, TasksDaily, TasksWeekly, AntispamMessages, \
-    Settings
+    Settings, SpecCommandsCooldown
 
 
 async def resetPremium():
@@ -28,9 +27,10 @@ async def resetPremium():
         await sendMessage(DAILY_TO + 2000000000, f'e from schedule resetPremium:\n{e}')
 
 
-async def resetAntispamMessages():
+async def deleteTempdataDB():
     try:
         AntispamMessages.delete().where(AntispamMessages.time < time.time() - 60).execute()
+        SpecCommandsCooldown.delete().where(SpecCommandsCooldown.time < time.time() - 10).execute()
     except Exception as e:
         await sendMessage(DAILY_TO + 2000000000, f'e from schedule resetAntispamMessages:\n{e}')
 
@@ -230,9 +230,10 @@ async def everyminute():
         await sendMessage(DAILY_TO + 2000000000, f'e from scheduler:\n' + traceback.format_exc())
 
 
-def run(loop):
+async def run():
+    loop = asyncio.get_event_loop()
     asyncio.set_event_loop(loop)
-    aiocron.crontab('* * * * * */5', func=resetAntispamMessages, loop=loop)
+    aiocron.crontab('* * * * * */5', func=deleteTempdataDB, loop=loop)
     aiocron.crontab('*/1 * * * *', func=everyminute, loop=loop)
     aiocron.crontab('0 * * * *', func=resetPremium, loop=loop)
     aiocron.crontab('0 0 * * *', func=dailyTasks, loop=loop)

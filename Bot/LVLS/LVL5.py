@@ -5,6 +5,7 @@ from datetime import datetime
 from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 
+import keyboard
 import messages
 from Bot.checkers import haveAccess
 from Bot.rules import SearchCMD
@@ -400,7 +401,7 @@ async def szov(message: Message):
         u_acc = await getUserAccessLevel(uid, chat_id)
         if not await haveAccess('szov', chat_id, u_acc):
             continue
-        members = await API.messages.get_conversation_members(chat_id + 2000000000)
+        members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
         members = members.items
         nickname = await getUserNickname(uid, chat_id)
         msg = messages.zov(uid, name, nickname, text, members)
@@ -420,13 +421,13 @@ async def chat(message: Message):
     members = members.items
     id = [i for i in members if i.is_admin and i.is_owner][0].member_id
 
-    names = await API.users.get(id)
+    names = await API.users.get(user_ids=id)
     try:
         name = f"{names[0].first_name} {names[0].last_name}"
         prefix = 'id'
     except:
         prefix = 'club'
-        names = await API.groups.get_by_id(-int(id))
+        names = await API.groups.get_by_id(group_id=-int(id))
         name = names[0].name
 
     if ChatGroups.get_or_none(ChatGroups.chat_id == chat_id) is not None:
@@ -442,7 +443,7 @@ async def chat(message: Message):
     muted = len(Mute.select().where(Mute.mute > time.time(), Mute.chat_id == chat_id))
     banned = len(Ban.select().where(Ban.ban > time.time(), Ban.chat_id == chat_id))
 
-    members = await API.messages.get_conversation_members(chat_id + 2000000000)
+    members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = members.items
     title = await getChatName(chat_id)
 
@@ -455,4 +456,5 @@ async def chat(message: Message):
     if prefix == 'club':
         id = -int(id)
     msg = messages.chat(id, name, chat_id, chatgroup, gpool, muted, banned, len(members), bjd, prefix, title)
-    await message.reply(disable_mentions=1, message=msg)
+    kb = None if await getUserAccessLevel(message.from_id, chat_id) < 7 else keyboard.settings_goto(message.from_id)
+    await message.reply(disable_mentions=1, message=msg, keyboard=kb)

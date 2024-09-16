@@ -119,7 +119,8 @@ async def getIDFromMessage(message, place=2) -> int:
 
 async def sendMessageEventAnswer(event_id, user_id, peer_id, event_data=None) -> bool:
     try:
-        await API.messages.send_message_event_answer(event_id, user_id, peer_id, event_data)
+        await API.messages.send_message_event_answer(event_id=event_id, user_id=user_id,
+                                                     peer_id=peer_id, event_data=event_data)
     except:
         return False
     return True
@@ -143,7 +144,8 @@ def NAsendMessage(chat_id, msg):
 
 async def editMessage(msg, peer_id, cmid, kb=None) -> bool:
     try:
-        await API.messages.edit(peer_id, msg, disable_mentions=1, conversation_message_id=cmid, keyboard=kb)
+        await API.messages.edit(peer_id=peer_id, message=msg, disable_mentions=1,
+                                conversation_message_id=cmid, keyboard=kb)
     except:
         return False
     return True
@@ -177,7 +179,7 @@ async def getUserTask(uid, task, tier) -> TasksDaily:
 
 async def isChatAdmin(id, chat_id) -> bool:
     try:
-        status = await API.messages.get_conversation_members(chat_id + 2000000000)
+        status = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
         for i in status.items:
             if i.member_id == id and (i.is_admin or i.is_owner):
                 return True

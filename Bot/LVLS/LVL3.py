@@ -68,7 +68,7 @@ async def inactive(message: Message):
         msg = messages.inactive_no_results()
         await message.reply(disable_mentions=1, message=msg)
         return
-    members = await API.messages.get_conversation_members(chat_id + 2000000000)
+    members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = [i.member_id for i in members.items if i.member_id > 0]
     for i in res:
         if i.uid in members:
@@ -234,7 +234,7 @@ async def banlist(message: Message):
     res = Ban.select().where(Ban.ban > int(time.time()), Ban.chat_id == chat_id)
     count = len(res)
     res = res.limit(30)[::-1]
-    names = await API.users.get([i.uid for i in res])
+    names = await API.users.get(user_ids=[i.uid for i in res])
     msg = await messages.banlist(res, names, count)
     kb = keyboard.banlist(uid, 0)
     await message.reply(disable_mentions=1, message=msg, keyboard=kb)
@@ -250,7 +250,7 @@ async def zov(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
     cause = ' '.join(data[1:])
-    members = await API.messages.get_conversation_members(chat_id + 2000000000)
+    members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = members.items
     u_name = await getUserName(uid)
     u_nick = await getUserNickname(uid, chat_id)
