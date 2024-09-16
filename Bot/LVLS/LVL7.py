@@ -8,8 +8,8 @@ import messages
 from Bot.checkers import haveAccess
 from Bot.rules import SearchCMD
 from Bot.utils import getUserPremium, getUserName, getUserNickname, getChatName, getUserAccessLevel, getIDFromMessage
-from config.config import API, COMMANDS, LVL_NAMES, SETTINGS_STANDARD
-from db import GPool, ChatGroups, Filters, AccessLevel, Settings, CMDLevels, AccessNames
+from config.config import API, COMMANDS, LVL_NAMES
+from db import GPool, ChatGroups, Filters, CMDLevels, AccessNames
 
 bl = BotLabeler()
 
@@ -455,7 +455,7 @@ async def resetlevel(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    ac = AccessLevel.get_or_create(chat_id=chat_id, access_level=lvl)[0]
+    ac = AccessNames.get_or_create(chat_id=chat_id, lvl=lvl)[0]
     ac.name = LVL_NAMES[lvl]
     ac.save()
 
@@ -469,21 +469,8 @@ async def resetlevel(message: Message):
 
 @bl.chat_message(SearchCMD('settings'))
 async def settings(message: Message):
-    chat_id = message.peer_id - 2000000000
-    settings = {}
-
-    setting = Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == 'setKick')
-    if setting is not None:
-        settings['setKick'] = setting.pos
-    settings['setKick'] = SETTINGS_STANDARD['setKick']
-
-    setting = Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == 'setDuel')
-    if setting is not None:
-        settings['setDuel'] = setting.pos
-    settings['setDuel'] = SETTINGS_STANDARD['setDuel']
-
-    msg = messages.settings(settings)
-    kb = keyboard.settings(message.from_id, settings)
+    msg = messages.settings()
+    kb = keyboard.settings(message.from_id)
     await message.reply(disable_mentions=1, message=msg, keyboard=kb)
 
 

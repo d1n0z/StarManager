@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 
 from peewee import PostgresqlDatabase, Model, IntegerField, BigIntegerField, TextField, BooleanField, TimestampField, \
@@ -165,7 +166,10 @@ class Bonus(Model):
 class Settings(Model):
     chat_id = IntegerField(default=0, index=True)
     setting = TextField(null=True)
-    pos = BooleanField(default=0)
+    pos = BooleanField(null=True)
+    value = IntegerField(null=True)
+    value2 = TextField(null=True)
+    punishment = TextField(null=True)
 
     class Meta:
         database = dbhandle
@@ -521,7 +525,7 @@ class TransferHistory(Model):
         db_table = f'transferhistory'
 
 
-class MessagesHistory(Model):
+class MessagesHistory(Model):  # unused
     cmid = IntegerField(default=0, index=True)
     id = IntegerField(default=0)
     chat_id = IntegerField()
@@ -540,3 +544,42 @@ class LvlBanned(Model):
     class Meta:
         database = dbhandle
         db_table = f'lvlbanned'
+
+
+class BotMessages(Model):
+    key = TextField(unique=True, index=True)
+    text = TextField()
+
+    class Meta:
+        database = dbhandle
+        db_table = f'botmessages'
+
+
+class AnonMessages(Model):
+    fromid = IntegerField()
+    chat_id = IntegerField()
+    time = BigIntegerField()
+
+    class Meta:
+        database = dbhandle
+        db_table = f'anonmessages'
+
+
+class AntispamMessages(Model):
+    cmid = IntegerField(default=0)
+    chat_id = IntegerField()
+    from_id = IntegerField()
+    time = BigIntegerField()
+
+    class Meta:
+        database = dbhandle
+        db_table = f'antispammessages'
+
+
+class AntispamURLExceptions(Model):
+    chat_id = IntegerField()
+    url = TextField()
+
+    class Meta:
+        database = dbhandle
+        db_table = f'antispamurlexceptions'

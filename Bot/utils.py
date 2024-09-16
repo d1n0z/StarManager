@@ -1,17 +1,39 @@
 import locale
+import time
 import traceback
 from ast import literal_eval
 from datetime import date
 
+import requests
 import urllib3
+import validators
 import xmltodict
 from vkbottle import PhotoMessageUploader
 from vkbottle.bot import Bot
 
-from config.config import API, VK_API_SESSION, VK_TOKEN_GROUP, GROUP_ID, SETTINGS_STANDARD, TASKS_DAILY, \
-    PREMIUM_TASKS_DAILY, PREMIUM_TASKS_DAILY_TIERS, TASKS_WEEKLY, PREMIUM_TASKS_WEEKLY
-from db import CMDNames, UserNames, ChatNames, GroupNames, AccessLevel, LastMessageDate, Nickname, Mute, Warn, Ban, \
-    XP, Premium, PremMenu, CMDLevels, Messages, DuelWins, Settings, TasksDaily, TasksWeekly, Coins, LvlBanned
+from nudenet import NudeDetector
+import tempfile
+import os
+import sys
+
+from vkbottle_types.objects import MessagesMessage, MessagesMessageAttachmentType
+
+from config.config import (API, VK_API_SESSION, VK_TOKEN_GROUP, GROUP_ID, TASKS_DAILY, PREMIUM_TASKS_DAILY,
+                           PREMIUM_TASKS_DAILY_TIERS, TASKS_WEEKLY, PREMIUM_TASKS_WEEKLY, SETTINGS, PATH,
+                           NSFW_CATEGORIES, SETTINGS_COUNTABLE)
+from db import (CMDNames, UserNames, ChatNames, GroupNames, AccessLevel, LastMessageDate, Nickname, Mute, Warn, Ban,
+                XP, Premium, PremMenu, CMDLevels, Messages, DuelWins, Settings, TasksDaily, TasksWeekly, Coins,
+                LvlBanned, AntispamMessages, AntispamURLExceptions)
+
+
+class HiddenPrints:
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        sys.stdout = open(os.devnull, 'w')
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stdout = self._original_stdout
 
 
 def namesAsCommand(cmd, uid) -> list:
@@ -33,6 +55,11 @@ async def getUserName(uid) -> str:
 async def kickUser(uid, chat_id) -> bool:
     try:
         await API.messages.remove_chat_user(chat_id=chat_id, member_id=uid)
+        if (await getChatSettings(chat_id))['main']['deleteAccessAndNicknameOnLeave']:
+            if u := AccessLevel.get_or_none(AccessLevel.uid == uid, AccessLevel.chat_id == chat_id):
+                u.delete_instance()
+            if u := Nickname.get_or_none(Nickname.uid == uid, Nickname.chat_id == chat_id):
+                u.delete_instance()
     except:
         return False
     return True
@@ -98,9 +125,9 @@ async def sendMessageEventAnswer(event_id, user_id, peer_id, event_data=None) ->
     return True
 
 
-async def sendMessage(peer_id, msg):
+async def sendMessage(peer_id, msg, kbd=None):
     try:
-        return await API.messages.send(random_id=0, peer_id=peer_id, message=msg)
+        return await API.messages.send(random_id=0, peer_id=peer_id, message=msg, keyboard=kbd, disable_mentions=1)
     except:
         traceback.print_exc()
         return False
@@ -357,18 +384,21 @@ async def getUserDuelWins(uid, none=0):
     return none
 
 
-async def getChatSetting(chat_id, setting, none=None):
-    if none is None:
-        none = SETTINGS_STANDARD[setting]
-    s = Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == setting)
-    if s is not None:
-        return s.pos
-    return none
+async def getChatSettings(chat_id):
+    chatsettings = SETTINGS()
+    for cat, settings in chatsettings.items():
+        for setting, pos in settings.items():
+            chatsetting = Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == setting)
+            if chatsetting is None:
+                continue
+            chatsettings[cat][setting] = chatsetting.pos
+    return chatsettings
 
 
-async def turnChatSetting(chat_id, setting):
-    s = Settings.get_or_create(chat_id=chat_id, setting=setting, defaults={'pos': SETTINGS_STANDARD[setting]})[0]
-    s.pos = int(not bool(s.pos))
+async def turnChatSetting(chat_id, category, setting):
+    s = Settings.get_or_create(chat_id=chat_id, setting=setting,
+                               defaults={'pos': SETTINGS()[category][setting]})[0]
+    s.pos = not s.pos
     s.save()
     return s.pos
 
@@ -410,6 +440,72 @@ async def addWeeklyTask(uid, task, count=1):
             c = Coins.get_or_create(uid=uid)[0]
             c.coins += 10
             c.save()
+
+
+async def isChatMember(uid, chat_id):
+    try:
+        return uid in [i.member_id for i in
+                       (await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)).items]
+    except:
+        return False
+
+
+async def NSFWDetector(pic_path):
+    detector = NudeDetector()
+    with open(pic_path, 'rb') as f:
+        image_data = f.read()
+
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        temp_file.write(image_data)
+        temp_file_path = temp_file.name
+    result = detector.detect(temp_file_path)
+    os.unlink(temp_file_path)
+    for i in result:
+        if i['class'] in NSFW_CATEGORIES:
+            if i['score'] > 0.3:
+                return True
+    return False
+
+
+async def antispamChecker(chat_id, uid, message: MessagesMessage, settings):
+    usermessages = AntispamMessages.select().where(AntispamMessages.chat_id == chat_id, AntispamMessages.from_id == uid)
+    if settings['antispam']['messagesPerMinute']:
+        setting = Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == 'messagesPerMinute')
+        if setting is not None and setting.value is not None:
+            if len(usermessages) >= setting.value:
+                return 'messagesPerMinute'
+    if settings['antispam']['maximumCharsInMessage']:
+        setting = Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == 'maximumCharsInMessage')
+        if setting is not None and setting.value is not None:
+            if len(message.text) >= setting.value:
+                return 'maximumCharsInMessage'
+    if settings['antispam']['disallowLinks']:
+        data = message.text.split()
+        for i in data:
+            for y in i.split('/'):
+                if (validators.url(y) or validators.domain(y)) and y not in ['vk.com', 'vk.ru']:
+                    if AntispamURLExceptions.get_or_none(
+                            AntispamURLExceptions.chat_id == chat_id,
+                            AntispamURLExceptions.url == y.replace('https://', '').replace('/', '')) is None:
+                        return 'disallowLinks'
+    if settings['antispam']['disallowNSFW']:
+        for i in message.attachments:
+            if i.type != MessagesMessageAttachmentType.PHOTO:
+                continue
+            photo = i.photo.sizes[2]
+            for y in i.photo.sizes:
+                if y.width > photo.width:
+                    photo = y
+            r = requests.get(photo.url)
+            filename = PATH + f'media/temp/{time.time()}.jpg'
+            with open(filename, "wb") as f:
+                f.write(r.content)
+                f.close()
+            r.close()
+            isNSFW = await NSFWDetector(filename)
+            if isNSFW:
+                return 'disallowNSFW'
+    return False
 
 
 def pointDays(seconds):

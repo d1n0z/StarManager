@@ -12,12 +12,13 @@ import keyboard
 import messages
 from Bot.rules import SearchPayloadCMD
 from Bot.utils import sendMessageEventAnswer, editMessage, getUserAccessLevel, getUserXP, getUserPremium, addUserXP, \
-    getUserName, getUserNickname, getChatSetting, turnChatSetting, kickUser, getXPTop, getChatName, addWeeklyTask, \
-    addDailyTask, getUserBan, getUserWarns, getUserMute, getULvlBanned
-from config.config import API, COMMANDS, DEVS, TASKS_LOTS, TASKS_DAILY, PREMIUM_TASKS_DAILY
-from db import AccessLevel, JoinedDate, DuelWins, ReportAnswers, PremMenu, Nickname, Mute, Warn, Ban, Premium, \
+    getUserName, getUserNickname, kickUser, getXPTop, getChatName, addWeeklyTask, \
+    addDailyTask, getUserBan, getUserWarns, getUserMute, getULvlBanned, getChatSettings, turnChatSetting
+from config.config import API, COMMANDS, DEVS, TASKS_LOTS, TASKS_DAILY, PREMIUM_TASKS_DAILY, SETTINGS_COUNTABLE, \
+    SETTINGS_COUNTABLE_NO_PUNISHMENT
+from db import AccessLevel, JoinedDate, DuelWins, ReportAnswers, Nickname, Mute, Warn, Ban, Premium, \
     GPool, ChatGroups, Messages, Notifs, TypeQueue, CMDLevels, ReportWarns, CMDNames, Coins, XP, TasksWeekly, \
-    TasksDaily, TasksStreak
+    TasksDaily, TasksStreak, Settings, AntispamURLExceptions
 
 bl = BotLabeler()
 
@@ -156,8 +157,29 @@ async def answer_report(message: MessageEvent):
     await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
 
 
-@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['change_setting']))
-async def change_setting(message: MessageEvent):
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['settings_menu']))
+async def settings_menu(message: MessageEvent):
+    payload = message.payload
+
+    try:
+        sender = payload['uid']
+    except:
+        sender = message.user_id
+    cmd = payload['cmd']
+    uid = message.user_id
+
+    peer_id = message.peer_id
+
+    if cmd in 'settings_menu' and sender == uid:
+        msg = messages.settings()
+        kb = keyboard.settings(uid)
+        await editMessage(msg, peer_id, message.conversation_message_id, kb)
+
+    await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['settings', 'change_setting']))
+async def settings(message: MessageEvent):
     payload = message.payload
 
     try:
@@ -170,23 +192,82 @@ async def change_setting(message: MessageEvent):
     peer_id = message.peer_id
     chat_id = peer_id - 2000000000
 
-    if cmd == 'change_setting' and sender == uid:
+    await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
+    if cmd in ['settings', 'change_setting'] and sender == uid:
+        category = payload['category']
+        if cmd == 'change_setting':
+            setting = payload['setting']
+            if setting not in SETTINGS_COUNTABLE:
+                await turnChatSetting(chat_id, category, setting)
+            else:
+                chatsetting = Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == setting)
+                value = None if chatsetting is None else chatsetting.value
+                value2 = None if chatsetting is None else chatsetting.value2
+                punishment = None if chatsetting is None else chatsetting.punishment
+                settings = await getChatSettings(chat_id)
+                pos = settings[category][setting]
+                msg = messages.settings_change_countable(setting, pos, value, value2, punishment)
+                kb = keyboard.settings_change_countable(uid, category, setting, settings)
+                await editMessage(msg, peer_id, message.conversation_message_id, kb)
+                return
+        settings = (await getChatSettings(chat_id))[category]
+        msg = messages.settings_category(category, settings)
+        kb = keyboard.settings_category(uid, category, settings)
+        await editMessage(msg, peer_id, message.conversation_message_id, kb)
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['settings_change_countable']))
+async def settings_change_countable(message: MessageEvent):
+    payload = message.payload
+
+    try:
+        sender = payload['uid']
+    except:
+        sender = message.user_id
+    cmd = payload['cmd']
+    uid = message.user_id
+
+    peer_id = message.peer_id
+    chat_id = peer_id - 2000000000
+
+    if cmd == 'settings_change_countable' and sender == uid:
+        await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
+        action = payload['action']
+        category = payload['category']
         setting = payload['setting']
-        settings = literal_eval(payload['settings'])
-        active_pos = await getChatSetting(chat_id, setting)
-        await turnChatSetting(chat_id, setting)
+        TypeQueue.delete().where(TypeQueue.uid == uid, TypeQueue.chat_id == chat_id).execute()
 
-        settings[setting] = int(not bool(active_pos))
-
-        msg = messages.settings(settings)
-        kb = keyboard.settings(uid, settings)
+        if action == 'turn':
+            await turnChatSetting(chat_id, category, setting)
+            chatsetting = Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == setting)
+            value = None if chatsetting is None else chatsetting.value
+            punishment = None if chatsetting is None else chatsetting.punishment
+            settings = await getChatSettings(chat_id)
+            pos = settings[category][setting]
+            msg = messages.settings_change_countable(setting, pos, value, punishment)
+            kb = keyboard.settings_change_countable(uid, category, setting, settings)
+            await editMessage(msg, peer_id, message.conversation_message_id, kb)
+            return
+        msg = None
+        kb = None
+        if action == 'set':
+            TypeQueue.create(
+                uid=uid, chat_id=chat_id, type='settings_change_countable',
+                additional='{' + f'"setting": "{setting}", "category": "{category}", '
+                                 f'"cmid": "{message.conversation_message_id}"' + '}'
+            )
+            msg = messages.settings_countable_action(action, setting)
+        if action == 'setPunishment':
+            msg = messages.settings_choose_punishment()
+            kb = keyboard.settings_set_punishment(uid, category, setting)
+        if action == 'setWhitelist' or action == 'setBlacklist':
+            msg = messages.settings_setlist(setting, action[3:-4])
+            kb = keyboard.settings_setlist(uid, category, setting, action[3:-4])
         await editMessage(msg, peer_id, message.conversation_message_id, kb)
 
-    await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
 
-
-@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['clear_by_fire']))
-async def clear_by_fire(message: MessageEvent):
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['settings_set_punishment']))
+async def settings_set_punishment(message: MessageEvent):
     payload = message.payload
 
     try:
@@ -196,29 +277,34 @@ async def clear_by_fire(message: MessageEvent):
     cmd = payload['cmd']
     uid = message.user_id
 
-    peer_id = message.object.peer_id
+    peer_id = message.peer_id
+    chat_id = peer_id - 2000000000
 
-    if cmd == 'clear_by_fire' and sender == uid:
-        pos = not bool(payload['setting'])
-        pool = PremMenu.get_or_create(uid=uid, setting='clear_by_fire', defaults={'pos': 1})[0]
-        pool.pos = pos
-        pool.save()
-
-        settings = {}
-        pm = PremMenu.get_or_none(PremMenu.uid == uid, PremMenu.setting == 'clear_by_fire')
-        settings['clear_by_fire'] = True
-        if pm is not None:
-            settings['clear_by_fire'] = pm.pos
-        settings['border_color'] = True
-        msg = messages.premmenu(settings)
-        kb = keyboard.premmenu(uid, settings)
+    if cmd == 'settings_set_punishment' and sender == uid:
+        action = payload['action']  # 'deletemessage' or 'kick' or 'mute' or 'ban'
+        category = payload['category']
+        setting = payload['setting']
+        if action in ['deletemessage', 'kick']:
+            chatsetting = Settings.get(Settings.chat_id == chat_id, Settings.setting == setting)
+            chatsetting.punishment = action
+            chatsetting.save()
+            msg = messages.settings_set_punishment(action)
+            kb = keyboard.settings_change_countable(uid, category, setting, await getChatSettings(chat_id), True)
+        else:
+            TypeQueue.create(
+                uid=uid, chat_id=chat_id, type='settings_set_punishment',
+                additional='{' + f'"setting": "{setting}", "action": "{action}", "category": "{category}", '
+                                 f'"cmid": "{message.conversation_message_id}"' + '}'
+            )
+            msg = messages.settings_set_punishment_input(action)
+            kb = keyboard.settings_change_countable(uid, category, setting, await getChatSettings(chat_id), True)
         await editMessage(msg, peer_id, message.conversation_message_id, kb)
 
     await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
 
 
-@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['clear_by_fire']))
-async def border_color(message: MessageEvent):
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['settings_exceptionlist']))
+async def settings_exceptionlist(message: MessageEvent):
     payload = message.payload
 
     try:
@@ -228,15 +314,44 @@ async def border_color(message: MessageEvent):
     cmd = payload['cmd']
     uid = message.user_id
 
-    peer_id = message.object.peer_id
+    peer_id = message.peer_id
+    chat_id = peer_id - 2000000000
 
-    if cmd == 'border_color' and sender == uid:
-        pass
-        # color = text.replace('#', '').split()[0]
-        # if len(color) != 6 or not re.findall(r'[0-9]ABCDEF'): пашол нахой
-        # msg = messages.premmenu(settings)
-        # kb = keyboard.premmenu(uid, settings)
-        # await editMessage(msg, peer_id, message.conversation_message_id, kb)
+    if cmd == 'settings_exceptionlist' and sender == uid:
+        setting = payload['setting']
+        if setting == 'disallowLinks':
+            msg = messages.settings_exceptionlist(AntispamURLExceptions.select().where(
+                AntispamURLExceptions.chat_id == chat_id))
+            kb = keyboard.settings_change_countable(uid, category='antispam', onlybackbutton=True)
+            await editMessage(msg, peer_id, message.conversation_message_id, kb)
+
+    await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['settings_listaction']))
+async def settings_listaction(message: MessageEvent):
+    payload = message.payload
+
+    try:
+        sender = payload['uid']
+    except:
+        sender = message.user_id
+    cmd = payload['cmd']
+    uid = message.user_id
+
+    peer_id = message.peer_id
+    chat_id = peer_id - 2000000000
+
+    if cmd == 'settings_listaction' and sender == uid:
+        setting = payload['setting']
+        action = payload['action']
+        type = payload['type']
+        TypeQueue.create(
+            uid=uid, chat_id=chat_id, type='settings_listaction',
+            additional='{' + f'"setting": "{setting}", "action": "{action}", "type": "{type}"' + '}'
+        )
+        msg = messages.settings_listaction_action(setting, action)
+        await editMessage(msg, peer_id, message.conversation_message_id)
 
     await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
 
@@ -963,10 +1078,11 @@ async def kick_banned(message: MessageEvent):
         uname = await getUserName(uid)
 
         kicked = 0
-        lst = await API.messages.get_conversation_members(peer_id, fields='deactivated')
-        for i in lst.items:
-            if cmd == 'deactivated' in i:
-                kicked += await kickUser(i.member_id, chat_id)
+        lst = await API.messages.get_conversation_members(peer_id)
+        lst = await API.users.get([i.member_id for i in lst.items])
+        for i in lst:
+            if i.deactivated:
+                kicked += await kickUser(i.id, chat_id)
 
         msg = messages.kickmenu_kick_banned(uid, uname, nick, kicked)
         await API.messages.send(random_id=0, message=msg, chat_id=chat_id)

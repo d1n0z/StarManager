@@ -206,10 +206,7 @@ async def mute(message: Message):
         mute_names = literal_eval(ms.last_mutes_names)
         mute_dates = literal_eval(ms.last_mutes_dates)
     else:
-        mute_times = []
-        mute_causes = []
-        mute_names = []
-        mute_dates = []
+        mute_times, mute_causes, mute_names, mute_dates = [], [], [], []
 
     if mute_cause is None:
         mute_cause = 'Без указания причины'
@@ -231,65 +228,6 @@ async def mute(message: Message):
 
     await setChatMute(id, chat_id, mute_time)
 
-    await message.reply(disable_mentions=1, message=msg)
-
-
-@bl.chat_message(SearchCMD('usermute'))
-async def usermute(message: Message):
-    chat_id = message.peer_id - 2000000000
-    id = await getIDFromMessage(message)
-    if not id:
-        msg = messages.usermute_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-    if id < 0:
-        msg = messages.id_group()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
-    u_name = await getUserName(id)
-    res = Mute.get_or_none(Mute.uid == id, Mute.chat_id == chat_id)
-    if res is None:
-        msg = messages.usermutes(id, u_name, [], [], [], [], 0)
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
-    u_mutes_times = literal_eval(res.last_mutes_times)[::-1]
-    u_mutes_causes = literal_eval(res.last_mutes_causes)[::-1]
-    u_mutes_names = literal_eval(res.last_mutes_names)[::-1]
-    u_mutes_dates = literal_eval(res.last_mutes_dates)[::-1]
-
-    msg = messages.usermutes(id, u_name, u_mutes_times, u_mutes_causes, u_mutes_names, u_mutes_dates, res.mute)
-    await message.reply(disable_mentions=1, message=msg)
-
-
-@bl.chat_message(SearchCMD('userwarn'))
-async def userwarn(message: Message):
-    chat_id = message.peer_id - 2000000000
-    id = await getIDFromMessage(message)
-    if not id:
-        msg = messages.userwarn_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-    if id < 0:
-        msg = messages.id_group()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
-    u_name = await getUserName(id)
-    res = Warn.get_or_none(Warn.chat_id == chat_id, Warn.uid == id)
-    if res is None:
-        msg = messages.userwarns(id, u_name, [], [], [], [], 0)
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
-    u_warns_times = literal_eval(res.last_warns_times)[::-1]
-    u_warns_causes = literal_eval(res.last_warns_causes)[::-1]
-    u_warns_names = literal_eval(res.last_warns_names)[::-1]
-    u_warns_dates = literal_eval(res.last_warns_dates)[::-1]
-
-    msg = messages.userwarns(id, u_name, u_warns_times, u_warns_causes, u_warns_names, u_warns_dates,
-                             len(u_warns_times))
     await message.reply(disable_mentions=1, message=msg)
 
 

@@ -2,12 +2,12 @@ import time
 from datetime import datetime
 
 from Bot.checkers import getUInfBanned, getULvlBanned
-from Bot.utils import getUserMessages, getUserPremium, addUserXP, addWeeklyTask, addDailyTask, getUserName
+from Bot.utils import getUserMessages, getUserPremium, addUserXP, addWeeklyTask, addDailyTask, getUserName, getChatName
 from config.config import CHEATING_TO, API
 from db import Messages, LastMessageDate, XP
 
 
-async def add_msg_counter(chat_id, uid, audio=False, addownerxp=0) -> None:
+async def add_msg_counter(chat_id, uid, audio=False) -> None:
     msgs = await getUserMessages(uid, chat_id)
     msgs += 1
     mst = Messages.get_or_create(uid=uid, chat_id=chat_id)[0]
@@ -27,7 +27,8 @@ async def add_msg_counter(chat_id, uid, audio=False, addownerxp=0) -> None:
         await addDailyTask(uid, 'sendvoice')
         await API.messages.send(
             random_id=0, chat_id=CHEATING_TO,
-            message=f'{chat_id} | [id{uid}|{await getUserName(uid)}] | {datetime.now().strftime("%H:%M:%S")}'
+            message=f'{chat_id} | {await getChatName(chat_id)} | '
+                    f'[id{uid}|{await getUserName(uid)}] | {datetime.now().strftime("%H:%M:%S")}'
         )
     else:
         addxp = 2
@@ -35,8 +36,6 @@ async def add_msg_counter(chat_id, uid, audio=False, addownerxp=0) -> None:
         await addDailyTask(uid, 'sendmsgs')
     if u_prem:
         addxp *= 2
-    if addownerxp != 0:
-        addxp = addownerxp
 
     lmt = XP.get_or_create(uid=uid, defaults={'xp': 0, 'lm': time.time()})[0]
     if time.time() - lmt.lm < 15:

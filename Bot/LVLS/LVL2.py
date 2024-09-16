@@ -8,7 +8,7 @@ import messages
 from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserAccessLevel, getUserNickname, getUserMute, getUserName, setChatMute, \
     getUserWarns
-from config.config import API
+from config.config import API, MAIN_DEVS
 from db import Mute, Warn, AccessLevel
 
 bl = BotLabeler()
@@ -107,8 +107,6 @@ async def unwarn(message: Message):
     u_nickname = await getUserNickname(uid, chat_id)
     w.warns -= 1
     w.save()
-    if w.warns == 0:
-        w.delete_instance()
     msg = messages.unwarn(u_name, u_nickname, uid, name, ch_nickname, id)
     await message.reply(disable_mentions=1, message=msg)
 
@@ -141,7 +139,7 @@ async def setaccess(message: Message):
         msg = messages.id_group()
         await message.reply(disable_mentions=1, message=msg)
         return
-    if id == uid:
+    if id == uid and uid not in MAIN_DEVS:
         msg = messages.setaccess_myself()
         await message.reply(disable_mentions=1, message=msg)
         return
@@ -191,7 +189,7 @@ async def delaccess(message: Message):
         msg = messages.id_group()
         await message.reply(disable_mentions=1, message=msg)
         return
-    if id == uid:
+    if id == uid and uid not in MAIN_DEVS:
         msg = messages.delaccess_myself()
         await message.reply(disable_mentions=1, message=msg)
         return

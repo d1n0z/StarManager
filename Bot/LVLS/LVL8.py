@@ -1,25 +1,44 @@
-import datetime
+import asyncio
 import importlib
-import sys
 import os
-import threading
+import sys
 import time
 import traceback
 
-from peewee import SQL
 from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 
 import keyboard
 import messages
-from Bot.checkers import getUInfBanned
+from Bot.checkers import getUInfBanned, checkCMD
 from Bot.rules import SearchCMD
-from Bot.utils import getUserName, getIDFromMessage, getUserNickname, sendMessage, addUserXP, getChatName, editMessage
-from config.config import API, GROUP_ID
+from Bot.utils import getUserName, getIDFromMessage, getUserNickname, sendMessage, addUserXP, getChatName, \
+    setUserAccessLevel
+from config.config import API, GROUP_ID, DEVS
 from db import AllChats, Blacklist, Premium, InfBanned, ReportWarns, Reboot, XP, Coins, Messages, TransferHistory, \
-    MessagesHistory, LvlBanned
+    LvlBanned
 
 bl = BotLabeler()
+
+
+@bl.chat_message(SearchCMD('getdev'))
+async def getdev_handler(message: Message):
+    chat_id = message.peer_id - 2000000000
+    uid = message.from_id
+    if await checkCMD(message, chat_id):
+        if uid in DEVS:
+            await setUserAccessLevel(uid, chat_id, 8)
+
+
+@bl.chat_message(SearchCMD('backup'))
+async def backup_handler(message: Message):
+    chat_id = message.peer_id - 2000000000
+    uid = message.from_id
+    if await checkCMD(message, chat_id):
+        if uid in DEVS:
+            from Bot.scheduler import backup
+            loop = asyncio.get_event_loop()
+            asyncio.run_coroutine_threadsafe(backup(), loop)
 
 
 @bl.chat_message(SearchCMD('botinfo'))
@@ -392,7 +411,7 @@ async def reboot(message: Message):
     Reboot.create(chat_id=message.chat_id, time=time.time(), sended=0)
     msg = messages.reboot()
     await message.reply(msg)
-    os.system('sudo reboot')
+    os.system('/root/startup.sh')
 
 
 @bl.chat_message(SearchCMD('sudo'))

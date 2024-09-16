@@ -3,6 +3,9 @@
 .__pycache__
 .config
 /config/config.ini
+dev
+*old.py
+*new.py
 venv
 test.py
 requirements.txt

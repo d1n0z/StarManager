@@ -25,8 +25,10 @@ async def isSGW(uid, msgtime) -> int | bool:
     return False
 
 
-async def haveAccess(cmd, chat_id, uacc) -> int | bool:
+async def haveAccess(cmd, chat_id, uacc, premium=0) -> int | bool:
     cmdacc = CMDLevels.get_or_none(CMDLevels.chat_id == chat_id, CMDLevels.cmd == cmd)
+    if cmd == 'check' and premium:
+        return True
     if cmdacc is not None:
         return cmdacc.lvl <= uacc
     try:
@@ -134,7 +136,7 @@ async def checkCMD(message, chat_id, fixing=False, accesstoalldevs=False, return
 
     u_prem = await getUserPremium(uid)
     u_acc = await getUserAccessLevel(uid, chat_id)
-    access = await haveAccess(cmd, chat_id, u_acc)
+    access = await haveAccess(cmd, chat_id, u_acc, await getUserPremium(uid))
     uprefixes = await getUserPrefixes(u_prem, uid)
     ign = await getUserIgnore(uid, chat_id)
     infb = await getUInfBanned(uid, chat_id)

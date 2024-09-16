@@ -104,7 +104,7 @@ async def ban(message: Message):
 
     if message.reply_message is None:
         if len(data) == 2:
-            ban_time = 365 * 86400
+            ban_time = 3650 * 86400
             ban_cause = None
         else:
             if data[2].isdigit():
@@ -115,11 +115,11 @@ async def ban(message: Message):
                     return
                 ban_cause = None if len(data) == 3 else ' '.join(data[3:])
             else:
-                ban_time = 365 * 86400
+                ban_time = 3650 * 86400
                 ban_cause = ' '.join(data[2:])
     else:
         if len(data) == 1:
-            ban_time = 365 * 86400
+            ban_time = 3650 * 86400
             ban_cause = None
         else:
             if data[1].isdigit():
@@ -130,7 +130,7 @@ async def ban(message: Message):
                     return
                 ban_cause = None if len(data) == 2 else ' '.join(data[2:])
             else:
-                ban_time = 365 * 86400
+                ban_time = 3650 * 86400
                 ban_cause = ' '.join(data[1:])
 
     ch_acc = await getUserAccessLevel(id, chat_id)
@@ -158,10 +158,8 @@ async def ban(message: Message):
         ban_names = literal_eval(res.last_bans_names)
         ban_dates = literal_eval(res.last_bans_dates)
     else:
-        ban_times = []
-        ban_causes = []
-        ban_names = []
-        ban_dates = []
+        ban_times, ban_causes, ban_names, ban_dates = [], [], [], []
+
     if ban_cause is None:
         ban_cause = 'Без указания причины'
     if ban_date is None:
@@ -240,38 +238,6 @@ async def banlist(message: Message):
     msg = await messages.banlist(res, names, count)
     kb = keyboard.banlist(uid, 0)
     await message.reply(disable_mentions=1, message=msg, keyboard=kb)
-
-
-@bl.chat_message(SearchCMD('userban'))
-async def userban(message: Message):
-    chat_id = message.peer_id - 2000000000
-    id = await getIDFromMessage(message)
-    if not id:
-        msg = messages.userwarn_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-    if id < 0:
-        msg = messages.id_group()
-        await (message.reply(disable_mentions=1, message=msg))
-        return
-
-    u_name = await getUserName(id)
-    res = Ban.get_or_none(Ban.chat_id == chat_id, Ban.uid == id)
-    if res is not None:
-        ban = res.ban
-        u_bans_times = literal_eval(res.last_bans_times)[::-1]
-        u_bans_causes = literal_eval(res.last_bans_causes)[::-1]
-        u_bans_names = literal_eval(res.last_bans_names)[::-1]
-        u_bans_dates = literal_eval(res.last_bans_dates)[::-1]
-    else:
-        ban = 0
-        u_bans_times = []
-        u_bans_causes = []
-        u_bans_names = []
-        u_bans_dates = []
-
-    msg = messages.userbans(id, u_name, u_bans_times, u_bans_causes, u_bans_names, u_bans_dates, ban)
-    await message.reply(disable_mentions=1, message=msg)
 
 
 @bl.chat_message(SearchCMD('zov'))

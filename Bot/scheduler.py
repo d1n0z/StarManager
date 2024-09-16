@@ -8,14 +8,16 @@ from datetime import datetime
 from zipfile import ZipFile
 
 import aiocron
+from dateutil.relativedelta import relativedelta
 
 import messages
 from Bot.megadrive import mega_drive
 from Bot.tgbot import getTGBot
-from Bot.utils import sendMessage, getUserName, chunks
+from Bot.utils import sendMessage, getUserName, chunks, getUserLVL
 from config.config import DATABASE, PASSWORD, USER, TG_CHAT_ID, REPORT_TO, NEWSEASON_REWARDS, TASKS_DAILY, \
-    PREMIUM_TASKS_DAILY, DAILY_TO, API, IMPLICIT_API, GROUP_ID
-from db import UserNames, ChatNames, GroupNames, Premium, Reboot, XP, TasksDaily, TasksWeekly
+    PREMIUM_TASKS_DAILY, DAILY_TO, API, IMPLICIT_API, GROUP_ID, PATH
+from db import UserNames, ChatNames, GroupNames, Premium, Reboot, XP, TasksDaily, TasksWeekly, AntispamMessages, \
+    Settings
 
 
 async def resetPremium():
@@ -24,6 +26,13 @@ async def resetPremium():
         await sendMessage(DAILY_TO + 2000000000, 'reset premium: 100%')
     except Exception as e:
         await sendMessage(DAILY_TO + 2000000000, f'e from schedule resetPremium:\n{e}')
+
+
+async def resetAntispamMessages():
+    try:
+        AntispamMessages.delete().where(AntispamMessages.time < time.time() - 60).execute()
+    except Exception as e:
+        await sendMessage(DAILY_TO + 2000000000, f'e from schedule resetAntispamMessages:\n{e}')
 
 
 async def dailyTasks():
@@ -164,36 +173,67 @@ async def reboot():
 
 async def new_season():
     try:
-        await sendMessage(DAILY_TO + 2000000000, 'new_season: 0%\n@all')
-        await asyncio.sleep(30)
+        await sendMessage(DAILY_TO + 2000000000, '@all new_season: 0%')
         top = XP.select().where(XP.uid > 1).order_by(XP.xp.desc()).limit(10)
+        if len(top) != 10:
+            await sendMessage(DAILY_TO + 2000000000, f'@all INCORRECT top LENGTH!\nLENGHT: {len(top)}')
+            return
         for k, i in enumerate(top):
             p = Premium.get_or_create(uid=i.uid, defaults={'time': 0})[0]
             if p.time < datetime.now().timestamp():
-                p.time = datetime.now().timestamp() + (NEWSEASON_REWARDS[k] * 86400)
-            else:
-                p.time += NEWSEASON_REWARDS[k] * 86400
+                p.time = datetime.now().timestamp()
+            p.time += NEWSEASON_REWARDS[k] * 86400
             p.save()
             try:
-                msg = messages.newseason_top(k + 1, NEWSEASON_REWARDS[k]),
+                msg = messages.newseason_top(k + 1, NEWSEASON_REWARDS[k])
                 await sendMessage(i.uid, msg)
             except:
-                pass
-        XP.update(xp=0).execute()
+                await sendMessage(DAILY_TO + 2000000000, f'FAILED TO SEND MESSAGE TO [id{i.uid}|USER]!\n'
+                                                         f'REWARD STILL RECEIVED!\n ERROR:\n' + traceback.format_exc())
         season_start = datetime.now().strftime('%d.%m.%Y')
-        ld = calendar.monthrange(datetime.now().year, datetime.now().month)[1]
-        season_end = datetime.now().replace(day=ld).strftime('%d.%m.%Y')
-        msg = messages.newseason_post(
-            [(i.uid, await getUserName(i.uid), (i.xp - 100) // 200 + 2 if i.xp > 100 else 1) for i in top],
-            season_start, season_end)
-        await IMPLICIT_API.wall.post(owner_id=-GROUP_ID, from_group=1, guid=1, message=msg)
-        await sendMessage(DAILY_TO + 2000000000, 'new_season: 100%')
-    except Exception as e:
-        await sendMessage(DAILY_TO + 2000000000, f'e from schedule everyday:\n{e}')
+        now = datetime.now()
+        ld = calendar.monthrange(datetime.now().year, now.month)[1]
+        season_end = now.replace(day=ld).strftime('%d.%m.%Y')
+        try:
+            msg = await messages.newseason_post(top, season_start, season_end)
+        except:
+            await sendMessage(DAILY_TO + 2000000000, f'@all POST MESSAGE CREATING FAILURE!\nERROR:\n' +
+                              traceback.format_exc())
+            return
+        try:
+            await IMPLICIT_API.wall.post(owner_id=-GROUP_ID, from_group=1, guid=1, message=msg)
+        except:
+            await sendMessage(DAILY_TO + 2000000000, f'@all POST FAILURE!\nPOST MESSAGE: {msg}\nERROR:\n' +
+                              traceback.format_exc())
+            return
+        XP.update(xp=0).execute()
+        await sendMessage(DAILY_TO + 2000000000, '@all new_season: 100%')
+    except:
+        await sendMessage(DAILY_TO + 2000000000, f'e from scheduler:\n' + traceback.format_exc())
+
+
+async def everyminute():
+    try:
+        s = Settings.select().where(Settings.setting == 'nightmode', Settings.value2.is_null(False))
+        for i in s:
+            args = i.value2.split('-')
+            now = datetime.now()
+            start = datetime.strptime(args[0], '%H:%M').replace(year=2024)
+            end = datetime.strptime(args[1], '%H:%M').replace(year=2024)
+            if now.hour == start.hour and now.minute == start.minute:
+                await sendMessage(i.chat_id + 2000000000, messages.nightmode_start(f'{start.hour}:{start.minute}',
+                                                                                   f'{end.hour}:{end.minute}'))
+            elif now.hour == end.hour and now.minute == end.minute:
+                await sendMessage(i.chat_id + 2000000000, messages.nightmode_end())
+        print(f'everyminute: 100% ({datetime.now().strftime("%H:%M:%S")})')
+    except:
+        await sendMessage(DAILY_TO + 2000000000, f'e from scheduler:\n' + traceback.format_exc())
 
 
 def run(loop):
     asyncio.set_event_loop(loop)
+    aiocron.crontab('* * * * * */5', func=resetAntispamMessages, loop=loop)
+    aiocron.crontab('*/1 * * * *', func=everyminute, loop=loop)
     aiocron.crontab('0 * * * *', func=resetPremium, loop=loop)
     aiocron.crontab('0 0 * * *', func=dailyTasks, loop=loop)
     aiocron.crontab('0 0 * * 1', func=weeklyTasks, loop=loop)

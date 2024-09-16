@@ -5,6 +5,7 @@ import traceback
 from loguru import logger
 from vkbottle import Bot, GroupEventType, GroupTypes, VKAPIError
 from vkbottle.bot import MessageReactionEvent
+from vkbottle.framework.labeler import BotLabeler
 
 from Bot.exception_handler import exception_handle
 from Bot.labelers import LABELERS
@@ -35,19 +36,21 @@ class VkBot:
         from Bot.notifications import run_notifications
         threading.Thread(target=run_notifications).start()
 
-        @self.bot.on.raw_event(GroupEventType.MESSAGE_REACTION_EVENT, dataclass=MessageReactionEvent)
+        labeler = BotLabeler()
+
+        @labeler.raw_event(GroupEventType.MESSAGE_REACTION_EVENT, dataclass=MessageReactionEvent)
         async def start(event: MessageReactionEvent):
             await reaction_handle(event)
 
-        @self.bot.on.raw_event(GroupEventType.MESSAGE_NEW, dataclass=GroupTypes.MessageNew)
+        @labeler.raw_event(GroupEventType.MESSAGE_NEW, dataclass=GroupTypes.MessageNew, blocking=False)
         async def new_message(event: GroupTypes.MessageNew):
             await message_handle(event)
 
-        @self.bot.on.raw_event(GroupEventType.WALL_REPLY_NEW, dataclass=GroupTypes.WallReplyNew)
+        @labeler.raw_event(GroupEventType.WALL_REPLY_NEW, dataclass=GroupTypes.WallReplyNew)
         async def new_wall_reply(event: GroupTypes.WallReplyNew):
             await comment_handle(event)
 
-        @self.bot.on.raw_event(GroupEventType.LIKE_ADD, dataclass=GroupTypes.LikeAdd)
+        @labeler.raw_event(GroupEventType.LIKE_ADD, dataclass=GroupTypes.LikeAdd)
         async def like_add(event: GroupTypes.LikeAdd):
             await like_handle(event)
 
@@ -55,6 +58,7 @@ class VkBot:
         async def exception_handler(e: VKAPIError):
             await exception_handle(e)
 
+        self.bot.labeler.load(labeler)
         for i in LABELERS:
             self.bot.labeler.load(i)
         self.bot.labeler.message_view.register_middleware(CommandMiddleware)

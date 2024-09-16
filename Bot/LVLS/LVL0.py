@@ -13,13 +13,24 @@ from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserName, getRegDate, kickUser, getUserNickname, getUserAccessLevel, \
     getUserLastMessage, getUserMute, getUserBan, getUserXP, getUserLVL, getUserNeededXP, getUserPremium, getXPTop, \
     uploadImage, addUserXP, isChatAdmin, getUserWarns, getUserMessages, setUserAccessLevel, getChatName, addWeeklyTask, \
-    getULvlBanned
+    getULvlBanned, getChatSettings, HiddenPrints
 from config.config import API, LVL_NAMES, PATH, REPORT_CD, REPORT_TO, COMMANDS, DEVS, PREMIUM_TASKS_DAILY, TASKS_DAILY
 from db import Messages, AccessNames, Referral, Reports, ReportWarns, CMDLevels, Bonus, Prefixes, CMDNames, PremMenu, \
-    Settings, TasksDaily, Coins, TasksStreak, TransferHistory
+    TasksDaily, Coins, TasksStreak, TransferHistory
 from media.stats.stats_img import createStatsImage
 
 bl = BotLabeler()
+
+
+@bl.chat_message(SearchCMD('test'))
+async def test_handler(message: Message):
+    chat_id = message.peer_id - 2000000000
+    await message.reply(f'💬 ID данной беседы : {chat_id}')
+
+
+@bl.chat_message(SearchCMD('chatid'))
+async def chatid(message: Message):
+    await message.reply(f'💬 ID данной беседы : {message.peer_id - 2000000000}')
 
 
 @bl.chat_message(SearchCMD('id'))
@@ -103,7 +114,7 @@ async def stats(message: Message):
         return
 
     acc = await getUserAccessLevel(message.from_id, chat_id)
-    if acc < 1:
+    if acc < 1 and not await getUserPremium(message.from_id):
         id = message.from_id
     else:
         acc = await getUserAccessLevel(id, chat_id)
@@ -426,13 +437,8 @@ async def premmenu(message: Message):
 async def duel(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    settings = Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == 'setDuel')
-    if settings is not None:
-        allowed = settings.pos
-    else:
-        allowed = 1
 
-    if not allowed:
+    if not (await getChatSettings(chat_id))['entertaining']['allowDuel']:
         msg = messages.duel_not_allowed()
         await message.reply(disable_mentions=1, message=msg)
         return
@@ -470,7 +476,10 @@ async def duel(message: Message):
 
 @bl.chat_message(SearchCMD('transfer'))
 async def transfer(message: Message):
-    chat_id = message.peer_id - 2000000000
+    chat_id = message.chat_id
+    if not (await getChatSettings(chat_id))['entertaining']['allowTransfer']:
+        await message.reply(messages.transfer_not_allowed())
+        return
     uid = message.from_id
     id = await getIDFromMessage(message)
     if id < 0:
@@ -545,6 +554,10 @@ async def start(message: Message):
 
 @bl.chat_message(SearchCMD('task'))
 async def task(message: Message):
+    chat_id = message.chat_id
+    if not (await getChatSettings(chat_id))['entertaining']['allowTask']:
+        await message.reply(messages.task_not_allowed())
+        return
     uid = message.from_id
     completed = 0
     prem = await getUserPremium(uid)
@@ -560,3 +573,9 @@ async def task(message: Message):
     s = s.streak if s is not None else 0
     kb = keyboard.tasks(uid)
     await message.reply(messages.task(completed, c, s), keyboard=kb)
+
+
+@bl.chat_message(SearchCMD('anon'))
+async def anon(message: Message):
+    msg = messages.anon_not_pm()
+    await message.reply(msg, disable_mentions=1)

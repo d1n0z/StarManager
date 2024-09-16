@@ -194,7 +194,7 @@ async def ssetaccess(message: Message):
     u_nickname = await getUserNickname(uid, chat_id)
     ch_nickname = await getUserNickname(id, chat_id)
 
-    msg = messages.ssetaccess_start(uid, u_name, u_nickname, id, name, ch_nickname, data[1])
+    msg = messages.ssetaccess_start(uid, u_name, u_nickname, id, name, ch_nickname, len(pool), data[1])
     edit = await message.reply(disable_mentions=1, message=msg)
     success = 0
     for chat_id in pool:
@@ -254,7 +254,7 @@ async def sdelaccess(message: Message):
     u_nickname = await getUserNickname(uid, chat_id)
     ch_nickname = await getUserNickname(id, chat_id)
 
-    msg = messages.sdelaccess_start(uid, u_name, u_nickname, id, name, ch_nickname, data[1])
+    msg = messages.sdelaccess_start(uid, u_name, u_nickname, id, name, ch_nickname, data[1], len(pool))
     edit = await message.reply(disable_mentions=1, message=msg)
     success = 0
     for chat_id in pool:
@@ -291,7 +291,7 @@ async def ignore(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    id = await getIDFromMessage(message, 3)
+    id = await getIDFromMessage(message)
     if not id:
         msg = messages.ignore_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -325,7 +325,7 @@ async def unignore(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    id = await getIDFromMessage(message, 3)
+    id = await getIDFromMessage(message)
     if not id:
         msg = messages.ignore_hint()
         await message.reply(disable_mentions=1, message=msg)

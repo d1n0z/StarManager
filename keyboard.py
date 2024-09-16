@@ -1,6 +1,6 @@
 from vkbottle import Keyboard, Callback, OpenLink, KeyboardButtonColor
 
-from config.config import TASKS_LOTS
+from config.config import TASKS_LOTS, SETTINGS_POSITIONS, DEVS, SETTINGS_COUNTABLE_CHANGEMENU, SETTINGS_COUNTABLE
 
 
 def join(chid):
@@ -107,17 +107,108 @@ def statuslist(uid, page):
     return kb.get_json()
 
 
-def settings(uid, settings: dict):
+def settings(uid):
     kb = Keyboard(inline=True)
-    k = 0
-    for e, i in settings.items():
-        k += 1
-        if i == 0:
-            color = KeyboardButtonColor.NEGATIVE
+    kb.add(Callback('➖ Основные', {"uid": uid, "cmd": "settings", "category": 'main'}))
+    kb.add(Callback('🎮 Развлекательные', {"uid": uid, "cmd": "settings", "category": 'entertaining'}))
+    kb.row()
+    kb.add(Callback('⛔️ Анти-Спам', {"uid": uid, "cmd": "settings", "category": 'antispam'}))
+    kb.add(Callback('🌓 Ночной режим', {"uid": uid, "cmd": "change_setting", "category": 'main',
+                                       "setting": 'nightmode'}))
+    # if uid in DEVS:
+    #     kb.add(Callback('⭐️ Star protect', {"uid": uid, "cmd": "settings", "category": 'protect'}))
+
+    return kb.get_json()
+
+
+def settings_category(uid, category, settings):
+    kb = Keyboard(inline=True)
+    c = 1
+    for k, i in settings.items():
+        name = SETTINGS_POSITIONS[category][k][not i]
+        if name == 'nightmode':
+            continue
+        if name in ['Вкл.', 'Выкл.']:
+            color = KeyboardButtonColor.NEGATIVE if i else KeyboardButtonColor.POSITIVE
         else:
-            color = KeyboardButtonColor.POSITIVE
-        kb.add(Callback(f'{k}', {"uid": uid, "cmd": "change_setting", "setting": f"{e}", "setting_pos": i,
-                                 "settings": f"{settings}"}), color)
+            color = KeyboardButtonColor.PRIMARY
+        name = 'Включить' if name == 'Вкл.' else name
+        name = 'Выключить' if name == 'Выкл.' else name
+        if k in SETTINGS_COUNTABLE:
+            name = 'Настроить'
+            color = KeyboardButtonColor.PRIMARY
+        name = f'[{c}]. ' + name
+        kb.add(Callback(name, {"uid": uid, "cmd": "change_setting", "category": category, "setting": k}), color)
+        if c % 2 == 0:
+            kb.row()
+        c += 1
+    if c % 2 == 0:
+        kb.row()
+    kb.add(Callback('Назад', {"uid": uid, "cmd": "settings_menu"}))
+
+    return kb.get_json()
+
+
+def settings_change_countable(uid, category, setting=None, settings=None, onlybackbutton=False):
+    kb = Keyboard(inline=True)
+    if setting != 'nightmode':
+        kb.add(Callback('Назад', {"uid": uid, "cmd": "settings", "category": category}))
+    else:
+        kb.add(Callback('Назад', {"uid": uid, "cmd": "settings_menu"}))
+    if onlybackbutton:
+        return kb.get_json()
+
+    c = 1
+    for i in SETTINGS_COUNTABLE_CHANGEMENU[setting]:
+        color = KeyboardButtonColor.PRIMARY
+        if isinstance(i['button'], str):
+            name = i['button']
+        else:
+            if len(i['button']) == 2:
+                name = i['button'][settings[category][setting]]
+                color = KeyboardButtonColor.NEGATIVE if settings[category][setting] else KeyboardButtonColor.POSITIVE
+            else:
+                raise Exception
+        if settings[category][setting] or len(i['button']) == 2:
+            if c % 2 == 0:
+                kb.row()
+            kb.add(Callback(name, {"uid": uid, "cmd": "settings_change_countable", "action": i['action'],
+                                   "category": category, "setting": setting}), color)
+            c += 1
+
+    return kb.get_json()
+
+
+def settings_set_punishment(uid, category, setting):
+    kb = Keyboard(inline=True)
+    kb.add(Callback('Назад', {"uid": uid, "cmd": "settings", "category": category}), KeyboardButtonColor.NEGATIVE)
+    kb.row()
+    if setting != 'messagesPerMinute':
+        kb.add(Callback('Удалить сообщение', {"uid": uid, "cmd": "settings_set_punishment",
+                                              "action": 'deletemessage', "category": category, "setting": setting}))
+    kb.add(Callback('Замутить', {"uid": uid, "cmd": "settings_set_punishment",
+                                 "action": 'mute', "category": category, "setting": setting}))
+    kb.row()
+    kb.add(Callback('Исключить', {"uid": uid, "cmd": "settings_set_punishment",
+                                  "action": 'kick', "category": category, "setting": setting}))
+    kb.add(Callback('Заблокировать', {"uid": uid, "cmd": "settings_set_punishment",
+                                      "action": 'ban', "category": category, "setting": setting}))
+
+    return kb.get_json()
+
+
+def settings_setlist(uid, category, setting, type):
+    kb = Keyboard(inline=True)
+
+    if setting == 'disallowLinks':
+        kb.add(Callback('Список исключений', {"uid": uid, "cmd": "settings_exceptionlist", "setting": setting}))
+        kb.row()
+        kb.add(Callback('Добавить', {"uid": uid, "cmd": "settings_listaction", "setting": setting,
+                                     "type": type, "action": "add"}))
+        kb.add(Callback('Удалить', {"uid": uid, "cmd": "settings_listaction", "setting": setting,
+                                    "type": type, "action": "remove"}))
+        kb.row()
+        kb.add(Callback('Назад', {"uid": uid, "cmd": "settings", "category": category}), KeyboardButtonColor.NEGATIVE)
 
     return kb.get_json()
 
