@@ -18,7 +18,7 @@ bl = BotLabeler()
 async def gdelaccess(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
         msg = messages.gdelaccess_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -77,7 +77,7 @@ async def gsetaccess(message: Message):
         msg = messages.gsetaccess_hint()
         await message.reply(message=msg, disable_mentions=1)
         return
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
         msg = messages.gsetaccess_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -155,7 +155,7 @@ async def ssetaccess(message: Message):
         msg = messages.ssetaccess_hint()
         await message.reply(message=msg, disable_mentions=1)
         return
-    id = await getIDFromMessage(message, 3)
+    id = await getIDFromMessage(message.text, message.reply_message, 3)
     if not id:
         msg = messages.ssetaccess_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -224,7 +224,7 @@ async def sdelaccess(message: Message):
         msg = messages.sdelaccess_hint()
         await message.reply(message=msg, disable_mentions=1)
         return
-    id = await getIDFromMessage(message, 3)
+    id = await getIDFromMessage(message.text, message.reply_message, 3)
     if not id:
         msg = messages.sdelaccess_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -291,7 +291,7 @@ async def ignore(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
         msg = messages.ignore_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -325,7 +325,7 @@ async def unignore(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
         msg = messages.ignore_hint()
         await message.reply(disable_mentions=1, message=msg)

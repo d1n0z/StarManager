@@ -88,7 +88,7 @@ async def ban(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if id == uid:
         msg = messages.ban_myself()
         await message.reply(disable_mentions=1, message=msg)
@@ -181,7 +181,8 @@ async def ban(message: Message):
     kick = await kickUser(id, chat_id)
     if not kick:
         msg += '\n❗ Пользователя не удалось кикнуть'
-    await message.reply(disable_mentions=1, message=msg)
+    kb = keyboard.punish_unpunish(uid, id, 'ban', message.conversation_message_id)
+    await message.reply(disable_mentions=1, message=msg, keyboard=kb)
     return
 
 
@@ -190,7 +191,7 @@ async def unban(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if id == uid:
         msg = messages.unban_myself()
         await message.reply(disable_mentions=1, message=msg)

@@ -138,7 +138,7 @@ async def msg(message: Message):
 async def addblack(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if id == 0:
         msg = messages.addblack_hint()
         await message.reply(msg)
@@ -166,7 +166,7 @@ async def addblack(message: Message):
 async def delblack(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if id == 0:
         msg = messages.delblack_hint()
         await message.reply(msg)
@@ -216,7 +216,7 @@ async def blacklist(message: Message):
 async def setstatus(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     data = message.text.split()
     if id == 0 or not data[2].isdigit():
         msg = messages.setstatus_hint()
@@ -243,7 +243,7 @@ async def setstatus(message: Message):
 
 @bl.chat_message(SearchCMD('givexp'))
 async def givexp(message: Message):
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if id is None:
         return
     uid = message.from_id
@@ -259,7 +259,7 @@ async def givexp(message: Message):
 
 @bl.chat_message(SearchCMD('resetlvl'))
 async def resetlvl(message: Message):
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if id is None:
         await message.reply('🔶 Пользователь не найден')
         return
@@ -285,7 +285,7 @@ async def resetlvl(message: Message):
 async def delstatus(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     data = message.text.split()
     if id == 0:
         msg = messages.delstatus_hint()
@@ -323,7 +323,7 @@ async def statuslist(message: Message):
 @bl.chat_message(SearchCMD('infban'))
 async def infban(message: Message):
     data = message.text.lower().split()
-    id = await getIDFromMessage(message, 3)
+    id = await getIDFromMessage(message.text, message.reply_message, 3)
     if len(data) != 3 or data[1] not in ['group', 'user'] or not id:
         msg = messages.infban_hint()
         await message.reply(msg)
@@ -338,7 +338,7 @@ async def infban(message: Message):
 @bl.chat_message(SearchCMD('infunban'))
 async def infunban(message: Message):
     data = message.text.lower().split()
-    id = await getIDFromMessage(message, 3)
+    id = await getIDFromMessage(message.text, message.reply_message, 3)
     if len(data) != 3 or data[1] not in ['group', 'user'] or not id:
         msg = messages.infunban_hint()
         await message.reply(msg)
@@ -394,7 +394,7 @@ async def getlink(message: Message):
 
 @bl.chat_message(SearchCMD('reportwarn'))
 async def reportwarn(message: Message):
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if id is not None:
         uwarns = ReportWarns.get_or_none(ReportWarns.uid == id)
         if uwarns is not None:
@@ -437,7 +437,7 @@ async def reimport(message: Message):
 
 @bl.chat_message(SearchCMD('getuserchats'))
 async def getuserchats(message: Message):
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if id is None:
         await message.reply('🔶 Пользователь не найден')
         return
@@ -488,7 +488,7 @@ async def helpdev(message: Message):
 @bl.chat_message(SearchCMD('gettransferhistoryto'))
 @bl.chat_message(SearchCMD('gettransferhistoryfrom'))
 async def gettransferhistory(message: Message):
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if id is None:
         await message.reply('🔶 Пользователь не найден')
         return
@@ -516,7 +516,7 @@ async def gettransferhistory(message: Message):
 @bl.chat_message(SearchCMD('lvlban'))
 async def lvlban(message: Message):
     data = message.text.lower().split()
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if len(data) != 2 or not id:
         msg = messages.lvlban_hint()
         await message.reply(msg)
@@ -531,7 +531,7 @@ async def lvlban(message: Message):
 @bl.chat_message(SearchCMD('lvlunban'))
 async def infunban(message: Message):
     data = message.text.lower().split()
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if len(data) != 2 or not id:
         msg = messages.lvlunban_hint()
         await message.reply(msg)

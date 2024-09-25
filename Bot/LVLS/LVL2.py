@@ -7,7 +7,7 @@ import keyboard
 import messages
 from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserAccessLevel, getUserNickname, getUserMute, getUserName, setChatMute
-from config.config import API, MAIN_DEVS
+from config.config import API, MAIN_DEVS, DEVS
 from db import Mute, Warn, AccessLevel
 
 bl = BotLabeler()
@@ -17,7 +17,7 @@ bl = BotLabeler()
 async def unmute(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
         msg = messages.unmute_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -73,7 +73,7 @@ async def mutelist(message: Message):
 async def unwarn(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
         msg = messages.unwarn_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -128,7 +128,7 @@ async def setaccess(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if (not id or (len(data) < 3 and message.reply_message is None) or (
             len(data) < 2 and message.reply_message is not None)):
         msg = messages.setacc_hint()
@@ -179,7 +179,7 @@ async def setaccess(message: Message):
 async def delaccess(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
         msg = messages.delaccess_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -199,7 +199,7 @@ async def delaccess(message: Message):
     u_acc = await getUserAccessLevel(uid, chat_id)
     u_nickname = await getUserNickname(uid, chat_id)
     ch_nickname = await getUserNickname(id, chat_id)
-    if ch_acc > u_acc:
+    if ch_acc >= u_acc and uid not in DEVS:
         msg = messages.delaccess_higher()
         await message.reply(disable_mentions=1, message=msg)
         return

@@ -3,14 +3,16 @@ import time
 import traceback
 from ast import literal_eval
 
+import requests
 import validators
 from vkbottle_types.events.bot_events import MessageNew
+from vkbottle_types.objects import MessagesMessageAttachmentType
 
 import keyboard
 import messages
-from Bot.utils import getUserName, getChatName, sendMessage, editMessage
-from config.config import REPORT_TO, SETTINGS_COUNTABLE_TWO_ARGUMENTS
-from db import ReportAnswers, Notifs, TypeQueue, Settings, AntispamURLExceptions
+from Bot.utils import getUserName, getChatName, sendMessage, editMessage, uploadImage, deleteMessages
+from config.config import REPORT_TO, SETTINGS_COUNTABLE_MULTIPLE_ARGUMENTS, PATH
+from db import ReportAnswers, Notifs, TypeQueue, Settings, AntispamURLExceptions, Welcome
 
 
 async def report_handler(event: MessageNew):
@@ -20,6 +22,7 @@ async def report_handler(event: MessageNew):
         return False
     answering_name = await getUserName(repansi.answering_id)
     name = await getUserName(repansi.uid)
+    await deleteMessages([repansi.cmid, event.object.message.conversation_message_id], REPORT_TO)
     await sendMessage(repansi.chat_id + 2000000000, messages.report_answer(
         repansi.answering_id, answering_name, repansi.repid, event.object.message.text, repansi.uid, name))
     await sendMessage(REPORT_TO + 2000000000, messages.report_answered(
@@ -32,7 +35,7 @@ async def report_handler(event: MessageNew):
 async def queue_handler(event: MessageNew):
     uid = event.object.message.from_id
     chat_id = event.object.message.peer_id - 2000000000
-    queue = TypeQueue.get_or_none(TypeQueue.uid == uid, TypeQueue.chat_id == chat_id)
+    queue: TypeQueue = TypeQueue.get_or_none(TypeQueue.uid == uid, TypeQueue.chat_id == chat_id)
     if queue is None:
         return False
     additional = literal_eval(queue.additional)
@@ -126,7 +129,7 @@ async def queue_handler(event: MessageNew):
         cmid = additional['cmid']
         text = event.object.message.text
         kb = keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True)
-        if setting not in SETTINGS_COUNTABLE_TWO_ARGUMENTS:
+        if setting not in SETTINGS_COUNTABLE_MULTIPLE_ARGUMENTS:
             if not text.isdigit() or int(text) <= 0 or int(text) >= 10000:
                 await editMessage(messages.settings_change_countable_digit_error(),
                                   event.object.message.peer_id, cmid, kb)
@@ -199,6 +202,46 @@ async def queue_handler(event: MessageNew):
             msg = messages.settings_listaction_done(setting, action, url)
             kb = keyboard.settings_change_countable(uid, 'antispam', onlybackbutton=True)
             await sendMessage(chat_id + 2000000000, msg, kb)
+    elif queue.type.startswith('settings_set_welcome_'):
+        welcome: Welcome = Welcome.get_or_create(chat_id=chat_id)[0]
+        if queue.type == 'settings_set_welcome_text':
+            if not event.object.message.text:
+                msg = messages.get(queue.type + '_no_text')
+                await sendMessage(chat_id + 2000000000, msg)
+                return
+            welcome.msg = event.object.message.text
+        elif queue.type == 'settings_set_welcome_photo':
+            if (len(event.object.message.attachments) == 0 or
+                    event.object.message.attachments[0].type != MessagesMessageAttachmentType.PHOTO):
+                msg = messages.get(queue.type + '_not_photo')
+                await sendMessage(chat_id + 2000000000, msg)
+                return
+            r = requests.get(event.object.message.attachments[0].photo.sizes[-1].url)
+            with open(f'{PATH}media/temp/{uid}welcome.jpg', "wb") as f:
+                f.write(r.content)
+                f.close()
+            r.close()
+            welcome.photo = await uploadImage(f'{PATH}media/temp/{uid}welcome.jpg')
+        elif queue.type == 'settings_set_welcome_url':
+            if not welcome.msg and not welcome.url:
+                msg = messages.get(queue.type + '_empty_text_url')
+                await sendMessage(chat_id + 2000000000, msg)
+                return
+            text = event.object.message.text.split()
+            if len(text) < 2:
+                msg = messages.settings_change_countable_format_error()
+                await sendMessage(chat_id + 2000000000, msg)
+                return
+            if not validators.url(text[-1]):
+                msg = messages.get(queue.type + '_no_url')
+                await sendMessage(chat_id + 2000000000, msg)
+                return
+            welcome.url = text[-1]
+            welcome.button_label = ' '.join(text[0:-1])
+        welcome.save()
+        msg = messages.get(f'{queue.type}_done')
+        kb = keyboard.settings_change_countable(uid, "main", "welcome", onlybackbutton=True)
+        await sendMessage(chat_id + 2000000000, msg, kb)
     return
 
 

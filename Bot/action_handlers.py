@@ -4,9 +4,9 @@ from vkbottle_types.events.bot_events import MessageNew
 import keyboard
 import messages
 from Bot.utils import kickUser, getUserName, getUserBan, getUserBanInfo, getUserNickname, getChatSettings, sendMessage, \
-    getUserAccessLevel
+    getUserAccessLevel, deleteMessages
 from config.config import GROUP_ID
-from db import AllUsers, UserJoinedDate, Referral, Blacklist, AllChats, LeavedChats, Welcome
+from db import AllUsers, UserJoinedDate, Referral, Blacklist, AllChats, LeavedChats, Welcome, Settings, WelcomeHistory
 
 
 async def action_handle(event: MessageNew) -> None:
@@ -66,7 +66,17 @@ async def action_handle(event: MessageNew) -> None:
             r.from_id = id
             r.save()
 
-        welcome = Welcome.get_or_none(Welcome.chat_id == chat_id)
-        if welcome is not None:
+        if s := Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == 'welcome'):
+            welcome = Welcome.get_or_none(Welcome.chat_id == chat_id)
+            if welcome is None or not s.pos:
+                print(welcome, s.pos)
+                return
             name = u_name if u_nickname is None else u_nickname
-            await sendMessage(event.peer_id, welcome.msg.replace('%name%', f"[id{uid}|{name}]"))
+            m = await sendMessage(event.peer_id, welcome.msg.replace('%name%', f"[id{uid}|{name}]"),
+                                  keyboard.welcome(welcome.url, welcome.button_label), welcome.photo)
+            if s.pos2:
+                lw: WelcomeHistory = WelcomeHistory.select().where(
+                    WelcomeHistory.chat_id == chat_id).order_by(WelcomeHistory.time.desc())
+                await deleteMessages(lw.cmid, chat_id)
+                lw.delete_instance()
+            WelcomeHistory.create(chat_id=chat_id, time=time.time(), cmid=m[0].conversation_message_id)

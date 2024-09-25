@@ -21,7 +21,7 @@ bl = BotLabeler()
 async def kick(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if id == 0:
         msg = messages.kick_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -133,7 +133,7 @@ async def mute(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
         msg = messages.mute_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -228,7 +228,8 @@ async def mute(message: Message):
 
     await setChatMute(id, chat_id, mute_time)
 
-    await message.reply(disable_mentions=1, message=msg)
+    kb = keyboard.punish_unpunish(uid, id, 'mute', message.conversation_message_id)
+    await message.reply(disable_mentions=1, message=msg, keyboard=kb)
 
 
 @bl.chat_message(SearchCMD('warn'))
@@ -236,7 +237,7 @@ async def warn(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
         msg = messages.warn_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -306,7 +307,8 @@ async def warn(message: Message):
     w.last_warns_dates = f"{warn_dates}"
     w.save()
 
-    await message.reply(disable_mentions=1, message=msg)
+    kb = keyboard.punish_unpunish(uid, id, 'warn', message.conversation_message_id)
+    await message.reply(disable_mentions=1, message=msg, keyboard=kb)
 
 
 @bl.chat_message(SearchCMD('clear'))
@@ -367,7 +369,7 @@ async def snick(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
         msg = messages.snick_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -416,7 +418,7 @@ async def snick(message: Message):
 async def rnick(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
         msg = messages.snick_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -519,7 +521,7 @@ async def olist(message: Message):
 @bl.chat_message(SearchCMD('check'))
 async def check(message: Message):
     chat_id = message.peer_id - 2000000000
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
         msg = messages.check_help()
         await message.reply(disable_mentions=1, message=msg)

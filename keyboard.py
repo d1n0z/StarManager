@@ -1,6 +1,9 @@
 from vkbottle import Keyboard, Callback, OpenLink, KeyboardButtonColor
 
-from config.config import TASKS_LOTS, SETTINGS_POSITIONS, DEVS, SETTINGS_COUNTABLE_CHANGEMENU, SETTINGS_COUNTABLE
+from Bot.utils import getChatAltSettings
+from config.config import TASKS_LOTS, SETTINGS_POSITIONS, DEVS, SETTINGS_COUNTABLE_CHANGEMENU, SETTINGS_COUNTABLE, \
+    SETTINGS_COUNTABLE_NO_CATEGORY
+from db import Settings
 
 
 def join(chid):
@@ -115,6 +118,9 @@ def settings(uid):
     kb.add(Callback('⛔️ Анти-Спам', {"uid": uid, "cmd": "settings", "category": 'antispam'}))
     kb.add(Callback('🌓 Ночной режим', {"uid": uid, "cmd": "change_setting", "category": 'main',
                                        "setting": 'nightmode'}))
+    kb.row()
+    kb.add(Callback('💬 Приветствие', {"uid": uid, "cmd": "change_setting", "category": 'main',
+                                      "setting": 'welcome'}))
     # if uid in DEVS:
     #     kb.add(Callback('⭐️ Star protect', {"uid": uid, "cmd": "settings", "category": 'protect'}))
 
@@ -134,7 +140,7 @@ def settings_category(uid, category, settings):
     c = 1
     for k, i in settings.items():
         name = SETTINGS_POSITIONS[category][k][not i]
-        if name == 'nightmode':
+        if k in SETTINGS_COUNTABLE_NO_CATEGORY:
             continue
         if name in ['Вкл.', 'Выкл.']:
             color = KeyboardButtonColor.NEGATIVE if i else KeyboardButtonColor.POSITIVE
@@ -157,9 +163,9 @@ def settings_category(uid, category, settings):
     return kb.get_json()
 
 
-def settings_change_countable(uid, category, setting=None, settings=None, onlybackbutton=False):
+def settings_change_countable(uid, category, setting=None, settings=None, altsettings=None, onlybackbutton=False):
     kb = Keyboard(inline=True)
-    if setting != 'nightmode':
+    if setting not in SETTINGS_COUNTABLE_NO_CATEGORY:
         kb.add(Callback('Назад', {"uid": uid, "cmd": "settings", "category": category}))
     else:
         kb.add(Callback('Назад', {"uid": uid, "cmd": "settings_menu"}))
@@ -172,12 +178,16 @@ def settings_change_countable(uid, category, setting=None, settings=None, onlyba
         if isinstance(i['button'], str):
             name = i['button']
         else:
-            if len(i['button']) == 2:
-                name = i['button'][settings[category][setting]]
+            name = i['button'][settings[category][setting]]
+            if i['button'] in (["Выкл.", "Вкл."], ["Вкл.", "Выкл."],
+                               ["Включить", "Выключить"], ["Выключить", "Включить"]):
                 color = KeyboardButtonColor.NEGATIVE if settings[category][setting] else KeyboardButtonColor.POSITIVE
+            elif i['action'] == 'turnalt':
+                color = KeyboardButtonColor.NEGATIVE if altsettings[category][setting] else KeyboardButtonColor.POSITIVE
             else:
                 raise Exception
-        if settings[category][setting] or len(i['button']) == 2:
+        if settings[category][setting] or (i['button'] in (
+                ["Выкл.", "Вкл."], ["Вкл.", "Выкл."], ["Включить", "Выключить"], ["Выключить", "Включить"]) and c <= 2):
             if c % 2 == 0:
                 kb.row()
             kb.add(Callback(name, {"uid": uid, "cmd": "settings_change_countable", "action": i['action'],
@@ -217,6 +227,18 @@ def settings_setlist(uid, category, setting, type):
                                     "type": type, "action": "remove"}))
         kb.row()
         kb.add(Callback('Назад', {"uid": uid, "cmd": "settings", "category": category}), KeyboardButtonColor.NEGATIVE)
+
+    return kb.get_json()
+
+
+def settings_set_welcome(uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('Назад', {"uid": uid, "cmd": "settings_menu"}))
+    kb.add(Callback('Установить текст', {"uid": uid, "cmd": "settings_set_welcome_text"}))
+    kb.row()
+    kb.add(Callback('Изображение', {"uid": uid, "cmd": "settings_set_welcome_photo"}))
+    kb.add(Callback('URL-кнопка', {"uid": uid, "cmd": "settings_set_welcome_url"}))
 
     return kb.get_json()
 
@@ -616,6 +638,32 @@ def check(uid, id):
 def check_history(uid, id, punishment, isempty):
     kb = Keyboard(inline=True)
 
+    kb.add(Callback('Назад', {"cmd": "check_menu", "uid": uid, "id": id}), KeyboardButtonColor.NEGATIVE)
     kb.add(Callback('История', {"cmd": "check_history", "uid": uid, "id": id, "check": punishment, "ie": isempty}))
 
+    return kb.get_json()
+
+
+def punish_unpunish(uid, id, punish, cmid):
+    kb = Keyboard(inline=True)
+
+    if punish == 'mute':
+        name = 'Размутить'
+    elif punish == 'ban':
+        name = 'Разбанить'
+    elif punish == 'warn':
+        name = 'Снять варн'
+    else:
+        return None
+
+    kb.add(Callback(name, {"cmd": f"un{punish}", "uid": uid, "id": id, "cmid": cmid}))
+
+    return kb.get_json()
+
+
+def welcome(url, name):
+    if not url:
+        return
+    kb = Keyboard(inline=True)
+    kb.add(OpenLink(label=name, link=url))
     return kb.get_json()

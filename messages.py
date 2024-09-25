@@ -10,7 +10,7 @@ from Bot.utils import getUserNickname, pointMinutes, pointDays, pointHours, poin
 from config.config import COMMANDS, LVL_NAMES, COMMANDS_DESC, TASKS_LOTS, TASKS_DAILY, PREMIUM_TASKS_DAILY, \
     PREMIUM_TASKS_DAILY_TIERS, TASKS_WEEKLY, PREMIUM_TASKS_WEEKLY, SETTINGS_POSITIONS, \
     SETTINGS_COUNTABLE_CHANGEPUNISHMENTMESSAGE, SETTINGS_COUNTABLE_NO_PUNISHMENT
-from db import AccessNames, BotMessages
+from db import AccessNames, BotMessages, Welcome
 
 
 @cached
@@ -1548,7 +1548,7 @@ def settings_category(category, settings):
     return get(f'settings_{category}', settings=settings)
 
 
-def settings_change_countable(setting, pos, value, value2, punishment=None):
+def settings_change_countable(chat_id, setting, pos, value, value2, pos2, punishment=None):
     status = "Включено" if pos else "Выключено"
     value = 0 if value is None else value
     if setting not in SETTINGS_COUNTABLE_NO_PUNISHMENT:
@@ -1567,6 +1567,14 @@ def settings_change_countable(setting, pos, value, value2, punishment=None):
         if not pos or value2 is None:
             value2 = '❌'
         return get(f'settings_change_countable_{setting}', status=status, time=value2)
+    elif setting == 'welcome':
+        status2 = "Да" if pos2 else "Нет"
+        w: Welcome = Welcome.get_or_none(Welcome.chat_id == chat_id)
+        if not pos or w is None or (not w.msg and not w.photo):
+            value = '❌'
+        else:
+            value = 'Установлено'
+        return get(f'settings_change_countable_{setting}', status=status, status2=status2, value=value)
 
 
 def settings_change_countable_digit_error():
@@ -1581,8 +1589,14 @@ def settings_choose_punishment():
     return get(f'settings_choose_punishment')
 
 
-def settings_countable_action(action, setting):
-    return get(f'settings_{action}_{setting}')
+def settings_countable_action(action, setting, text=None, image=None, url=None):
+    if setting == 'welcome':
+        text = 'Не установлено' if not text else text
+        url = 'Не установлено' if not url else url
+        image = 'Не установлено' if not image else 'Установлено'
+        return get(f'settings_{action}_{setting}', text=text, image=image, url=url)
+    else:
+        return get(f'settings_{action}_{setting}')
 
 
 def settings_set_punishment(punishment, time=None):

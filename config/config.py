@@ -203,6 +203,7 @@ def SETTINGS():
             "kickBlockingViolator": 0,
             "deleteAccessAndNicknameOnLeave": 0,
             "nightmode": 0,
+            "welcome": 0,
         },
         "entertaining": {
             "allowDuel": 1,
@@ -222,6 +223,20 @@ def SETTINGS():
     }
 
 
+def SETTINGS_ALT():
+    return {
+        "main": {
+            "welcome": 0,
+        },
+        "entertaining": {
+        },
+        "antispam": {
+        },
+        "protect": {
+        }
+    }
+
+
 SETTINGS_POSITIONS = {
     "main": {
         "kickInvitedByNoAccess": ["Выкл.", "Вкл."],
@@ -229,6 +244,7 @@ SETTINGS_POSITIONS = {
         "kickBlockingViolator": ["Удалить сообщ.", "Исключить"],
         "deleteAccessAndNicknameOnLeave": ["Выкл.", "Вкл."],
         "nightmode": ["Выкл.", "Вкл."],
+        "welcome": ["Выкл.", "Вкл."],
     },
     "entertaining": {
         "allowDuel": ["Выкл.", "Вкл."],
@@ -247,13 +263,16 @@ SETTINGS_POSITIONS = {
     }
 }
 SETTINGS_COUNTABLE = [
-    "messagesPerMinute", "maximumCharsInMessage", "disallowLinks", "disallowNSFW", "nightmode",
+    "messagesPerMinute", "maximumCharsInMessage", "disallowLinks", "disallowNSFW", "nightmode", "welcome",
 ]
-SETTINGS_COUNTABLE_TWO_ARGUMENTS = [
-    "nightmode",
+SETTINGS_COUNTABLE_MULTIPLE_ARGUMENTS = [
+    "nightmode", "welcome"
 ]
 SETTINGS_COUNTABLE_NO_PUNISHMENT = [
-    "nightmode",
+    "nightmode", "welcome"
+]
+SETTINGS_COUNTABLE_NO_CATEGORY = [
+    "nightmode", "welcome"
 ]
 SETTINGS_COUNTABLE_CHANGEMENU = {
     "messagesPerMinute": [
@@ -264,6 +283,11 @@ SETTINGS_COUNTABLE_CHANGEMENU = {
     "nightmode": [
         {"action": "turn", "button": ["Включить", "Выключить"]},
         {"action": "set", "button": "Установить время"},
+    ],
+    "welcome": [
+        {"action": "turn", "button": ["Включить", "Выключить"]},
+        {"action": "set", "button": "Установить сообщение"},
+        {"action": "turnalt", "button": ["Удаление сообщения", "Удаление сообщения"]},
     ],
     "maximumCharsInMessage": [
         {"action": "turn", "button": ["Включить", "Выключить"]},

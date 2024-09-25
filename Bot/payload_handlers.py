@@ -1,5 +1,6 @@
 import json
 import random
+import secrets
 import time
 from ast import literal_eval
 from datetime import datetime
@@ -10,15 +11,17 @@ from vkbottle_types.events import GroupEventType
 
 import keyboard
 import messages
+from Bot.checkers import haveAccess
 from Bot.rules import SearchPayloadCMD
 from Bot.utils import sendMessageEventAnswer, editMessage, getUserAccessLevel, getUserXP, getUserPremium, addUserXP, \
     getUserName, getUserNickname, kickUser, getXPTop, getChatName, addWeeklyTask, \
-    addDailyTask, getUserBan, getUserWarns, getUserMute, getULvlBanned, getChatSettings, turnChatSetting
+    addDailyTask, getUserBan, getUserWarns, getUserMute, getULvlBanned, getChatSettings, turnChatSetting, \
+    deleteMessages, setChatMute, getChatAltSettings
 from config.config import API, COMMANDS, DEVS, TASKS_LOTS, TASKS_DAILY, PREMIUM_TASKS_DAILY, SETTINGS_COUNTABLE, \
     SETTINGS_COUNTABLE_NO_PUNISHMENT
 from db import AccessLevel, JoinedDate, DuelWins, ReportAnswers, Nickname, Mute, Warn, Ban, Premium, \
     GPool, ChatGroups, Messages, Notifs, TypeQueue, CMDLevels, ReportWarns, CMDNames, Coins, XP, TasksWeekly, \
-    TasksDaily, TasksStreak, Settings, AntispamURLExceptions
+    TasksDaily, TasksStreak, Settings, AntispamURLExceptions, Welcome
 
 bl = BotLabeler()
 
@@ -98,7 +101,7 @@ async def duel(message: MessageEvent):
             await message.show_snackbar("У вашего соперника недостаточно XP")
             return
 
-        rid = random.choice([id, uid])
+        rid = [id, uid][secrets.randbelow(2)]
         if rid == id:
             loseid = uid
             winid = id
@@ -148,7 +151,8 @@ async def answer_report(message: MessageEvent):
         repid = int(payload['repid'])
         answering_id = int(message.user_id)
         report = payload['text']
-        ReportAnswers.create(uid=uid, chat_id=chat_id, repid=repid, answering_id=answering_id, report_text=report)
+        ReportAnswers.create(uid=uid, chat_id=chat_id, repid=repid, answering_id=answering_id, report_text=report,
+                             cmid=message.conversation_message_id)
 
         msg = messages.report_answering(repid)
         await editMessage(msg, peer_id, message.conversation_message_id)
@@ -206,8 +210,10 @@ async def settings(message: MessageEvent):
                 punishment = None if chatsetting is None else chatsetting.punishment
                 settings = await getChatSettings(chat_id)
                 pos = settings[category][setting]
-                msg = messages.settings_change_countable(setting, pos, value, value2, punishment)
-                kb = keyboard.settings_change_countable(uid, category, setting, settings)
+                altsettings = await getChatAltSettings(chat_id)
+                pos2 = altsettings[category][setting]
+                msg = messages.settings_change_countable(chat_id, setting, pos, value, value2, pos2, punishment)
+                kb = keyboard.settings_change_countable(uid, category, setting, settings, altsettings)
                 await editMessage(msg, peer_id, message.conversation_message_id, kb)
                 return
         settings = (await getChatSettings(chat_id))[category]
@@ -237,26 +243,37 @@ async def settings_change_countable(message: MessageEvent):
         setting = payload['setting']
         TypeQueue.delete().where(TypeQueue.uid == uid, TypeQueue.chat_id == chat_id).execute()
 
-        if action == 'turn':
-            await turnChatSetting(chat_id, category, setting)
+        if action in ('turn', 'turnalt'):
+            await turnChatSetting(chat_id, category, setting, alt=action == 'turnalt')
             chatsetting = Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == setting)
             value = None if chatsetting is None else chatsetting.value
             punishment = None if chatsetting is None else chatsetting.punishment
+            value2 = None if chatsetting is None else chatsetting.value2
             settings = await getChatSettings(chat_id)
             pos = settings[category][setting]
-            msg = messages.settings_change_countable(setting, pos, value, punishment)
-            kb = keyboard.settings_change_countable(uid, category, setting, settings)
+            altsettings = await getChatAltSettings(chat_id)
+            pos2 = altsettings[category][setting]
+            msg = messages.settings_change_countable(chat_id, setting, pos, value, value2, pos2, punishment)
+            kb = keyboard.settings_change_countable(uid, category, setting, settings, altsettings)
             await editMessage(msg, peer_id, message.conversation_message_id, kb)
             return
         msg = None
         kb = None
         if action == 'set':
-            TypeQueue.create(
-                uid=uid, chat_id=chat_id, type='settings_change_countable',
-                additional='{' + f'"setting": "{setting}", "category": "{category}", '
-                                 f'"cmid": "{message.conversation_message_id}"' + '}'
-            )
-            msg = messages.settings_countable_action(action, setting)
+            if setting == 'welcome':
+                w = Welcome.get_or_none(Welcome.chat_id == chat_id)
+                if w is None:
+                    msg = messages.settings_countable_action(action, setting)
+                else:
+                    msg = messages.settings_countable_action(action, setting, w.msg, w.photo, w.url)
+                kb = keyboard.settings_set_welcome(uid)
+            else:
+                TypeQueue.create(
+                    uid=uid, chat_id=chat_id, type='settings_change_countable',
+                    additional='{' + f'"setting": "{setting}", "category": "{category}", '
+                                     f'"cmid": "{message.conversation_message_id}"' + '}'
+                )
+                msg = messages.settings_countable_action(action, setting)
         if action == 'setPunishment':
             msg = messages.settings_choose_punishment()
             kb = keyboard.settings_set_punishment(uid, category, setting)
@@ -289,7 +306,8 @@ async def settings_set_punishment(message: MessageEvent):
             chatsetting.punishment = action
             chatsetting.save()
             msg = messages.settings_set_punishment(action)
-            kb = keyboard.settings_change_countable(uid, category, setting, await getChatSettings(chat_id), True)
+            kb = keyboard.settings_change_countable(uid, category, setting, await getChatSettings(chat_id),
+                                                    await getChatAltSettings(chat_id), True)
         else:
             TypeQueue.create(
                 uid=uid, chat_id=chat_id, type='settings_set_punishment',
@@ -297,7 +315,8 @@ async def settings_set_punishment(message: MessageEvent):
                                  f'"cmid": "{message.conversation_message_id}"' + '}'
             )
             msg = messages.settings_set_punishment_input(action)
-            kb = keyboard.settings_change_countable(uid, category, setting, await getChatSettings(chat_id), True)
+            kb = keyboard.settings_change_countable(uid, category, setting, await getChatSettings(chat_id),
+                                                    await getChatAltSettings(chat_id), True)
         await editMessage(msg, peer_id, message.conversation_message_id, kb)
 
     await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
@@ -351,6 +370,29 @@ async def settings_listaction(message: MessageEvent):
             additional='{' + f'"setting": "{setting}", "action": "{action}", "type": "{type}"' + '}'
         )
         msg = messages.settings_listaction_action(setting, action)
+        await editMessage(msg, peer_id, message.conversation_message_id)
+
+    await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD([
+    'settings_set_welcome_text', 'settings_set_welcome_photo', 'settings_set_welcome_url']))
+async def settings_listaction(message: MessageEvent):
+    payload = message.payload
+
+    try:
+        sender = payload['uid']
+    except:
+        sender = message.user_id
+    cmd = payload['cmd']
+    uid = message.user_id
+
+    peer_id = message.peer_id
+    chat_id = peer_id - 2000000000
+
+    if cmd in ['settings_set_welcome_text', 'settings_set_welcome_photo', 'settings_set_welcome_url'] and sender == uid:
+        TypeQueue.create(uid=uid, chat_id=chat_id, type=cmd, additional='{}')
+        msg = messages.get(cmd)
         await editMessage(msg, peer_id, message.conversation_message_id)
 
     await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
@@ -1719,6 +1761,40 @@ async def check(message: MessageEvent):
     await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
 
 
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['check_menu']))
+async def check_menu(message: MessageEvent):
+    payload = message.payload
+
+    try:
+        sender = payload['uid']
+    except:
+        sender = message.user_id
+    cmd = payload['cmd']
+    uid = message.user_id
+
+    peer_id = message.object.peer_id
+    chat_id = peer_id - 2000000000
+
+    if cmd == 'check_menu' and sender == uid:
+        id = payload['id']
+
+        ban = await getUserBan(id, chat_id) - time.time()
+        if ban < 0:
+            ban = 0
+        mute = await getUserMute(id, chat_id) - time.time()
+        if mute < 0:
+            mute = 0
+        warn = await getUserWarns(id, chat_id)
+
+        name = await getUserName(id)
+        nickname = await getUserNickname(id, chat_id)
+        msg = messages.check(id, name, nickname, ban, warn, mute)
+        kb = keyboard.check(uid, id)
+        await editMessage(msg, peer_id, message.conversation_message_id, kb)
+
+    await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
+
+
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['check_history']))
 async def check_history(message: MessageEvent):
     payload = message.payload
@@ -1781,3 +1857,52 @@ async def check_history(message: MessageEvent):
             await editMessage(msg, peer_id, message.conversation_message_id)
 
     await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['unmute', 'unwarn', 'unban']))
+async def check_history(message: MessageEvent):
+    payload = message.payload
+
+    cmd = payload['cmd']
+    uid = message.user_id
+
+    peer_id = message.object.peer_id
+    chat_id = peer_id - 2000000000
+
+    if cmd in ('unmute', 'unwarn', 'unban'):
+        id = payload['id']
+        cmid = payload['cmid']
+        u_acc = await getUserAccessLevel(uid, chat_id)
+        if u_acc <= await getUserAccessLevel(id, chat_id) or not await haveAccess(cmd[2:], chat_id, u_acc):
+            await message.show_snackbar("⛔️ У вас недостаточно прав.")
+            await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
+            return
+        await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
+        name = await getUserName(id)
+        nickname = await getUserNickname(id, chat_id)
+        uname = await getUserName(uid)
+        unickname = await getUserNickname(uid, chat_id)
+        if cmd == 'unmute':
+            res = Mute.get(Mute.chat_id == chat_id, Mute.uid == id)
+            if res.mute < time.time():
+                return
+            res.mute = 0
+            await setChatMute(id, chat_id, 0)
+            msg = messages.unmute(uname, unickname, uid, name, nickname, id)
+        elif cmd == 'unwarn':
+            res = Warn.get(Warn.chat_id == chat_id, Warn.uid == id)
+            if res.warns <= 0 or res.warns >= 3:
+                return
+            res.warns -= 1
+            msg = messages.unwarn(uname, unickname, uid, name, nickname, id)
+        elif cmd == 'unban':
+            res = Ban.get(Ban.chat_id == chat_id, Ban.uid == id)
+            if res.ban < time.time():
+                return
+            res.ban = 0
+            msg = messages.unban(uname, unickname, uid, name, nickname, id)
+        else:
+            return
+        res.save()
+        await editMessage(msg, peer_id, message.conversation_message_id)
+        await deleteMessages(cmid, chat_id)

@@ -1,4 +1,3 @@
-import pickle
 import time
 from ast import literal_eval
 from datetime import datetime
@@ -12,7 +11,7 @@ from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserAccessLevel, getUserName, getUserNickname, kickUser, getUserBan, \
     setChatMute, getUserWarns
 from config.config import API
-from db import GPool, Ban, Mute, Warn, Nickname, Welcome
+from db import GPool, Ban, Mute, Warn, Nickname
 
 bl = BotLabeler()
 
@@ -22,7 +21,7 @@ async def gkick(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if id == uid:
         msg = messages.kick_myself()
         await message.reply(disable_mentions=1, message=msg)
@@ -92,7 +91,7 @@ async def gban(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if id == uid:
         msg = messages.ban_myself()
         await message.reply(disable_mentions=1, message=msg)
@@ -214,7 +213,7 @@ async def gunban(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if id == uid:
         msg = messages.unban_myself()
         await message.reply(disable_mentions=1, message=msg)
@@ -266,7 +265,7 @@ async def gmute(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if id == uid:
         msg = messages.mute_myself()
         await message.reply(disable_mentions=1, message=msg)
@@ -369,7 +368,7 @@ async def gunmute(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if id == uid:
         msg = messages.unmute_myself()
         await message.reply(disable_mentions=1, message=msg)
@@ -433,7 +432,7 @@ async def gwarn(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if id == uid:
         msg = messages.warn_myself()
         await message.reply(disable_mentions=1, message=msg)
@@ -533,7 +532,7 @@ async def gunwarn(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if id == uid:
         msg = messages.unwarn_myself()
         await message.reply(disable_mentions=1, message=msg)
@@ -593,7 +592,7 @@ async def gsnick(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if (len(data) == 1 and message.reply_message is None) or not id:
         msg = messages.gsnick_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -656,7 +655,7 @@ async def grnick(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if (len(data) == 1 and message.reply_message is None) or not id:
         msg = messages.grnick_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -699,43 +698,6 @@ async def grnick(message: Message):
 
     msg = messages.grnick(id, ch_name, ch_nick, len(pool), success)
     await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id, message=msg)
-
-
-@bl.chat_message(SearchCMD('welcome'))
-async def welcome(message: Message):
-    chat_id = message.peer_id - 2000000000
-    uid = message.from_id
-    data = message.text.split()
-    if len(data) <= 1:
-        msg = messages.welcome_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-    msg = message.text[9:]
-    u_name = await getUserName(uid)
-    u_nickname = await getUserNickname(uid, chat_id)
-    welcome = Welcome.get_or_create(chat_id=chat_id, defaults={'msg': ''})[0]
-    welcome.msg = msg
-    welcome.save()
-    msg = messages.welcome(uid, u_name, u_nickname)
-    await message.reply(disable_mentions=1, message=msg)
-
-
-@bl.chat_message(SearchCMD('delwelcome'))
-async def delwelcome(message: Message):
-    chat_id = message.peer_id - 2000000000
-    uid = message.from_id
-    data = message.text.split()
-    if len(data) != 1:
-        msg = messages.delwelcome_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-    u_name = await getUserName(uid)
-    u_nickname = await getUserNickname(uid, chat_id)
-    welcome = Welcome.get_or_none(Welcome.chat_id == chat_id)
-    if welcome is not None:
-        welcome.delete()
-    msg = messages.delwelcome(uid, u_name, u_nickname)
-    await message.reply(disable_mentions=1, message=msg)
 
 
 @bl.chat_message(SearchCMD('gzov'))

@@ -10,7 +10,7 @@ import messages
 from Bot.checkers import haveAccess
 from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserAccessLevel, getUserName, getUserNickname, kickUser, \
-    getUserBan, getChatName
+    getUserBan, getChatName, getGroupName
 from config.config import API
 from db import AccessLevel, ChatGroups, Ban, Nickname, GPool, Mute, JoinedDate
 
@@ -22,7 +22,7 @@ async def skick(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message, 3)
+    id = await getIDFromMessage(message.text, message.reply_message, 3)
     if not id:
         msg = messages.skick_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -86,7 +86,7 @@ async def sban(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message, 3)
+    id = await getIDFromMessage(message.text, message.reply_message, 3)
     if not id:
         msg = messages.sban_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -193,7 +193,7 @@ async def sunban(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message, 3)
+    id = await getIDFromMessage(message.text, message.reply_message, 3)
     if not id:
         msg = messages.sunban_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -252,7 +252,7 @@ async def ssnick(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message, 3)
+    id = await getIDFromMessage(message.text, message.reply_message, 3)
     if not id or ((len(data) < 4 and message.reply_message is None) or
                   (len(data) < 3 and message.reply_message is not None)):
         msg = messages.ssnick_hint()
@@ -317,7 +317,7 @@ async def srnick(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message, 3)
+    id = await getIDFromMessage(message.text, message.reply_message, 3)
     if not id:
         msg = messages.srnick_hint()
         await message.reply(disable_mentions=1, message=msg)
@@ -427,8 +427,7 @@ async def chat(message: Message):
         prefix = 'id'
     except:
         prefix = 'club'
-        names = await API.groups.get_by_id(group_id=-int(id))
-        name = names[0].name
+        name = await getGroupName(-int(id))
 
     if ChatGroups.get_or_none(ChatGroups.chat_id == chat_id) is not None:
         chatgroup = 'Привязана'

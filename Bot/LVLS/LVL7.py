@@ -389,7 +389,7 @@ async def editlevel(message: Message):
 @bl.chat_message(SearchCMD('giveowner'))
 async def giveowner(message: Message):
     chat_id = message.peer_id - 2000000000
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if id is not None:
         kb = keyboard.giveowner(chat_id, id, message.from_id)
         msg = messages.giveowner_ask()

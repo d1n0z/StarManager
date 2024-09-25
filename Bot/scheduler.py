@@ -214,7 +214,7 @@ async def new_season():
 
 async def everyminute():
     try:
-        s = Settings.select().where(Settings.setting == 'nightmode', Settings.value2.is_null(False))
+        s = Settings.select().where(Settings.setting == 'nightmode', Settings.pos == 1, Settings.value2.is_null(False))
         for i in s:
             args = i.value2.split('-')
             now = datetime.now()

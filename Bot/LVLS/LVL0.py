@@ -10,13 +10,13 @@ from vkbottle.framework.labeler import BotLabeler
 import keyboard
 import messages
 from Bot.rules import SearchCMD
-from Bot.utils import getIDFromMessage, getUserName, getRegDate, kickUser, getUserNickname, getUserAccessLevel, \
-    getUserLastMessage, getUserMute, getUserBan, getUserXP, getUserLVL, getUserNeededXP, getUserPremium, getXPTop, \
-    uploadImage, addUserXP, isChatAdmin, getUserWarns, getUserMessages, setUserAccessLevel, getChatName, addWeeklyTask, \
-    getULvlBanned, getChatSettings, HiddenPrints
+from Bot.utils import (getIDFromMessage, getUserName, getRegDate, kickUser, getUserNickname, getUserAccessLevel,
+                       getUserLastMessage, getUserMute, getUserBan, getUserXP, getUserLVL, getUserNeededXP,
+                       getUserPremium, getXPTop, uploadImage, addUserXP, isChatAdmin, getUserWarns, getUserMessages,
+                       setUserAccessLevel, getChatName, addWeeklyTask, getULvlBanned, getChatSettings)
 from config.config import API, LVL_NAMES, PATH, REPORT_CD, REPORT_TO, COMMANDS, DEVS, PREMIUM_TASKS_DAILY, TASKS_DAILY
-from db import Messages, AccessNames, Referral, Reports, ReportWarns, CMDLevels, Bonus, Prefixes, CMDNames, PremMenu, \
-    TasksDaily, Coins, TasksStreak, TransferHistory, SpecCommandsCooldown
+from db import (Messages, AccessNames, Referral, Reports, ReportWarns, CMDLevels, Bonus, Prefixes, CMDNames, PremMenu,
+                TasksDaily, Coins, TasksStreak, TransferHistory, SpecCommandsCooldown)
 from media.stats.stats_img import createStatsImage
 
 bl = BotLabeler()
@@ -35,7 +35,7 @@ async def chatid(message: Message):
 
 @bl.chat_message(SearchCMD('id'))
 async def id(message: Message):
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
 
     if not id:
         id = message.from_id
@@ -104,7 +104,7 @@ async def mtop(message: Message):
 @bl.chat_message(SearchCMD('stats'))
 async def stats(message: Message):
     chat_id = message.peer_id - 2000000000
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     reply = await message.reply(messages.stats_loading(), disable_mentions=1)
     if not id:
         id = message.from_id
@@ -438,13 +438,14 @@ async def duel(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
 
-    if s := SpecCommandsCooldown.get_or_none(SpecCommandsCooldown.uid == uid,
-                                             SpecCommandsCooldown.time > time.time() - 10):
-        s: SpecCommandsCooldown
-        msg = messages.speccommandscooldown(int(10 - (time.time() - s.time) + 1))
-        await message.reply(disable_mentions=1, message=msg)
-        return
-    SpecCommandsCooldown.create(time=time.time(), uid=uid)
+    if uid not in DEVS:
+        if s := SpecCommandsCooldown.get_or_none(SpecCommandsCooldown.uid == uid,
+                                                 SpecCommandsCooldown.time > time.time() - 10):
+            s: SpecCommandsCooldown
+            msg = messages.speccommandscooldown(int(10 - (time.time() - s.time) + 1))
+            await message.reply(disable_mentions=1, message=msg)
+            return
+        SpecCommandsCooldown.create(time=time.time(), uid=uid)
 
     if not (await getChatSettings(chat_id))['entertaining']['allowDuel']:
         msg = messages.duel_not_allowed()
@@ -498,7 +499,7 @@ async def transfer(message: Message):
         return
     SpecCommandsCooldown.create(time=time.time(), uid=uid)
 
-    id = await getIDFromMessage(message)
+    id = await getIDFromMessage(message.text, message.reply_message)
     if id < 0:
         msg = messages.transfer_community()
         await message.reply(disable_mentions=1, message=msg)

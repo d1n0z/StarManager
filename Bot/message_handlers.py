@@ -77,7 +77,7 @@ async def message_handle(event: MessageNew) -> None:
                 end = datetime.strptime(setting[1], '%H:%M').replace(year=now.year)
                 if not (now.hour < start.hour or now.hour > end.hour or
                         (now.hour == start.hour and now.minute < start.minute) or
-                        (now.hour == end.hour and now.minute > end.minute)):
+                        (now.hour == end.hour and now.minute >= end.minute)):
                     await deleteMessages(event.object.message.conversation_message_id, chat_id)
                     return
 
@@ -99,11 +99,11 @@ async def message_handle(event: MessageNew) -> None:
     except:
         pass
 
-    if (await getChatSettings(chat_id))['antispam']['messagesPerMinute']:
+    if settings['antispam']['messagesPerMinute']:
         userantispammessages = AntispamMessages.select().where(AntispamMessages.from_id == uid,
                                                                AntispamMessages.chat_id == chat_id)
         setting = Settings.get(Settings.chat_id == chat_id, Settings.setting == 'messagesPerMinute')
-        if len(userantispammessages) < setting.value:
+        if setting.value and len(userantispammessages) < setting.value:
             AntispamMessages.create(cmid=event.object.message.conversation_message_id, chat_id=chat_id, from_id=uid,
                                     time=event.object.message.date)
 

@@ -163,6 +163,7 @@ class Settings(Model):
     chat_id = IntegerField(default=0, index=True)
     setting = TextField(null=True)
     pos = BooleanField(null=True)
+    pos2 = BooleanField(null=True)
     value = IntegerField(null=True)
     value2 = TextField(null=True)
     punishment = TextField(null=True)
@@ -175,10 +176,23 @@ class Settings(Model):
 class Welcome(Model):
     chat_id = IntegerField(default=0, index=True, unique=True)
     msg = TextField(null=True)
+    photo = TextField(null=True)
+    url = TextField(null=True)
+    button_label = TextField(null=True)
 
     class Meta:
         database = dbhandle
         table_name = f'welcome'
+
+
+class WelcomeHistory(Model):
+    chat_id = IntegerField(default=0, index=True, unique=True)
+    cmid = IntegerField()
+    time = BigIntegerField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'welcomehistory'
 
 
 class JoinedDate(Model):
@@ -332,6 +346,7 @@ class ReportAnswers(Model):
     chat_id = IntegerField(default=0)
     repid = IntegerField(default=0, unique=True)
     report_text = TextField(null=True)
+    cmid = IntegerField(null=True)
 
     class Meta:
         database = dbhandle

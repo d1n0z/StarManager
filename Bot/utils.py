@@ -1,4 +1,6 @@
 import locale
+import os
+import tempfile
 import time
 import traceback
 from ast import literal_eval
@@ -8,32 +10,18 @@ import requests
 import urllib3
 import validators
 import xmltodict
+from memoization import cached
+from nudenet import NudeDetector
 from vkbottle import PhotoMessageUploader
 from vkbottle.bot import Bot
-
-from nudenet import NudeDetector
-import tempfile
-import os
-import sys
-
 from vkbottle_types.objects import MessagesMessage, MessagesMessageAttachmentType
 
 from config.config import (API, VK_API_SESSION, VK_TOKEN_GROUP, GROUP_ID, TASKS_DAILY, PREMIUM_TASKS_DAILY,
                            PREMIUM_TASKS_DAILY_TIERS, TASKS_WEEKLY, PREMIUM_TASKS_WEEKLY, SETTINGS, PATH,
-                           NSFW_CATEGORIES, SETTINGS_COUNTABLE)
+                           NSFW_CATEGORIES, SETTINGS_ALT)
 from db import (CMDNames, UserNames, ChatNames, GroupNames, AccessLevel, LastMessageDate, Nickname, Mute, Warn, Ban,
                 XP, Premium, PremMenu, CMDLevels, Messages, DuelWins, Settings, TasksDaily, TasksWeekly, Coins,
                 LvlBanned, AntispamMessages, AntispamURLExceptions)
-
-
-class HiddenPrints:
-    def __enter__(self):
-        self._original_stdout = sys.stdout
-        sys.stdout = open(os.devnull, 'w')
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        sys.stdout.close()
-        sys.stdout = self._original_stdout
 
 
 def namesAsCommand(cmd, uid) -> list:
@@ -73,18 +61,19 @@ async def deleteMessages(cmids, chat_id) -> bool:
     return True
 
 
-async def getIDFromMessage(message, place=2) -> int:
+async def getIDFromMessage(message, reply, place=2) -> int:
     """
     The getIDFromMessage function is used to get the ID of a user from a message.
 
-    :param message: Get the message object that was sent
+    :param message: Get the message text
+    :param reply: Get the reply_message object
     :param place: Determine which part of the message to get the id from
     :return: The user's id
     """
-    data = message.text.split()
+    data = message.split()
     try:
-        if len(data) >= place or message.reply_message:
-            if message.reply_message is None:
+        if len(data) >= place or reply:
+            if reply is None:
                 try:
                     if data[place - 1].count('[id') != 0:
                         id = data[place - 1][data[place - 1].find('[id') + 3:data[place - 1].find('|')]
@@ -108,7 +97,7 @@ async def getIDFromMessage(message, place=2) -> int:
                 except IndexError:
                     id = False
             else:
-                id = message.reply_message.from_id
+                id = reply.from_id
         else:
             id = False
 
@@ -126,11 +115,13 @@ async def sendMessageEventAnswer(event_id, user_id, peer_id, event_data=None) ->
     return True
 
 
-async def sendMessage(peer_id, msg, kbd=None):
+async def sendMessage(peer_ids, msg=None, kbd=None, photo=None):
     try:
-        return await API.messages.send(random_id=0, peer_id=peer_id, message=msg, keyboard=kbd, disable_mentions=1)
+        return await API.messages.send(random_id=0, peer_ids=peer_ids, message=msg,
+                                       keyboard=kbd, attachment=photo, disable_mentions=1)
     except:
-        traceback.print_exc()
+        if peer_ids == 2000029477:
+            traceback.print_exc()
         return False
 
 
@@ -166,8 +157,8 @@ async def getChatName(chat_id=None) -> str:
 async def getGroupName(group_id) -> str:
     name = GroupNames.get_or_none(GroupNames.group_id == group_id)
     if name is None:
-        name = await API.groups.get_by_id(group_id=abs(group_id))
-        name = name[0].name
+        name = await API.groups.get_by_id(group_ids=abs(group_id))
+        name = name.groups[0].name
         name = GroupNames.create(group_id=group_id, name=name)
     return name.name
 
@@ -198,6 +189,7 @@ async def setChatMute(id, chat_id, mute_time):
             return VK_API_SESSION.method('messages.changeConversationMemberRestrictions',
                                          {'peer_id': chat_id + 2000000000, 'member_ids': id, 'action': 'rw'})
     except:
+        traceback.print_exc()
         return
 
 
@@ -208,6 +200,7 @@ async def uploadImage(file):
         photo = await photo_uploader.upload(file_source=file)
         return photo
     except:
+        traceback.print_exc()
         return None
 
 
@@ -397,10 +390,24 @@ async def getChatSettings(chat_id):
     return chatsettings
 
 
-async def turnChatSetting(chat_id, category, setting):
+async def getChatAltSettings(chat_id):
+    chatsettings = SETTINGS_ALT()
+    for cat, settings in chatsettings.items():
+        for setting, pos in settings.items():
+            chatsetting = Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == setting)
+            if chatsetting is None:
+                continue
+            chatsettings[cat][setting] = chatsetting.pos2
+    return chatsettings
+
+
+async def turnChatSetting(chat_id, category, setting, alt=False):
     s = Settings.get_or_create(chat_id=chat_id, setting=setting,
                                defaults={'pos': SETTINGS()[category][setting]})[0]
-    s.pos = not s.pos
+    if alt:
+        s.pos2 = not s.pos2
+    else:
+        s.pos = not s.pos
     s.save()
     return s.pos
 
@@ -485,11 +492,12 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings):
         data = message.text.split()
         for i in data:
             for y in i.split('/'):
-                if (validators.url(y) or validators.domain(y)) and y not in ['vk.com', 'vk.ru']:
-                    if AntispamURLExceptions.get_or_none(
-                            AntispamURLExceptions.chat_id == chat_id,
-                            AntispamURLExceptions.url == y.replace('https://', '').replace('/', '')) is None:
-                        return 'disallowLinks'
+                if not validators.url(y) and not validators.domain(y) or y in ['vk.com', 'vk.ru']:
+                    continue
+                if AntispamURLExceptions.get_or_none(
+                        AntispamURLExceptions.chat_id == chat_id,
+                        AntispamURLExceptions.url == y.replace('https://', '').replace('/', '')) is None:
+                    return 'disallowLinks'
     if settings['antispam']['disallowNSFW']:
         for i in message.attachments:
             if i.type != MessagesMessageAttachmentType.PHOTO:
@@ -510,6 +518,7 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings):
     return False
 
 
+@cached
 def pointDays(seconds):
     res = int(seconds // 86400)
     if res == 1:
@@ -521,6 +530,7 @@ def pointDays(seconds):
     return res
 
 
+@cached
 def pointHours(seconds):
     res = int(seconds // 3600)
     if res in [23, 22, 4, 3, 2]:
@@ -532,6 +542,7 @@ def pointHours(seconds):
     return res
 
 
+@cached
 def pointMinutes(seconds):
     res = int(seconds // 60)
     if res % 10 == 1 and res % 100 != 11:
@@ -543,6 +554,7 @@ def pointMinutes(seconds):
     return res
 
 
+@cached
 def pointWords(value, words):
     """
     :param value
