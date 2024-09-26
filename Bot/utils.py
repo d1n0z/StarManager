@@ -361,8 +361,11 @@ async def getUserMessages(uid, chat_id, none=0) -> int:
     return none
 
 
-async def addUserXP(uid, addxp):
-    if not await getULvlBanned(uid):
+async def addUserXP(uid, addxp, lvlbanned=None):
+    if lvlbanned is None:
+        if not await getULvlBanned(uid):
+            return
+    elif not lvlbanned:
         return
     u = XP.get_or_create(uid=uid, defaults={'xp': 0})[0]
     ul = await getUserLVL(u.xp)
@@ -381,12 +384,12 @@ async def getUserDuelWins(uid, none=0):
 
 async def getChatSettings(chat_id):
     chatsettings = SETTINGS()
+    dbchatsettings = {i.setting: i.pos for i in Settings.select().where(Settings.chat_id == chat_id)}
     for cat, settings in chatsettings.items():
         for setting, pos in settings.items():
-            chatsetting = Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == setting)
-            if chatsetting is None:
+            if setting not in dbchatsettings:
                 continue
-            chatsettings[cat][setting] = chatsetting.pos
+            chatsettings[cat][setting] = dbchatsettings[setting]
     return chatsettings
 
 
@@ -421,8 +424,11 @@ async def setUserAccessLevel(uid, chat_id, access_level):
     ac.save()
 
 
-async def addDailyTask(uid, task, count=1):
-    if not await getULvlBanned(uid):
+async def addDailyTask(uid, task, count=1, lvlbanned=None):
+    if lvlbanned is None:
+        if not await getULvlBanned(uid):
+            return
+    elif not lvlbanned:
         return
     t = TasksDaily.get_or_create(uid=uid, task=task)[0]
     t.count += count
@@ -438,8 +444,11 @@ async def addDailyTask(uid, task, count=1):
         c.save()
 
 
-async def addWeeklyTask(uid, task, count=1):
-    if not await getULvlBanned(uid):
+async def addWeeklyTask(uid, task, count=1, lvlbanned=None):
+    if lvlbanned is None:
+        if not await getULvlBanned(uid):
+            return
+    elif not lvlbanned:
         return
     t = TasksWeekly.get_or_create(uid=uid, task=task)[0]
     t.count += count

@@ -1,4 +1,4 @@
-from peewee import PostgresqlDatabase, Model, IntegerField, BigIntegerField, TextField, BooleanField
+from peewee import PostgresqlDatabase, Model, IntegerField, BigIntegerField, TextField, BooleanField, DateTimeField
 from config.config import USER, PASSWORD, DATABASE
 
 dbhandle = PostgresqlDatabase(DATABASE, user=USER, password=PASSWORD, host='localhost')
@@ -603,3 +603,22 @@ class SpecCommandsCooldown(Model):
     class Meta:
         database = dbhandle
         table_name = f'speccommandscooldown'
+
+
+class CommandsStatistics(Model):
+    cmd = TextField()
+    timestart = DateTimeField(null=True)
+    timeend = DateTimeField(null=True)
+
+    class Meta:
+        database = dbhandle
+        table_name = f'commandsstatistics'
+
+
+class MessagesStatistics(Model):
+    timestart = DateTimeField(null=True)
+    timeend = DateTimeField(null=True)
+
+    class Meta:
+        database = dbhandle
+        table_name = f'messagesstatistics'

@@ -44,7 +44,7 @@ COMMANDS = {
     "statuslist": 8, "cmdcount": 8, "infban": 8, "infunban": 8, "getlink": 8, "backup": 8, "gps": 8, "checkleaved": 8,
     "reportwarn": 8, "reboot": 8, "sudo": 8, "givexp": 8, "reimport": 8, "resetlvl": 8, "getuserchats": 8, "helpdev": 8,
     "getchats": 8, "gettransferhistory": 8, "gettransferhistoryto": 8, "gettransferhistoryfrom": 8,
-    "getmessageshistory": 8, "lvlban": 8, "lvlunban": 8, "lvlbanlist": 8
+    "getmessageshistory": 8, "lvlban": 8, "lvlunban": 8, "lvlbanlist": 8, "msgcount": 8
 }
 PM_COMMANDS = [
     "anon", "deanon",

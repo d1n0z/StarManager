@@ -332,7 +332,7 @@ def pm_market():
 
 
 def duel(uid, xp):
-    kb = Keyboard(inline=True)
+    kb = Keyboard(inline=True, one_time=True)
 
     kb.add(Callback('Сразиться', {'cmd': 'duel', 'uid': uid, 'xp': xp}), KeyboardButtonColor.SECONDARY)
 

@@ -1,6 +1,7 @@
 import asyncio
 import importlib
 import os
+import statistics
 import sys
 import time
 import traceback
@@ -16,7 +17,7 @@ from Bot.utils import getUserName, getIDFromMessage, getUserNickname, sendMessag
     setUserAccessLevel
 from config.config import API, GROUP_ID, DEVS
 from db import AllChats, Blacklist, Premium, InfBanned, ReportWarns, Reboot, XP, Coins, Messages, TransferHistory, \
-    LvlBanned
+    LvlBanned, CommandsStatistics, MessagesStatistics
 
 bl = BotLabeler()
 
@@ -371,11 +372,25 @@ async def inflist(message: Message):
 
 @bl.chat_message(SearchCMD('cmdcount'))
 async def cmdcount(message: Message):
-    pass  # completely broken
-    # cmdcounter = getCMDCounter()
-    # cmdcounter = cmdcounter.select().order_by(cmdcounter.count.desc()).limit(25)
-    # msg = messages.cmdcount(cmdcounter)
-    # await message.reply(msg)
+    cmdsraw = CommandsStatistics.select().where(CommandsStatistics.timeend.is_null(False))
+    cmds = {}
+    for i in cmdsraw.iterator():
+        i: CommandsStatistics
+        if i.cmd not in cmds:
+            cmds[i.cmd] = [i.timeend.timestamp() - i.timestart.timestamp()]
+        else:
+            cmds[i.cmd].append(i.timeend.timestamp() - i.timestart.timestamp())
+    msg = ''
+    for i in cmds.keys():
+        msg += f'{i}: {statistics.mean(cmds[i])} секунд | использован {len(cmds[i])} раз\n'
+    await message.reply(disable_mentions=1, message=msg)
+
+
+@bl.chat_message(SearchCMD('msgcount'))
+async def cmdcount(message: Message):
+    msgs = [i.timeend.timestamp() - i.timestart.timestamp() for i in
+            MessagesStatistics.select().where(MessagesStatistics.timeend.is_null(False))]
+    await message.reply(disable_mentions=1, message=f'Среднее время обработки - {statistics.mean(msgs)} секунд')
 
 
 @bl.chat_message(SearchCMD('getlink'))

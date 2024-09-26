@@ -52,11 +52,8 @@ async def getUserIgnore(uid, chat_id) -> int:
 
 
 async def getUInfBanned(uid, chat_id) -> int:
-    inf = InfBanned.get_or_none(InfBanned.type == 'group', InfBanned.uid == chat_id)
-    if inf is not None:
-        return 0
-    inf = InfBanned.get_or_none(InfBanned.type == 'user', InfBanned.uid == uid)
-    if inf is not None:
+    inf = InfBanned.select().where(InfBanned.uid << (chat_id, uid))
+    if len(inf):
         return 0
     return 1
 

@@ -11,13 +11,14 @@ from Bot.action_handlers import action_handle
 from Bot.add_msg_count import add_msg_counter
 from Bot.answers_handlers import answer_handler
 from Bot.checkers import getUChatLimit, getSilence
-from Bot.utils import getUserLastMessage, getUserAccessLevel, getUserMute, addDailyTask, \
-    sendMessage, deleteMessages, getChatSettings, kickUser, getUserName, getUserNickname, antispamChecker, setChatMute
+from Bot.utils import getUserLastMessage, getUserAccessLevel, getUserMute, addDailyTask, sendMessage, deleteMessages, \
+    getChatSettings, kickUser, getUserName, getUserNickname, antispamChecker, setChatMute
 from config.config import ADMINS, PM_COMMANDS
-from db import AllUsers, AllChats, Filters, AntispamMessages, Settings, Mute, Ban
+from db import AllUsers, AllChats, Filters, AntispamMessages, Settings, Mute, Ban, MessagesStatistics
 
 
 async def message_handle(event: MessageNew) -> None:
+    dbmsg = MessagesStatistics.create(timestart=datetime.now())
     if event.object.message.action:
         await action_handle(event)
         return
@@ -75,9 +76,9 @@ async def message_handle(event: MessageNew) -> None:
                 now = datetime.now()
                 start = datetime.strptime(setting[0], '%H:%M').replace(year=now.year)
                 end = datetime.strptime(setting[1], '%H:%M').replace(year=now.year)
-                if not (now.hour < start.hour or now.hour > end.hour or
-                        (now.hour == start.hour and now.minute < start.minute) or
-                        (now.hour == end.hour and now.minute >= end.minute)):
+                if not (now.hour < start.hour or now.hour > end.hour or (
+                        now.hour == start.hour and now.minute < start.minute) or (
+                                now.hour == end.hour and now.minute >= end.minute)):
                     await deleteMessages(event.object.message.conversation_message_id, chat_id)
                     return
 
@@ -189,4 +190,7 @@ async def message_handle(event: MessageNew) -> None:
                                   messages.antispam_punishment(uid, name, nick, setting.setting, punishment[0],
                                                                setting.value, punishment[1]))
             return
+
     await add_msg_counter(chat_id, uid, audio)
+    dbmsg.timeend = datetime.now()
+    dbmsg.save()
