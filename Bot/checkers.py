@@ -1,5 +1,8 @@
 import threading
+import time
 import traceback
+
+from memoization import cached
 
 import messages
 from Bot.global_warn_handler import global_warn_handle
@@ -8,9 +11,7 @@ from config.config import COMMANDS, API, PREFIX, DEVS, MAIN_DEVS, LVL_BANNED_COM
 from db import GlobalWarns, CMDLevels, Prefixes, Ignore, InfBanned, SilenceMode, ChatLimit, CMDNames, LvlBanned
 
 
-async def isAdmin(cmd, chat_id) -> bool:
-    if cmd not in COMMANDS:
-        return True
+async def isAdmin(chat_id) -> bool:
     try:
         await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
         return True
@@ -91,18 +92,16 @@ async def checkCMD(message, chat_id, fixing=False, accesstoalldevs=False, return
         return False
     if text[:1] in PREFIX:
         prefix = text[:1]
-    elif text[:2] in PREFIX:
-        prefix = text[:2]
     else:
         prefix = Prefixes.get_or_none(Prefixes.uid == uid, Prefixes.prefix << [text[:1], text[:2]])
         if prefix is None:
             return False
         prefix = prefix.prefix
 
-    if text.replace(prefix, '') in COMMANDS:
-        cmd = text.replace(prefix, '')
+    if text.replace(prefix, '', 1) in COMMANDS:
+        cmd = text.replace(prefix, '', 1)
     else:
-        cmd = CMDNames.get_or_none(CMDNames.uid == uid, CMDNames.name == text.replace(prefix, ''))
+        cmd = CMDNames.get_or_none(CMDNames.uid == uid, CMDNames.name == text.replace(prefix, '', 1))
         if cmd is None:
             return False
         cmd = cmd.cmd
@@ -120,15 +119,6 @@ async def checkCMD(message, chat_id, fixing=False, accesstoalldevs=False, return
     sgw = await isSGW(uid, message.date)
     if sgw:
         await message.reply(messages.lock(sgw - message.date))
-        return False
-
-    admin = await isAdmin(cmd, chat_id)
-    if not admin:
-        msg = messages.notadmin()
-        try:
-            await message.reply(msg)
-        except:
-            await API.messages.send(message=message, random_id=0, chat_id=chat_id)
         return False
 
     u_prem = await getUserPremium(uid)
@@ -154,7 +144,7 @@ async def checkCMD(message, chat_id, fixing=False, accesstoalldevs=False, return
     if prefix not in uprefixes or not access or ign or not infb:
         return False
 
-    threading.Thread(target=global_warn_handle, args=(uid, cmd,)).start()
+    # await global_warn_handle(uid, cmd)
     if returncmd:
         return cmd
     return True

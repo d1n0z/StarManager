@@ -622,3 +622,12 @@ class MessagesStatistics(Model):
     class Meta:
         database = dbhandle
         table_name = f'messagesstatistics'
+
+
+class MiddlewaresStatistics(Model):
+    timestart = DateTimeField(null=True)
+    timeend = DateTimeField(null=True)
+
+    class Meta:
+        database = dbhandle
+        table_name = f'middlewaresstatistics'

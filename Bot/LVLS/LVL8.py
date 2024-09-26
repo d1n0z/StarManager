@@ -5,6 +5,7 @@ import statistics
 import sys
 import time
 import traceback
+from datetime import datetime
 
 from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
@@ -17,7 +18,7 @@ from Bot.utils import getUserName, getIDFromMessage, getUserNickname, sendMessag
     setUserAccessLevel
 from config.config import API, GROUP_ID, DEVS
 from db import AllChats, Blacklist, Premium, InfBanned, ReportWarns, Reboot, XP, Coins, Messages, TransferHistory, \
-    LvlBanned, CommandsStatistics, MessagesStatistics
+    LvlBanned, CommandsStatistics, MessagesStatistics, MiddlewaresStatistics
 
 bl = BotLabeler()
 
@@ -386,11 +387,53 @@ async def cmdcount(message: Message):
     await message.reply(disable_mentions=1, message=msg)
 
 
-@bl.chat_message(SearchCMD('msgcount'))
+@bl.chat_message(SearchCMD('msgsaverage'))
 async def cmdcount(message: Message):
     msgs = [i.timeend.timestamp() - i.timestart.timestamp() for i in
             MessagesStatistics.select().where(MessagesStatistics.timeend.is_null(False))]
     await message.reply(disable_mentions=1, message=f'Среднее время обработки - {statistics.mean(msgs)} секунд')
+
+
+@bl.chat_message(SearchCMD('msgscount'))
+async def cmdcount(message: Message):
+    msgs5minutes = MessagesStatistics.select().where(MessagesStatistics.timeend.is_null(False),
+                                                     MessagesStatistics.timestart.minute >= datetime.now().minute - 5,
+                                                     MessagesStatistics.timestart.hour == datetime.now().hour,
+                                                     MessagesStatistics.timestart.day == datetime.now().day,
+                                                     MessagesStatistics.timestart.month == datetime.now().month,
+                                                     MessagesStatistics.timestart.year == datetime.now().year).count()
+    msgsminute = MessagesStatistics.select().where(MessagesStatistics.timeend.is_null(False),
+                                                   MessagesStatistics.timestart.minute == datetime.now().minute,
+                                                   MessagesStatistics.timestart.hour == datetime.now().hour,
+                                                   MessagesStatistics.timestart.day == datetime.now().day,
+                                                   MessagesStatistics.timestart.month == datetime.now().month,
+                                                   MessagesStatistics.timestart.year == datetime.now().year).count()
+    msgshour = MessagesStatistics.select().where(MessagesStatistics.timeend.is_null(False),
+                                                 MessagesStatistics.timestart.hour == datetime.now().hour,
+                                                 MessagesStatistics.timestart.day == datetime.now().day,
+                                                 MessagesStatistics.timestart.month == datetime.now().month,
+                                                 MessagesStatistics.timestart.year == datetime.now().year).count()
+    msgslasthour = MessagesStatistics.select().where(MessagesStatistics.timeend.is_null(False),
+                                                     MessagesStatistics.timestart.hour == datetime.now().hour - 1,
+                                                     MessagesStatistics.timestart.day == datetime.now().day,
+                                                     MessagesStatistics.timestart.month == datetime.now().month,
+                                                     MessagesStatistics.timestart.year == datetime.now().year).count()
+    msgsday = MessagesStatistics.select().where(MessagesStatistics.timeend.is_null(False),
+                                                MessagesStatistics.timestart.day == datetime.now().day,
+                                                MessagesStatistics.timestart.month == datetime.now().month,
+                                                MessagesStatistics.timestart.year == datetime.now().year).count()
+    await message.reply(disable_mentions=1, message=f'{msgsday} сообщений в за сегодня\n'
+                                                    f'{msgslasthour} сообщений за прошлый час\n'
+                                                    f'{msgshour} сообщений за этот час\n'
+                                                    f'{msgs5minutes} сообщений за последние 5 минут\n'
+                                                    f'{msgsminute} сообщений за эту минуту')
+
+
+@bl.chat_message(SearchCMD('mwaverage'))
+async def cmdcount(message: Message):
+    average = statistics.mean([i.timeend.timestamp() - i.timestart.timestamp() for i in
+                               MiddlewaresStatistics.select().where(MiddlewaresStatistics.timeend.is_null(False))])
+    await message.reply(disable_mentions=1, message=f'Среднее время работы мидлвари - {average} секунд')
 
 
 @bl.chat_message(SearchCMD('getlink'))

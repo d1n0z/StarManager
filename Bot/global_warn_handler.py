@@ -5,7 +5,7 @@ from config.config import GWARN_TIME_LIMIT
 from db import LastFiveCommands, GlobalWarns
 
 
-def global_warn_handle(uid, cmd) -> None:
+async def global_warn_handle(uid, cmd) -> None:
     res = LastFiveCommands.get_or_none(LastFiveCommands.uid == uid)
     if res is not None:
         cmds = literal_eval(res.cmds)

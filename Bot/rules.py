@@ -15,7 +15,7 @@ class SearchCMD(ABCRule[Message]):
         if event.out == self.cmd:
             if event.from_id > 0:
                 await addDailyTask(event.from_id, 'cmds')
-                return True
+            return True
         return False
 
 
