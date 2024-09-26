@@ -1,9 +1,7 @@
 from vkbottle import Keyboard, Callback, OpenLink, KeyboardButtonColor
 
-from Bot.utils import getChatAltSettings
-from config.config import TASKS_LOTS, SETTINGS_POSITIONS, DEVS, SETTINGS_COUNTABLE_CHANGEMENU, SETTINGS_COUNTABLE, \
+from config.config import TASKS_LOTS, SETTINGS_POSITIONS, SETTINGS_COUNTABLE_CHANGEMENU, SETTINGS_COUNTABLE, \
     SETTINGS_COUNTABLE_NO_CATEGORY
-from db import Settings
 
 
 def join(chid):

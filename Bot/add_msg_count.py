@@ -2,13 +2,12 @@ import time
 from datetime import datetime
 
 from Bot.checkers import getUInfBanned, getULvlBanned
-from Bot.utils import getUserPremium, addUserXP, addWeeklyTask, addDailyTask, getUserName, getChatName
+from Bot.utils import getUserPremium, addUserXP, addWeeklyTask, addDailyTask
 from config.config import CHEATING_TO, API
 from db import Messages, LastMessageDate, XP
 
 
 async def add_msg_counter(chat_id, uid, audio=False) -> None:
-    st = time.time()
     mst = Messages.get_or_create(uid=uid, chat_id=chat_id)[0]
     mst.messages += 1
     mst.save()

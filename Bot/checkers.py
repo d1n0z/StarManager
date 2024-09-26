@@ -1,11 +1,6 @@
-import threading
-import time
 import traceback
 
-from memoization import cached
-
 import messages
-from Bot.global_warn_handler import global_warn_handle
 from Bot.utils import getUserAccessLevel, getUserPremium, getUserLastMessage, getUserMute
 from config.config import COMMANDS, API, PREFIX, DEVS, MAIN_DEVS, LVL_BANNED_COMMANDS
 from db import GlobalWarns, CMDLevels, Prefixes, Ignore, InfBanned, SilenceMode, ChatLimit, CMDNames, LvlBanned

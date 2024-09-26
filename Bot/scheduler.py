@@ -13,10 +13,10 @@ import messages
 from Bot.megadrive import mega_drive
 from Bot.tgbot import getTGBot
 from Bot.utils import sendMessage, chunks
-from config.config import DATABASE, PASSWORD, USER, TG_CHAT_ID, REPORT_TO, NEWSEASON_REWARDS, TASKS_DAILY, \
+from config.config import DATABASE, PASSWORD, USER, TG_CHAT_ID, NEWSEASON_REWARDS, TASKS_DAILY, \
     PREMIUM_TASKS_DAILY, DAILY_TO, API, IMPLICIT_API, GROUP_ID
 from db import UserNames, ChatNames, GroupNames, Premium, Reboot, XP, TasksDaily, TasksWeekly, AntispamMessages, \
-    Settings, SpecCommandsCooldown
+    Settings, SpecCommandsCooldown, MiddlewaresStatistics, MessagesStatistics, CommandsStatistics
 
 
 async def resetPremium():
@@ -164,7 +164,10 @@ async def updateNames():
 
 async def reboot():
     try:
-        Reboot.create(chat_id=REPORT_TO, time=time.time(), sended=0).save()
+        Reboot.create(chat_id=DAILY_TO + 2000000000, time=time.time(), sended=0).save()
+        CommandsStatistics.delete().execute()
+        MessagesStatistics.delete().execute()
+        MiddlewaresStatistics.delete().execute()
         os.system('sudo reboot')
         await sendMessage(DAILY_TO + 2000000000, 'reboot: 100%')
     except Exception as e:

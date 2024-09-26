@@ -234,7 +234,7 @@ def warn(name, nick, uid, ch_name, ch_nick, id, cause):
         cause = ' по причине: ' + cause
     n = nick if nick is not None else name
     cn = ch_nick if ch_nick is not None else ch_name
-    return get('warn', uid=uid, n=n,cause=cause, cn=cn, id=id)
+    return get('warn', uid=uid, n=n, cause=cause, cn=cn, id=id)
 
 
 def warn_kick(name, nick, uid, ch_name, ch_nick, id, cause):

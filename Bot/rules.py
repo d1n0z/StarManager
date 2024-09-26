@@ -4,7 +4,7 @@ from vkbottle_types.events.bot_events import MessageNew
 
 from Bot.checkers import getUserPrefixes
 from Bot.utils import addDailyTask, getUserPremium
-from config.config import PM_COMMANDS, MAIN_DEVS
+from config.config import PM_COMMANDS
 
 
 class SearchCMD(ABCRule[Message]):

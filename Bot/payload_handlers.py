@@ -1,5 +1,4 @@
 import json
-import random
 import secrets
 import time
 from ast import literal_eval
@@ -17,8 +16,7 @@ from Bot.utils import sendMessageEventAnswer, editMessage, getUserAccessLevel, g
     getUserName, getUserNickname, kickUser, getXPTop, getChatName, addWeeklyTask, \
     addDailyTask, getUserBan, getUserWarns, getUserMute, getULvlBanned, getChatSettings, turnChatSetting, \
     deleteMessages, setChatMute, getChatAltSettings
-from config.config import API, COMMANDS, DEVS, TASKS_LOTS, TASKS_DAILY, PREMIUM_TASKS_DAILY, SETTINGS_COUNTABLE, \
-    SETTINGS_COUNTABLE_NO_PUNISHMENT
+from config.config import API, COMMANDS, DEVS, TASKS_LOTS, TASKS_DAILY, PREMIUM_TASKS_DAILY, SETTINGS_COUNTABLE
 from db import AccessLevel, JoinedDate, DuelWins, ReportAnswers, Nickname, Mute, Warn, Ban, Premium, \
     GPool, ChatGroups, Messages, Notifs, TypeQueue, CMDLevels, ReportWarns, CMDNames, Coins, XP, TasksWeekly, \
     TasksDaily, TasksStreak, Settings, AntispamURLExceptions, Welcome

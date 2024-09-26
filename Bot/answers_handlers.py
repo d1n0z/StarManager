@@ -180,7 +180,7 @@ async def queue_handler(event: MessageNew):
     elif queue.type == 'settings_listaction':
         setting = additional['setting']
         action = additional['action']
-        type = additional['type']
+        # type = additional['type']
         if setting == 'disallowLinks':
             if action == 'add':
                 url = event.object.message.text.replace(' ', '').replace('https://', '').replace('/', '')

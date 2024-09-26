@@ -3,8 +3,8 @@ from vkbottle_types.events.bot_events import MessageNew
 
 import keyboard
 import messages
-from Bot.utils import kickUser, getUserName, getUserBan, getUserBanInfo, getUserNickname, getChatSettings, sendMessage, \
-    getUserAccessLevel, deleteMessages
+from Bot.utils import (kickUser, getUserName, getUserBan, getUserBanInfo, getUserNickname, getChatSettings, sendMessage,
+                       getUserAccessLevel, deleteMessages)
 from config.config import GROUP_ID
 from db import AllUsers, UserJoinedDate, Referral, Blacklist, AllChats, LeavedChats, Welcome, Settings, WelcomeHistory
 

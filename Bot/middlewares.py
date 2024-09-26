@@ -1,5 +1,4 @@
 from datetime import datetime
-import time
 
 from vkbottle import BaseMiddleware
 from vkbottle.bot import Message

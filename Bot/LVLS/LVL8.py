@@ -46,7 +46,7 @@ async def backup_handler(message: Message):
 @bl.chat_message(SearchCMD('botinfo'))
 async def botinfo(message: Message):
     # completely broken
-    pass  # chat_id = message.peer_id - 2000000000
+    await message.reply(disable_mentions=1, message='Эта команда отключена.')  # chat_id = message.peer_id - 2000000000
     # chats = []
     # for i in ac.select().where(ac.access_level > 6):
     #     if i.chat_id not in chats:
@@ -116,7 +116,6 @@ async def botinfo(message: Message):
 
 @bl.chat_message(SearchCMD('msg'))
 async def msg(message: Message):
-    chat_id = message.peer_id - 2000000000
     data = message.text.split()
     if len(data) <= 1:
         msg = messages.msg_hint()
@@ -201,7 +200,6 @@ async def delblack(message: Message):
 
 @bl.chat_message(SearchCMD('blacklist'))
 async def blacklist(message: Message):
-    chat_id = message.peer_id - 2000000000
     users = {}
     for user in Blacklist.select().iterator():
         name = await getUserName(user.uid)
