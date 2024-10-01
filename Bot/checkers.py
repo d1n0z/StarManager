@@ -1,9 +1,12 @@
 import traceback
+from datetime import datetime
 
 import messages
-from Bot.utils import getUserAccessLevel, getUserPremium, getUserLastMessage, getUserMute
+from Bot.utils import getUserAccessLevel, getUserPremium, getUserLastMessage, getUserMute, getChatSettings, \
+    deleteMessages
 from config.config import COMMANDS, API, PREFIX, DEVS, MAIN_DEVS, LVL_BANNED_COMMANDS
-from db import GlobalWarns, CMDLevels, Prefixes, Ignore, InfBanned, SilenceMode, ChatLimit, CMDNames, LvlBanned
+from db import GlobalWarns, CMDLevels, Prefixes, Ignore, InfBanned, SilenceMode, ChatLimit, CMDNames, LvlBanned, \
+    Settings
 
 
 async def isAdmin(chat_id) -> bool:
@@ -126,6 +129,21 @@ async def checkCMD(message, chat_id, fixing=False, accesstoalldevs=False, return
     chlim = await getUChatLimit(message.date, lm, u_acc, chat_id)
     mute = await getUserMute(uid, chat_id)
     timeout = await getSilence(chat_id)
+    settings = await getChatSettings(chat_id)
+
+    if settings['main']['nightmode'] and u_acc < 6:
+        chatsetting = Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == 'nightmode')
+        if chatsetting is not None:
+            if setting := chatsetting.value2:
+                setting = setting.split('-')
+                now = datetime.now()
+                start = datetime.strptime(setting[0], '%H:%M').replace(year=now.year)
+                end = datetime.strptime(setting[1], '%H:%M').replace(year=now.year)
+                if not (now.hour < start.hour or now.hour > end.hour or (
+                        now.hour == start.hour and now.minute < start.minute) or (
+                                now.hour == end.hour and now.minute >= end.minute)):
+                    await deleteMessages(message.conversation_message_id, chat_id)
+                    return False
 
     if chlim or mute > message.date or (timeout and u_acc == 0):
         try:

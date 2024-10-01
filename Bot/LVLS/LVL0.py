@@ -1,6 +1,7 @@
 import random
 import re
 import time
+import traceback
 from datetime import datetime
 
 import requests
@@ -10,11 +11,13 @@ from vkbottle.framework.labeler import BotLabeler
 import keyboard
 import messages
 from Bot.rules import SearchCMD
+from Bot.tgbot import getTGBot
 from Bot.utils import (getIDFromMessage, getUserName, getRegDate, kickUser, getUserNickname, getUserAccessLevel,
                        getUserLastMessage, getUserMute, getUserBan, getUserXP, getUserLVL, getUserNeededXP,
                        getUserPremium, getXPTop, uploadImage, addUserXP, isChatAdmin, getUserWarns, getUserMessages,
                        setUserAccessLevel, getChatName, addWeeklyTask, getULvlBanned, getChatSettings)
-from config.config import API, LVL_NAMES, PATH, REPORT_CD, REPORT_TO, COMMANDS, DEVS, PREMIUM_TASKS_DAILY, TASKS_DAILY
+from config.config import (API, LVL_NAMES, PATH, REPORT_CD, REPORT_TO, COMMANDS, DEVS, PREMIUM_TASKS_DAILY, TASKS_DAILY,
+                           TG_CHAT_ID, TG_TRANSFER_THREAD_ID)
 from db import (Messages, AccessNames, Referral, Reports, ReportWarns, CMDLevels, Bonus, Prefixes, CMDNames, PremMenu,
                 TasksDaily, Coins, TasksStreak, TransferHistory, SpecCommandsCooldown)
 from media.stats.stats_img import createStatsImage
@@ -104,6 +107,15 @@ async def mtop(message: Message):
 @bl.chat_message(SearchCMD('stats'))
 async def stats(message: Message):
     chat_id = message.peer_id - 2000000000
+
+    if s := SpecCommandsCooldown.get_or_none(SpecCommandsCooldown.uid == message.from_id,
+                                             SpecCommandsCooldown.time > time.time() - 15,
+                                             SpecCommandsCooldown.cmd == 'stats'):
+        msg = messages.speccommandscooldown(int(15 - (time.time() - s.time) + 1))
+        await message.reply(disable_mentions=1, message=msg)
+        return
+    SpecCommandsCooldown.create(time=time.time(), uid=message.from_id, cmd='stats')
+
     id = await getIDFromMessage(message.text, message.reply_message)
     reply = await message.reply(messages.stats_loading(), disable_mentions=1)
     if not id:
@@ -201,17 +213,11 @@ async def help(message: Message):
     uid = message.from_id
     cmds = CMDLevels.select().where(CMDLevels.chat_id == chat_id)
     base = COMMANDS.copy()
-    if message.from_id in DEVS:
-        for i in cmds:
-            print(i.chat_id, i.cmd, i.lvl)
-        print(base)
     for i in cmds:
         try:
             base[i.cmd] = int(i.lvl)
         except:
             pass
-    if message.from_id in DEVS:
-        print(base)
     msg = messages.help(cmds=base)
     u_prem = await getUserPremium(uid)
     kb = keyboard.help(uid, u_prem=u_prem)
@@ -438,14 +444,13 @@ async def duel(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
 
-    if uid not in DEVS:
-        if s := SpecCommandsCooldown.get_or_none(SpecCommandsCooldown.uid == uid,
-                                                 SpecCommandsCooldown.time > time.time() - 10):
-            s: SpecCommandsCooldown
-            msg = messages.speccommandscooldown(int(10 - (time.time() - s.time) + 1))
-            await message.reply(disable_mentions=1, message=msg)
-            return
-        SpecCommandsCooldown.create(time=time.time(), uid=uid)
+    if s := SpecCommandsCooldown.get_or_none(SpecCommandsCooldown.uid == uid,
+                                             SpecCommandsCooldown.time > time.time() - 15,
+                                             SpecCommandsCooldown.cmd == 'duel'):
+        msg = messages.speccommandscooldown(int(15 - (time.time() - s.time) + 1))
+        await message.reply(disable_mentions=1, message=msg)
+        return
+    SpecCommandsCooldown.create(time=time.time(), uid=uid, cmd='duel')
 
     if not (await getChatSettings(chat_id))['entertaining']['allowDuel']:
         msg = messages.duel_not_allowed()
@@ -492,12 +497,13 @@ async def transfer(message: Message):
     uid = message.from_id
 
     if s := SpecCommandsCooldown.get_or_none(SpecCommandsCooldown.uid == uid,
-                                             SpecCommandsCooldown.time > time.time() - 10):
+                                             SpecCommandsCooldown.time > time.time() - 10,
+                                             SpecCommandsCooldown.cmd == 'transfer'):
         s: SpecCommandsCooldown
         msg = messages.speccommandscooldown(int(10 - (time.time() - s.time) + 1))
         await message.reply(disable_mentions=1, message=msg)
         return
-    SpecCommandsCooldown.create(time=time.time(), uid=uid)
+    SpecCommandsCooldown.create(time=time.time(), uid=uid, cmd='transfer')
 
     id = await getIDFromMessage(message.text, message.reply_message)
     if id < 0:
@@ -543,20 +549,27 @@ async def transfer(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    if int(u_prem) == 0:
+    if not u_prem:
         ftxp = int(txp / 100 * 95)
     else:
         ftxp = txp
 
     await addUserXP(uid, -txp)
     await addUserXP(id, ftxp)
-
-    TransferHistory.create(to_id=id, from_id=uid, time=time.time(), amount=ftxp, com=u_prem).save()
-
     uname = await getUserName(uid)
     name = await getUserName(id)
+    TransferHistory.create(to_id=id, from_id=uid, time=time.time(), amount=ftxp, com=bool(u_prem))
+    try:
+        bot = getTGBot()
+        await bot.send_message(chat_id=TG_CHAT_ID, message_thread_id=TG_TRANSFER_THREAD_ID,
+                               text=f'{chat_id} | <a href="vk.com/id{uid}">{uname}</a> | '
+                                    f'<a href="vk.com/id{id}">{name}</a> | {ftxp} | К: {not u_prem} | '
+                                    f'{datetime.now().strftime("%H:%M:%S")}',
+                               disable_web_page_preview=True, parse_mode='HTML')
+    except:
+        traceback.print_exc()
+
     msg = messages.transfer(uid, uname, id, name, ftxp, u_prem)
-    await API.messages.send(peer_id=2000020672, random_id=0, message='#transfer ' + msg)
     await message.reply(disable_mentions=1, message=msg)
 
 

@@ -599,6 +599,7 @@ class AntispamURLExceptions(Model):
 class SpecCommandsCooldown(Model):
     uid = IntegerField()
     time = BigIntegerField()
+    cmd = TextField()
 
     class Meta:
         database = dbhandle

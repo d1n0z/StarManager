@@ -1,4 +1,5 @@
 import time
+
 from vkbottle_types.events.bot_events import MessageNew
 
 import keyboard
@@ -69,7 +70,6 @@ async def action_handle(event: MessageNew) -> None:
         if s := Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == 'welcome'):
             welcome = Welcome.get_or_none(Welcome.chat_id == chat_id)
             if welcome is None or not s.pos:
-                print(welcome, s.pos)
                 return
             name = u_name if u_nickname is None else u_nickname
             m = await sendMessage(event.peer_id, welcome.msg.replace('%name%', f"[id{uid}|{name}]"),

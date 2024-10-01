@@ -31,49 +31,59 @@ def stats(uid, id):
     return kb.get_json()
 
 
-def nlist(uid, page):
+def nlist(uid, page, count):
     kb = Keyboard(inline=True)
 
-    kb.add(Callback('⏪', {"cmd": "prev_page_nlist", "page": page, "uid": uid}), KeyboardButtonColor.NEGATIVE)
-    kb.add(Callback('Без ников', {"cmd": "nonicklist", "uid": uid}), KeyboardButtonColor.PRIMARY)
-    kb.add(Callback('⏩', {"cmd": "next_page_nlist", "page": page, "uid": uid}), KeyboardButtonColor.POSITIVE)
+    if page != 0:
+        kb.add(Callback('⏪', {"cmd": "prev_page_nlist", "page": page - 1, "uid": uid}), KeyboardButtonColor.NEGATIVE)
+    kb.add(Callback('Без ников', {"cmd": "nonicklist", "uid": uid}), KeyboardButtonColor.SECONDARY)
+    if count > 30:
+        kb.add(Callback('⏩', {"cmd": "next_page_nlist", "page": page + 1, "uid": uid}), KeyboardButtonColor.POSITIVE)
 
     return kb.get_json()
 
 
-def nnlist(uid, page):
+def nnlist(uid, page, count):
     kb = Keyboard(inline=True)
 
-    kb.add(Callback('⏪', {"cmd": "prev_page_nnlist", "page": page, "uid": uid}), KeyboardButtonColor.NEGATIVE)
-    kb.add(Callback('С никами', {"cmd": "nicklist", "uid": uid}), KeyboardButtonColor.PRIMARY)
-    kb.add(Callback('⏩', {"cmd": "next_page_nnlist", "page": page, "uid": uid}), KeyboardButtonColor.POSITIVE)
+    if page != 0:
+        kb.add(Callback('⏪', {"cmd": "prev_page_nnlist", "page": page - 1, "uid": uid}), KeyboardButtonColor.NEGATIVE)
+    kb.add(Callback('С никами', {"cmd": "nicklist", "uid": uid}), KeyboardButtonColor.SECONDARY)
+    if count > 30:
+        kb.add(Callback('⏩', {"cmd": "next_page_nnlist", "page": page + 1, "uid": uid}), KeyboardButtonColor.POSITIVE)
 
     return kb.get_json()
 
 
-def mutelist(uid, page):
+def mutelist(uid, page, count):
     kb = Keyboard(inline=True)
 
-    kb.add(Callback('⏪', {"cmd": "prev_page_mutelist", "page": page, "uid": uid}), KeyboardButtonColor.NEGATIVE)
-    kb.add(Callback('⏩', {"cmd": "next_page_mutelist", "page": page, "uid": uid}), KeyboardButtonColor.POSITIVE)
+    if page != 0:
+        kb.add(Callback('⏪', {"cmd": "prev_page_mutelist", "page": page - 1, "uid": uid}), KeyboardButtonColor.NEGATIVE)
+    if count > (30 * (page + 1)):
+        kb.add(Callback('⏩', {"cmd": "next_page_mutelist", "page": page + 1, "uid": uid}), KeyboardButtonColor.POSITIVE)
 
     return kb.get_json()
 
 
-def warnlist(uid, page):
+def warnlist(uid, page, count):
     kb = Keyboard(inline=True)
 
-    kb.add(Callback('⏪', {"cmd": "prev_page_warnlist", "page": page, "uid": uid}), KeyboardButtonColor.NEGATIVE)
-    kb.add(Callback('⏩', {"cmd": "next_page_warnlist", "page": page, "uid": uid}), KeyboardButtonColor.POSITIVE)
+    if page != 0:
+        kb.add(Callback('⏪', {"cmd": "prev_page_warnlist", "page": page - 1, "uid": uid}), KeyboardButtonColor.NEGATIVE)
+    if count > 30:
+        kb.add(Callback('⏩', {"cmd": "next_page_warnlist", "page": page + 1, "uid": uid}), KeyboardButtonColor.POSITIVE)
 
     return kb.get_json()
 
 
-def banlist(uid, page):
+def banlist(uid, page, count):
     kb = Keyboard(inline=True)
 
-    kb.add(Callback('⏪', {"cmd": "prev_page_banlist", "page": page, "uid": uid}), KeyboardButtonColor.NEGATIVE)
-    kb.add(Callback('⏩', {"cmd": "next_page_banlist", "page": page, "uid": uid}), KeyboardButtonColor.POSITIVE)
+    if page != 0:
+        kb.add(Callback('⏪', {"cmd": "prev_page_banlist", "page": page, "uid": uid}), KeyboardButtonColor.NEGATIVE)
+    if count > (30 * (page + 1)):
+        kb.add(Callback('⏩', {"cmd": "next_page_banlist", "page": page, "uid": uid}), KeyboardButtonColor.POSITIVE)
 
     return kb.get_json()
 
@@ -99,11 +109,13 @@ def demote_accept(uid, chat_id, option):
     return kb.get_json()
 
 
-def statuslist(uid, page):
+def statuslist(uid, page, count):
     kb = Keyboard(inline=True)
 
-    kb.add(Callback('⏪', {"cmd": "prev_page_mutelist", "page": page, "uid": uid}), KeyboardButtonColor.NEGATIVE)
-    kb.add(Callback('⏩', {"cmd": "next_page_mutelist", "page": page, "uid": uid}), KeyboardButtonColor.POSITIVE)
+    if page != 0:
+        kb.add(Callback('⏪', {"cmd": "prev_page_mutelist", "page": page, "uid": uid}), KeyboardButtonColor.NEGATIVE)
+    if count > (30 * (page + 1)):
+        kb.add(Callback('⏩', {"cmd": "next_page_mutelist", "page": page, "uid": uid}), KeyboardButtonColor.POSITIVE)
 
     return kb.get_json()
 
@@ -229,7 +241,7 @@ def settings_setlist(uid, category, setting, type):
     return kb.get_json()
 
 
-def settings_set_welcome(uid):
+def settings_set_welcome(uid, text, img, url):
     kb = Keyboard(inline=True)
 
     kb.add(Callback('Назад', {"uid": uid, "cmd": "settings_menu"}))
@@ -237,6 +249,21 @@ def settings_set_welcome(uid):
     kb.row()
     kb.add(Callback('Изображение', {"uid": uid, "cmd": "settings_set_welcome_photo"}))
     kb.add(Callback('URL-кнопка', {"uid": uid, "cmd": "settings_set_welcome_url"}))
+    if text or img or url:
+        kb.row()
+    k = 0
+    if text and ((img and url) or (not img and not url) or not url):
+        kb.add(Callback('Удалить текст', {"uid": uid, "cmd": "settings_unset_welcome_text"}),
+               KeyboardButtonColor.NEGATIVE)
+        k = 1
+    if img and ((text and url) or (not text and not url) or not url):
+        kb.add(Callback('Удалить изображение', {"uid": uid, "cmd": "settings_unset_welcome_photo"}),
+               KeyboardButtonColor.NEGATIVE)
+        if k:
+            kb.row()
+    if url:
+        kb.add(Callback('Удалить кнопку', {"uid": uid, "cmd": "settings_unset_welcome_url"}),
+               KeyboardButtonColor.NEGATIVE)
 
     return kb.get_json()
 
@@ -330,7 +357,7 @@ def pm_market():
 
 
 def duel(uid, xp):
-    kb = Keyboard(inline=True, one_time=True)
+    kb = Keyboard(inline=True)
 
     kb.add(Callback('Сразиться', {'cmd': 'duel', 'uid': uid, 'xp': xp}), KeyboardButtonColor.SECONDARY)
 

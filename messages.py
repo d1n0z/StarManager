@@ -318,23 +318,18 @@ def rnick(uid, u_name, u_nick, id, name, nick):
     return get('rnick', uid=uid, un=un, id=id, nick=nick, name=name)
 
 
-def nlist(res, members, offset=0):
+def nlist(res, members, page=0):
     msg = get('nlist')
     cnt = 0
-    offcnt = 0
     for it in members:
-        offcnt += 1
-        if offcnt >= offset:
-            if it.id >= 0 and it.first_name != 'DELETED' and it.last_name != 'DELETED':
-                for item in res:
-                    if it.id == item.uid:
-                        cnt += 1
-                        addmsg = f"{cnt + offset}. {item.nickname} - [id{item.uid}|{it.first_name} " \
-                                 f"{it.last_name}]\n"
-                        if addmsg not in msg:
-                            msg += addmsg
-        if cnt > 29:
-            break
+        if it.id >= 0 and it.first_name != 'DELETED' and it.last_name != 'DELETED':
+            for item in res:
+                if it.id == item.uid:
+                    cnt += 1
+                    addmsg = f"{cnt + 30 * page}. {item.nickname} - [id{item.uid}|{it.first_name} " \
+                             f"{it.last_name}]\n"
+                    if addmsg not in msg:
+                        msg += addmsg
     return msg
 
 
@@ -525,21 +520,24 @@ async def mutelist(res, names, mutedcount):
     msg = get('mutelist', mutedcount=mutedcount)
 
     for ind, item in enumerate(res):
-        if names[ind].first_name != 'DELETED' and names[ind].last_name != 'DELETED':
-            nickname = await getUserNickname(item.uid, item.chat_id)
-            if nickname is not None:
-                name = nickname
-            else:
-                name = f"{names[ind].first_name} {names[ind].last_name}"
-            if literal_eval(item.last_mutes_causes)[-1] is None or literal_eval(item.last_mutes_causes)[-1] == '':
-                cause = "Без указания причины"
-            else:
-                cause = literal_eval(item.last_mutes_causes)[-1]
-            addmsg = f"[{ind + 1}]. [id{item.uid}|{name}] | " \
-                     f"{int((item.mute - time.time()) / 60)} минут | {cause} | Выдал: " \
-                     f"{literal_eval(item.last_mutes_names)[-1]}\n"
-            if addmsg not in msg:
-                msg += addmsg
+        try:
+            if names[ind].first_name != 'DELETED' and names[ind].last_name != 'DELETED':
+                nickname = await getUserNickname(item.uid, item.chat_id)
+                if nickname is not None:
+                    name = nickname
+                else:
+                    name = f"{names[ind].first_name} {names[ind].last_name}"
+                if not item.last_mutes_causes or not literal_eval(item.last_mutes_causes)[-1]:
+                    cause = "Без указания причины"
+                else:
+                    cause = literal_eval(item.last_mutes_causes)[-1]
+                addmsg = f"[{ind + 1}]. [id{item.uid}|{name}] | " \
+                         f"{int((item.mute - time.time()) / 60)} минут | {cause} | Выдал: " \
+                         f"{literal_eval(item.last_mutes_names)[-1]}\n"
+                if addmsg not in msg:
+                    msg += addmsg
+        except:
+            pass
     return msg
 
 
@@ -547,21 +545,24 @@ async def warnlist(res, names, warnedcount):
     msg = get('warnlist', warnedcount=warnedcount)
 
     for ind, item in enumerate(res):
-        if names[ind].first_name != 'DELETED' and names[ind].last_name != 'DELETED':
-            nickname = await getUserNickname(item.uid, item.chat_id)
-            if nickname is not None:
-                name = nickname
-            else:
-                name = f"{names[ind].first_name} {names[ind].last_name}"
-            if literal_eval(item.last_warns_causes)[-1] is None or literal_eval(item.last_warns_causes)[-1] == '':
-                cause = "Без указания причины"
-            else:
-                cause = literal_eval(item.last_warns_causes)[-1]
-            addmsg = f"[{ind + 1}]. [id{item.uid}|{name}] | " \
-                     f"кол-во: {item.warns}/3 | {cause} | Выдал: " \
-                     f"{literal_eval(item.last_warns_names)[-1]}\n"
-            if addmsg not in msg:
-                msg += addmsg
+        try:
+            if names[ind].first_name != 'DELETED' and names[ind].last_name != 'DELETED':
+                nickname = await getUserNickname(item.uid, item.chat_id)
+                if nickname is not None:
+                    name = nickname
+                else:
+                    name = f"{names[ind].first_name} {names[ind].last_name}"
+                if not item.last_warns_causes or not literal_eval(item.last_warns_causes)[-1]:
+                    cause = "Без указания причины"
+                else:
+                    cause = literal_eval(item.last_warns_causes)[-1]
+                addmsg = f"[{ind + 1}]. [id{item.uid}|{name}] | " \
+                         f"кол-во: {item.warns}/3 | {cause} | Выдал: " \
+                         f"{literal_eval(item.last_warns_names)[-1]}\n"
+                if addmsg not in msg:
+                    msg += addmsg
+        except:
+            pass
     return msg
 
 
@@ -1280,7 +1281,7 @@ def ssetaccess(uid, u_name, u_nickname, chats, success):
 def ssetaccess_start(uid, u_name, u_nickname, id, name, nickname, chats, group):
     un = u_nickname if u_nickname is not None else u_name
     n = nickname if nickname is not None else name
-    return get('ssetaccess_start', uid=uid, un=un, group=group, pool=chats, id=id, n=n)
+    return get('ssetaccess_start', uid=uid, un=un, group=group, chats=chats, id=id, n=n)
 
 
 def sdelaccess_hint():
@@ -2121,10 +2122,8 @@ def duel_res(uid, uname, unick, id, name, nick, xp, prem):
         n = nick
     else:
         n = name
-    if prem is not None and int(prem) > 0:
-        return get('duel_res', uid=uid, un=un, id=id, n=n, xp=xp)
-    else:
-        return get('duel_res', uid=uid, un=un, id=id, n=n, xp=int(xp / 100 * 90))
+    com = '' if prem else ' с учётом комиссии 10%'
+    return get('duel_res', uid=uid, un=un, id=id, n=n, xp=xp, com=com)
 
 
 def dueling():

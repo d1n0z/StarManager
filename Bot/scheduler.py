@@ -14,9 +14,9 @@ from Bot.megadrive import mega_drive
 from Bot.tgbot import getTGBot
 from Bot.utils import sendMessage, chunks
 from config.config import DATABASE, PASSWORD, USER, TG_CHAT_ID, NEWSEASON_REWARDS, TASKS_DAILY, \
-    PREMIUM_TASKS_DAILY, DAILY_TO, API, IMPLICIT_API, GROUP_ID
+    PREMIUM_TASKS_DAILY, DAILY_TO, API, IMPLICIT_API, GROUP_ID, TG_BACKUP_THREAD_ID
 from db import UserNames, ChatNames, GroupNames, Premium, Reboot, XP, TasksDaily, TasksWeekly, AntispamMessages, \
-    Settings, SpecCommandsCooldown, MiddlewaresStatistics, MessagesStatistics, CommandsStatistics
+    Settings, SpecCommandsCooldown, MiddlewaresStatistics, MessagesStatistics, CommandsStatistics, Coins
 
 
 async def resetPremium():
@@ -93,8 +93,8 @@ async def backup() -> None:
 
         try:
             bot = getTGBot()
-            bot.send_message(chat_id=TG_CHAT_ID, text=f"<a href='{drive.get_upload_link(file)}'>{name}</a>",
-                             parse_mode='HTML')
+            await bot.send_message(chat_id=TG_CHAT_ID, message_thread_id=TG_BACKUP_THREAD_ID,
+                                   text=f"<a href='{drive.get_upload_link(file)}'>{name}</a>", parse_mode='HTML')
         except:
             traceback.print_exc()
 
@@ -209,26 +209,9 @@ async def new_season():
             await sendMessage(DAILY_TO + 2000000000, f'@all POST FAILURE!\nPOST MESSAGE: {msg}\nERROR:\n' +
                               traceback.format_exc())
             return
+        Coins.delete().execute()
         XP.update(xp=0).execute()
         await sendMessage(DAILY_TO + 2000000000, '@all new_season: 100%')
-    except:
-        await sendMessage(DAILY_TO + 2000000000, f'e from scheduler:\n' + traceback.format_exc())
-
-
-async def everyminute():
-    try:
-        s = Settings.select().where(Settings.setting == 'nightmode', Settings.pos == 1, Settings.value2.is_null(False))
-        for i in s:
-            args = i.value2.split('-')
-            now = datetime.now()
-            start = datetime.strptime(args[0], '%H:%M').replace(year=2024)
-            end = datetime.strptime(args[1], '%H:%M').replace(year=2024)
-            if now.hour == start.hour and now.minute == start.minute:
-                await sendMessage(i.chat_id + 2000000000, messages.nightmode_start(f'{start.hour}:{start.minute}',
-                                                                                   f'{end.hour}:{end.minute}'))
-            elif now.hour == end.hour and now.minute == end.minute:
-                await sendMessage(i.chat_id + 2000000000, messages.nightmode_end())
-        print(f'everyminute: 100% ({datetime.now().strftime("%H:%M:%S")})')
     except:
         await sendMessage(DAILY_TO + 2000000000, f'e from scheduler:\n' + traceback.format_exc())
 
@@ -237,7 +220,6 @@ async def run():
     loop = asyncio.get_event_loop()
     asyncio.set_event_loop(loop)
     aiocron.crontab('* * * * * */5', func=deleteTempdataDB, loop=loop)
-    aiocron.crontab('*/1 * * * *', func=everyminute, loop=loop)
     aiocron.crontab('0 * * * *', func=resetPremium, loop=loop)
     aiocron.crontab('0 0 * * *', func=dailyTasks, loop=loop)
     aiocron.crontab('0 0 * * 1', func=weeklyTasks, loop=loop)

@@ -179,6 +179,25 @@ async def isChatAdmin(id, chat_id) -> bool:
     return False
 
 
+async def getChatOwner(chat_id) -> int | bool:
+    try:
+        status = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
+        for i in status.items:
+            if i.is_owner:
+                return i.member_id
+    except:
+        pass
+    return False
+
+
+async def getChatMembers(chat_id) -> int:
+    try:
+        status = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
+        return len(status.items)
+    except:
+        return False
+
+
 async def setChatMute(id, chat_id, mute_time):
     try:
         if mute_time > 0:
@@ -361,12 +380,10 @@ async def getUserMessages(uid, chat_id, none=0) -> int:
     return none
 
 
-async def addUserXP(uid, addxp, lvlbanned=None):
-    if lvlbanned is None:
+async def addUserXP(uid, addxp, checklvlbanned=True):
+    if checklvlbanned:
         if not await getULvlBanned(uid):
             return
-    elif not lvlbanned:
-        return
     u = XP.get_or_create(uid=uid, defaults={'xp': 0})[0]
     ul = await getUserLVL(u.xp)
     u.xp += addxp
@@ -424,12 +441,10 @@ async def setUserAccessLevel(uid, chat_id, access_level):
     ac.save()
 
 
-async def addDailyTask(uid, task, count=1, lvlbanned=None):
-    if lvlbanned is None:
+async def addDailyTask(uid, task, count=1, checklvlbanned=True):
+    if checklvlbanned:
         if not await getULvlBanned(uid):
             return
-    elif not lvlbanned:
-        return
     t = TasksDaily.get_or_create(uid=uid, task=task)[0]
     t.count += count
     t.save()
@@ -444,12 +459,10 @@ async def addDailyTask(uid, task, count=1, lvlbanned=None):
         c.save()
 
 
-async def addWeeklyTask(uid, task, count=1, lvlbanned=None):
-    if lvlbanned is None:
+async def addWeeklyTask(uid, task, count=1, checklvlbanned=True):
+    if checklvlbanned:
         if not await getULvlBanned(uid):
             return
-    elif not lvlbanned:
-        return
     t = TasksWeekly.get_or_create(uid=uid, task=task)[0]
     t.count += count
     t.save()

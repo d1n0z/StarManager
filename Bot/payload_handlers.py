@@ -1,6 +1,7 @@
 import json
 import secrets
 import time
+import traceback
 from ast import literal_eval
 from datetime import datetime
 
@@ -12,11 +13,13 @@ import keyboard
 import messages
 from Bot.checkers import haveAccess
 from Bot.rules import SearchPayloadCMD
+from Bot.tgbot import getTGBot
 from Bot.utils import sendMessageEventAnswer, editMessage, getUserAccessLevel, getUserXP, getUserPremium, addUserXP, \
     getUserName, getUserNickname, kickUser, getXPTop, getChatName, addWeeklyTask, \
     addDailyTask, getUserBan, getUserWarns, getUserMute, getULvlBanned, getChatSettings, turnChatSetting, \
-    deleteMessages, setChatMute, getChatAltSettings
-from config.config import API, COMMANDS, DEVS, TASKS_LOTS, TASKS_DAILY, PREMIUM_TASKS_DAILY, SETTINGS_COUNTABLE
+    deleteMessages, setChatMute, getChatAltSettings, getChatMembers, getChatOwner
+from config.config import API, COMMANDS, DEVS, TASKS_LOTS, TASKS_DAILY, PREMIUM_TASKS_DAILY, SETTINGS_COUNTABLE, \
+    TG_CHAT_ID, TG_NEWCHAT_THREAD_ID
 from db import AccessLevel, JoinedDate, DuelWins, ReportAnswers, Nickname, Mute, Warn, Ban, Premium, \
     GPool, ChatGroups, Messages, Notifs, TypeQueue, CMDLevels, ReportWarns, CMDNames, Coins, XP, TasksWeekly, \
     TasksDaily, TasksStreak, Settings, AntispamURLExceptions, Welcome
@@ -59,6 +62,16 @@ async def join(message: MessageEvent):
         chtime = JoinedDate.get_or_create(chat_id=chat_id)[0]
         chtime.time = time.time()
         chtime.save()
+
+        try:
+            bot = getTGBot()
+            await bot.send_message(chat_id=TG_CHAT_ID, message_thread_id=TG_NEWCHAT_THREAD_ID,
+                                   text=f'{chat_id} | {await getChatName(chat_id)} | '
+                                        f'{await getChatOwner(chat_id)} | {await getChatMembers(chat_id)} | '
+                                        f'{datetime.now().strftime("%H:%M:%S")}',
+                                   disable_web_page_preview=True, parse_mode='HTML')
+        except:
+            traceback.print_exc()
 
         msg = messages.start()
         await editMessage(msg, peer_id, message.conversation_message_id)
@@ -107,11 +120,10 @@ async def duel(message: MessageEvent):
             loseid = id
             winid = uid
 
+        xtw = duelxp
         u_premium = await getUserPremium(winid)
-        if u_premium:
-            xtw = duelxp
-        else:
-            xtw = duelxp / 100 * 90
+        if not u_premium:
+            xtw = int(xtw / 100 * 90)
 
         dw = DuelWins.get_or_create(uid=winid, defaults={'wins': 0})[0]
         dw.wins += 1
@@ -128,7 +140,7 @@ async def duel(message: MessageEvent):
         unick = await getUserNickname(winid, chat_id)
         nick = await getUserNickname(loseid, chat_id)
 
-        msg = messages.duel_res(winid, uname, unick, loseid, name, nick, duelxp, u_premium)
+        msg = messages.duel_res(winid, uname, unick, loseid, name, nick, xtw, u_premium)
         await editMessage(msg, peer_id, message.conversation_message_id)
 
     await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
@@ -209,7 +221,8 @@ async def settings(message: MessageEvent):
                 settings = await getChatSettings(chat_id)
                 pos = settings[category][setting]
                 altsettings = await getChatAltSettings(chat_id)
-                pos2 = altsettings[category][setting]
+                pos2 = altsettings[category][setting] if (category in altsettings and
+                                                          setting in altsettings[category]) else None
                 msg = messages.settings_change_countable(chat_id, setting, pos, value, value2, pos2, punishment)
                 kb = keyboard.settings_change_countable(uid, category, setting, settings, altsettings)
                 await editMessage(msg, peer_id, message.conversation_message_id, kb)
@@ -250,7 +263,8 @@ async def settings_change_countable(message: MessageEvent):
             settings = await getChatSettings(chat_id)
             pos = settings[category][setting]
             altsettings = await getChatAltSettings(chat_id)
-            pos2 = altsettings[category][setting]
+            pos2 = altsettings[category][setting] if (category in altsettings and
+                                                      setting in altsettings[category]) else None
             msg = messages.settings_change_countable(chat_id, setting, pos, value, value2, pos2, punishment)
             kb = keyboard.settings_change_countable(uid, category, setting, settings, altsettings)
             await editMessage(msg, peer_id, message.conversation_message_id, kb)
@@ -262,9 +276,10 @@ async def settings_change_countable(message: MessageEvent):
                 w = Welcome.get_or_none(Welcome.chat_id == chat_id)
                 if w is None:
                     msg = messages.settings_countable_action(action, setting)
+                    kb = keyboard.settings_set_welcome(uid, None, None, None)
                 else:
                     msg = messages.settings_countable_action(action, setting, w.msg, w.photo, w.url)
-                kb = keyboard.settings_set_welcome(uid)
+                    kb = keyboard.settings_set_welcome(uid, w.msg, w.photo, w.url)
             else:
                 TypeQueue.create(
                     uid=uid, chat_id=chat_id, type='settings_change_countable',
@@ -396,6 +411,45 @@ async def settings_listaction(message: MessageEvent):
     await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
 
 
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD([
+    'settings_unset_welcome_text', 'settings_unset_welcome_photo', 'settings_unset_welcome_url']))
+async def settings_unset_welcome(message: MessageEvent):
+    payload = message.payload
+
+    try:
+        sender = payload['uid']
+    except:
+        sender = message.user_id
+    cmd = payload['cmd']
+    uid = message.user_id
+
+    peer_id = message.peer_id
+    chat_id = peer_id - 2000000000
+
+    await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
+    if cmd in ['settings_unset_welcome_text', 'settings_unset_welcome_photo',
+               'settings_unset_welcome_url'] and sender == uid:
+        welcome = Welcome.get(Welcome.chat_id == chat_id)
+        text = welcome.msg
+        img = welcome.photo
+        url = welcome.url
+        if (cmd in ['settings_unset_welcome_text', 'settings_unset_welcome_photo'] and
+                not ((text and ((img and url) or (not img and not url) or not url)) or
+                     (img and ((text and url) or (not text and not url) or not url)))):
+            return
+        if cmd == 'settings_unset_welcome_text':
+            welcome.msg = None
+        if cmd == 'settings_unset_welcome_photo':
+            welcome.photo = None
+        if cmd == 'settings_unset_welcome_url':
+            welcome.url = None
+        welcome.save()
+
+        kb = keyboard.settings_set_welcome(uid, welcome.msg, welcome.photo, welcome.url)
+        msg = messages.settings_countable_action('set', 'welcome')
+        await editMessage(msg, peer_id, message.conversation_message_id, kb)
+
+
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['nicklist']))
 async def nicklist(message: MessageEvent):
     payload = message.payload
@@ -416,9 +470,11 @@ async def nicklist(message: MessageEvent):
         members_uid = [i.member_id for i in members]
         res = Nickname.select().where(Nickname.uid > 0, Nickname.uid << members_uid, Nickname.chat_id == chat_id,
                                       Nickname.nickname.is_null(False)).order_by(Nickname.nickname)
+        count = len(res)
+        res = res[:30]
         names = await API.users.get(user_ids=[f'{i.uid}' for i in res])
         msg = messages.nlist(res, names)
-        kb = keyboard.nlist(uid, 0)
+        kb = keyboard.nlist(uid, 0, count)
         await editMessage(msg, peer_id, message.conversation_message_id, kb)
 
     await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
@@ -438,25 +494,20 @@ async def page_nlist(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
 
-    page = 0
-    if cmd == 'prev_page_nlist':
-        page = payload['page'] - 1
-    elif cmd == 'next_page_nlist':
-        page = payload['page'] + 1
-
     if (cmd == 'prev_page_nlist' or cmd == 'next_page_nlist') and sender == uid:
-        if page >= 0:
-            members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
-            members = members.items
-            members_uid = [i.member_id for i in members]
-            res = Nickname.select().where(Nickname.uid > 0, Nickname.uid << members_uid, Nickname.chat_id == chat_id,
-                                          Nickname.nickname.is_null(False)).order_by(Nickname.nickname)
-            offset = page * 30
-            if len(res) > 0:
-                names = await API.users.get(user_ids=[i.uid for i in res])
-                msg = messages.nlist(res, names, offset)
-                kb = keyboard.nlist(uid, page)
-                await editMessage(msg, peer_id, message.conversation_message_id, kb)
+        page = payload['page']
+        members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
+        members = members.items
+        members_uid = [i.member_id for i in members]
+        res = Nickname.select().where(Nickname.uid > 0, Nickname.uid << members_uid,
+                                      Nickname.chat_id == chat_id, Nickname.nickname.is_null(False)
+                                      ).order_by(Nickname.nickname).offset(30 * page)
+        if count := len(res):
+            res = res[:30]
+            names = await API.users.get(user_ids=[i.uid for i in res])
+            msg = messages.nlist(res, names, page)
+            kb = keyboard.nlist(uid, page, count)
+            await editMessage(msg, peer_id, message.conversation_message_id, kb)
 
     await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
 
@@ -480,10 +531,12 @@ async def nonicklist(message: MessageEvent):
         nickmembers = [i.uid for i in res]
         members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
         members = members.items
-        members_uid = [i.member_id for i in members if i.member_id not in nickmembers][:30]
+        members_uid = [i.member_id for i in members if i.member_id not in nickmembers]
+        count = len(members_uid)
+        members_uid = members_uid[:30]
         names = await API.users.get(user_ids=[f'{i}' for i in members_uid])
         msg = messages.nnlist(names)
-        kb = keyboard.nnlist(uid, 0)
+        kb = keyboard.nnlist(uid, 0, count)
         await editMessage(msg, peer_id, message.conversation_message_id, kb)
 
     await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
@@ -503,24 +556,18 @@ async def page_nnlist(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
 
-    page = 0
-    if cmd == 'prev_page_nnlist':
-        page = payload['page'] - 1
-    elif cmd == 'next_page_nnlist':
-        page = payload['page'] + 1
-
-    if (cmd == 'prev_page_nnlist' or cmd == 'next_page_nnlist') and sender == uid:
-        if page >= 0:
-            res = Nickname.select().where(Nickname.uid > 0, Nickname.chat_id == chat_id)
-            nickmembers = [i.uid for i in res]
-            members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
-            members = members.items
-            members = [i for i in members if i.member_id not in nickmembers][page * 30: page * 30 + 30]
-            if len(members) > 0:
-                members = await API.users.get(user_ids=[f'{i.member_id}' for i in members])
-                msg = messages.nnlist(members, page)
-                kb = keyboard.nnlist(uid, page)
-                await editMessage(msg, peer_id, message.conversation_message_id, kb)
+    if cmd in ('prev_page_nnlist', 'next_page_nnlist') and sender == uid:
+        page = payload['page']
+        res = Nickname.select().where(Nickname.uid > 0, Nickname.chat_id == chat_id)
+        nickmembers = [i.uid for i in res]
+        members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
+        members_count = len(members.items[page * 30:])
+        members = [i for i in members.items if i.member_id not in nickmembers][page * 30: page * 30 + 30]
+        if len(members) > 0:
+            members = await API.users.get(user_ids=[f'{i.member_id}' for i in members])
+            msg = messages.nnlist(members, page)
+            kb = keyboard.nnlist(uid, page, members_count)
+            await editMessage(msg, peer_id, message.conversation_message_id, kb)
 
     await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
 
@@ -540,22 +587,16 @@ async def page_mutelist(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
 
-    page = 0
-    if cmd == 'prev_page_mutelist':
-        page = payload['page'] - 1
-    elif cmd == 'next_page_mutelist':
-        page = payload['page'] + 1
-
-    if (cmd == 'prev_page_mutelist' or cmd == 'next_page_mutelist') and sender == uid:
-        if page >= 0:
-            res = Mute.select().where(Mute.mute > int(time.time()), Mute.chat_id == chat_id)
-            if len(res) > 0:
-                muted_count = len(res)
-                res = res.offset(page * 30).limit(30)
-                names = await API.users.get(user_ids=[i.uid for i in res])
-                msg = await messages.mutelist(res, names, muted_count)
-                kb = keyboard.mutelist(uid, page)
-                await editMessage(msg, peer_id, message.conversation_message_id, kb)
+    if cmd in ('prev_page_mutelist', 'next_page_mutelist') and sender == uid:
+        page = payload['page']
+        res = Mute.select().where(Mute.mute > int(time.time()), Mute.chat_id == chat_id)
+        if len(res) > 0:
+            muted_count = len(res)
+            res = res.offset(page * 30).limit(30)
+            names = await API.users.get(user_ids=[i.uid for i in res])
+            msg = await messages.mutelist(res, names, muted_count)
+            kb = keyboard.mutelist(uid, page, muted_count)
+            await editMessage(msg, peer_id, message.conversation_message_id, kb)
 
     await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
 
@@ -575,22 +616,15 @@ async def page_warnlist(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
 
-    page = 0
-    if cmd == 'prev_page_warnlist':
-        page = payload['page'] - 1
-    elif cmd == 'next_page_warnlist':
-        page = payload['page'] + 1
-
-    if (cmd == 'prev_page_warnlist' or cmd == 'next_page_warnlist') and sender == uid:
-        if page >= 0:
-            res = Warn.select().where(Warn.warns > 0, Warn.chat_id == chat_id)
-            if len(res) > 0:
-                muted_count = len(res)
-                res = res.offset(page * 30).limit(30)
-                names = await API.users.get(user_ids=[i.uid for i in res])
-                msg = await messages.warnlist(res, names, muted_count)
-                kb = keyboard.warnlist(uid, page)
-                await editMessage(msg, peer_id, message.conversation_message_id, kb)
+    if cmd in ('prev_page_warnlist', 'next_page_warnlist') and sender == uid:
+        page = payload['page']
+        res = Warn.select().where(Warn.warns > 0, Warn.chat_id == chat_id)
+        if count := len(res):
+            res = res.offset(page * 30).limit(30)
+            names = await API.users.get(user_ids=[i.uid for i in res])
+            msg = await messages.warnlist(res, names, count)
+            kb = keyboard.warnlist(uid, page, count)
+            await editMessage(msg, peer_id, message.conversation_message_id, kb)
 
     await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
 
@@ -623,7 +657,7 @@ async def page_banlist(message: MessageEvent):
                 res = res.offset(page * 30).limit(30)
                 names = await API.users.get(user_ids=[i.uid for i in res])
                 msg = await messages.banlist(res, names, banned_count)
-                kb = keyboard.banlist(uid, page)
+                kb = keyboard.banlist(uid, page, banned_count)
                 await editMessage(msg, peer_id, message.conversation_message_id, kb)
 
     await sendMessageEventAnswer(message.event_id, uid, message.peer_id)
@@ -656,7 +690,7 @@ async def page_statuslist(message: MessageEvent):
             if len(premium_pool) > 0:
                 names = await API.users.get(user_ids=[i.uid for i in premium_pool])
                 msg = messages.statuslist(names, premium_pool)
-                kb = keyboard.statuslist(uid, 0)
+                kb = keyboard.statuslist(uid, 0, len(names))
                 await editMessage(msg, peer_id, message.conversation_message_id, kb)
 
     await sendMessageEventAnswer(message.event_id, uid, message.peer_id)

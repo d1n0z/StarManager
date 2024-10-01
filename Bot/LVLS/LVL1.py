@@ -460,9 +460,11 @@ async def nlist(message: Message):
     members_uid = [i.member_id for i in members]
     res = Nickname.select().where(Nickname.chat_id == chat_id, Nickname.uid > 0, Nickname.uid << members_uid,
                                   Nickname.nickname.is_null(False)).order_by(Nickname.nickname)
-    names = await API.users.get(user_ids=[f'{i.uid}' for i in res])
+    count = len(res)
+    res = res[:30]
+    names = await API.users.get(user_ids=[i.uid for i in res])
     msg = messages.nlist(res, names)
-    kb = keyboard.nlist(uid, 0)
+    kb = keyboard.nlist(uid, 0, count)
     await message.reply(disable_mentions=1, message=msg, keyboard=kb)
 
 

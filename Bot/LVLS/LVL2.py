@@ -65,7 +65,7 @@ async def mutelist(message: Message):
     res = res.limit(30)[::-1]
     names = await API.users.get(user_ids=[i.uid for i in res])
     msg = await messages.mutelist(res, names, muted_count)
-    kb = keyboard.mutelist(uid, 0)
+    kb = keyboard.mutelist(uid, 0, muted_count)
     await message.reply(disable_mentions=1, message=msg, keyboard=kb)
 
 
@@ -119,7 +119,7 @@ async def warnlist(message: Message):
     res = res.limit(30)[::-1]
     names = await API.users.get(user_ids=[f'{i.uid}' for i in res])
     msg = await messages.warnlist(res, names, count)
-    kb = keyboard.warnlist(uid, 0)
+    kb = keyboard.warnlist(uid, 0, count)
     await message.reply(disable_mentions=1, message=msg, keyboard=kb)
 
 

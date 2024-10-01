@@ -237,7 +237,7 @@ async def banlist(message: Message):
     res = res.limit(30)[::-1]
     names = await API.users.get(user_ids=[i.uid for i in res])
     msg = await messages.banlist(res, names, count)
-    kb = keyboard.banlist(uid, 0)
+    kb = keyboard.banlist(uid, 0, count)
     await message.reply(disable_mentions=1, message=msg, keyboard=kb)
 
 

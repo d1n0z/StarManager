@@ -36,6 +36,8 @@ class VkBot:
 
         from Bot.notifications import run_notifications
         threading.Thread(target=run_notifications).start()
+        from Bot.nightmode import run_nightmode_notifications
+        threading.Thread(target=run_nightmode_notifications).start()
 
         labeler = BotLabeler()
 

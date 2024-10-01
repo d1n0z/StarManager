@@ -1,6 +1,5 @@
 from ast import literal_eval
 from datetime import datetime
-import time
 
 import requests
 from django.contrib.auth.decorators import login_required
@@ -38,7 +37,7 @@ def yookassa(request: HttpRequest):
 
     token = config.TG_TOKEN
     chat_id = config.TG_CHAT_ID
-    thread_id = config.TG_FREEKASSA_THREAD_ID
+    thread_id = config.TG_PREMIUM_THREAD_ID
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     params = {

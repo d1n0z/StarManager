@@ -1,7 +1,7 @@
-import telebot
+import aiogram
 
 from config.config import TG_TOKEN
 
 
 def getTGBot():
-    return telebot.TeleBot(TG_TOKEN)
+    return aiogram.Bot(token=TG_TOKEN)

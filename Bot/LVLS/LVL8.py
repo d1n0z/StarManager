@@ -316,7 +316,7 @@ async def statuslist(message: Message):
     premium_uids = [i.uid for i in prem]
     names = await API.users.get(user_ids=','.join([f'{i}' for i in premium_uids]))
     msg = messages.statuslist(names, prem)
-    kb = keyboard.statuslist(message.from_id, 0)
+    kb = keyboard.statuslist(message.from_id, 0, len(names))
     await message.reply(msg, keyboard=kb)
 
 

@@ -57,7 +57,7 @@ async def message_handle(event: MessageNew) -> None:
         return
 
     uacc = await getUserAccessLevel(uid, chat_id)
-    if await getUChatLimit(msgtime, await getUserLastMessage(uid, chat_id, 0), uacc, chat_id) and uacc == 0:
+    if uacc == 0 and await getUChatLimit(msgtime, await getUserLastMessage(uid, chat_id, 0), uacc, chat_id):
         await deleteMessages(event.object.message.conversation_message_id, chat_id)
         return
     settings = await getChatSettings(chat_id)
@@ -82,7 +82,7 @@ async def message_handle(event: MessageNew) -> None:
                     await deleteMessages(event.object.message.conversation_message_id, chat_id)
                     return
 
-    if await getSilence(chat_id) and uacc == 0:
+    if uacc == 0 and await getSilence(chat_id):
         await deleteMessages(event.object.message.conversation_message_id, chat_id)
         return
 
@@ -110,13 +110,10 @@ async def message_handle(event: MessageNew) -> None:
 
     if uacc < 5:
         if setting := await antispamChecker(chat_id, uid, event.object.message, settings):
-            print(setting)
             setting = Settings.get(Settings.chat_id == chat_id, Settings.setting == setting)
-            print(setting)
             if setting.punishment is None:
                 return
             punishment = setting.punishment.split('|')
-            print(punishment)
             if punishment[0] == 'deletemessage':
                 await deleteMessages(event.object.message.conversation_message_id, chat_id)
                 return
