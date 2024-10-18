@@ -1,5 +1,5 @@
 import json
-import secrets
+import os
 import time
 import traceback
 from ast import literal_eval
@@ -108,7 +108,7 @@ async def duel(message: MessageEvent):
         await message.show_snackbar("У вашего соперника недостаточно XP")
         return
 
-    rid = [id, uid][secrets.randbelow(2)]
+    rid = [id, uid][int.from_bytes(os.urandom(1)) % 2]
     if rid == id:
         loseid = uid
         winid = id
