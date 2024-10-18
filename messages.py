@@ -1814,8 +1814,8 @@ def premmenu(settings):
     return msg
 
 
-def addprefix_hint():
-    return get('addprefix_hint')
+def prefix():
+    return get('prefix')
 
 
 def addprefix_max():
@@ -1831,10 +1831,6 @@ def addprefix(uid, name, nick, prefix):
     return get('addprefix', uid=uid, n=n, prefix=prefix)
 
 
-def delprefix_hint():
-    return get('delprefix_hint')
-
-
 def delprefix(uid, name, nick, prefix):
     n = nick if nick is not None and len(nick) > 0 else name
     return get('delprefix', uid=uid, n=n, prefix=prefix)
@@ -1848,7 +1844,7 @@ def listprefix(uid, name, nick, prefixes):
     n = nick if nick is not None and len(nick) > 0 else name
     msg = get('listprefix', uid=uid, n=n)
     if len(prefixes) == 0:
-        msg += 'Префиксов не обнаружено. Используйте команду /addprefix'
+        msg += 'Префиксов не обнаружено. Используйте кнопку "Добавить префикс"'
     for i in prefixes:
         msg += f'➖ "{i.prefix}"\n'
     return msg
@@ -2728,15 +2724,3 @@ def captcha_punish(uid, n, punishment):
 
 def captcha_pass(uid, n, date):
     return get('captcha_pass', uid=uid, n=n, date=date)
-
-
-def prefix():
-    return get('prefix')
-
-
-def prefix_add():
-    return get('prefix')
-
-
-def prefix_del():
-    return get('prefix')

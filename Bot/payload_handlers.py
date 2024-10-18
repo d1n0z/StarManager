@@ -1362,7 +1362,7 @@ async def unpunish(message: MessageEvent):
     cmid = payload['cmid']
     
     u_acc = await getUserAccessLevel(uid, chat_id)
-    if u_acc <= await getUserAccessLevel(id, chat_id) or not await haveAccess(cmd[2:], chat_id, u_acc):
+    if u_acc <= await getUserAccessLevel(id, chat_id) or not await haveAccess(cmd, chat_id, u_acc):
         await message.show_snackbar("⛔️ У вас недостаточно прав.")
         return
     name = await getUserName(id)

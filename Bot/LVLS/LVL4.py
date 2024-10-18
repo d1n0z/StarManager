@@ -250,11 +250,14 @@ async def gunban(message: Message):
         if u_acc <= ch_acc or not await haveAccess('gunban', chat_id, u_acc):
             continue
         ch_ban = await getUserBan(id, chat_id)
-        if ch_ban > time.time():
-            b = Ban.get_or_none(Ban.uid == id, Ban.chat_id == chat_id)
-            if b is not None:
-                b.delete_instance()
-                success += 1
+        if ch_ban <= time.time():
+            continue
+        b: Ban = Ban.get_or_none(Ban.uid == id, Ban.chat_id == chat_id)
+        if b is None:
+            continue
+        b.ban = 0
+        b.save()
+        success += 1
 
     msg = messages.gunban(id, name, nick, len(pool), success)
     await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id, message=msg)
