@@ -87,7 +87,7 @@ async def join(message: MessageEvent):
             await editMessage(msg, peer_id, message.conversation_message_id)
 
 
-@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['duel']))
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['duel'], checksender=False))
 async def duel(message: MessageEvent):
     payload = message.payload
     peer_id = message.object.peer_id
@@ -108,7 +108,7 @@ async def duel(message: MessageEvent):
         await message.show_snackbar("У вашего соперника недостаточно XP")
         return
 
-    rid = [id, uid][int.from_bytes(os.urandom(1)) % 2]
+    rid = (id, uid)[int.from_bytes(os.urandom(1)) % 2]
     if rid == id:
         loseid = uid
         winid = id
