@@ -15,10 +15,10 @@ import messages
 from Bot.checkers import getUInfBanned, checkCMD
 from Bot.rules import SearchCMD
 from Bot.utils import getUserName, getIDFromMessage, getUserNickname, sendMessage, addUserXP, getChatName, \
-    setUserAccessLevel
+    setUserAccessLevel, pointWords
 from config.config import API, GROUP_ID, DEVS
 from db import AllChats, Blacklist, Premium, InfBanned, ReportWarns, Reboot, XP, Coins, Messages, TransferHistory, \
-    LvlBanned, CommandsStatistics, MessagesStatistics, MiddlewaresStatistics
+    LvlBanned, CommandsStatistics, MessagesStatistics, MiddlewaresStatistics, Settings
 
 bl = BotLabeler()
 
@@ -611,4 +611,13 @@ async def lvlbanlist(message: Message):
     for user in lvlban:
         name = await getUserName(user.uid)
         msg += f"➖ {user.uid} : | [id{user.uid}|{name}]\n"
+    await message.reply(msg)
+
+
+@bl.chat_message(SearchCMD('chatsstats'))
+async def chatsstats(message: Message):
+    nm = Settings.select().where(Settings.setting == 'nightmode', Settings.pos == True).count()
+    c = Settings.select().where(Settings.setting == 'captcha', Settings.pos == True).count()
+    msg = (f'🌓 Ночной режим включен в: {pointWords(nm, ["беседе", "беседах", "беседах"])}\n'
+           f'🔢 Капча включена в: {pointWords(c, ["беседе", "беседах", "беседах"])}')
     await message.reply(msg)

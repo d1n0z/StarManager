@@ -336,8 +336,6 @@ async def clear(message: Message):
 
     for ind, i in enumerate(u_ids):
         if int(i) < 0:
-            u_ids.remove(i)
-            cmids.remove(cmids[ind])
             continue
         if await getUserAccessLevel(uid, chat_id) < await getUserAccessLevel(i, chat_id):
             u_ids.pop(ind)

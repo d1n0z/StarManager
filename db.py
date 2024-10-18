@@ -632,3 +632,15 @@ class MiddlewaresStatistics(Model):
     class Meta:
         database = dbhandle
         table_name = f'middlewaresstatistics'
+
+
+class Captcha(Model):
+    chat_id = IntegerField(index=True)
+    uid = IntegerField()
+    result = TextField(null=True)
+    exptime = BigIntegerField()
+    cmid = IntegerField(null=True)
+
+    class Meta:
+        database = dbhandle
+        table_name = f'captcha'

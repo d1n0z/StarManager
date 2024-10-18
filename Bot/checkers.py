@@ -6,7 +6,7 @@ from Bot.utils import getUserAccessLevel, getUserPremium, getUserLastMessage, ge
     deleteMessages
 from config.config import COMMANDS, API, PREFIX, DEVS, MAIN_DEVS, LVL_BANNED_COMMANDS
 from db import GlobalWarns, CMDLevels, Prefixes, Ignore, InfBanned, SilenceMode, ChatLimit, CMDNames, LvlBanned, \
-    Settings
+    Settings, TypeQueue
 
 
 async def isAdmin(chat_id) -> bool:
@@ -119,16 +119,15 @@ async def checkCMD(message, chat_id, fixing=False, accesstoalldevs=False, return
         await message.reply(messages.lock(sgw - message.date))
         return False
 
-    u_prem = await getUserPremium(uid)
     u_acc = await getUserAccessLevel(uid, chat_id)
-    access = await haveAccess(cmd, chat_id, u_acc, await getUserPremium(uid))
-    uprefixes = await getUserPrefixes(u_prem, uid)
-    ign = await getUserIgnore(uid, chat_id)
-    infb = await getUInfBanned(uid, chat_id)
-    lm = await getUserLastMessage(uid, chat_id, 0)
-    chlim = await getUChatLimit(message.date, lm, u_acc, chat_id)
-    mute = await getUserMute(uid, chat_id)
-    timeout = await getSilence(chat_id)
+    if ((not await haveAccess(cmd, chat_id, u_acc, await getUserPremium(uid))) or
+            (prefix not in await getUserPrefixes(await getUserPremium(uid), uid)) or
+            (await getUserMute(uid, chat_id) > message.date) or
+            (await getUserIgnore(uid, chat_id)) or
+            (not await getUInfBanned(uid, chat_id)) or
+            (await getUChatLimit(message.date, await getUserLastMessage(uid, chat_id, 0), u_acc, chat_id)) or
+            (await getSilence(chat_id) and u_acc == 0)):
+        return False
     settings = await getChatSettings(chat_id)
 
     if settings['main']['nightmode'] and u_acc < 6:
@@ -145,19 +144,11 @@ async def checkCMD(message, chat_id, fixing=False, accesstoalldevs=False, return
                     await deleteMessages(message.conversation_message_id, chat_id)
                     return False
 
-    if chlim or mute > message.date or (timeout and u_acc == 0):
-        try:
-            await API.messages.delete(cmids=message.conversation_message_id, peer_id=chat_id + 2000000000,
-                                      delete_for_all=True)
-        except:
-            pass
+    if settings['main']['captcha']:
+        if TypeQueue.get_or_none(TypeQueue.chat_id == chat_id, TypeQueue.uid == uid,
+                                 TypeQueue.type == 'captcha') is not None:
+            return False
 
-        return False
-
-    if prefix not in uprefixes or not access or ign or not infb:
-        return False
-
-    # await global_warn_handle(uid, cmd)
     if returncmd:
         return cmd
     return True

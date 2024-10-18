@@ -15,7 +15,7 @@ from Bot.tgbot import getTGBot
 from Bot.utils import (getIDFromMessage, getUserName, getRegDate, kickUser, getUserNickname, getUserAccessLevel,
                        getUserLastMessage, getUserMute, getUserBan, getUserXP, getUserLVL, getUserNeededXP,
                        getUserPremium, getXPTop, uploadImage, addUserXP, isChatAdmin, getUserWarns, getUserMessages,
-                       setUserAccessLevel, getChatName, addWeeklyTask, getULvlBanned, getChatSettings)
+                       setUserAccessLevel, getChatName, addWeeklyTask, getULvlBanned, getChatSettings, deleteMessages)
 from config.config import (API, LVL_NAMES, PATH, REPORT_CD, REPORT_TO, COMMANDS, DEVS, PREMIUM_TASKS_DAILY, TASKS_DAILY,
                            TG_CHAT_ID, TG_TRANSFER_THREAD_ID)
 from db import (Messages, AccessNames, Referral, Reports, ReportWarns, CMDLevels, Bonus, Prefixes, CMDNames, PremMenu,
@@ -165,8 +165,8 @@ async def stats(message: Message):
     nickname = await getUserNickname(id, chat_id)
     statsimg = await createStatsImage(warns, messages_count, id, access_level, nickname, date, last_message, prem, xp,
                                       userlvl, invites, name, top, mute, ban, lvl_name, neededxp)
-    await API.messages.edit(peer_id=message.peer_id, conversation_message_id=reply.conversation_message_id,
-                            disable_mentions=1, attachment=await uploadImage(statsimg))
+    await deleteMessages(reply.conversation_message_id, chat_id)
+    await message.reply(disable_mentions=1, attachment=await uploadImage(statsimg))
 
 
 @bl.chat_message(SearchCMD('report'))
@@ -258,85 +258,9 @@ async def bonus(message: Message):
     await message.reply(disable_mentions=1, message=msg)
 
 
-@bl.chat_message(SearchCMD('addprefix'))
-async def addprefix(message: Message):
-    chat_id = message.peer_id - 2000000000
-    uid = message.from_id
-    u_prem = await getUserPremium(uid)
-    if not u_prem:
-        msg = messages.no_prem()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
-    data = message.text.split()
-
-    if len(data) != 2:
-        msg = messages.addprefix_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-    if len(data[1]) > 2:
-        msg = messages.addprefix_too_long()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
-    if len(Prefixes.select().where(Prefixes.uid == uid)) >= 3:
-        msg = messages.addprefix_max()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
-    Prefixes.get_or_create(uid=uid, prefix=data[1])
-
-    name = await getUserName(uid)
-    nick = await getUserNickname(uid, chat_id)
-    msg = messages.addprefix(uid, name, nick, data[1])
-    await message.reply(disable_mentions=1, message=msg)
-
-
-@bl.chat_message(SearchCMD('delprefix'))
-async def delprefix(message: Message):
-    chat_id = message.peer_id - 2000000000
-    uid = message.from_id
-    u_prem = await getUserPremium(uid)
-    if not u_prem:
-        msg = messages.no_prem()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
-    data = message.text.split()
-    if len(data) < 2:
-        msg = messages.delprefix_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
-    pr = Prefixes.get_or_none(Prefixes.uid == uid, Prefixes.prefix == data[1])
-    if pr is None:
-        msg = messages.delprefix_not_found(data[1])
-        await message.reply(disable_mentions=1, message=msg)
-        return
-    pr.delete_instance()
-
-    name = await getUserName(uid)
-    nick = await getUserNickname(uid, chat_id)
-    msg = messages.delprefix(uid, name, nick, data[1])
-    await message.reply(disable_mentions=1, message=msg)
-
-
-@bl.chat_message(SearchCMD('listprefix'))
-async def listprefix(message: Message):
-    chat_id = message.peer_id - 2000000000
-    uid = message.from_id
-    u_prem = await getUserPremium(uid)
-    if int(u_prem) <= 0:
-        msg = messages.no_prem()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
-    prefixes = Prefixes.select().where(Prefixes.uid == uid)
-
-    name = await getUserName(uid)
-    nick = await getUserNickname(uid, chat_id)
-    msg = messages.listprefix(uid, name, nick, prefixes)
-    await message.reply(disable_mentions=1, message=msg)
+@bl.chat_message(SearchCMD('prefix'))
+async def prefix(message: Message):
+    await message.reply(disable_mentions=1, message=messages.prefix(), keyboard=keyboard.prefix(message.from_id))
 
 
 @bl.chat_message(SearchCMD('cmd'))

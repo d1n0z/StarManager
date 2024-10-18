@@ -1,9 +1,9 @@
 from vkbottle import ABCRule
-from vkbottle.bot import Message
+from vkbottle.bot import Message, MessageEvent
 from vkbottle_types.events.bot_events import MessageNew
 
 from Bot.checkers import getUserPrefixes
-from Bot.utils import addDailyTask, getUserPremium
+from Bot.utils import addDailyTask, getUserPremium, sendMessageEventAnswer
 from config.config import PM_COMMANDS
 
 
@@ -40,13 +40,21 @@ class SearchPMCMD(ABCRule[Message]):
 
 
 class SearchPayloadCMD(ABCRule[Message]):
-    def __init__(self, cmds: list = None):
+    def __init__(self, cmds: list = None, answer: bool = True, checksender: bool = True):
         if cmds is None:
             cmds = []
         self.cmds = cmds
+        self.answer = answer
+        self.checksender = checksender
 
-    async def check(self, event: Message) -> bool:
+    async def check(self, event: MessageEvent) -> bool:
         cmd = event.payload['cmd']
         if cmd in self.cmds:
+            if self.answer:
+                await sendMessageEventAnswer(event.event_id, event.user_id, event.peer_id)
+            if self.checksender:
+                sender = event.payload['uid'] if 'uid' in event.payload else event.user_id
+                if sender != event.user_id:
+                    return False
             return True
         return False

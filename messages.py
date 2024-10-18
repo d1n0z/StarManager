@@ -707,7 +707,7 @@ def ban_higher():
 
 
 def already_banned(name, nick, id, ban):
-    time_left = (ban - time.time()) // 86400 + 1
+    time_left = int((ban - time.time()) / 86400 + 1)
     n = nick if nick is not None else name
     return get('already_banned', id=id, n=n, time_left=time_left)
 
@@ -1315,10 +1315,7 @@ def demote_disaccept():
 
 
 def demote_accept(id, name, nick):
-    if nick is not None and len(nick) > 0:
-        n = nick
-    else:
-        n = name
+    n = nick if nick is not None and len(nick) > 0 else name
     return get('demote_accept', id=id, n=n)
 
 
@@ -1661,18 +1658,12 @@ def uexpStatus():
 
 
 def q(uid, name, nick):
-    if nick is not None and len(nick) > 0:
-        n = nick
-    else:
-        n = name
+    n = nick if nick is not None and len(nick) > 0 else name
     return get('q', uid=uid, n=n)
 
 
 def q_fail(uid, name, nick):
-    if nick is not None and len(nick) > 0:
-        n = nick
-    else:
-        n = name
+    n = nick if nick is not None and len(nick) > 0 else name
     return get('q_fail', uid=uid, n=n)
 
 
@@ -1764,26 +1755,17 @@ def giveowner(uid, unick, uname, id, nick, name):
         un = unick
     else:
         un = uname
-    if nick is not None and len(nick) > 0:
-        n = nick
-    else:
-        n = name
+    n = nick if nick is not None and len(nick) > 0 else name
     return get('giveowner', uid=uid, un=un, id=id, n=n)
 
 
 def bonus(id, nick, name, xp):
-    if nick is not None and len(nick) > 0:
-        n = nick
-    else:
-        n = name
+    n = nick if nick is not None and len(nick) > 0 else name
     return get('bonus', id=id, n=n, xp=xp)
 
 
 def bonus_time(id, nick, name, timeleft):
-    if nick is not None and len(nick) > 0:
-        n = nick
-    else:
-        n = name
+    n = nick if nick is not None and len(nick) > 0 else name
     hours = pointHours((timeleft // 3600) * 3600)
     minutes = pointMinutes(timeleft - (timeleft // 3600) * 3600)
     return get('bonus_time', id=id, n=n, hours=hours, minutes=minutes)
@@ -1845,10 +1827,7 @@ def addprefix_too_long():
 
 
 def addprefix(uid, name, nick, prefix):
-    if nick is not None and len(nick) > 0:
-        n = nick
-    else:
-        n = name
+    n = nick if nick is not None and len(nick) > 0 else name
     return get('addprefix', uid=uid, n=n, prefix=prefix)
 
 
@@ -1857,10 +1836,7 @@ def delprefix_hint():
 
 
 def delprefix(uid, name, nick, prefix):
-    if nick is not None and len(nick) > 0:
-        n = nick
-    else:
-        n = name
+    n = nick if nick is not None and len(nick) > 0 else name
     return get('delprefix', uid=uid, n=n, prefix=prefix)
 
 
@@ -1869,10 +1845,7 @@ def delprefix_not_found(prefix):
 
 
 def listprefix(uid, name, nick, prefixes):
-    if nick is not None and len(nick) > 0:
-        n = nick
-    else:
-        n = name
+    n = nick if nick is not None and len(nick) > 0 else name
     msg = get('listprefix', uid=uid, n=n)
     if len(prefixes) == 0:
         msg += 'Префиксов не обнаружено. Используйте команду /addprefix'
@@ -1886,10 +1859,7 @@ def levelname_hint():
 
 
 def levelname(uid, name, nick, lvl, lvlname):
-    if nick is not None and len(nick) > 0:
-        n = nick
-    else:
-        n = name
+    n = nick if nick is not None and len(nick) > 0 else name
     return get('levelname', uid=uid, n=n, lvlname=lvlname, lvl=lvl)
 
 
@@ -1964,10 +1934,7 @@ def chatlimit_hint():
 
 
 def chatlimit(id, name, nick, t, postfix, lpos):
-    if nick is not None and len(nick) > 0:
-        n = nick
-    else:
-        n = name
+    n = nick if nick is not None and len(nick) > 0 else name
     if bool(t):
         if t == 1 or (t > 20 and int(str(t)[-1]) == 1):
             if postfix == 's':
@@ -2031,10 +1998,7 @@ def cmd_prem():
 
 
 def cmd_set(uid, name, nick, cmd, changed):
-    if nick is not None and len(nick) > 0:
-        n = nick
-    else:
-        n = name
+    n = nick if nick is not None and len(nick) > 0 else name
     return get('cmd_set', uid=uid, n=n, changed=changed, cmd=cmd)
 
 
@@ -2051,10 +2015,7 @@ def resetcmd_not_changed(cmd):
 
 
 def resetcmd(uid, name, nick, cmd, cmdname):
-    if nick is not None and len(nick) > 0:
-        n = nick
-    else:
-        n = name
+    n = nick if nick is not None and len(nick) > 0 else name
     return get('resetcmd', uid=uid, n=n, cmdname=cmdname, cmd=cmd)
 
 
@@ -2094,10 +2055,7 @@ def duel_hint():
 
 
 def duel_uxp_not_enough(uid, name, nick):
-    if nick is not None and len(nick) > 0:
-        n = nick
-    else:
-        n = name
+    n = nick if nick is not None and len(nick) > 0 else name
     return get('duel_uxp_not_enough', uid=uid, n=n)
 
 
@@ -2106,10 +2064,7 @@ def duel_xp_minimum():
 
 
 def duel(uid, name, nick, xp):
-    if nick is not None and len(nick) > 0:
-        n = nick
-    else:
-        n = name
+    n = nick if nick is not None and len(nick) > 0 else name
     return get('duel', uid=uid, n=n, xp=xp)
 
 
@@ -2118,10 +2073,7 @@ def duel_res(uid, uname, unick, id, name, nick, xp, prem):
         un = unick
     else:
         un = uname
-    if nick is not None and len(nick) > 0:
-        n = nick
-    else:
-        n = name
+    n = nick if nick is not None and len(nick) > 0 else name
     com = '' if prem else ' с учётом комиссии 10%'
     return get('duel_res', uid=uid, un=un, id=id, n=n, xp=xp, com=com)
 
@@ -2184,26 +2136,17 @@ def kickmenu():
 
 
 def kickmenu_kick_nonick(uid, name, nick, kicked):
-    if nick is not None and len(nick) > 0:
-        n = nick
-    else:
-        n = name
+    n = nick if nick is not None and len(nick) > 0 else name
     return get('kickmenu_kick_nonick', uid=uid, n=n, kicked=kicked)
 
 
 def kickmenu_kick_nick(uid, name, nick, kicked):
-    if nick is not None and len(nick) > 0:
-        n = nick
-    else:
-        n = name
+    n = nick if nick is not None and len(nick) > 0 else name
     return get('kickmenu_kick_nick', uid=uid, n=n, kicked=kicked)
 
 
 def kickmenu_kick_banned(uid, name, nick, kicked):
-    if nick is not None and len(nick) > 0:
-        n = nick
-    else:
-        n = name
+    n = nick if nick is not None and len(nick) > 0 else name
     return get('kickmenu_kick_banned', uid=uid, n=n, kicked=kicked)
 
 
@@ -2758,3 +2701,42 @@ def nightmode_end():
 
 def speccommandscooldown(time):
     return get('speccommandscooldown', time=pointWords(time, ['секунду', 'секунды', 'секунд']))
+
+
+def captcha(uid, n, ctime, punishment: str):
+    if punishment == 'kick':
+        punishment = 'кикнуты'
+    elif punishment.startswith('mute'):
+        t = punishment.split("|")[-1]
+        punishment = f'замучены на {t} {pointHours(t)}'
+    elif punishment.startswith('ban'):
+        t = punishment.split("|")[-1]
+        punishment = f'забанены на {t} {pointDays(t)}'
+    return get('captcha', uid=uid, n=n, time=ctime, punishment=punishment)
+
+
+def captcha_punish(uid, n, punishment):
+    ctime = None
+    if punishment.startswith('mute'):
+        ctime = punishment.split("|")[-1]
+        punishment = punishment.split("|")[0]
+    elif punishment.startswith('ban'):
+        ctime = punishment.split("|")[-1]
+        punishment = punishment.split("|")[0]
+    return get(f'captcha_punishment_{punishment}', uid=uid, n=n, time=ctime)
+
+
+def captcha_pass(uid, n, date):
+    return get('captcha_pass', uid=uid, n=n, date=date)
+
+
+def prefix():
+    return get('prefix')
+
+
+def prefix_add():
+    return get('prefix')
+
+
+def prefix_del():
+    return get('prefix')

@@ -1,7 +1,7 @@
 from vkbottle import Keyboard, Callback, OpenLink, KeyboardButtonColor
 
 from config.config import TASKS_LOTS, SETTINGS_POSITIONS, SETTINGS_COUNTABLE_CHANGEMENU, SETTINGS_COUNTABLE, \
-    SETTINGS_COUNTABLE_NO_CATEGORY
+    SETTINGS_COUNTABLE_NO_CATEGORY, SETTINGS_COUNTABLE_PUNISHMENT_NO_DELETE_MESSAGE, DEVS
 
 
 def join(chid):
@@ -131,16 +131,19 @@ def settings(uid):
     kb.row()
     kb.add(Callback('💬 Приветствие', {"uid": uid, "cmd": "change_setting", "category": 'main',
                                       "setting": 'welcome'}))
+    kb.add(Callback('🔢 Каптча', {"uid": uid, "cmd": "change_setting", "category": 'main',
+                                 "setting": 'captcha'}))
     # if uid in DEVS:
     #     kb.add(Callback('⭐️ Star protect', {"uid": uid, "cmd": "settings", "category": 'protect'}))
 
     return kb.get_json()
 
 
-def settings_goto(uid):
+def settings_goto(uid, back=False):
     kb = Keyboard(inline=True)
 
-    kb.add(Callback('⚙️ Настройки беседы', {"uid": uid, "cmd": "settings_menu"}))
+    name = 'Назад' if back else '⚙️ Настройки беседы'
+    kb.add(Callback(name, {"uid": uid, "cmd": "settings_menu"}))
 
     return kb.get_json()
 
@@ -211,7 +214,7 @@ def settings_set_punishment(uid, category, setting):
     kb = Keyboard(inline=True)
     kb.add(Callback('Назад', {"uid": uid, "cmd": "settings", "category": category}), KeyboardButtonColor.NEGATIVE)
     kb.row()
-    if setting != 'messagesPerMinute':
+    if setting not in SETTINGS_COUNTABLE_PUNISHMENT_NO_DELETE_MESSAGE:
         kb.add(Callback('Удалить сообщение', {"uid": uid, "cmd": "settings_set_punishment",
                                               "action": 'deletemessage', "category": category, "setting": setting}))
     kb.add(Callback('Замутить', {"uid": uid, "cmd": "settings_set_punishment",
@@ -691,4 +694,23 @@ def welcome(url, name):
         return
     kb = Keyboard(inline=True)
     kb.add(OpenLink(label=name, link=url))
+    return kb.get_json()
+
+
+def prefix(uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('Добавить префикс', {"cmd": "prefix_add", "uid": uid}))
+    kb.add(Callback('Удалить префикс', {"cmd": "prefix_del", "uid": uid}))
+    kb.row()
+    kb.add(Callback('Список префиксов', {"cmd": "prefix_list", "uid": uid}))
+
+    return kb.get_json()
+
+
+def prefix_back(uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('Назад', {"cmd": "prefix", "uid": uid}))
+
     return kb.get_json()

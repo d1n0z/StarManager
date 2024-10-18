@@ -4,13 +4,14 @@ import tempfile
 import time
 import traceback
 from ast import literal_eval
-from datetime import date
+from datetime import date, datetime
 
 import requests
 import urllib3
 import validators
 import xmltodict
 from memoization import cached
+from multicolorcaptcha import CaptchaGenerator
 from nudenet import NudeDetector
 from vkbottle import PhotoMessageUploader
 from vkbottle.bot import Bot
@@ -18,10 +19,10 @@ from vkbottle_types.objects import MessagesMessage, MessagesMessageAttachmentTyp
 
 from config.config import (API, VK_API_SESSION, VK_TOKEN_GROUP, GROUP_ID, TASKS_DAILY, PREMIUM_TASKS_DAILY,
                            PREMIUM_TASKS_DAILY_TIERS, TASKS_WEEKLY, PREMIUM_TASKS_WEEKLY, SETTINGS, PATH,
-                           NSFW_CATEGORIES, SETTINGS_ALT)
+                           NSFW_CATEGORIES, SETTINGS_ALT, SETTINGS_DEFAULTS)
 from db import (CMDNames, UserNames, ChatNames, GroupNames, AccessLevel, LastMessageDate, Nickname, Mute, Warn, Ban,
                 XP, Premium, PremMenu, CMDLevels, Messages, DuelWins, Settings, TasksDaily, TasksWeekly, Coins,
-                LvlBanned, AntispamMessages, AntispamURLExceptions)
+                LvlBanned, AntispamMessages, AntispamURLExceptions, Captcha)
 
 
 def namesAsCommand(cmd, uid) -> list:
@@ -135,11 +136,10 @@ def NAsendMessage(chat_id, msg):
 
 async def editMessage(msg, peer_id, cmid, kb=None) -> bool:
     try:
-        await API.messages.edit(peer_id=peer_id, message=msg, disable_mentions=1,
-                                conversation_message_id=cmid, keyboard=kb)
+        return await API.messages.edit(peer_id=peer_id, message=msg, disable_mentions=1,
+                                       conversation_message_id=cmid, keyboard=kb)
     except:
         return False
-    return True
 
 
 async def getChatName(chat_id=None) -> str:
@@ -422,8 +422,9 @@ async def getChatAltSettings(chat_id):
 
 
 async def turnChatSetting(chat_id, category, setting, alt=False):
+    defaults = SETTINGS_DEFAULTS[setting] if setting in SETTINGS_DEFAULTS else {'pos': SETTINGS()[category][setting]}
     s = Settings.get_or_create(chat_id=chat_id, setting=setting,
-                               defaults={'pos': SETTINGS()[category][setting]})[0]
+                               defaults=defaults)[0]
     if alt:
         s.pos2 = not s.pos2
     else:
@@ -602,3 +603,81 @@ async def getULvlBanned(uid) -> int:
     if ban is not None:
         return 0
     return 1
+
+
+def generateCaptcha(uid, chat_id, exp):
+    gen = CaptchaGenerator()
+    c = Captcha.create(chat_id=chat_id, uid=uid, exptime=time.time() + exp * 60)
+    name = f'{PATH}media/temp/captcha{uid}_{chat_id}_{c.get_id}.png'
+    image = gen.gen_math_captcha_image(difficult_level=2, multicolor=True)
+    image.image.save(name, 'png')
+    c.result = str(image.equation_result)
+    c.save()
+    return name, c
+
+
+async def punish(uid, chat_id, setting: Settings):
+    if setting.punishment is None:
+        return False
+    punishment = setting.punishment.split('|')
+    if punishment[0] == 'deletemessage':
+        return False
+    if punishment[0] == 'kick':
+        await kickUser(uid, chat_id)
+        return punishment
+    elif punishment[0] == 'mute':
+        ms = Mute.get_or_none(Mute.uid == uid, Mute.chat_id == chat_id)
+        if ms is not None:
+            mute_times = literal_eval(ms.last_mutes_times)
+            mute_causes = literal_eval(ms.last_mutes_causes)
+            mute_names = literal_eval(ms.last_mutes_names)
+            mute_dates = literal_eval(ms.last_mutes_dates)
+        else:
+            mute_times, mute_causes, mute_names, mute_dates = [], [], [], []
+
+        mute_date = datetime.now().strftime('%Y.%m.%d %H:%M:%S')
+        mute_time = int(punishment[1]) * 60
+        mute_times.append(mute_time)
+        mute_causes.append('Нарушение правил беседы')
+        mute_names.append(f'[club222139436|Star Manager]')
+        mute_dates.append(mute_date)
+
+        ms = Mute.get_or_create(uid=uid, chat_id=chat_id)[0]
+        ms.mute = int(time.time()) + mute_time
+        ms.last_mutes_times = f"{mute_times}"
+        ms.last_mutes_causes = f"{mute_causes}"
+        ms.last_mutes_names = f"{mute_names}"
+        ms.last_mutes_dates = f"{mute_dates}"
+        ms.save()
+
+        await setChatMute(uid, chat_id, mute_time)
+        return punishment
+    elif punishment[0] == 'ban':
+        ban_date = datetime.now().strftime('%Y.%m.%d %H:%M:%S')
+        res = Ban.get_or_none(Ban.chat_id == chat_id, Ban.uid == uid)
+        if res is not None:
+            ban_times = literal_eval(res.last_bans_times)
+            ban_causes = literal_eval(res.last_bans_causes)
+            ban_names = literal_eval(res.last_bans_names)
+            ban_dates = literal_eval(res.last_bans_dates)
+        else:
+            ban_times, ban_causes, ban_names, ban_dates = [], [], [], []
+
+        ban_cause = 'Нарушение правил беседы'
+        ban_time = int(punishment[1]) * 86400
+        ban_times.append(ban_time)
+        ban_causes.append(ban_cause)
+        ban_names.append(f'[club222139436|Star Manager]')
+        ban_dates.append(ban_date)
+
+        b = Ban.get_or_create(uid=uid, chat_id=chat_id)[0]
+        b.ban = int(time.time()) + ban_time
+        b.last_bans_times = f"{ban_times}"
+        b.last_bans_causes = f"{ban_causes}"
+        b.last_bans_names = f"{ban_names}"
+        b.last_bans_dates = f"{ban_dates}"
+        b.save()
+
+        await kickUser(uid, chat_id)
+        return punishment
+    return False

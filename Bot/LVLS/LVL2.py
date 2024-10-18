@@ -188,7 +188,7 @@ async def delaccess(message: Message):
         msg = messages.id_group()
         await message.reply(disable_mentions=1, message=msg)
         return
-    if id == uid and uid not in MAIN_DEVS:
+    if id == uid and uid not in DEVS:
         msg = messages.delaccess_myself()
         await message.reply(disable_mentions=1, message=msg)
         return

@@ -1,13 +1,15 @@
 import time
 
+from vkbottle.tools.mini_types.bot import MessageMin
 from vkbottle_types.events.bot_events import MessageNew
 
 import keyboard
 import messages
 from Bot.utils import (kickUser, getUserName, getUserBan, getUserBanInfo, getUserNickname, getChatSettings, sendMessage,
-                       getUserAccessLevel, deleteMessages)
+                       getUserAccessLevel, deleteMessages, uploadImage, generateCaptcha)
 from config.config import GROUP_ID
-from db import AllUsers, UserJoinedDate, Referral, Blacklist, AllChats, LeavedChats, Welcome, Settings, WelcomeHistory
+from db import AllUsers, UserJoinedDate, Referral, Blacklist, AllChats, LeavedChats, Welcome, Settings, WelcomeHistory, \
+    TypeQueue, Captcha
 
 
 async def action_handle(event: MessageNew) -> None:
@@ -18,6 +20,9 @@ async def action_handle(event: MessageNew) -> None:
     if action.type.value == 'chat_kick_user':
         if (await getChatSettings(chat_id))['main']['kickLeaving']:
             await kickUser(uid, chat_id=chat_id)
+        Captcha.delete().where(Captcha.chat_id == chat_id, Captcha.uid == uid).execute()
+        TypeQueue.delete().where(TypeQueue.chat_id == chat_id, TypeQueue.uid == uid,
+                                 TypeQueue.type == 'captcha').execute()
         return
     if action.type.value == 'chat_invite_user':
         id = event.from_id
@@ -66,6 +71,20 @@ async def action_handle(event: MessageNew) -> None:
             r = Referral.get_or_create(chat_id=chat_id, uid=uid)[0]
             r.from_id = id
             r.save()
+
+        if s := Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == 'captcha'):
+            if not s.pos or not s.value or not s.punishment:
+                return
+            captcha = generateCaptcha(uid, chat_id, s.value)
+            m = await sendMessage(event.peer_id, messages.captcha(uid, u_name, s.value, s.punishment),
+                                  photo=await uploadImage(captcha[0]))
+            c = captcha[1]
+            c.cmid = m[0].conversation_message_id
+            c.save()
+            TypeQueue.create(
+                uid=uid, chat_id=chat_id, type='captcha', additional='{}'
+            )
+            return
 
         if s := Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == 'welcome'):
             welcome = Welcome.get_or_none(Welcome.chat_id == chat_id)
