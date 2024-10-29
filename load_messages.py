@@ -1,4 +1,4 @@
-from db import BotMessages
+from tables import BotMessages
 
 
 # noinspection LongLine

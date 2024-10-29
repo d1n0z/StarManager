@@ -1,7 +1,7 @@
 from vkbottle import Keyboard, Callback, OpenLink, KeyboardButtonColor
 
-from config.config import TASKS_LOTS, SETTINGS_POSITIONS, SETTINGS_COUNTABLE_CHANGEMENU, SETTINGS_COUNTABLE, \
-    SETTINGS_COUNTABLE_NO_CATEGORY, SETTINGS_COUNTABLE_PUNISHMENT_NO_DELETE_MESSAGE, DEVS
+from config.config import (TASKS_LOTS, SETTINGS_POSITIONS, SETTINGS_COUNTABLE_CHANGEMENU, SETTINGS_COUNTABLE,
+                           SETTINGS_COUNTABLE_NO_CATEGORY, SETTINGS_COUNTABLE_PUNISHMENT_NO_DELETE_MESSAGE)
 
 
 def join(chid):
@@ -446,11 +446,11 @@ def notif_list(uid, notifs, page=1):
     notifs = notifs[ppgg:]
 
     for k, i in enumerate(notifs):
-        if i.status == 1:
+        if i[0] == 1:
             c = KeyboardButtonColor.POSITIVE
         else:
             c = KeyboardButtonColor.NEGATIVE
-        kb.add(Callback(f'{k + 1 + ppgg}', {"cmd": "notif_select", "sender": uid, "uid": uid, "name": i.name}), c)
+        kb.add(Callback(f'{k + 1 + ppgg}', {"cmd": "notif_select", "sender": uid, "uid": uid, "name": i[1]}), c)
         if k == kx:
             kb.row()
         if k + 1 == 10 + ttlx:

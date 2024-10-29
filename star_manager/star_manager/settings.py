@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'users.apps.UsersConfig',
     'social_django',
     'sslserver',
+    'rest_framework',
 ]
 
 MIDDLEWARE = [
@@ -117,14 +118,6 @@ DATABASES = {
         'HOST': 'localhost',
         'PORT': 5432,
     },
-    'starmanager': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config.DATABASE,
-        'USER': config.USER,
-        'PASSWORD': config.PASSWORD,
-        'HOST': 'localhost',
-        'PORT': 5432,
-    }
 }
 
 

@@ -13,21 +13,19 @@ import keyboard
 import messages
 from Bot.checkers import haveAccess
 from Bot.rules import SearchPayloadCMD
-from Bot.tgbot import getTGBot
+from Bot.tgbot import tgbot
 from Bot.utils import sendMessageEventAnswer, editMessage, getUserAccessLevel, getUserXP, getUserPremium, addUserXP, \
     getUserName, getUserNickname, kickUser, getXPTop, getChatName, addWeeklyTask, \
     addDailyTask, getUserBan, getUserWarns, getUserMute, getULvlBanned, getChatSettings, turnChatSetting, \
     deleteMessages, setChatMute, getChatAltSettings, getChatMembers, getChatOwner
 from config.config import API, COMMANDS, DEVS, TASKS_LOTS, TASKS_DAILY, PREMIUM_TASKS_DAILY, SETTINGS_COUNTABLE, \
     TG_CHAT_ID, TG_NEWCHAT_THREAD_ID, SETTINGS_PREMIUM
-from db import AccessLevel, JoinedDate, DuelWins, ReportAnswers, Nickname, Mute, Warn, Ban, Premium, \
-    GPool, ChatGroups, Messages, Notifs, TypeQueue, CMDLevels, ReportWarns, CMDNames, Coins, XP, TasksWeekly, \
-    TasksDaily, TasksStreak, Settings, AntispamURLExceptions, Welcome, Prefixes
+from db import pool
 
 bl = BotLabeler()
 
 
-@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['join', 'rejoin']))
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['join', 'rejoin'], checksender=False))
 async def join(message: MessageEvent):
     payload = message.payload
     cmd = payload['cmd']
@@ -52,27 +50,47 @@ async def join(message: MessageEvent):
         bp = message.user_id
         if bp not in omembers:
             return
-        if s := AccessLevel.get_or_none(AccessLevel.access_level == 7, AccessLevel.chat_id == chat_id):
-            if s.uid != bp:
-                return
-
-        AccessLevel.delete().where(AccessLevel.chat_id == chat_id).execute()
-
-        ac = AccessLevel.get_or_create(uid=bp, chat_id=chat_id)[0]
-        ac.access_level = 7
-        ac.save()
-
-        chtime = JoinedDate.get_or_create(chat_id=chat_id)[0]
-        chtime.time = time.time()
-        chtime.save()
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                if s := await (await c.execute(
+                        'select uid from accesslvl where chat_id=%s and access_level=7', (chat_id,))).fetchone():
+                    if s[0] != bp:
+                        return
+                for i in await (await c.execute(
+                        'select uid from mute where chat_id=%s and mute>%s', (chat_id, time.time()))).fetchall():
+                    await setChatMute(i[0], chat_id, 0)
+                await c.execute('delete from accesslvl where chat_id=%s', (chat_id,))
+                await c.execute('delete from nickname where chat_id=%s', (chat_id,))
+                await c.execute('delete from settings where chat_id=%s', (chat_id,))
+                await c.execute('delete from welcome where chat_id=%s', (chat_id,))
+                await c.execute('delete from welcomehistory where chat_id=%s', (chat_id,))
+                await c.execute('delete from accessnames where chat_id=%s', (chat_id,))
+                await c.execute('delete from ignore where chat_id=%s', (chat_id,))
+                await c.execute('delete from commandlevels where chat_id=%s', (chat_id,))
+                await c.execute('delete from mute where chat_id=%s', (chat_id,))
+                await c.execute('delete from warn where chat_id=%s', (chat_id,))
+                await c.execute('delete from ban where chat_id=%s', (chat_id,))
+                await c.execute('delete from gpool where chat_id=%s', (chat_id,))
+                await c.execute('delete from chatgroups where chat_id=%s', (chat_id,))
+                await c.execute('delete from silencemode where chat_id=%s', (chat_id,))
+                await c.execute('delete from filters where chat_id=%s', (chat_id,))
+                await c.execute('delete from chatlimit where chat_id=%s', (chat_id,))
+                await c.execute('delete from notifications where chat_id=%s', (chat_id,))
+                await c.execute('delete from typequeue where chat_id=%s', (chat_id,))
+                await c.execute('delete from antispamurlexceptions where chat_id=%s', (chat_id,))
+                await c.execute('delete from botjoineddate where chat_id=%s', (chat_id,))
+                await c.execute('delete from captcha where chat_id=%s', (chat_id,))
+                await c.execute('insert into accesslvl (uid, chat_id, access_level) values (%s, %s, 7)', (bp, chat_id))
+                await c.execute('insert into botjoineddate (chat_id, time) values (%s, %s)',
+                                (chat_id, int(time.time())))
+                await conn.commit()
 
         try:
-            bot = getTGBot()
-            await bot.send_message(chat_id=TG_CHAT_ID, message_thread_id=TG_NEWCHAT_THREAD_ID,
-                                   text=f'{chat_id} | {await getChatName(chat_id)} | '
-                                        f'{await getChatOwner(chat_id)} | {await getChatMembers(chat_id)} | '
-                                        f'{datetime.now().strftime("%H:%M:%S")}',
-                                   disable_web_page_preview=True, parse_mode='HTML')
+            await tgbot.send_message(chat_id=TG_CHAT_ID, message_thread_id=TG_NEWCHAT_THREAD_ID,
+                                     text=f'{chat_id} | {await getChatName(chat_id)} | '
+                                          f'{await getChatOwner(chat_id)} | {await getChatMembers(chat_id)} | '
+                                          f'{datetime.now().strftime("%H:%M:%S")}',
+                                     disable_web_page_preview=True, parse_mode='HTML')
         except:
             traceback.print_exc()
 
@@ -87,7 +105,7 @@ async def join(message: MessageEvent):
             await editMessage(msg, peer_id, message.conversation_message_id)
 
 
-@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['duel'], checksender=False))
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['duel'], answer=False, checksender=False))
 async def duel(message: MessageEvent):
     payload = message.payload
     peer_id = message.object.peer_id
@@ -96,7 +114,7 @@ async def duel(message: MessageEvent):
     id = int(message.user_id)
     uid = int(payload['uid'])
 
-    if id == uid or not await getULvlBanned(id):
+    if id == uid or await getULvlBanned(id):
         return
 
     xp = await getUserXP(id)
@@ -107,6 +125,7 @@ async def duel(message: MessageEvent):
     elif uxp < duelxp:
         await message.show_snackbar("У вашего соперника недостаточно XP")
         return
+    await sendMessageEventAnswer(message.event_id, id, peer_id)
 
     rid = (id, uid)[int.from_bytes(os.urandom(1)) % 2]
     if rid == id:
@@ -121,9 +140,11 @@ async def duel(message: MessageEvent):
     if not u_premium:
         xtw = int(xtw / 100 * 90)
 
-    dw = DuelWins.get_or_create(uid=winid, defaults={'wins': 0})[0]
-    dw.wins += 1
-    dw.save()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if not (await c.execute('update duelwins set wins=wins+1 where uid=%s', (winid,))).rowcount:
+                await c.execute('insert into duelwins (uid, wins) values (%s, 1)', (winid,))
+            await conn.commit()
     await addWeeklyTask(winid, 'duelwin')
     await addDailyTask(winid, 'duelwin')
 
@@ -150,8 +171,12 @@ async def answer_report(message: MessageEvent):
     answering_id = int(message.user_id)
     report = payload['text']
 
-    ReportAnswers.create(uid=uid, chat_id=chat_id, repid=repid, answering_id=answering_id, report_text=report,
-                         cmid=message.conversation_message_id)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            await c.execute(
+                'insert into reportanswers (uid, chat_id, repid, answering_id, report_text, cmid) values (%s, %s, %s,'
+                ' %s, %s, %s)', (uid, chat_id, repid, answering_id, report, message.conversation_message_id))
+            await conn.commit()
     msg = messages.report_answering(repid)
     await editMessage(msg, peer_id, message.conversation_message_id)
     await API.messages.mark_as_important(message_ids=message.conversation_message_id, important=1)
@@ -185,10 +210,14 @@ async def settings(message: MessageEvent):
         if setting not in SETTINGS_COUNTABLE:
             await turnChatSetting(chat_id, category, setting)
         else:
-            chatsetting = Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == setting)
-            value = None if chatsetting is None else chatsetting.value
-            value2 = None if chatsetting is None else chatsetting.value2
-            punishment = None if chatsetting is None else chatsetting.punishment
+            async with (await pool()).connection() as conn:
+                async with conn.cursor() as c:
+                    chatsetting = await (await c.execute(
+                        'select "value", value2, punishment from settings where chat_id=%s and '
+                        'setting=%s', (chat_id, setting))).fetchone()
+            value = None if chatsetting is None else chatsetting[0]
+            value2 = None if chatsetting is None else chatsetting[1]
+            punishment = None if chatsetting is None else chatsetting[2]
             settings = await getChatSettings(chat_id)
             pos = settings[category][setting]
             altsettings = await getChatAltSettings(chat_id)
@@ -218,14 +247,21 @@ async def settings_change_countable(message: MessageEvent):
         await editMessage(messages.no_prem(), peer_id, message.conversation_message_id,
                           keyboard.settings_goto(uid, True))
         return
-    TypeQueue.delete().where(TypeQueue.uid == uid, TypeQueue.chat_id == chat_id).execute()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            await c.execute('delete from typequeue where chat_id=%s and uid=%s', (chat_id, uid))
+            await conn.commit()
 
     if action in ('turn', 'turnalt'):
         await turnChatSetting(chat_id, category, setting, alt=action == 'turnalt')
-        chatsetting = Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == setting)
-        value = None if chatsetting is None else chatsetting.value
-        punishment = None if chatsetting is None else chatsetting.punishment
-        value2 = None if chatsetting is None else chatsetting.value2
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                chatsetting = await (await c.execute(
+                    'select "value", value2, punishment from settings where chat_id=%s and setting=%s',
+                    (chat_id, setting))).fetchone()
+        value = None if chatsetting is None else chatsetting[0]
+        value2 = None if chatsetting is None else chatsetting[1]
+        punishment = None if chatsetting is None else chatsetting[2]
         settings = await getChatSettings(chat_id)
         pos = settings[category][setting]
         altsettings = await getChatAltSettings(chat_id)
@@ -239,19 +275,25 @@ async def settings_change_countable(message: MessageEvent):
     kb = None
     if action == 'set':
         if setting == 'welcome':
-            w = Welcome.get_or_none(Welcome.chat_id == chat_id)
-            if w is None:
+            async with (await pool()).connection() as conn:
+                async with conn.cursor() as c:
+                    w = await (await c.execute(
+                        'select msg, photo, url from welcome where chat_id=%s', (chat_id,))).fetchone()
+            if w:
+                msg = messages.settings_countable_action(action, setting, w[0], w[1], w[2])
+                kb = keyboard.settings_set_welcome(uid, w[0], w[1], w[2])
+            else:
                 msg = messages.settings_countable_action(action, setting)
                 kb = keyboard.settings_set_welcome(uid, None, None, None)
-            else:
-                msg = messages.settings_countable_action(action, setting, w.msg, w.photo, w.url)
-                kb = keyboard.settings_set_welcome(uid, w.msg, w.photo, w.url)
         else:
-            TypeQueue.create(
-                uid=uid, chat_id=chat_id, type='settings_change_countable',
-                additional='{' + f'"setting": "{setting}", "category": "{category}", '
-                                 f'"cmid": "{message.conversation_message_id}"' + '}'
-            )
+            async with (await pool()).connection() as conn:
+                async with conn.cursor() as c:
+                    await c.execute(
+                        'insert into typequeue (chat_id, uid, type, additional) values (%s, %s, %s, %s)',
+                        (chat_id, uid, 'settings_change_countable',
+                         '{' + f'"setting": "{setting}", "category": "{category}", '
+                               f'"cmid": "{message.conversation_message_id}"' + '}'))
+                    await conn.commit()
             msg = messages.settings_countable_action(action, setting)
     if action == 'setPunishment':
         msg = messages.settings_choose_punishment()
@@ -277,18 +319,22 @@ async def settings_set_punishment(message: MessageEvent):
                           keyboard.settings_goto(uid, True))
         return
     if action in ['deletemessage', 'kick']:
-        chatsetting = Settings.get(Settings.chat_id == chat_id, Settings.setting == setting)
-        chatsetting.punishment = action
-        chatsetting.save()
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                await c.execute(
+                    'update settings set punishment = %s where chat_id=%s and setting=%s', (action, chat_id, setting))
+                await conn.commit()
         msg = messages.settings_set_punishment(action)
         kb = keyboard.settings_change_countable(uid, category, setting, await getChatSettings(chat_id),
                                                 await getChatAltSettings(chat_id), True)
     else:
-        TypeQueue.create(
-            uid=uid, chat_id=chat_id, type='settings_set_punishment',
-            additional='{' + f'"setting": "{setting}", "action": "{action}", "category": "{category}", '
-                             f'"cmid": "{message.conversation_message_id}"' + '}'
-        )
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                await c.execute('insert into typequeue (chat_id, uid, type, additional) values (%s, %s, %s, %s)',
+                                (chat_id, uid, 'settings_set_punishment', '{' +
+                                 f'"setting": "{setting}", "action": "{action}", "category": "{category}", '
+                                 f'"cmid": "{message.conversation_message_id}"' + '}'))
+                await conn.commit()
         msg = messages.settings_set_punishment_input(action)
         kb = keyboard.settings_change_countable(uid, category, setting, await getChatSettings(chat_id),
                                                 await getChatAltSettings(chat_id), True)
@@ -308,8 +354,11 @@ async def settings_exceptionlist(message: MessageEvent):
                           keyboard.settings_goto(uid, True))
         return
     if setting == 'disallowLinks':
-        msg = messages.settings_exceptionlist(AntispamURLExceptions.select().where(
-            AntispamURLExceptions.chat_id == chat_id))
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                aurle = await (await c.execute(
+                    'select url from antispamurlexceptions where chat_id=%s', (chat_id,))).fetchall()
+        msg = messages.settings_exceptionlist(aurle)
         kb = keyboard.settings_change_countable(uid, category='antispam', onlybackbutton=True)
         await editMessage(msg, peer_id, message.conversation_message_id, kb)
 
@@ -328,10 +377,13 @@ async def settings_listaction(message: MessageEvent):
         await editMessage(messages.no_prem(), peer_id, message.conversation_message_id,
                           keyboard.settings_goto(uid, True))
         return
-    TypeQueue.create(
-        uid=uid, chat_id=chat_id, type='settings_listaction',
-        additional='{' + f'"setting": "{setting}", "action": "{action}", "type": "{type}"' + '}'
-    )
+
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            await c.execute('insert into typequeue (chat_id, uid, type, additional) values (%s, %s, %s, %s)',
+                            (chat_id, uid, 'settings_listaction',
+                             '{' + f'"setting": "{setting}", "action": "{action}", "type": "{type}"' + '}'))
+            await conn.commit()
     msg = messages.settings_listaction_action(setting, action)
     await editMessage(msg, peer_id, message.conversation_message_id)
 
@@ -345,7 +397,11 @@ async def settings_set_welcome(message: MessageEvent):
     peer_id = message.peer_id
     chat_id = peer_id - 2000000000
 
-    TypeQueue.create(uid=uid, chat_id=chat_id, type=cmd, additional='{}')
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            await c.execute('insert into typequeue (chat_id, uid, type, additional) values (%s, %s, %s, \'{}\')',
+                            (chat_id, uid, cmd,))
+            await conn.commit()
     msg = messages.get(cmd)
     await editMessage(msg, peer_id, message.conversation_message_id)
 
@@ -359,21 +415,22 @@ async def settings_unset_welcome(message: MessageEvent):
     peer_id = message.peer_id
     chat_id = peer_id - 2000000000
 
-    welcome = Welcome.get(Welcome.chat_id == chat_id)
-    text = welcome.msg
-    img = welcome.photo
-    url = welcome.url
-    if (cmd in ['settings_unset_welcome_text', 'settings_unset_welcome_photo'] and
-            not ((text and ((img and url) or (not img and not url) or not url)) or
-                 (img and ((text and url) or (not text and not url) or not url)))):
-        return
-    if cmd == 'settings_unset_welcome_text':
-        welcome.msg = None
-    if cmd == 'settings_unset_welcome_photo':
-        welcome.photo = None
-    if cmd == 'settings_unset_welcome_url':
-        welcome.url = None
-    welcome.save()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            welcome = await (await c.execute(
+                'select msg, photo, url from welcome where chat_id=%s', (chat_id,))).fetchone()
+            text = welcome[0]
+            img = welcome[1]
+            url = welcome[2]
+            if (cmd in ['settings_unset_welcome_text', 'settings_unset_welcome_photo'] and
+                    not ((text and ((img and url) or (not img and not url) or not url)) or
+                         (img and ((text and url) or (not text and not url) or not url)))):
+                return
+            await c.execute('update welcome set msg = %s, photo = %s, url = %s where chat_id=%s',
+                            (None if cmd == 'settings_unset_welcome_text' else text,
+                             None if cmd == 'settings_unset_welcome_photo' else img,
+                             None if cmd == 'settings_unset_welcome_url' else url, chat_id))
+            await conn.commit()
 
     kb = keyboard.settings_set_welcome(uid, welcome.msg, welcome.photo, welcome.url)
     msg = messages.settings_countable_action('set', 'welcome')
@@ -389,11 +446,14 @@ async def nicklist(message: MessageEvent):
     members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = members.items
     members_uid = [i.member_id for i in members]
-    res = Nickname.select().where(Nickname.uid > 0, Nickname.uid << members_uid, Nickname.chat_id == chat_id,
-                                  Nickname.nickname.is_null(False)).order_by(Nickname.nickname)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            res = await (await c.execute(
+                'select uid, nickname from nickname where chat_id=%s and uid>0 and uid=ANY(%s) and nickname is not null'
+                ' order by nickname', (chat_id, members_uid))).fetchall()
     count = len(res)
     res = res[:30]
-    names = await API.users.get(user_ids=[f'{i.uid}' for i in res])
+    names = await API.users.get(user_ids=[i[0] for i in res])
     msg = messages.nlist(res, names)
     kb = keyboard.nlist(uid, 0, count)
     await editMessage(msg, peer_id, message.conversation_message_id, kb)
@@ -410,13 +470,15 @@ async def page_nlist(message: MessageEvent):
     members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = members.items
     members_uid = [i.member_id for i in members]
-    res = Nickname.select().where(Nickname.uid > 0, Nickname.uid << members_uid,
-                                  Nickname.chat_id == chat_id, Nickname.nickname.is_null(False)
-                                  ).order_by(Nickname.nickname).offset(30 * page)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            res = await (await c.execute(
+                'select uid, nickname from nickname where chat_id=%s and uid>0 and uid=ANY(%s) and nickname is not null'
+                ' order by nickname', (chat_id, members_uid))).fetchall()
     if not (count := len(res)):
         return
-    res = res[:30]
-    names = await API.users.get(user_ids=[i.uid for i in res])
+    res = res[page * 30:page * 30 + 30]
+    names = await API.users.get(user_ids=[i[0] for i in res])
     msg = messages.nlist(res, names, page)
     kb = keyboard.nlist(uid, page, count)
     await editMessage(msg, peer_id, message.conversation_message_id, kb)
@@ -428,14 +490,16 @@ async def nonicklist(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
 
-    res = Nickname.select().where(Nickname.uid > 0, Nickname.chat_id == chat_id, Nickname.nickname.is_null(False))
-    nickmembers = [i.uid for i in res]
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            res = [i[0] for i in await (await c.execute(
+                'select uid from nickname where chat_id=%s and uid>0 and nickname is not null', (chat_id,))).fetchall()]
     members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = members.items
-    members_uid = [i.member_id for i in members if i.member_id not in nickmembers]
+    members_uid = [i.member_id for i in members if i.member_id not in res]
     count = len(members_uid)
     members_uid = members_uid[:30]
-    names = await API.users.get(user_ids=[f'{i}' for i in members_uid])
+    names = await API.users.get(user_ids=members_uid)
 
     msg = messages.nnlist(names)
     kb = keyboard.nnlist(uid, 0, count)
@@ -450,11 +514,13 @@ async def page_nnlist(message: MessageEvent):
     chat_id = peer_id - 2000000000
     page = payload['page']
 
-    res = Nickname.select().where(Nickname.uid > 0, Nickname.chat_id == chat_id)
-    nickmembers = [i.uid for i in res]
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            res = [i[0] for i in await (await c.execute(
+                'select uid from nickname where chat_id=%s and uid>0 and nickname is not null')).fetchall()]
     members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members_count = len(members.items[page * 30:])
-    members = [i for i in members.items if i.member_id not in nickmembers][page * 30: page * 30 + 30]
+    members = [i for i in members.items if i.member_id not in res][page * 30: page * 30 + 30]
     if len(members) <= 0:
         return
     members = await API.users.get(user_ids=[f'{i.member_id}' for i in members])
@@ -472,14 +538,18 @@ async def page_mutelist(message: MessageEvent):
     chat_id = peer_id - 2000000000
     page = payload['page']
 
-    res = Mute.select().where(Mute.mute > int(time.time()), Mute.chat_id == chat_id)
-    if len(res) <= 0:
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            res = await (await c.execute(
+                'select uid, chat_id, last_mutes_causes, mute, last_mutes_names from mute where chat_id=%s and '
+                'mute>%s order by uid desc', (chat_id, int(time.time())))).fetchall()
+    if not (count := len(res)):
         return
-    muted_count = len(res)
     res = res.offset(page * 30).limit(30)
-    names = await API.users.get(user_ids=[i.uid for i in res])
-    msg = await messages.mutelist(res, names, muted_count)
-    kb = keyboard.mutelist(uid, page, muted_count)
+    res = res[page * 30: page * 30 + 30]
+    names = await API.users.get(user_ids=[i[0] for i in res])
+    msg = await messages.mutelist(res, names, count)
+    kb = keyboard.mutelist(uid, page, count)
     await editMessage(msg, peer_id, message.conversation_message_id, kb)
 
 
@@ -492,11 +562,15 @@ async def page_warnlist(message: MessageEvent):
     chat_id = peer_id - 2000000000
     page = payload['page']
 
-    res = Warn.select().where(Warn.warns > 0, Warn.chat_id == chat_id)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            res = await (await c.execute(
+                'select uid, chat_id, last_warns_causes, warns, last_warns_names from warn where chat_id=%s and'
+                ' warns>0 order by uid desc', (chat_id,))).fetchall()
     if not (count := len(res)):
         return
-    res = res.offset(page * 30).limit(30)
-    names = await API.users.get(user_ids=[i.uid for i in res])
+    res = res[page * 30: page * 30 + 30]
+    names = await API.users.get(user_ids=[i[0] for i in res])
     msg = await messages.warnlist(res, names, count)
     kb = keyboard.warnlist(uid, page, count)
     await editMessage(msg, peer_id, message.conversation_message_id, kb)
@@ -517,12 +591,16 @@ async def page_banlist(message: MessageEvent):
 
     if page < 0:
         return
-    res = Ban.select().where(Ban.ban > int(time.time()), Ban.chat_id == chat_id)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            res = await (await c.execute(
+                'select uid, chat_id, last_bans_causes, ban, last_bans_names from ban where chat_id=%s and '
+                'ban>%s order by uid desc', (chat_id, int(time.time())))).fetchall()
     if len(res) <= 0:
         return
     banned_count = len(res)
-    res = res.offset(page * 30).limit(30)
-    names = await API.users.get(user_ids=[i.uid for i in res])
+    res = res[page * 30:page * 30 + 30]
+    names = await API.users.get(user_ids=[i[0] for i in res])
     msg = await messages.banlist(res, names, banned_count)
     kb = keyboard.banlist(uid, page, banned_count)
     await editMessage(msg, peer_id, message.conversation_message_id, kb)
@@ -543,12 +621,16 @@ async def page_statuslist(message: MessageEvent):
 
     if page < 0:
         return
-    premium_pool = Premium.select().where(Premium.time >= time.time())
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            premium_pool = await (await c.execute('select uid, time from premium where time>%s',
+                                                  (int(time.time()),))).fetchall()
     if len(premium_pool) <= 0:
         return
-    names = await API.users.get(user_ids=[i.uid for i in premium_pool])
+    premium_pool = premium_pool[page * 30:page * 30 + 30]
+    names = await API.users.get(user_ids=[i[0] for i in premium_pool])
     msg = messages.statuslist(names, premium_pool)
-    kb = keyboard.statuslist(uid, 0, len(names))
+    kb = keyboard.statuslist(uid, page, len(names))
     await editMessage(msg, peer_id, message.conversation_message_id, kb)
 
 
@@ -616,17 +698,17 @@ async def giveowner(message: MessageEvent):
     name = await getUserName(id)
     nick = await getUserNickname(id, chat_id)
 
-    u = AccessLevel.get(uid=uid, chat_id=chat_id)
-    u.access_level = 0
-    u.save()
-    AccessLevel.update(access_level=0).where(AccessLevel.chat_id == chat_id,
-                                             AccessLevel.access_level == 7).execute()
-    u = AccessLevel.get_or_create(uid=id, chat_id=chat_id)[0]
-    u.access_level = 7
-    u.save()
-
-    GPool.delete().where(GPool.chat_id == chat_id).execute()
-    ChatGroups.delete().where(ChatGroups.chat_id == chat_id).execute()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if not (await c.execute('delete from accesslvl where chat_id=%s and uid=%s', (chat_id, uid))).rowcount:
+                return
+            if not (await c.execute('update accesslvl set access_level=7 where chat_id=%s and uid=%s',
+                                    (chat_id, id))).rowcount:
+                await c.execute('insert into accesslvl (uid, chat_id, access_level) values (%s, %s, 7)',
+                                (id, chat_id))
+            await c.execute('delete from gpool where chat_id=%s', (chat_id,))
+            await c.execute('delete from chatgroups where chat_id=%s', (chat_id,))
+            await conn.commit()
 
     await editMessage(messages.giveowner(uid, unick, uname, id, nick, name), peer_id,
                       message.conversation_message_id)
@@ -641,9 +723,12 @@ async def mtop(message: MessageEvent):
     members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = [int(i.member_id) for i in members.items]
 
-    res = Messages.select().where(Messages.uid > 0, Messages.messages > 0, Messages.uid << members,
-                                  Messages.chat_id == chat_id).order_by(Messages.messages.desc()).limit(10)
-    ids = [i.uid for i in res]
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            res = await (await c.execute(
+                'select uid, messages from messages where uid>0 and messages>0 and chat_id=%s and '
+                'uid=ANY(%s) order by messages desc limit 10', (chat_id, members))).fetchall()
+    ids = [i[0] for i in res]
 
     names = await API.users.get(user_ids=ids)
 
@@ -690,9 +775,11 @@ async def top_duels(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
 
-    lvln = {i.uid: i.wins for i in DuelWins.select().order_by(DuelWins.wins.desc()) if int(i.uid) > 0}
-    lvln = dict(list(lvln.items())[:10])
-
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            lvln = await (await c.execute(
+                'select uid, wins from duelwins where uid>0 order by wins desc limit 10')).fetchall()
+    lvln = {i[0]: i[1] for i in lvln}
     names = await API.users.get(user_ids=[int(x) for x in list(lvln.keys())])
 
     msg = messages.top_duels(names, lvln)
@@ -709,9 +796,12 @@ async def top_duels_in_group(message: MessageEvent):
     members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = members.items
     all_members = [i.member_id for i in members]
-    lvln = {i.uid: i.wins for i in DuelWins.select().order_by(DuelWins.wins.desc()) if
-            int(i.uid) > 0 and int(i.uid) in all_members}
-    lvln = dict(list(lvln.items())[:10])
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            lvln = await (await c.execute(
+                'select uid, wins from duelwins where uid>0 and uid=ANY(%s) order by wins desc limit 10',
+                (all_members,))).fetchall()
+    lvln = {i[0]: i[1] for i in lvln}
 
     names = await API.users.get(user_ids=[int(x) for x in list(lvln.keys())])
 
@@ -726,7 +816,10 @@ async def resetnick_accept(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
 
-    Nickname.delete().where(Nickname.chat_id == chat_id).execute()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            await c.execute('delete from nickname where chat_id=%s', (chat_id,))
+            await conn.commit()
     name = await getUserName(uid)
     msg = messages.resetnick_accept(uid, name)
     await editMessage(msg, peer_id, message.conversation_message_id)
@@ -747,8 +840,10 @@ async def resetaccess_accept(message: MessageEvent):
     chat_id = peer_id - 2000000000
     lvl = payload['lvl']
 
-    AccessLevel.delete().where(AccessLevel.access_level == lvl, AccessLevel.chat_id == chat_id).execute()
-
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            await c.execute('delete from accesslvl where chat_id=%s and access_level=%s', (chat_id, lvl))
+            await conn.commit()
     name = await getUserName(uid)
 
     msg = messages.resetaccess_accept(uid, name, lvl)
@@ -774,11 +869,14 @@ async def kick_nonick(message: MessageEvent):
     nick = await getUserNickname(uid, chat_id)
     uname = await getUserName(uid)
 
-    res = Nickname.select().where(Nickname.uid > 0, Nickname.chat_id == chat_id, Nickname.nickname.is_null(False))
-    nickmembers = [i.uid for i in res]
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            res = await (await c.execute('select uid from nickname where chat_id=%s and uid>0 and nickname is not null',
+                                         (chat_id,))).fetchall()
+    res = [i[0] for i in res]
     members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = members.items
-    members_uid = [i.member_id for i in members if i.member_id not in nickmembers and i.member_id > 0]
+    members_uid = [i.member_id for i in members if i.member_id not in res and i.member_id > 0]
 
     kicked = 0
     for i in members_uid:
@@ -798,9 +896,12 @@ async def kick_nick(message: MessageEvent):
     uname = await getUserName(uid)
 
     kicked = 0
-    for i in Nickname.select().where(Nickname.nickname.is_null(False), Nickname.chat_id == chat_id,
-                                     Nickname.uid > 0):
-        kicked += await kickUser(i.uid, chat_id)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            nicknamed = await (await c.execute(
+                'select uid from nickname where chat_id=%s and uid>0 and nickname is not null', (chat_id,))).fetchall()
+    for i in nicknamed:
+        kicked += await kickUser(i[0], chat_id)
 
     msg = messages.kickmenu_kick_nick(uid, uname, nick, kicked)
     await API.messages.send(random_id=0, message=msg, chat_id=chat_id)
@@ -834,7 +935,11 @@ async def notif(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
 
-    notifs = Notifs.select().where(Notifs.chat_id == chat_id).order_by(Notifs.name.desc())
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            notifs = await (await c.execute(
+                'select status, name from notifications where chat_id=%s order by name desc',
+                (chat_id,))).fetchall()
     if cmd == 'page' in payload:
         page = int(payload['page'])
     else:
@@ -855,10 +960,15 @@ async def notif_select(message: MessageEvent):
     chat_id = peer_id - 2000000000
     name = payload['name']
 
-    notif = Notifs.get(Notifs.chat_id == chat_id, Notifs.name == name)
-    TypeQueue.delete().where(TypeQueue.uid == uid, TypeQueue.chat_id == chat_id).execute()
-    msg = messages.notification(notif.name, notif.text, notif.time, notif.every, notif.tag, notif.status)
-    kb = keyboard.notification(uid, notif.status, notif.name)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            notif = await (await c.execute(
+                'select name, text, time, every, tag, status from notifications where chat_id=%s and name=%s',
+                (chat_id, name))).fetchone()
+            await c.execute('delete from typequeue where uid=%s and chat_id=%s', (uid, chat_id))
+            await conn.commit()
+    msg = messages.notification(notif[0], notif[1], notif[2], notif[3], notif[4], notif[5])
+    kb = keyboard.notification(uid, notif[5], notif[0])
     await editMessage(msg, peer_id, message.conversation_message_id, kb)
 
 
@@ -871,12 +981,18 @@ async def notification_status(message: MessageEvent):
     turn_to = payload['turn']
     name = payload['name']
 
-    snotif = Notifs.get(Notifs.name == name, Notifs.chat_id == chat_id)
-    st = time.time() + snotif.every
-    snotif.status = turn_to
-    snotif.time = st
-    snotif.save()
-    msg = messages.notification(name, snotif.text, st, snotif.every, snotif.tag, turn_to)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            snotif = await (await c.execute('select time, every from notifications where chat_id=%s and name=%s',
+                                            (chat_id, name))).fetchone()
+            ntime = snotif[0]
+            while ntime < time.time() and snotif[1] > 0:
+                ntime += snotif[1] * 60
+            snotif = await (await c.execute(
+                'update notifications set status = %s, time = %s where chat_id=%s and name=%s '
+                'returning text, every, tag', (turn_to, ntime, chat_id, name))).fetchone()
+            await conn.commit()
+    msg = messages.notification(name, snotif[0], ntime, snotif[1], snotif[2], turn_to)
     kb = keyboard.notification(uid, turn_to, name)
     await editMessage(msg, peer_id, message.conversation_message_id, kb)
 
@@ -889,8 +1005,12 @@ async def notification_text(message: MessageEvent):
     chat_id = peer_id - 2000000000
     name = payload['name']
 
-    TypeQueue.create(uid=uid, chat_id=chat_id, type='notification_text',
-                     additional='{' + f'"name": "{name}", "cmid": "{message.conversation_message_id}"' + '}')
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            await c.execute('insert into typequeue (chat_id, uid, type, additional) values (%s, %s, %s, %s)',
+                            (chat_id, uid, 'notification_text',
+                             '{' + f'"name": "{name}", "cmid": "{message.conversation_message_id}"' + '}'))
+            await conn.commit()
     msg = messages.notification_changing_text()
     await editMessage(msg, peer_id, message.conversation_message_id)
 
@@ -923,10 +1043,12 @@ async def notification_time_change(message: MessageEvent):
     else:
         msg = messages.notification_changing_time_everyxmin()
 
-    TypeQueue.create(
-        uid=uid, chat_id=chat_id, type='notification_time_change',
-        additional='{' + f'"name": "{name}", "cmid": "{message.conversation_message_id}", "type": "{ctype}"' + '}'
-    )
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            await c.execute('insert into typequeue (chat_id, uid, type, additional) values (%s, %s, %s, %s)',
+                            (chat_id, uid, 'notification_time_change', '{' +
+                             f'"name": "{name}", "cmid": "{message.conversation_message_id}", "type": "{ctype}"' + '}'))
+            await conn.commit()
 
     await editMessage(msg, peer_id, message.conversation_message_id)
 
@@ -952,12 +1074,15 @@ async def notification_tag_change(message: MessageEvent):
     name = payload['name']
     ctype = payload['type']
 
-    notif = Notifs.get(Notifs.name == name, Notifs.chat_id == chat_id)
-    notif.tag = ctype
-    notif.save()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            notif = await (await c.execute(
+                'update notifications set tag = %s where chat_id=%s and name=%s returning text, time, every, status',
+                (ctype, chat_id, name))).fetchone()
+            await conn.commit()
 
-    msg = messages.notification(name, notif.text, notif.time, notif.every, notif.tag, notif.status)
-    kb = keyboard.notification(uid, notif.status, name)
+    msg = messages.notification(name, notif[0], notif[1], notif[2], ctype, notif[3])
+    kb = keyboard.notification(uid, notif[3], name)
     await editMessage(msg, peer_id, message.conversation_message_id, kb)
 
 
@@ -968,7 +1093,10 @@ async def notification_delete(message: MessageEvent):
     chat_id = peer_id - 2000000000
     name = payload['name']
 
-    Notifs.get(Notifs.chat_id == chat_id, Notifs.name == name).delete_instance()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            await c.execute('delete from notifications where chat_id=%s and name=%s', (chat_id, name))
+            await conn.commit()
     msg = messages.notification_delete(name)
     await editMessage(msg, peer_id, message.conversation_message_id)
 
@@ -980,7 +1108,10 @@ async def listasync(message: MessageEvent):
     peer_id = message.object.peer_id
     page = payload['page']
 
-    chat_ids = [i.chat_id for i in GPool.select().where(GPool.uid == uid).iterator()]
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            chat_ids = await (await c.execute('select chat_id from gpool where uid=%s', (uid,))).fetchall()
+    chat_ids = [i[0] for i in chat_ids]
     total = len(chat_ids)
     chat_ids = chat_ids[(page - 1) * 10:page * 10]
     if len(chat_ids) > 0:
@@ -1003,11 +1134,13 @@ async def help(message: MessageEvent):
     page = payload['page']
     prem = payload['prem']
 
-    cmds = CMDLevels.select().where(CMDLevels.chat_id == chat_id)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            cmds = await (await c.execute('select cmd, lvl from commandlevels where chat_id=%s', (chat_id,))).fetchall()
     base = COMMANDS.copy()
     for i in cmds:
         try:
-            base[i.cmd] = int(i.lvl)
+            base[i[0]] = int(i[1])
         except:
             pass
     msg = messages.help(page, base)
@@ -1024,13 +1157,19 @@ async def warn_report(message: MessageEvent):
     if id not in DEVS:
         return
     uid = payload['uid']
-    uws = ReportWarns.get_or_create(uid=uid, defaults={'warns': 0})[0]
-    uws.warns += 1
-    uws.save()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if not (w := await (await c.execute(
+                    'update reportwarns set warns=warns+1 where uid=%s returning warns', (uid,))).fetchone()):
+                await c.execute('insert into reportwarns (uid, warns) values (%s, 1)', (uid,))
+                w = 1
+            else:
+                w = w[0]
+            await conn.commit()
 
-    kb = keyboard.warn_report(uid, uws.warns)
-    if uws.warns < 3:
-        msg = messages.warn_report(id, await getUserName(id), uws.warns, uid, await getUserName(uid))
+    kb = keyboard.warn_report(uid, w)
+    if w < 3:
+        msg = messages.warn_report(id, await getUserName(id), w, uid, await getUserName(uid))
         await API.messages.send(message=msg, peer_id=peer_id, keyboard=kb, random_id=0)
         return
     msg = messages.warn_report_ban(id, await getUserName(id), uid, await getUserName(uid))
@@ -1047,15 +1186,17 @@ async def unwarn_report(message: MessageEvent):
         return
     uwarns = payload['warns']
     id = payload['uid']
-    uws = ReportWarns.get_or_none(uid=id)
-    if uws is not None:
-        uwarns = uws.warns - uwarns
-        if uwarns < 0:
-            uwarns = 0
-        uws.warns = uwarns
-        uws.save()
-    else:
-        uwarns = 0
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            uws = await (await c.execute('select warns from reportwarns where uid=%s', (id,))).fetchone()
+            if uws:
+                uwarns = uws[0] - uwarns
+                if uwarns < 0:
+                    uwarns = 0
+                await c.execute('update reportwarns set warns = %s where uid=%s', (uwarns, id))
+                await conn.commit()
+            else:
+                uwarns = 0
 
     kb = keyboard.warn_report(id, uwarns)
     if uwarns < 3:
@@ -1075,9 +1216,10 @@ async def cmdlist(message: MessageEvent):
     uid = message.user_id
     peer_id = message.peer_id
 
-    cmdnames = {}
-    for i in CMDNames.select().where(CMDNames.uid == uid).iterator():
-        cmdnames[i.cmd] = i.name
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            cmdnames = {i[0]: i[1] for i in await (await c.execute('select cmd, name from cmdnames where uid=%s',
+                                                                   (uid,))).fetchall()}
 
     msg = messages.cmdlist(dict(list(cmdnames.items())[page * 10: (page * 10) + 10]), page, len(list(cmdnames)))
     kb = keyboard.cmdlist(uid, page, len(cmdnames))
@@ -1091,18 +1233,20 @@ async def task(message: MessageEvent):
 
     completed = 0
     prem = await getUserPremium(uid)
-    t = TasksDaily.select().where(TasksDaily.uid == uid)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            cs = await (await c.execute('select coins from coins where uid=%s', (uid,))).fetchone()
+            cs = cs[0] if cs else 0
+            s = await (await c.execute('select streak from tasksstreak where uid=%s', (uid,))).fetchone()
+            s = s[0] if s else 0
+            t = await (await c.execute('select count, task from tasksdaily where uid=%s', (uid,))).fetchall()
     for i in t:
-        if i.count >= (TASKS_DAILY | PREMIUM_TASKS_DAILY)[i.task]:
-            if i.task in PREMIUM_TASKS_DAILY and not prem:
+        if i[0] >= (TASKS_DAILY | PREMIUM_TASKS_DAILY)[i[1]]:
+            if i[1] in PREMIUM_TASKS_DAILY and not prem:
                 continue
             completed += 1
-    c = Coins.get_or_none(Coins.uid == uid)
-    c = c.coins if c is not None else 0
-    s = TasksStreak.get_or_none(TasksStreak.uid == uid)
-    s = s.streak if s is not None else 0
     kb = keyboard.tasks(uid)
-    msg = messages.task(completed, c, s)
+    msg = messages.task(completed, cs, s)
     await editMessage(msg, peer_id, message.conversation_message_id, kb)
 
 
@@ -1111,8 +1255,10 @@ async def task_trade(message: MessageEvent):
     uid = message.user_id
     peer_id = message.peer_id
 
-    c = Coins.get_or_none(Coins.uid == uid)
-    c = c.coins if c is not None else 0
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            c = await (await c.execute('select coins from coins where uid=%s', (uid,))).fetchone()
+            c = c[0] if c else 0
     msg = messages.task_trade(c)
     kb = keyboard.task_trade(uid, c)
     await editMessage(msg, peer_id, message.conversation_message_id, kb)
@@ -1125,28 +1271,25 @@ async def task_trade_lot(message: MessageEvent):
     uid = message.user_id
     peer_id = message.peer_id
 
-    c = Coins.get_or_none(Coins.uid == uid)
-    cc = c.coins if c is not None else 0
-    cost = list(TASKS_LOTS.keys())[lot - 1]
-    if cc < cost:
-        msg = messages.task_trade_not_enough(cost - cc)
-        kb = keyboard.task_back(uid)
-        await editMessage(msg, peer_id, message.conversation_message_id, kb)
-        return
-    c.coins -= cost
-    c.save()
-
-    if lot < 4:
-        x = XP.get(XP.uid == uid)
-        x.xp += TASKS_LOTS[cost] * 200
-        x.save()
-    else:
-        p = Premium.get_or_create(uid=uid, defaults={'time': 0})[0]
-        if p.time < datetime.now().timestamp():
-            p.time = datetime.now().timestamp() + (TASKS_LOTS[cost] * 86400)
-        else:
-            p.time += TASKS_LOTS[cost] * 86400
-        p.save()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            cs = await (await c.execute('select id, coins from coins where uid=%s', (uid,))).fetchone()
+            cc = cs[1] if cs else 0
+            cost = list(TASKS_LOTS.keys())[lot - 1]
+            if cc < cost or not (await c.execute(
+                    'update coins set coins=coins-%s where uid=%s', (cost, uid,))).rowcount:
+                msg = messages.task_trade_not_enough(cost - cc)
+                kb = keyboard.task_back(uid)
+                await editMessage(msg, peer_id, message.conversation_message_id, kb)
+                return
+            if lot < 4:
+                await c.execute('update xp set xp=xp+%s where uid=%s', (TASKS_LOTS[cost] * 200, uid))
+            else:
+                if not (await c.execute(
+                        'update premium set time=time+%s where uid=%s', (TASKS_LOTS[cost] * 86400, uid))).rowcount:
+                    await c.execute('insert into premium (uid, time) values (%s, %s)',
+                                    (uid, int(time.time() + TASKS_LOTS[cost] * 86400)))
+            await conn.commit()
 
     msg = messages.task_trade_lot_log(lot, uid, await getUserName(uid))
     await API.messages.send(peer_id=2000020672, random_id=0, message='#task' + msg)
@@ -1162,16 +1305,23 @@ async def task_weekly(message: MessageEvent):
     peer_id = message.peer_id
     prem = await getUserPremium(uid)
 
-    bonus = TasksWeekly.get_or_none(TasksWeekly.uid == uid, TasksWeekly.task == 'bonus')
-    bonus = bonus.count if bonus is not None else 0
-    dailytask = TasksWeekly.get_or_none(TasksWeekly.uid == uid, TasksWeekly.task == 'dailytask')
-    dailytask = dailytask.count if dailytask is not None else 0
-    sendmsgs = TasksWeekly.get_or_none(TasksWeekly.uid == uid, TasksWeekly.task == 'sendmsgs')
-    sendmsgs = sendmsgs.count if sendmsgs is not None else 0
-    lvlup = TasksWeekly.get_or_none(TasksWeekly.uid == uid, TasksWeekly.task == 'lvlup')
-    lvlup = lvlup.count if lvlup is not None else 0
-    duelwin = TasksWeekly.get_or_none(TasksWeekly.uid == uid, TasksWeekly.task == 'duelwin')
-    duelwin = duelwin.count if duelwin is not None else 0
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            bonus = await (await c.execute(
+                'select count from tasksweekly where uid=%s and task=\'bonus\'', (uid,))).fetchone()
+            bonus = bonus[0] if bonus else 0
+            dailytask = await (await c.execute(
+                'select count from tasksweekly where uid=%s and task=\'dailytask\'', (uid,))).fetchone()
+            dailytask = dailytask[0] if dailytask else 0
+            sendmsgs = await (await c.execute(
+                'select count from tasksweekly where uid=%s and task=\'sendmsgs\'', (uid,))).fetchone()
+            sendmsgs = sendmsgs[0] if sendmsgs else 0
+            lvlup = await (await c.execute(
+                'select count from tasksweekly where uid=%s and task=\'lvlup\'', (uid,))).fetchone()
+            lvlup = lvlup[0] if lvlup else 0
+            duelwin = await (await c.execute(
+                'select count from tasksweekly where uid=%s and task=\'duelwin\'', (uid,))).fetchone()
+            duelwin = duelwin[0] if duelwin else 0
 
     msg = messages.task_weekly(prem, [bonus, dailytask, sendmsgs, lvlup, duelwin])
     kb = keyboard.task_back(uid)
@@ -1184,16 +1334,23 @@ async def task_daily(message: MessageEvent):
     peer_id = message.peer_id
     prem = await getUserPremium(uid)
 
-    sendmsgs = TasksDaily.get_or_none(TasksDaily.uid == uid, TasksDaily.task == 'sendmsgs')
-    sendmsgs = sendmsgs.count if sendmsgs is not None else 0
-    sendvoice = TasksDaily.get_or_none(TasksDaily.uid == uid, TasksDaily.task == 'sendvoice')
-    sendvoice = sendvoice.count if sendvoice is not None else 0
-    duelwin = TasksDaily.get_or_none(TasksDaily.uid == uid, TasksDaily.task == 'duelwin')
-    duelwin = duelwin.count if duelwin is not None else 0
-    cmds = TasksDaily.get_or_none(TasksDaily.uid == uid, TasksDaily.task == 'cmds')
-    cmds = cmds.count if cmds is not None else 0
-    stickers = TasksDaily.get_or_none(TasksDaily.uid == uid, TasksDaily.task == 'stickers')
-    stickers = stickers.count if stickers is not None else 0
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            sendmsgs = await (await c.execute(
+                'select count from tasksdaily where uid=%s and task=\'sendmsgs\'', (uid,))).fetchone()
+            sendmsgs = sendmsgs[0] if sendmsgs else 0
+            sendvoice = await (await c.execute(
+                'select count from tasksdaily where uid=%s and task=\'sendvoice\'', (uid,))).fetchone()
+            sendvoice = sendvoice[0] if sendvoice else 0
+            duelwin = await (await c.execute(
+                'select count from tasksdaily where uid=%s and task=\'duelwin\'', (uid,))).fetchone()
+            duelwin = duelwin[0] if duelwin else 0
+            cmds = await (await c.execute(
+                'select count from tasksdaily where uid=%s and task=\'cmds\'', (uid,))).fetchone()
+            cmds = cmds[0] if cmds else 0
+            stickers = await (await c.execute(
+                'select count from tasksdaily where uid=%s and task=\'stickers\'', (uid,))).fetchone()
+            stickers = stickers[0] if stickers else 0
 
     msg = messages.task_daily(prem, [sendmsgs, sendvoice, duelwin, cmds, stickers])
     kb = keyboard.task_back(uid)
@@ -1210,16 +1367,17 @@ async def check(message: MessageEvent):
     check = payload['check']
 
     if check == 'ban':
-        res = Ban.get_or_none(Ban.chat_id == chat_id, Ban.uid == id)
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                res = await (await c.execute(
+                    'select last_bans_causes, last_bans_names, last_bans_dates, last_bans_times from ban where '
+                    'chat_id=%s and uid=%s', (chat_id, id))).fetchone()
         if res is not None:
-            u_bans_causes = literal_eval(res.last_bans_causes)[::-1]
-            u_bans_names = literal_eval(res.last_bans_names)[::-1]
-            u_bans_dates = literal_eval(res.last_bans_dates)[::-1]
-            u_bans_times = literal_eval(res.last_bans_times)[::-1]
-            ban_date = u_bans_dates[0]
+            ban_date = literal_eval(res[0])[::-1][0]
+            u_bans_names = literal_eval(res[1])[::-1]
             ban_from = u_bans_names[0]
-            ban_reason = u_bans_causes[0]
-            ban_time = u_bans_times[0]
+            ban_reason = literal_eval(res[2])[::-1][0]
+            ban_time = literal_eval(res[3])[::-1][0]
         else:
             u_bans_names = []
             ban_date = ban_from = ban_reason = ban_time = None
@@ -1232,16 +1390,17 @@ async def check(message: MessageEvent):
         kb = keyboard.check_history(sender, id, 'ban', len(u_bans_names))
         await editMessage(msg, peer_id, message.conversation_message_id, kb)
     if check == 'mute':
-        res = Mute.get_or_none(Mute.chat_id == chat_id, Mute.uid == id)
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                res = await (await c.execute(
+                    'select last_mutes_causes, last_mutes_names, last_mutes_dates, last_mutes_times from mute '
+                    'where chat_id=%s and uid=%s', (chat_id, id))).fetchone()
         if res is not None:
-            u_mutes_causes = literal_eval(res.last_mutes_causes)[::-1]
-            u_mutes_names = literal_eval(res.last_mutes_names)[::-1]
-            u_mutes_dates = literal_eval(res.last_mutes_dates)[::-1]
-            u_mutes_times = literal_eval(res.last_mutes_times)[::-1]
-            mute_date = u_mutes_dates[0]
+            mute_date = literal_eval(res[0])[::-1][0]
+            u_mutes_names = literal_eval(res[1])[::-1]
             mute_from = u_mutes_names[0]
-            mute_reason = u_mutes_causes[0]
-            mute_time = u_mutes_times[0]
+            mute_reason = literal_eval(res[2])[::-1][0]
+            mute_time = literal_eval(res[3])[::-1][0]
         else:
             u_mutes_names = []
             mute_date = mute_from = mute_reason = mute_time = None
@@ -1255,11 +1414,15 @@ async def check(message: MessageEvent):
         kb = keyboard.check_history(sender, id, 'mute', len(u_mutes_names))
         await editMessage(msg, peer_id, message.conversation_message_id, kb)
     if check == 'warn':
-        res = Warn.get_or_none(Warn.chat_id == chat_id, Warn.uid == id)
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                res = await (await c.execute(
+                    'select last_warns_causes, last_warns_names, last_warns_dates from warn where uid=%s and '
+                    'chat_id=%s', (id, chat_id))).fetchone()
         if res is not None:
-            u_warns_causes = literal_eval(res.last_warns_causes)[::-1]
-            u_warns_names = literal_eval(res.last_warns_names)[::-1]
-            u_warns_dates = literal_eval(res.last_warns_dates)[::-1]
+            u_warns_causes = literal_eval(res[0])[::-1]
+            u_warns_names = literal_eval(res[1])[::-1]
+            u_warns_dates = literal_eval(res[2])[::-1]
         else:
             u_warns_names = u_warns_causes = u_warns_dates = []
         warn = await getUserWarns(id, chat_id)
@@ -1310,12 +1473,16 @@ async def check_history(message: MessageEvent):
     await sendMessageEventAnswer(message.event_id, uid, peer_id)
 
     if check == 'ban':
-        res = Ban.get_or_none(Ban.chat_id == chat_id, Ban.uid == id)
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                res = await (await c.execute(
+                    'select last_bans_causes, last_bans_names, last_bans_dates, last_bans_times from ban where '
+                    'chat_id=%s and uid=%s', (chat_id, id))).fetchone()
         if res is not None:
-            bans_causes = literal_eval(res.last_bans_causes)[::-1][:50]
-            bans_names = literal_eval(res.last_bans_names)[::-1][:50]
-            bans_dates = literal_eval(res.last_bans_dates)[::-1][:50]
-            bans_times = literal_eval(res.last_bans_times)[::-1][:50]
+            bans_causes = literal_eval(res[0])[::-1][:50]
+            bans_names = literal_eval(res[1])[::-1][:50]
+            bans_dates = literal_eval(res[2])[::-1][:50]
+            bans_times = literal_eval(res[3])[::-1][:50]
         else:
             bans_causes = bans_names = bans_dates = bans_times = []
         name = await getUserName(id)
@@ -1323,12 +1490,16 @@ async def check_history(message: MessageEvent):
         msg = messages.check_history_ban(id, name, nickname, bans_dates, bans_names, bans_times, bans_causes)
         await editMessage(msg, peer_id, message.conversation_message_id)
     if check == 'mute':
-        res = Mute.get_or_none(Mute.chat_id == chat_id, Mute.uid == id)
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                res = await (await c.execute(
+                    'select last_mutes_causes, last_mutes_names, last_mutes_dates, last_mutes_times from '
+                    'mute where chat_id=%s and uid=%s',  (chat_id, id))).fetchone()
         if res is not None:
-            mutes_causes = literal_eval(res.last_mutes_causes)[::-1][:50]
-            mutes_names = literal_eval(res.last_mutes_names)[::-1][:50]
-            mutes_dates = literal_eval(res.last_mutes_dates)[::-1][:50]
-            mutes_times = literal_eval(res.last_mutes_times)[::-1][:50]
+            mutes_causes = literal_eval(res[0])[::-1][:50]
+            mutes_names = literal_eval(res[1])[::-1][:50]
+            mutes_dates = literal_eval(res[2])[::-1][:50]
+            mutes_times = literal_eval(res[3])[::-1][:50]
         else:
             mutes_causes = mutes_names = mutes_dates = mutes_times = []
         name = await getUserName(id)
@@ -1336,12 +1507,16 @@ async def check_history(message: MessageEvent):
         msg = messages.check_history_mute(id, name, nickname, mutes_dates, mutes_names, mutes_times, mutes_causes)
         await editMessage(msg, peer_id, message.conversation_message_id)
     if check == 'warn':
-        res = Warn.get_or_none(Warn.chat_id == chat_id, Warn.uid == id)
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                res = await (await c.execute(
+                    'select last_warns_causes, last_warns_names, last_warns_dates, last_warns_times from warn '
+                    'where chat_id=%s and uid=%s', (chat_id, id))).fetchone()
         if res is not None:
-            warns_causes = literal_eval(res.last_warns_causes)[::-1][:50]
-            warns_names = literal_eval(res.last_warns_names)[::-1][:50]
-            warns_dates = literal_eval(res.last_warns_dates)[::-1][:50]
-            warns_times = literal_eval(res.last_warns_times)[::-1][:50]
+            warns_causes = literal_eval(res[0])[::-1][:50]
+            warns_names = literal_eval(res[1])[::-1][:50]
+            warns_dates = literal_eval(res[2])[::-1][:50]
+            warns_times = literal_eval(res[3])[::-1][:50]
         else:
             warns_causes = warns_names = warns_dates = warns_times = []
         name = await getUserName(id)
@@ -1351,7 +1526,7 @@ async def check_history(message: MessageEvent):
 
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, 
-              SearchPayloadCMD(['unmute', 'unwarn', 'unban'], checksender=False))
+              SearchPayloadCMD(['unmute', 'unwarn', 'unban'], answer=False, checksender=False))
 async def unpunish(message: MessageEvent):
     payload = message.payload
     uid = message.user_id
@@ -1365,34 +1540,42 @@ async def unpunish(message: MessageEvent):
     if u_acc <= await getUserAccessLevel(id, chat_id) or not await haveAccess(cmd, chat_id, u_acc):
         await message.show_snackbar("⛔️ У вас недостаточно прав.")
         return
+    await sendMessageEventAnswer(message.event_id, uid, peer_id)
+
     name = await getUserName(id)
     nickname = await getUserNickname(id, chat_id)
     uname = await getUserName(uid)
     unickname = await getUserNickname(uid, chat_id)
     
     if cmd == 'unmute':
-        res = Mute.get(Mute.chat_id == chat_id, Mute.uid == id)
-        if res.mute < time.time():
-            return
-        res.mute = 0
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                if not (await c.execute('update mute set mute=0 where chat_id=%s and uid=%s and mute>%s',
+                                        (chat_id, id, int(time.time())))).rowcount:
+                    return
+                await conn.commit()
         await setChatMute(id, chat_id, 0)
         msg = messages.unmute(uname, unickname, uid, name, nickname, id)
     elif cmd == 'unwarn':
-        res = Warn.get(Warn.chat_id == chat_id, Warn.uid == id)
-        if res.warns <= 0 or res.warns >= 3:
-            return
-        res.warns -= 1
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                if not (await c.execute(
+                        'update warn set warns=warns-1 where chat_id=%s and uid=%s and warns>0 and warns<3',
+                        (chat_id, id))).rowcount:
+                    return
+                await conn.commit()
         msg = messages.unwarn(uname, unickname, uid, name, nickname, id)
     elif cmd == 'unban':
-        res = Ban.get(Ban.chat_id == chat_id, Ban.uid == id)
-        if res.ban < time.time():
-            return
-        res.ban = 0
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                if not (await c.execute('update ban set ban=0 where chat_id=%s and uid=%s and ban>%s',
+                                        (chat_id, id, int(time.time())))).rowcount:
+                    return
+                await conn.commit()
         msg = messages.unban(uname, unickname, uid, name, nickname, id)
     else:
         return
-    
-    res.save()
+
     await editMessage(msg, peer_id, message.conversation_message_id)
     await deleteMessages(cmid, chat_id)
 
@@ -1409,16 +1592,22 @@ async def addprefix(message: MessageEvent):
     if not await getUserPremium(uid):
         await editMessage(messages.no_prem(), peer_id, message.conversation_message_id)
         return
-    if cmd == 'prefix_add' and len(Prefixes.select().where(Prefixes.uid == uid)) >= 3:
-        await editMessage(messages.addprefix_max(), peer_id, message.conversation_message_id, keyboard.prefix_back(uid))
-        return
-    if cmd in ('prefix_add', 'prefix_del'):
-        TypeQueue.create(uid=uid, chat_id=chat_id, type=cmd,
-                         additional='{"cmid": ' + str(message.conversation_message_id) + '}')
-        await editMessage(messages.get(cmd), peer_id, message.conversation_message_id)
-    elif cmd == 'prefix_list':
-        await editMessage(messages.listprefix(uid, await getUserName(uid), await getUserNickname(uid, chat_id),
-                                              Prefixes.select().where(Prefixes.uid == uid)),
-                          peer_id, message.conversation_message_id, keyboard.prefix_back(uid))
-    else:
-        await editMessage(messages.prefix(), peer_id, message.conversation_message_id, keyboard.prefix(uid))
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if cmd == 'prefix_add' and (await (await c.execute(
+                    'select count(*) as c from prefix where uid=%s', (uid,))).fetchone())[0] > 2:
+                await editMessage(messages.addprefix_max(), peer_id, message.conversation_message_id,
+                                  keyboard.prefix_back(uid))
+                return
+            if cmd in ('prefix_add', 'prefix_del'):
+                await c.execute('insert into typequeue (chat_id, uid, type, additional) values (%s, %s, %s, %s)',
+                                (chat_id, uid, cmd, '{"cmid": ' + str(message.conversation_message_id) + '}'))
+                await conn.commit()
+                await editMessage(messages.get(cmd), peer_id, message.conversation_message_id)
+            elif cmd == 'prefix_list':
+                prefixes = await (await c.execute('select prefix from prefix where uid=%s', (uid,))).fetchall()
+                await editMessage(
+                    messages.listprefix(uid, await getUserName(uid), await getUserNickname(uid, chat_id), prefixes),
+                    peer_id, message.conversation_message_id, keyboard.prefix_back(uid))
+            else:
+                await editMessage(messages.prefix(), peer_id, message.conversation_message_id, keyboard.prefix(uid))

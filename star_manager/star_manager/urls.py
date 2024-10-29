@@ -22,6 +22,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('bot_manager.urls')),
     path('users/', include('users.urls', namespace='users')),
+    path('api/', include('api.urls', namespace='api')),
 ]
 
 handler404 = views.handler404

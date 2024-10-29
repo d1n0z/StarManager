@@ -1,6 +1,5 @@
 import time
 
-from vkbottle.tools.mini_types.bot import MessageMin
 from vkbottle_types.events.bot_events import MessageNew
 
 import keyboard
@@ -8,8 +7,7 @@ import messages
 from Bot.utils import (kickUser, getUserName, getUserBan, getUserBanInfo, getUserNickname, getChatSettings, sendMessage,
                        getUserAccessLevel, deleteMessages, uploadImage, generateCaptcha)
 from config.config import GROUP_ID
-from db import AllUsers, UserJoinedDate, Referral, Blacklist, AllChats, LeavedChats, Welcome, Settings, WelcomeHistory, \
-    TypeQueue, Captcha
+from db import pool
 
 
 async def action_handle(event: MessageNew) -> None:
@@ -20,33 +18,40 @@ async def action_handle(event: MessageNew) -> None:
     if action.type.value == 'chat_kick_user':
         if (await getChatSettings(chat_id))['main']['kickLeaving']:
             await kickUser(uid, chat_id=chat_id)
-        Captcha.delete().where(Captcha.chat_id == chat_id, Captcha.uid == uid).execute()
-        TypeQueue.delete().where(TypeQueue.chat_id == chat_id, TypeQueue.uid == uid,
-                                 TypeQueue.type == 'captcha').execute()
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                await c.execute('delete from captcha where chat_id=%s and uid=%s', (chat_id, uid))
+                await c.execute('delete from typequeue where chat_id=%s and uid=%s and type=\'captcha\'',
+                                (chat_id, uid))
+                await conn.commit()
         return
     if action.type.value == 'chat_invite_user':
         id = event.from_id
-        AllUsers.get_or_create(uid=id)
-        ujd = UserJoinedDate.get_or_create(chat_id=chat_id, uid=id)[0]
-        ujd.time = time.time()
-        ujd.save()
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                await c.execute('insert into allusers (uid) values (%s) on conflict (uid) do nothing', (id,))
+                if not (await c.execute('update userjoineddate set time = %s where chat_id=%s and uid=%s',
+                                        (int(time.time()), chat_id, id))).rowcount:
+                    await c.execute('insert into userjoineddate (chat_id, uid, time) values (%s, %s, %s)',
+                                    (chat_id, id, int(time.time())))
+                await conn.commit()
 
         if uid == -GROUP_ID:
-            b = Blacklist.get_or_none(Blacklist.uid == id)
-            if b is not None:
-                await sendMessage(event.peer_id, messages.blocked())
-                await kickUser(-GROUP_ID, chat_id=chat_id)
-                return
+            async with (await pool()).connection() as conn:
+                async with conn.cursor() as c:
+                    if await (await c.execute('select id from blacklist where uid=%s', (id,))).fetchone():
+                        await sendMessage(event.peer_id, messages.blocked())
+                        await kickUser(-GROUP_ID, chat_id=chat_id)
+                        return
 
-            c = AllChats.get_or_none(AllChats.chat_id == chat_id)
-            if c is None:
-                AllChats.create(chat_id=chat_id)
-                await sendMessage(event.peer_id, messages.join(), keyboard.join(chat_id))
-                return
+                    if not await (await c.execute('select id from allchats where chat_id=%s', (chat_id,))).fetchone():
+                        await c.execute('insert into allchats (chat_id) values (%s)', (chat_id,))
+                        await conn.commit()
+                        await sendMessage(event.peer_id, messages.join(), keyboard.join(chat_id))
+                        return
 
-            lc = LeavedChats.get_or_none(LeavedChats.chat_id == chat_id)
-            if lc is not None:
-                lc.delete_instance()
+                    await c.execute('delete from leavedchats where chat_id=%s', (chat_id,))
+                    await conn.commit()
             await sendMessage(event.peer_id, messages.rejoin(), keyboard.rejoin(chat_id))
             return
 
@@ -67,35 +72,44 @@ async def action_handle(event: MessageNew) -> None:
             await kickUser(uid, chat_id=chat_id)
             return
 
-        if id is not None and id:
-            r = Referral.get_or_create(chat_id=chat_id, uid=uid)[0]
-            r.from_id = id
-            r.save()
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                if id is not None and id:
+                    if not (await c.execute('update refferal set from_id = %s where chat_id=%s and uid=%s',
+                                            (id, chat_id, uid))).rowcount:
+                        await c.execute('insert into refferal (chat_id, uid, from_id) values (%s, %s, %s)',
+                                        (chat_id, uid, id))
+                    await conn.commit()
 
-        if s := Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == 'captcha'):
-            if not s.pos or not s.value or not s.punishment:
-                return
-            captcha = generateCaptcha(uid, chat_id, s.value)
-            m = await sendMessage(event.peer_id, messages.captcha(uid, u_name, s.value, s.punishment),
-                                  photo=await uploadImage(captcha[0]))
-            c = captcha[1]
-            c.cmid = m[0].conversation_message_id
-            c.save()
-            TypeQueue.create(
-                uid=uid, chat_id=chat_id, type='captcha', additional='{}'
-            )
-            return
+                if s := await (await c.execute(
+                        'select pos, "value", punishment from settings where chat_id=%s and setting=\'captcha\'',
+                        (chat_id,))).fetchone():
+                    if s[0] and s[1] and s[2]:
+                        captcha = await generateCaptcha(uid, chat_id, s[1])
+                        m = await sendMessage(event.peer_id, messages.captcha(uid, u_name, s[1], s[2]),
+                                              photo=await uploadImage(captcha[0]))
+                        await c.execute('update captcha set cmid = %s where id=%s',
+                                        (m[0].conversation_message_id, captcha[1]))
+                        await c.execute('insert into typequeue (chat_id, uid, "type", additional) '
+                                        'values (%s, %s, \'captcha\', \'{}\')', (chat_id, uid))
+                        await conn.commit()
 
-        if s := Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == 'welcome'):
-            welcome = Welcome.get_or_none(Welcome.chat_id == chat_id)
-            if welcome is None or not s.pos:
-                return
-            name = u_name if u_nickname is None else u_nickname
-            m = await sendMessage(event.peer_id, welcome.msg.replace('%name%', f"[id{uid}|{name}]"),
-                                  keyboard.welcome(welcome.url, welcome.button_label), welcome.photo)
-            if s.pos2:
-                lw: WelcomeHistory = WelcomeHistory.select().where(
-                    WelcomeHistory.chat_id == chat_id).order_by(WelcomeHistory.time.desc())
-                await deleteMessages(lw.cmid, chat_id)
-                lw.delete_instance()
-            WelcomeHistory.create(chat_id=chat_id, time=time.time(), cmid=m[0].conversation_message_id)
+                if s := await (await c.execute(
+                        'select pos, pos2 from settings where chat_id=%s and setting=\'welcome\'',
+                        (chat_id,))).fetchone():
+                    welcome = await (await c.execute(
+                        'select msg, url, button_label, photo from welcome where chat_id=%s',
+                        (chat_id,))).fetchone()
+                    if welcome is not None and s[0]:
+                        name = u_name if u_nickname is None else u_nickname
+                        m = await sendMessage(event.peer_id, welcome[0].replace('%name%', f"[id{uid}|{name}]"),
+                                              keyboard.welcome(welcome[1], welcome[2]), welcome[3])
+                        if s[1]:
+                            lw = (await (await c.execute(
+                                'delete from welcomehistory where chat_id=%s returning cmid',
+                                (chat_id,))).fetchone())[0]
+                            await deleteMessages(lw, chat_id)
+                        await c.execute('insert into welcomehistory (chat_id, time, cmid) values (%s, %s, %s) '
+                                        'on conflict (chat_id) do nothing',
+                                        (chat_id, time.time(), m[0].conversation_message_id))
+                        await conn.commit()

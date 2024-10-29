@@ -45,7 +45,7 @@ nav button {
     font-family: "Montserrat", sans-serif;
     font-weight: normal;
     font-size: 24px;
-    color: white;
+    color: #ffffff;
     float: left;
     top: 5px;
     /*right: -5px;*/
@@ -83,7 +83,7 @@ nav button:hover {
     margin-right: 200px;
     font-size: 20px;
     padding: 0 25px;
-    color: white;
+    color: #ffffff;
     line-height: 50px;
 }
 
@@ -114,7 +114,7 @@ body p {
     margin-right: 200px;
     font-size: 20px;
     padding: 0 25px;
-    color: white;
+    color: #ffffff;
     line-height: 50px;
 }
 
@@ -195,7 +195,7 @@ body p {
 .columns {
     width: 100%;
     min-height: 100vh;
-    background: white;
+    background: #ffffff;
 }
 
 .price-h1 {
@@ -216,7 +216,7 @@ body p {
     padding: 15% 15%;
     border-radius: 10px;
     border: 2px solid #FFE55C;
-    color: white;
+    color: #ffffff;
     height: 1%;
     text-align: center;
     transition: 0.3s;

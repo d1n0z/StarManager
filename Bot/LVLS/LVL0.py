@@ -4,22 +4,22 @@ import time
 import traceback
 from datetime import datetime
 
-import requests
+from vkbottle import AiohttpClient
 from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 
 import keyboard
 import messages
 from Bot.rules import SearchCMD
-from Bot.tgbot import getTGBot
+from Bot.tgbot import tgbot
 from Bot.utils import (getIDFromMessage, getUserName, getRegDate, kickUser, getUserNickname, getUserAccessLevel,
                        getUserLastMessage, getUserMute, getUserBan, getUserXP, getUserLVL, getUserNeededXP,
                        getUserPremium, getXPTop, uploadImage, addUserXP, isChatAdmin, getUserWarns, getUserMessages,
-                       setUserAccessLevel, getChatName, addWeeklyTask, getULvlBanned, getChatSettings, deleteMessages)
-from config.config import (API, LVL_NAMES, PATH, REPORT_CD, REPORT_TO, COMMANDS, DEVS, PREMIUM_TASKS_DAILY, TASKS_DAILY,
+                       setUserAccessLevel, getChatName, addWeeklyTask, getULvlBanned, getChatSettings, deleteMessages,
+                       speccommandscheck)
+from config.config import (API, LVL_NAMES, PATH, REPORT_CD, REPORT_TO, COMMANDS, PREMIUM_TASKS_DAILY, TASKS_DAILY,
                            TG_CHAT_ID, TG_TRANSFER_THREAD_ID)
-from db import (Messages, AccessNames, Referral, Reports, ReportWarns, CMDLevels, Bonus, Prefixes, CMDNames, PremMenu,
-                TasksDaily, Coins, TasksStreak, TransferHistory, SpecCommandsCooldown)
+from db import pool
 from media.stats.stats_img import createStatsImage
 
 bl = BotLabeler()
@@ -95,9 +95,12 @@ async def mtop(message: Message):
     members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = [int(i.member_id) for i in members.items]
 
-    msgs = Messages.select().where(Messages.uid > 0, Messages.messages > 0, Messages.chat_id == chat_id,
-                                   Messages.uid << members).order_by(Messages.messages.desc()).limit(10)
-    names = await API.users.get(user_ids=[i.uid for i in msgs])
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            msgs = await (await c.execute(
+                'select uid, messages from messages where uid>0 and messages>0 and chat_id=%s and '
+                'uid=ANY(%s) order by messages desc limit 10', (chat_id, members))).fetchall()
+    names = await API.users.get(user_ids=[i[0] for i in msgs])
 
     kb = keyboard.mtop(chat_id, uid)
     msg = messages.mtop(msgs, names)
@@ -108,13 +111,10 @@ async def mtop(message: Message):
 async def stats(message: Message):
     chat_id = message.peer_id - 2000000000
 
-    if s := SpecCommandsCooldown.get_or_none(SpecCommandsCooldown.uid == message.from_id,
-                                             SpecCommandsCooldown.time > time.time() - 15,
-                                             SpecCommandsCooldown.cmd == 'stats'):
-        msg = messages.speccommandscooldown(int(15 - (time.time() - s.time) + 1))
+    if st := await speccommandscheck(message.from_id, 'stats', 15):
+        msg = messages.speccommandscooldown(int(15 - (time.time() - st) + 1))
         await message.reply(disable_mentions=1, message=msg)
         return
-    SpecCommandsCooldown.create(time=time.time(), uid=message.from_id, cmd='stats')
 
     id = await getIDFromMessage(message.text, message.reply_message)
     reply = await message.reply(messages.stats_loading(), disable_mentions=1)
@@ -143,20 +143,23 @@ async def stats(message: Message):
     top = await getXPTop()
     top = top.get(id) if id in top else len(top)
 
-    lvl_name = AccessNames.get_or_none(AccessNames.chat_id == chat_id, AccessNames.lvl == acc)
-    if lvl_name is not None:
-        lvl_name = lvl_name.name
-    else:
-        lvl_name = LVL_NAMES[acc]
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            lvl_name = await (await c.execute('select name from accessnames where chat_id=%s and lvl=%s',
+                                              (chat_id, acc))).fetchone()
+    lvl_name = lvl_name[0] if lvl_name else LVL_NAMES[acc]
 
     user = await API.users.get(user_ids=id, fields='photo_max_orig')
-    r = requests.get(user[0].photo_max_orig)
+    r = await AiohttpClient().request_content(user[0].photo_max_orig)
     with open(PATH + f'media/temp/{id}ava.jpg', "wb") as f:
-        f.write(r.content)
+        f.write(r)
         f.close()
-    r.close()
 
-    invites = len(Referral.select().where(Referral.from_id == id, Referral.chat_id == chat_id))
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            invites = await (await c.execute(
+                'select count(*) as c from refferal where from_id=%s and chat_id=%s',
+                (id, chat_id))).fetchone()
     date = await getRegDate(id, '%d.%m.%Y', 'Неизвестно')
     name = await getUserName(id)
     warns = await getUserWarns(id, chat_id)
@@ -164,7 +167,7 @@ async def stats(message: Message):
     access_level = await getUserAccessLevel(id, chat_id)
     nickname = await getUserNickname(id, chat_id)
     statsimg = await createStatsImage(warns, messages_count, id, access_level, nickname, date, last_message, prem, xp,
-                                      userlvl, invites, name, top, mute, ban, lvl_name, neededxp)
+                                      userlvl, invites[0], name, top, mute, ban, lvl_name, neededxp)
     await deleteMessages(reply.conversation_message_id, chat_id)
     await message.reply(disable_mentions=1, attachment=await uploadImage(statsimg))
 
@@ -179,29 +182,37 @@ async def report(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    repu = Reports.select().where(Reports.uid == uid).order_by(Reports.time.desc()).get_or_none()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            repu = await (await c.execute(
+                'select time from reports where uid=%s order by time desc limit 1', (uid,))).fetchone()
     lreptime = 0
     if repu is not None:
-        lreptime = repu.time
+        lreptime = repu[0]
 
     if time.time() - lreptime < REPORT_CD:
         msg = messages.report_cd()
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    repid = Reports.select().order_by(Reports.id.desc()).get_or_none()
-    repid = repid.id + 1
-
-    Reports.create(uid=uid, id=repid, time=time.time())
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            repid = await (await c.execute('select id from reports order by id limit 1')).fetchone()
+            if repid:
+                repid = repid[0] + 1
+            else:
+                repid = 1
+            await c.execute('insert into reports (uid, id, time) VALUES (%s, %s, %s)', (uid, repid, int(time.time())))
+            uwarns = await (await c.execute('select warns from reportwarns where uid=%s', (uid,))).fetchone()
+            await conn.commit()
 
     report = ' '.join(data[1:])
     name = await getUserName(uid)
     chat_name = await getChatName(chat_id)
     msg = messages.report(uid, name, report, repid, chat_id, chat_name)
     kb = keyboard.report(uid, repid, chat_id, report)
-
-    uwarns = ReportWarns.get_or_none(ReportWarns.uid == uid)
-    if uwarns is None or uwarns.warns < 3:
+    
+    if uwarns is None or uwarns[0] < 3:
         await API.messages.send(disable_mentions=1, chat_id=REPORT_TO, random_id=0, message=msg, keyboard=kb)
     msg = messages.report_sent(repid)
     await message.reply(disable_mentions=1, message=msg)
@@ -211,13 +222,12 @@ async def report(message: Message):
 async def help(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    cmds = CMDLevels.select().where(CMDLevels.chat_id == chat_id)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            cmds = await (await c.execute('select cmd, lvl from commandlevels where chat_id=%s', (chat_id,))).fetchall()
     base = COMMANDS.copy()
     for i in cmds:
-        try:
-            base[i.cmd] = int(i.lvl)
-        except:
-            pass
+        base[i[0]] = int(i[1])
     msg = messages.help(cmds=base)
     u_prem = await getUserPremium(uid)
     kb = keyboard.help(uid, u_prem=u_prem)
@@ -230,10 +240,10 @@ async def bonus(message: Message):
     uid = message.from_id
     name = await getUserName(uid)
 
-    bonus = Bonus.get_or_none(Bonus.uid == uid)
-    ltb = 0
-    if bonus is not None:
-        ltb = bonus.time
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            bonus = await (await c.execute('select time from bonus where uid=%s', (uid,))).fetchone()
+    ltb = bonus[0] if bonus is not None else 0
 
     if time.time() - ltb < 86400:
         timeleft = ltb + 86400 - time.time()
@@ -241,9 +251,11 @@ async def bonus(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    bonus = Bonus.get_or_create(uid=uid, defaults={'time': 0})[0]
-    bonus.time = time.time()
-    bonus.save()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if not (await c.execute('update bonus set time = %s where uid=%s', (int(time.time()), uid))).rowcount:
+                await c.execute('insert into bonus (uid, time) values (%s, %s)', (uid, int(time.time())))
+            await conn.commit()
 
     await addWeeklyTask(uid, 'bonus')
 
@@ -280,17 +292,20 @@ async def cmd(message: Message):
             await message.reply(disable_mentions=1, message=msg)
             return
 
-        cmdn = CMDNames.get_or_none(CMDNames.uid == uid, CMDNames.cmd == cmd)
-        if cmdn is None:
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                cmdn = await (await c.execute(
+                    'select name from cmdnames where uid=%s and cmd=%s', (uid, cmd))).fetchone()
+                await c.execute('delete from cmdnames where uid=%s and cmd=%s', (uid, cmd))
+                await conn.commit()
+        if not cmdn:
             msg = messages.resetcmd_not_changed(cmd)
             await message.reply(disable_mentions=1, message=msg)
             return
-        cmdname = cmdn.name
-        cmdn.delete_instance()
 
         name = await getUserName(uid)
         nick = await getUserNickname(uid, chat_id)
-        msg = messages.resetcmd(uid, name, nick, cmd, cmdname)
+        msg = messages.resetcmd(uid, name, nick, cmd, cmdn[0])
         await message.reply(disable_mentions=1, message=msg)
     elif len(data) == 3:
         try:
@@ -309,12 +324,15 @@ async def cmd(message: Message):
             await message.reply(disable_mentions=1, message=msg)
             return
 
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                cmdns = await (await c.execute('select cmd, name from cmdnames where uid=%s', (uid,))).fetchall()
         res = []
-        for i in CMDNames.select().where(CMDNames.uid == uid):
-            if i.cmd not in res:
-                res.append(i.cmd)
-            if changed == i.name:
-                msg = messages.cmd_changed_in_users_cmds(i.cmd)
+        for i in cmdns:
+            if i[0] not in res:
+                res.append(i[0])
+            if changed == i[1]:
+                msg = messages.cmd_changed_in_users_cmds(i[0])
                 await message.reply(disable_mentions=1, message=msg)
                 return
         u_prem = await getUserPremium(uid)
@@ -329,9 +347,12 @@ async def cmd(message: Message):
             await message.reply(disable_mentions=1, message=msg)
             return
 
-        cmdn = CMDNames.get_or_create(uid=uid, cmd=cmd)[0]
-        cmdn.name = changed
-        cmdn.save()
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                if not (await c.execute(
+                        'update cmdnames set name = %s where uid=%s and cmd=%s', (changed, uid, cmd))).rowcount:
+                    await c.execute('insert into cmdnames (uid, cmd, name) values (%s, %s, %s)', (uid, cmd, changed))
+                await conn.commit()
 
         name = await getUserName(uid)
         nick = await getUserNickname(uid, chat_id)
@@ -353,10 +374,13 @@ async def premmenu(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
     settings = {}
-    pm = PremMenu.get_or_none(PremMenu.uid == uid, PremMenu.setting == 'clear_by_fire')
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            pm = await (await c.execute(
+                'select pos from premmenu where uid=%s and setting=%s', (uid, 'clear_by_fire'))).fetchone()
     settings['clear_by_fire'] = True
     if pm is not None:
-        settings['clear_by_fire'] = pm.pos
+        settings['clear_by_fire'] = pm[0]
     settings['border_color'] = True
     msg = messages.premmenu(settings)
     kb = keyboard.premmenu(uid, settings)
@@ -366,15 +390,11 @@ async def premmenu(message: Message):
 @bl.chat_message(SearchCMD('duel'))
 async def duel(message: Message):
     chat_id = message.peer_id - 2000000000
-    uid = message.from_id
-
-    if s := SpecCommandsCooldown.get_or_none(SpecCommandsCooldown.uid == uid,
-                                             SpecCommandsCooldown.time > time.time() - 15,
-                                             SpecCommandsCooldown.cmd == 'duel'):
-        msg = messages.speccommandscooldown(int(15 - (time.time() - s.time) + 1))
+    if st := await speccommandscheck(message.from_id, 'duel', 15):
+        msg = messages.speccommandscooldown(int(15 - (time.time() - st) + 1))
         await message.reply(disable_mentions=1, message=msg)
         return
-    SpecCommandsCooldown.create(time=time.time(), uid=uid, cmd='duel')
+    uid = message.from_id
 
     if not (await getChatSettings(chat_id))['entertaining']['allowDuel']:
         msg = messages.duel_not_allowed()
@@ -418,16 +438,11 @@ async def transfer(message: Message):
     if not (await getChatSettings(chat_id))['entertaining']['allowTransfer']:
         await message.reply(messages.transfer_not_allowed())
         return
-    uid = message.from_id
-
-    if s := SpecCommandsCooldown.get_or_none(SpecCommandsCooldown.uid == uid,
-                                             SpecCommandsCooldown.time > time.time() - 10,
-                                             SpecCommandsCooldown.cmd == 'transfer'):
-        s: SpecCommandsCooldown
-        msg = messages.speccommandscooldown(int(10 - (time.time() - s.time) + 1))
+    if st := await speccommandscheck(message.from_id, 'transfer', 10):
+        msg = messages.speccommandscooldown(int(10 - (time.time() - st) + 1))
         await message.reply(disable_mentions=1, message=msg)
         return
-    SpecCommandsCooldown.create(time=time.time(), uid=uid, cmd='transfer')
+    uid = message.from_id
 
     id = await getIDFromMessage(message.text, message.reply_message)
     if id < 0:
@@ -442,7 +457,7 @@ async def transfer(message: Message):
         msg = messages.transfer_myself()
         await message.reply(disable_mentions=1, message=msg)
         return
-    if not await getULvlBanned(id):
+    if await getULvlBanned(id):
         msg = messages.user_lvlbanned()
         await message.reply(disable_mentions=1, message=msg)
         return
@@ -482,14 +497,18 @@ async def transfer(message: Message):
     await addUserXP(id, ftxp)
     uname = await getUserName(uid)
     name = await getUserName(id)
-    TransferHistory.create(to_id=id, from_id=uid, time=time.time(), amount=ftxp, com=bool(u_prem))
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            await c.execute(
+                'insert into transferhistory (to_id, from_id, time, amount, com) VALUES (%s, %s, %s, %s, %s)',
+                (id, uid, int(time.time()), ftxp, u_prem))
+            await conn.commit()
     try:
-        bot = getTGBot()
-        await bot.send_message(chat_id=TG_CHAT_ID, message_thread_id=TG_TRANSFER_THREAD_ID,
-                               text=f'{chat_id} | <a href="vk.com/id{uid}">{uname}</a> | '
-                                    f'<a href="vk.com/id{id}">{name}</a> | {ftxp} | К: {not u_prem} | '
-                                    f'{datetime.now().strftime("%H:%M:%S")}',
-                               disable_web_page_preview=True, parse_mode='HTML')
+        await tgbot.send_message(chat_id=TG_CHAT_ID, message_thread_id=TG_TRANSFER_THREAD_ID,
+                                 text=f'{chat_id} | <a href="vk.com/id{uid}">{uname}</a> | '
+                                      f'<a href="vk.com/id{id}">{name}</a> | {ftxp} | К: {not u_prem} | '
+                                      f'{datetime.now().strftime("%H:%M:%S")}',
+                                 disable_web_page_preview=True, parse_mode='HTML')
     except:
         traceback.print_exc()
 
@@ -516,18 +535,20 @@ async def task(message: Message):
     uid = message.from_id
     completed = 0
     prem = await getUserPremium(uid)
-    t = TasksDaily.select().where(TasksDaily.uid == uid)
-    for i in t:
-        if i.count >= (TASKS_DAILY | PREMIUM_TASKS_DAILY)[i.task]:
-            if i.task in PREMIUM_TASKS_DAILY and not prem:
-                continue
-            completed += 1
-    c = Coins.get_or_none(Coins.uid == uid)
-    c = c.coins if c is not None else 0
-    s = TasksStreak.get_or_none(TasksStreak.uid == uid)
-    s = s.streak if s is not None else 0
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            t = await c.execute('select count, task from tasksdaily where uid=%s', (uid,))
+            for i in await t.fetchall():
+                if i[0] >= (TASKS_DAILY | PREMIUM_TASKS_DAILY)[i[1]]:
+                    if i[1] in PREMIUM_TASKS_DAILY and not prem:
+                        continue
+                    completed += 1
+            coins = await (await c.execute('select coins from coins where uid=%s', (uid,))).fetchone()
+            coins = 0 if coins is None else coins[0]
+            streak = await (await c.execute('select streak from tasksstreak where uid=%s', (uid,))).fetchone()
+            streak = 0 if streak is None else streak[0]
     kb = keyboard.tasks(uid)
-    await message.reply(messages.task(completed, c, s), keyboard=kb)
+    await message.reply(messages.task(completed, coins, streak), keyboard=kb)
 
 
 @bl.chat_message(SearchCMD('anon'))

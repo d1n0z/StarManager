@@ -10,9 +10,9 @@ import messages
 from Bot.checkers import haveAccess
 from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserAccessLevel, getUserName, getUserNickname, kickUser, \
-    getUserBan, getChatName, getGroupName
+    getUserBan, getChatName, getGroupName, getpool, sendMessage
 from config.config import API
-from db import AccessLevel, ChatGroups, Ban, Nickname, GPool, Mute, JoinedDate
+from db import pool
 
 bl = BotLabeler()
 
@@ -43,13 +43,7 @@ async def skick(message: Message):
     except:
         kick_cause = 'Причина не указана'
 
-    try:
-        res = AccessLevel.get(AccessLevel.chat_id == chat_id, AccessLevel.access_level > 6)
-        pool = ChatGroups.select().where(ChatGroups.group == data[1], ChatGroups.uid == res.uid)
-        pool = [i.chat_id for i in pool]
-        if len(pool) == 0:
-            raise Exception
-    except:
+    if not (chats := await getpool(chat_id, data[1])):
         msg = messages.s_invalid_group(data[1])
         await message.reply(disable_mentions=1, message=msg)
         return
@@ -58,10 +52,10 @@ async def skick(message: Message):
     ch_nickname = await getUserNickname(id, chat_id)
     u_name = await getUserName(uid)
     ch_name = await getUserName(id)
-    msg = messages.skick_start(uid, u_name, u_nickname, id, ch_name, ch_nickname, len(pool), data[1])
+    msg = messages.skick_start(uid, u_name, u_nickname, id, ch_name, ch_nickname, len(chats), data[1])
     edit = await message.reply(disable_mentions=1, message=msg)
     success = 0
-    for chat_id in pool:
+    for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
         if not await haveAccess('skick', chat_id, u_acc):
             continue
@@ -76,7 +70,7 @@ async def skick(message: Message):
             success += 1
 
     nick = await getUserNickname(id, edit.peer_id - 2000000000)
-    msg = messages.skick(id, ch_name, nick, len(pool), success)
+    msg = messages.skick(id, ch_name, nick, len(chats), success)
     await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
                             message=msg)
 
@@ -100,13 +94,7 @@ async def sban(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    try:
-        res = AccessLevel.get(AccessLevel.chat_id == chat_id, AccessLevel.access_level > 6)
-        pool = ChatGroups.select().where(ChatGroups.group == data[1], ChatGroups.uid == res.uid)
-        pool = [i.chat_id for i in pool]
-        if len(pool) == 0:
-            raise Exception
-    except:
+    if not (chats := await getpool(chat_id, data[1])):
         msg = messages.s_invalid_group(data[1])
         await message.reply(disable_mentions=1, message=msg)
         return
@@ -132,10 +120,10 @@ async def sban(message: Message):
         ban_time = 86400 * 365
         ban_cause = None
 
-    msg = messages.sban_start(uid, u_name, u_nickname, id, ch_name, ch_nickname, len(pool), data[1])
+    msg = messages.sban_start(uid, u_name, u_nickname, id, ch_name, ch_nickname, len(chats), data[1])
     edit = await message.reply(disable_mentions=1, message=msg)
     success = 0
-    for chat_id in pool:
+    for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
         if not await haveAccess('sban', chat_id, u_acc):
             continue
@@ -147,17 +135,18 @@ async def sban(message: Message):
         msg = messages.ban(uid, u_name, u_nickname, id, ch_name, ch_nickname, ban_cause, ban_time // 86400)
 
         ban_date = datetime.now().strftime('%Y.%m.%d %H:%M:%S')
-        res = Ban.get_or_none(Ban.uid == id, Ban.chat_id == chat_id)
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                res = await (await c.execute(
+                    'select last_bans_times, last_bans_causes, last_bans_names, last_bans_dates from ban where '
+                    'chat_id=%s and uid=%s', (chat_id, id))).fetchone()
         if res is not None:
-            ban_times = literal_eval(res.last_bans_times)
-            ban_causes = literal_eval(res.last_bans_causes)
-            ban_names = literal_eval(res.last_bans_names)
-            ban_dates = literal_eval(res.last_bans_dates)
+            ban_times = literal_eval(res[0])
+            ban_causes = literal_eval(res[1])
+            ban_names = literal_eval(res[2])
+            ban_dates = literal_eval(res[3])
         else:
-            ban_times = []
-            ban_causes = []
-            ban_names = []
-            ban_dates = []
+            ban_times, ban_causes, ban_names, ban_dates = [], [], [], []
         if ban_cause is None:
             ban_cause = 'Без указания причины'
         if ban_date is None:
@@ -167,13 +156,19 @@ async def sban(message: Message):
         ban_names.append(f'[id{uid}|{u_name}]')
         ban_dates.append(ban_date)
 
-        b = Ban.get_or_create(uid=id, chat_id=chat_id)[0]
-        b.ban = int(time.time()) + ban_time
-        b.last_bans_times = f"{ban_times}"
-        b.last_bans_causes = f"{ban_causes}"
-        b.last_bans_names = f"{ban_names}"
-        b.last_bans_dates = f"{ban_dates}"
-        b.save()
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                if not (await c.execute(
+                        'update ban set ban = %s, last_bans_times = %s, last_bans_causes = %s, last_bans_names = %s, '
+                        'last_bans_dates = %s where chat_id=%s and uid=%s',
+                        (int(time.time() + ban_time), f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}",
+                            chat_id, id))).rowcount:
+                    await c.execute(
+                        'insert into ban (uid, chat_id, ban, last_bans_times, last_bans_causes, last_bans_names, '
+                        'last_bans_dates) values (%s, %s, %s, %s, %s, %s, %s)',
+                        (id, chat_id, int(time.time() + ban_time), f"{ban_times}", f"{ban_causes}", f"{ban_names}",
+                         f"{ban_dates}"))
+                await conn.commit()
 
         kick_res = await kickUser(id, chat_id)
 
@@ -183,7 +178,7 @@ async def sban(message: Message):
         success += 1
 
     nick = await getUserNickname(id, edit.peer_id - 2000000000)
-    msg = messages.sban(id, ch_name, nick, len(pool), success)
+    msg = messages.sban(id, ch_name, nick, len(chats), success)
     await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
                             message=msg)
 
@@ -207,13 +202,7 @@ async def sunban(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    try:
-        res = AccessLevel.get(AccessLevel.chat_id == chat_id, AccessLevel.access_level > 6)
-        pool = ChatGroups.select().where(ChatGroups.group == data[1], ChatGroups.uid == res.uid)
-        pool = [i.chat_id for i in pool]
-        if len(pool) == 0:
-            raise Exception
-    except:
+    if not (chats := await getpool(chat_id, data[1])):
         msg = messages.s_invalid_group(data[1])
         await message.reply(disable_mentions=1, message=msg)
         return
@@ -222,27 +211,24 @@ async def sunban(message: Message):
     u_nick = await getUserNickname(uid, chat_id)
     ch_name = await getUserName(id)
     ch_nick = await getUserNickname(id, chat_id)
-    msg = messages.sunban_start(uid, u_name, u_nick, id, ch_name, ch_nick, len(pool), data[1])
+    msg = messages.sunban_start(uid, u_name, u_nick, id, ch_name, ch_nick, len(chats), data[1])
     edit = await message.reply(disable_mentions=1, message=msg)
     success = 0
-    for chat_id in pool:
+    for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
-        if u_acc < await haveAccess('sunban', chat_id, u_acc):
+        if (u_acc < await haveAccess('sunban', chat_id, u_acc) or
+                await getUserAccessLevel(id, chat_id) >= u_acc or
+                await getUserBan(id, chat_id) <= time.time()):
             continue
-        ch_acc = await getUserAccessLevel(id, chat_id)
-        ch_ban = await getUserBan(id, chat_id)
-        if ch_acc >= u_acc:
-            continue
-        if ch_ban > time.time():
-            b = Ban.get_or_none(Ban.uid == id, Ban.chat_id == chat_id)
-            if b is not None:
-                b.ban = 0
-                b.save()
-            success += 1
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                await c.execute('update ban set ban = 0 where chat_id=%s and uid=%s', (chat_id, id))
+                await conn.commit()
+        success += 1
 
     nick = await getUserNickname(id, edit.peer_id - 2000000000)
     name = await getUserName(id)
-    msg = messages.sunban(id, name, nick, len(pool), success)
+    msg = messages.sunban(id, name, nick, len(chats), success)
     await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
                             message=msg)
 
@@ -263,13 +249,7 @@ async def ssnick(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    try:
-        res = AccessLevel.get(AccessLevel.chat_id == chat_id, AccessLevel.access_level > 6)
-        pool = ChatGroups.select().where(ChatGroups.group == data[1], ChatGroups.uid == res.uid)
-        pool = [i.chat_id for i in pool]
-        if len(pool) == 0:
-            raise Exception
-    except:
+    if not (chats := await getpool(chat_id, data[1])):
         msg = messages.s_invalid_group(data[1])
         await message.reply(disable_mentions=1, message=msg)
         return
@@ -284,30 +264,31 @@ async def ssnick(message: Message):
     name = await getUserName(id)
     u_nickname = await getUserNickname(uid, chat_id)
     ch_nickname = await getUserNickname(id, chat_id)
-    msg = messages.ssnick_start(uid, u_name, u_nickname, id, name, ch_nickname, len(pool), data[1])
+    msg = messages.ssnick_start(uid, u_name, u_nickname, id, name, ch_nickname, len(chats), data[1])
     edit = await message.reply(disable_mentions=1, message=msg)
     success = 0
-    for chat_id in pool:
+    for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
-        if not await haveAccess('ssnick', chat_id, u_acc):
+        if not await haveAccess('ssnick', chat_id, u_acc) or await getUserAccessLevel(id, chat_id) > u_acc:
             continue
-        ch_acc = await getUserAccessLevel(id, chat_id)
-        if ch_acc > u_acc:
-            continue
-        n = Nickname.get_or_create(uid=id, chat_id=chat_id)[0]
-        n.nickname = nickname
-        n.save()
-        try:
-            u_nick = await getUserNickname(uid, chat_id)
-            ch_nick = await getUserNickname(id, chat_id)
-            msg = messages.snick(uid, u_name, u_nick, id, name, ch_nick, nickname)
-            await API.messages.send(disable_mentions=1, random_id=0, message=msg, chat_id=chat_id)
-        except:
-            pass
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                ch_nick = await (await c.execute(
+                    'select nickname from nickname where chat_id=%s and uid=%s', (chat_id, id))).fetchone()
+                u_nick = await (await c.execute(
+                    'select nickname from nickname where chat_id=%s and uid=%s', (chat_id, uid))).fetchone()
+                if not (await c.execute('update nickname set nickname = %s where chat_id=%s and uid=%s',
+                                        (nickname, chat_id, id))).rowcount:
+                    await c.execute(
+                        'insert into nickname (uid, chat_id, nickname) values (%s, %s, %s)', (id, chat_id, nickname))
+                await conn.commit()
+        msg = messages.snick(uid, u_name, u_nick[0] if u_nick else None, id, name,
+                             ch_nick[0] if ch_nick else None, nickname)
+        await sendMessage(chat_id + 2000000000, msg)
         success += 1
 
     nick = await getUserNickname(id, edit.peer_id - 2000000000)
-    msg = messages.ssnick(id, name, nick, len(pool), success)
+    msg = messages.ssnick(id, name, nick, len(chats), success)
     await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
                             message=msg)
 
@@ -327,13 +308,7 @@ async def srnick(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    try:
-        res = AccessLevel.get(AccessLevel.chat_id == chat_id, AccessLevel.access_level > 6)
-        pool = ChatGroups.select().where(ChatGroups.group == data[1], ChatGroups.uid == res.uid)
-        pool = [i.chat_id for i in pool]
-        if len(pool) == 0:
-            raise Exception
-    except:
+    if not (chats := await getpool(chat_id, data[1])):
         msg = messages.s_invalid_group(data[1])
         await message.reply(disable_mentions=1, message=msg)
         return
@@ -342,10 +317,10 @@ async def srnick(message: Message):
     u_name = await getUserName(uid)
     ch_nickname = await getUserName(id)
     u_nickname = await getUserName(uid)
-    msg = messages.srnick_start(uid, u_name, u_nickname, id, ch_name, ch_nickname, len(pool), data[1])
+    msg = messages.srnick_start(uid, u_name, u_nickname, id, ch_name, ch_nickname, len(chats), data[1])
     edit = await message.reply(disable_mentions=1, message=msg)
     success = 0
-    for chat_id in pool:
+    for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
         if not await haveAccess('srnick', chat_id, u_acc):
             continue
@@ -354,9 +329,10 @@ async def srnick(message: Message):
             continue
         ch_nickname = await getUserName(id)
         u_nickname = await getUserName(uid)
-        n = Nickname.get_or_none(Nickname.uid == id, Nickname.chat_id == chat_id)
-        if n is not None:
-            n.delete_instance()
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                await c.execute('delete from nickname where chat_id=%s and uid=%s', (chat_id, id))
+                await conn.commit()
         try:
             msg = messages.rnick(uid, u_name, u_nickname, id, ch_name, ch_nickname)
             await API.messages.send(disable_mentions=1, random_id=0, message=msg,
@@ -365,7 +341,7 @@ async def srnick(message: Message):
             pass
         success += 1
 
-    msg = messages.srnick(id, ch_name, len(pool), success)
+    msg = messages.srnick(id, ch_name, len(chats), success)
     await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
                             message=msg)
 
@@ -380,24 +356,18 @@ async def szov(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    try:
-        res = AccessLevel.get(AccessLevel.chat_id == chat_id, AccessLevel.access_level > 6)
-        pool = ChatGroups.select().where(ChatGroups.group == data[1], ChatGroups.uid == res.uid)
-        pool = [i.chat_id for i in pool]
-        if len(pool) == 0:
-            raise Exception
-    except:
+    if not (chats := await getpool(chat_id, data[1])):
         msg = messages.s_invalid_group(data[1])
         await message.reply(disable_mentions=1, message=msg)
         return
 
     name = await getUserName(uid)
     nickname = await getUserNickname(uid, chat_id)
-    msg = messages.szov_start(uid, name, nickname, len(pool), data[1])
+    msg = messages.szov_start(uid, name, nickname, len(chats), data[1])
     edit = await message.reply(disable_mentions=1, message=msg)
     success = 0
     text = ' '.join(data[2:])
-    for chat_id in pool:
+    for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
         if not await haveAccess('szov', chat_id, u_acc):
             continue
@@ -409,7 +379,7 @@ async def szov(message: Message):
         success += 1
 
     nick = await getUserNickname(uid, edit.peer_id - 2000000000)
-    msg = messages.szov(uid, name, nick, data[1], len(pool), success)
+    msg = messages.szov(uid, name, nick, data[1], len(chats), success)
     await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
                             message=msg)
 
@@ -429,28 +399,26 @@ async def chat(message: Message):
         prefix = 'club'
         name = await getGroupName(-int(id))
 
-    if ChatGroups.get_or_none(ChatGroups.chat_id == chat_id) is not None:
-        chatgroup = 'Привязана'
-    else:
-        chatgroup = 'Не привязана'
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            chatgroup = 'Привязана' if (await (await c.execute(
+                'select count(*) as c from chatgroups where chat_id=%s', (chat_id,))).fetchone())[0] else 'Не привязана'
+            gpool = 'Привязана' if (await (await c.execute(
+                'select count(*) as c from gpool where chat_id=%s', (chat_id,))).fetchone())[0] else 'Не привязана'
 
-    if GPool.get_or_none(GPool.chat_id == chat_id) is not None:
-        gpool = 'Привязана'
-    else:
-        gpool = 'Не привязана'
+            muted = (await (await c.execute('select count(*) as c from mute where chat_id=%s and mute>%s',
+                                            (chat_id, int(time.time())))).fetchone())[0]
+            banned = (await (await c.execute('select count(*) as c from ban where chat_id=%s and ban>%s',
+                                             (chat_id, int(time.time())))).fetchone())[0]
 
-    muted = len(Mute.select().where(Mute.mute > time.time(), Mute.chat_id == chat_id))
-    banned = len(Ban.select().where(Ban.ban > time.time(), Ban.chat_id == chat_id))
+            if bjd := await (await c.execute('select time from botjoineddate where chat_id=%s', (chat_id,))).fetchone():
+                bjd = datetime.utcfromtimestamp(bjd[0]).strftime('%d.%m.%Y %H:%M')
+            else:
+                bjd = 'Невозможно определить'
 
     members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = members.items
     title = await getChatName(chat_id)
-
-    bjd = JoinedDate.get_or_none(JoinedDate.chat_id == chat_id)
-    if bjd is not None:
-        bjd = datetime.utcfromtimestamp(bjd.time).strftime('%d.%m.%Y %H:%M')
-    else:
-        bjd = 'Невозможно определить'
 
     if prefix == 'club':
         id = -int(id)

@@ -12,17 +12,15 @@ from Bot.checkers import getUChatLimit, getSilence
 from Bot.utils import getUserLastMessage, getUserAccessLevel, getUserMute, addDailyTask, sendMessage, deleteMessages, \
     getChatSettings, kickUser, getUserName, getUserNickname, antispamChecker, punish
 from config.config import ADMINS, PM_COMMANDS
-from db import AllUsers, AllChats, Filters, AntispamMessages, Settings, MessagesStatistics
+from db import pool
 
 
 async def message_handle(event: MessageNew) -> None:
-    dbmsg = MessagesStatistics.create(timestart=datetime.now())
+    timestart = datetime.now()
     if event.object.message.action:
         await action_handle(event)
         return
     msg = event.object.message.text
-    # MessagesHistory.create(id=event.object.message.id, cmid=event.object.message.conversation_message_id,
-    #                        chat_id=chat_id, from_id=uid, text=msg, time=time.time())
     if event.object.message.peer_id < 2000000000:
         chat_id = event.object.message.peer_id
         for i in PM_COMMANDS:
@@ -43,16 +41,19 @@ async def message_handle(event: MessageNew) -> None:
     uid = event.object.message.from_id
     msgtime = event.object.message.date
     chat_id = event.object.message.peer_id - 2000000000
-    AllUsers.get_or_create(uid=uid)
-    AllChats.get_or_create(chat_id=chat_id)
-
     if uid in ADMINS:
         print(f'{uid}({chat_id}): {msg}')
 
-    if Filters.get_or_none(Filters.chat_id == chat_id,
-                           Filters.filter << [i.lower() for i in msg.lower().split()]) is not None:
-        await deleteMessages(event.object.message.conversation_message_id, chat_id)
-        return
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            await c.execute('insert into allusers (uid) values (%s) on conflict (uid) do nothing', (uid,))
+            await c.execute('insert into allchats (chat_id) values (%s) on conflict (chat_id) do nothing', (chat_id,))
+            await conn.commit()
+            
+            if await (await c.execute('select id from filters where chat_id=%s and filter=ANY(%s)',
+                                      (chat_id, [i.lower() for i in msg.lower().split()]))).fetchone():
+                await deleteMessages(event.object.message.conversation_message_id, chat_id)
+                return
 
     uacc = await getUserAccessLevel(uid, chat_id)
     if uacc == 0 and await getUChatLimit(msgtime, await getUserLastMessage(uid, chat_id, 0), uacc, chat_id):
@@ -67,18 +68,20 @@ async def message_handle(event: MessageNew) -> None:
                                   messages.kicked(uid, await getUserName(uid), await getUserNickname(uid, chat_id)))
         return
     if settings['main']['nightmode'] and uacc < 6:
-        chatsetting = Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == 'nightmode')
-        if chatsetting is not None:
-            if setting := chatsetting.value2:
-                setting = setting.split('-')
-                now = datetime.now()
-                start = datetime.strptime(setting[0], '%H:%M').replace(year=now.year)
-                end = datetime.strptime(setting[1], '%H:%M').replace(year=now.year)
-                if not (now.hour < start.hour or now.hour > end.hour or (
-                        now.hour == start.hour and now.minute < start.minute) or (
-                                now.hour == end.hour and now.minute >= end.minute)):
-                    await deleteMessages(event.object.message.conversation_message_id, chat_id)
-                    return
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                chatsetting = await (await c.execute(
+                    'select value2 from settings where chat_id=%s and setting=\'nightmode\'', (chat_id,))).fetchone()
+        if chatsetting and (setting := chatsetting[0]):
+            setting = setting.split('-')
+            now = datetime.now()
+            start = datetime.strptime(setting[0], '%H:%M').replace(year=now.year)
+            end = datetime.strptime(setting[1], '%H:%M').replace(year=now.year)
+            if not (now.hour < start.hour or now.hour > end.hour or (
+                    now.hour == start.hour and now.minute < start.minute) or (
+                            now.hour == end.hour and now.minute >= end.minute)):
+                await deleteMessages(event.object.message.conversation_message_id, chat_id)
+                return
 
     if uacc == 0 and await getSilence(chat_id):
         await deleteMessages(event.object.message.conversation_message_id, chat_id)
@@ -99,25 +102,37 @@ async def message_handle(event: MessageNew) -> None:
         pass
 
     if settings['antispam']['messagesPerMinute']:
-        userantispammessages = AntispamMessages.select().where(AntispamMessages.from_id == uid,
-                                                               AntispamMessages.chat_id == chat_id)
-        setting = Settings.get(Settings.chat_id == chat_id, Settings.setting == 'messagesPerMinute')
-        if setting.value and len(userantispammessages) < setting.value:
-            AntispamMessages.create(cmid=event.object.message.conversation_message_id, chat_id=chat_id, from_id=uid,
-                                    time=event.object.message.date)
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                uantispammessages = (await (await c.execute(
+                    'select count(*) as c from antispammessages where chat_id=%s and from_id=%s',
+                    (chat_id, uid))).fetchone())[0]
+                setting = await (await c.execute(
+                    'select "value" from settings where chat_id=%s and setting=\'messagesPerMinute\'',
+                    (chat_id,))).fetchone()
+                if setting[0] and uantispammessages < setting[0]:
+                    await c.execute(
+                        'insert into antispammessages (cmid, chat_id, from_id, time) values (%s, %s, %s, %s)',
+                        (event.object.message.conversation_message_id, chat_id, uid, event.object.message.date))
+                    await conn.commit()
 
-    if uacc < 5:
-        if setting := await antispamChecker(chat_id, uid, event.object.message, settings):
-            setting = Settings.get(Settings.chat_id == chat_id, Settings.setting == setting)
-            if punishment := await punish(uid, chat_id, setting):
-                name = await getUserName(uid)
-                nick = await getUserNickname(uid, chat_id)
-                await deleteMessages(event.object.message.conversation_message_id, chat_id)
-                await sendMessage(chat_id + 2000000000,
-                                  messages.antispam_punishment(uid, name, nick, setting.setting,
-                                                               punishment[0], setting.value,
-                                                               punishment[1] if len(punishment) > 1 else None))
+    if uacc < 5 and (setting := await antispamChecker(chat_id, uid, event.object.message, settings)):
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                setting = await (await c.execute(
+                    'select id, setting, "value" from settings where chat_id=%s and setting=%s',
+                    (chat_id, setting))).fetchone()
+        if punishment := await punish(uid, chat_id, setting[0]):
+            name = await getUserName(uid)
+            nick = await getUserNickname(uid, chat_id)
+            await deleteMessages(event.object.message.conversation_message_id, chat_id)
+            await sendMessage(chat_id + 2000000000, messages.antispam_punishment(
+                uid, name, nick, setting[1], punishment[0], setting[2], punishment[1] if len(punishment) > 1 else None))
 
     await add_msg_counter(chat_id, uid, audio)
-    dbmsg.timeend = datetime.now()
-    dbmsg.save()
+
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            await c.execute(
+                'insert into messagesstatistics (timestart, timeend) values (%s, %s)', (timestart, datetime.now()))
+            await conn.commit()

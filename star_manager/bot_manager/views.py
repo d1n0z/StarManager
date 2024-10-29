@@ -1,3 +1,4 @@
+import time
 from ast import literal_eval
 from datetime import datetime
 
@@ -28,11 +29,13 @@ def yookassa(request: HttpRequest):
     order_id_p = query['id']
     amnt = int(query['amount']['value'][:-3])
 
-    res = sdb.Payments.get(id=order_id)
-    res.success = 1
-    res.save()
+    with sdb.syncpool().connection() as conn:
+        with conn.cursor() as c:
+            if not c.execute('update payments set success=1 where id=%s', (order_id,)).rowcount:
+                return
+            uid = c.execute('select uid from payments where id=%s', (order_id,)).fetchone()[0]
+            conn.commit()
 
-    uid = res.uid
     days = list(config.PREMIUM_COST.keys())[list(config.PREMIUM_COST.values()).index(int(amnt))]
 
     token = config.TG_TOKEN
@@ -48,11 +51,14 @@ def yookassa(request: HttpRequest):
     }
     requests.get(url, params)
 
-    obj = sdb.Premium.get_or_create(uid=uid)[0]
-    if obj.time < datetime.now().timestamp():
-        obj.time = datetime.now().timestamp()
-    obj.time += days * 86400
-    obj.save()
+    with sdb.syncpool().connection() as conn:
+        with conn.cursor() as c:
+            obj = c.execute('select time from premium where uid=%s', (uid,)).fetchone()
+            if obj is None:
+                c.execute('insert into premium (uid, time) VALUES (%s, %s)', (uid, days * 86400 + time.time()))
+            else:
+                c.execute('update premium set time = %s where uid=%s', (days * 86400 + obj[0], uid))
+            conn.commit()
 
     Configuration.account_id = config.YOOKASSA_MERCHANT_ID
     Configuration.secret_key = config.YOOKASSA_TOKEN
@@ -95,8 +101,13 @@ def buy(request: HttpRequest):
             usersocial = UserSocialAuth.objects.select_related("user").filter(user_id=request.user.id)[0]
             user = User.objects.filter(id=request.user.id)[0]
 
-            order_id = sdb.Payments.select().order_by(sdb.Payments.id.desc())[0].id + 1
-            sdb.Payments.create(uid=usersocial.uid, id=order_id, success=0).save()
+            with sdb.syncpool().connection() as conn:
+                with conn.cursor() as c:
+                    oid = c.execute('select id from payments order by id desc limit 1').fetchone()
+                    oid = 1 if oid is None else oid[0]
+                    c.execute('insert into payments (id, uid, success) values (%s, %s, %s)',
+                              (oid + 1, usersocial.uid, 0))
+                    conn.commit()
 
             payment = {
                 'amount': {
@@ -105,7 +116,8 @@ def buy(request: HttpRequest):
                 },
                 'receipt': {
                     'customer': {
-                        'full_name': f'{user.last_name} {user.first_name}'
+                        'full_name': f'{user.last_name} {user.first_name}',
+                        'email': config.data['email']
                     },
                     'items': [{
                         'description': 'Premium-статус',
@@ -118,7 +130,7 @@ def buy(request: HttpRequest):
                     }]
                 },
                 'metadata': {
-                    'pid': order_id
+                    'pid': oid + 1
                 },
                 'merchant_customer_id': user.id,
                 'confirmation': {

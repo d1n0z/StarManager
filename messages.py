@@ -10,12 +10,14 @@ from Bot.utils import getUserNickname, pointMinutes, pointDays, pointHours, poin
 from config.config import COMMANDS, LVL_NAMES, COMMANDS_DESC, TASKS_LOTS, TASKS_DAILY, PREMIUM_TASKS_DAILY, \
     PREMIUM_TASKS_DAILY_TIERS, TASKS_WEEKLY, PREMIUM_TASKS_WEEKLY, SETTINGS_POSITIONS, \
     SETTINGS_COUNTABLE_CHANGEPUNISHMENTMESSAGE, SETTINGS_COUNTABLE_NO_PUNISHMENT
-from db import AccessNames, BotMessages, Welcome
+from db import syncpool
 
 
 @cached
 def get(key: str, **kwargs):
-    return BotMessages.get(BotMessages.key == key).text.format(**kwargs)
+    with syncpool().connection() as conn:
+        with conn.cursor() as c:
+            return c.execute('select text from botmessages where key=%s', (key,)).fetchone()[0].format(**kwargs)
 
 
 def join():
@@ -43,7 +45,7 @@ def mtop(res, names):
     for index, item in enumerate(res):
         try:
             name = f"{names[index].first_name} {names[index].last_name}"
-            addmsg = f"[{index + 1}]. [id{names[index].id}|{name}] - {item.messages} сообщений\n"
+            addmsg = f"[{index + 1}]. [id{names[index].id}|{name}] - {item[1]} сообщений\n"
             if addmsg not in msg:
                 msg += addmsg
         except:
@@ -322,20 +324,20 @@ def nlist(res, members, page=0):
     msg = get('nlist')
     cnt = 0
     for it in members:
-        if it.id >= 0 and it.first_name != 'DELETED' and it.last_name != 'DELETED':
-            for item in res:
-                if it.id == item.uid:
-                    cnt += 1
-                    addmsg = f"{cnt + 30 * page}. {item.nickname} - [id{item.uid}|{it.first_name} " \
-                             f"{it.last_name}]\n"
-                    if addmsg not in msg:
-                        msg += addmsg
+        if it.id < 0 or it.first_name == 'DELETED' or it.last_name == 'DELETED':
+            continue
+        for item in res:
+            if it.id != item[0]:
+                continue
+            cnt += 1
+            addmsg = f"{cnt + 30 * page}. {item[1]} - [id{item[0]}|{it.first_name} {it.last_name}]\n"
+            if addmsg not in msg:
+                msg += addmsg
     return msg
 
 
 def nnlist(members, page=0):
     msg = get('nnlist')
-    print(members)
     k = page * 30
     for i in members:
         try:
@@ -354,125 +356,127 @@ async def staff(res, names, chat_id):
     admins = {}
     included = []
     users = {'1': [], '2': [], '3': [], '4': [], '5': [], '6': [], '7': [], '8': []}
-    for ind, item in enumerate(res[::-1]):
-        x = {"uid": item.uid, "name": [f"{i.first_name} {i.last_name}" for i in names if i.id == item.uid][0],
-             "nickname": await getUserNickname(item.uid, chat_id), "access_level": item.access_level}
-        users[f'{item.access_level}'].append(x)
-        admins[f'{item.access_level}'] = x
+    for ind, item in enumerate(res):
+        x = {"uid": item[0], "name": [f"{i.first_name} {i.last_name}" for i in names if i.id == item[0]][0],
+             "nickname": await getUserNickname(item[0], chat_id), "access_level": item[1]}
+        users[f'{item[1]}'].append(x)
+        admins[f'{item[1]}'] = x
     for k, i in admins.items():
         try:
-            if k == '1':
-                try:
-                    lvl_name = AccessNames.select().where(AccessNames.chat_id == chat_id, AccessNames.lvl == 1)[
-                        0].name
-                except:
-                    lvl_name = LVL_NAMES[1]
-                msg += f'[☀] {lvl_name}\n'
-                for item in users['1']:
-                    if item['access_level'] == 1:
-                        if item['uid'] > 0:
-                            if item['uid'] not in included:
-                                if item['nickname'] is not None and item['nickname'] != '':
-                                    msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
-                                else:
-                                    msg += f"➖ [id{item['uid']}|{item['name']}]\n"
-                                included.append(item['uid'])
-            if k == '2':
-                try:
-                    lvl_name = AccessNames.select().where(AccessNames.chat_id == chat_id, AccessNames.lvl == 2)[
-                        0].name
-                except:
-                    lvl_name = LVL_NAMES[2]
-                msg += f'[🔥] {lvl_name}\n'
-                for item in users['2']:
-                    if item['access_level'] == 2:
-                        if item['uid'] > 0:
-                            if item['uid'] not in included:
-                                if item['nickname'] is not None and item['nickname'] != '':
-                                    msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
-                                else:
-                                    msg += f"➖ [id{item['uid']}|{item['name']}]\n"
-                                included.append(item['uid'])
-            if k == '3':
-                try:
-                    lvl_name = AccessNames.select().where(AccessNames.chat_id == chat_id, AccessNames.lvl == 3)[
-                        0].name
-                except:
-                    lvl_name = LVL_NAMES[3]
-                msg += f'[🔥] {lvl_name}\n'
-                for item in users['3']:
-                    if item['access_level'] == 3:
-                        if item['uid'] > 0:
-                            if item['uid'] not in included:
-                                if item['nickname'] is not None and item['nickname'] != '':
-                                    msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
-                                else:
-                                    msg += f"➖ [id{item['uid']}|{item['name']}]\n"
-                                included.append(item['uid'])
-            if k == '4':
-                try:
-                    lvl_name = AccessNames.select().where(AccessNames.chat_id == chat_id, AccessNames.lvl == 4)[
-                        0].name
-                except:
-                    lvl_name = LVL_NAMES[4]
-                msg += f'[🔥] {lvl_name}\n'
-                for item in users['4']:
-                    if item['access_level'] == 4:
-                        if item['uid'] > 0:
-                            if item['uid'] not in included:
-                                if item['nickname'] is not None and item['nickname'] != '':
-                                    msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
-                                else:
-                                    msg += f"➖ [id{item['uid']}|{item['name']}]\n"
-                                included.append(item['uid'])
-            if k == '5':
-                try:
-                    lvl_name = AccessNames.select().where(AccessNames.chat_id == chat_id, AccessNames.lvl == 5)[
-                        0].name
-                except:
-                    lvl_name = LVL_NAMES[5]
-                msg += f'[✨] {lvl_name}\n'
-                for item in users['5']:
-                    if item['access_level'] == 5:
-                        if item['uid'] > 0:
-                            if item['uid'] not in included:
-                                if item['nickname'] is not None and item['nickname'] != '':
-                                    msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
-                                else:
-                                    msg += f"➖ [id{item['uid']}|{item['name']}]\n"
-                                included.append(item['uid'])
-            if k == '6':
-                try:
-                    lvl_name = AccessNames.select().where(AccessNames.chat_id == chat_id, AccessNames.lvl == 6)[
-                        0].name
-                except:
-                    lvl_name = LVL_NAMES[6]
-                msg += f'[⚡] {lvl_name}\n'
-                for item in users['6']:
-                    if item['access_level'] == 6:
-                        if item['uid'] > 0:
-                            if item['uid'] not in included:
-                                if item['nickname'] is not None and item['nickname'] != '':
-                                    msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
-                                else:
-                                    msg += f"➖ [id{item['uid']}|{item['name']}]\n"
-                                included.append(item['uid'])
-            if k == '7':
-                try:
-                    lvl_name = AccessNames.select().where(AccessNames.chat_id == chat_id, AccessNames.lvl == 7)[
-                        0].name
-                except:
-                    lvl_name = LVL_NAMES[7]
-                msg += f'[⭐] {lvl_name}\n'
-                for item in users['7']:
-                    if item['access_level'] == 7:
-                        if item['uid'] > 0:
-                            if item['uid'] not in included:
-                                if item['nickname'] is not None and item['nickname'] != '':
-                                    msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
-                                else:
-                                    msg += f"➖ [id{item['uid']}|{item['name']}]\n"
-                                included.append(item['uid'])
+            with syncpool().connection() as conn:
+                with conn.cursor() as c:
+                    if k == '1':
+                        try:
+                            lvl_name = c.execute('select name from accessnames where chat_id=%s and lvl=1',
+                                                 (chat_id,)).fetchone()[0]
+                        except:
+                            lvl_name = LVL_NAMES[1]
+                        msg += f'[☀] {lvl_name}\n'
+                        for item in users['1']:
+                            if item['access_level'] == 1:
+                                if item['uid'] > 0:
+                                    if item['uid'] not in included:
+                                        if item['nickname'] is not None and item['nickname'] != '':
+                                            msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
+                                        else:
+                                            msg += f"➖ [id{item['uid']}|{item['name']}]\n"
+                                        included.append(item['uid'])
+                    if k == '2':
+                        try:
+                            lvl_name = c.execute('select name from accessnames where chat_id=%s and lvl=2',
+                                                 (chat_id,)).fetchone()[0]
+                        except:
+                            lvl_name = LVL_NAMES[2]
+                        msg += f'[🔥] {lvl_name}\n'
+                        for item in users['2']:
+                            if item['access_level'] == 2:
+                                if item['uid'] > 0:
+                                    if item['uid'] not in included:
+                                        if item['nickname'] is not None and item['nickname'] != '':
+                                            msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
+                                        else:
+                                            msg += f"➖ [id{item['uid']}|{item['name']}]\n"
+                                        included.append(item['uid'])
+                    if k == '3':
+                        try:
+                            lvl_name = c.execute('select name from accessnames where chat_id=%s and lvl=3',
+                                                 (chat_id,)).fetchone()[0]
+                        except:
+                            lvl_name = LVL_NAMES[3]
+                        msg += f'[🔥] {lvl_name}\n'
+                        for item in users['3']:
+                            if item['access_level'] == 3:
+                                if item['uid'] > 0:
+                                    if item['uid'] not in included:
+                                        if item['nickname'] is not None and item['nickname'] != '':
+                                            msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
+                                        else:
+                                            msg += f"➖ [id{item['uid']}|{item['name']}]\n"
+                                        included.append(item['uid'])
+                    if k == '4':
+                        try:
+                            lvl_name = c.execute('select name from accessnames where chat_id=%s and lvl=4',
+                                                 (chat_id,)).fetchone()[0]
+                        except:
+                            lvl_name = LVL_NAMES[4]
+                        msg += f'[🔥] {lvl_name}\n'
+                        for item in users['4']:
+                            if item['access_level'] == 4:
+                                if item['uid'] > 0:
+                                    if item['uid'] not in included:
+                                        if item['nickname'] is not None and item['nickname'] != '':
+                                            msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
+                                        else:
+                                            msg += f"➖ [id{item['uid']}|{item['name']}]\n"
+                                        included.append(item['uid'])
+                    if k == '5':
+                        try:
+                            lvl_name = c.execute('select name from accessnames where chat_id=%s and lvl=5',
+                                                 (chat_id,)).fetchone()[0]
+                        except:
+                            lvl_name = LVL_NAMES[5]
+                        msg += f'[✨] {lvl_name}\n'
+                        for item in users['5']:
+                            if item['access_level'] == 5:
+                                if item['uid'] > 0:
+                                    if item['uid'] not in included:
+                                        if item['nickname'] is not None and item['nickname'] != '':
+                                            msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
+                                        else:
+                                            msg += f"➖ [id{item['uid']}|{item['name']}]\n"
+                                        included.append(item['uid'])
+                    if k == '6':
+                        try:
+                            lvl_name = c.execute('select name from accessnames where chat_id=%s and lvl=6',
+                                                 (chat_id,)).fetchone()[0]
+                        except:
+                            lvl_name = LVL_NAMES[6]
+                        msg += f'[⚡] {lvl_name}\n'
+                        for item in users['6']:
+                            if item['access_level'] == 6:
+                                if item['uid'] > 0:
+                                    if item['uid'] not in included:
+                                        if item['nickname'] is not None and item['nickname'] != '':
+                                            msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
+                                        else:
+                                            msg += f"➖ [id{item['uid']}|{item['name']}]\n"
+                                        included.append(item['uid'])
+                    if k == '7':
+                        try:
+                            lvl_name = c.execute('select name from accessnames where chat_id=%s and lvl=7',
+                                                 (chat_id,)).fetchone()[0]
+                        except:
+                            lvl_name = LVL_NAMES[7]
+                        msg += f'[⭐] {lvl_name}\n'
+                        for item in users['7']:
+                            if item['access_level'] == 7:
+                                if item['uid'] > 0:
+                                    if item['uid'] not in included:
+                                        if item['nickname'] is not None and item['nickname'] != '':
+                                            msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
+                                        else:
+                                            msg += f"➖ [id{item['uid']}|{item['name']}]\n"
+                                        included.append(item['uid'])
         except:
             pass
     return msg
@@ -522,18 +526,18 @@ async def mutelist(res, names, mutedcount):
     for ind, item in enumerate(res):
         try:
             if names[ind].first_name != 'DELETED' and names[ind].last_name != 'DELETED':
-                nickname = await getUserNickname(item.uid, item.chat_id)
+                nickname = await getUserNickname(item[0], item[1])
                 if nickname is not None:
                     name = nickname
                 else:
                     name = f"{names[ind].first_name} {names[ind].last_name}"
-                if not item.last_mutes_causes or not literal_eval(item.last_mutes_causes)[-1]:
+                if not item[2] or not literal_eval(item[2])[-1]:
                     cause = "Без указания причины"
                 else:
-                    cause = literal_eval(item.last_mutes_causes)[-1]
-                addmsg = f"[{ind + 1}]. [id{item.uid}|{name}] | " \
-                         f"{int((item.mute - time.time()) / 60)} минут | {cause} | Выдал: " \
-                         f"{literal_eval(item.last_mutes_names)[-1]}\n"
+                    cause = literal_eval(item[2])[-1]
+                addmsg = f"[{ind + 1}]. [id{item[0]}|{name}] | " \
+                         f"{int((item[3] - time.time()) / 60)} минут | {cause} | Выдал: " \
+                         f"{literal_eval(item[4])[-1]}\n"
                 if addmsg not in msg:
                     msg += addmsg
         except:
@@ -547,18 +551,18 @@ async def warnlist(res, names, warnedcount):
     for ind, item in enumerate(res):
         try:
             if names[ind].first_name != 'DELETED' and names[ind].last_name != 'DELETED':
-                nickname = await getUserNickname(item.uid, item.chat_id)
+                nickname = await getUserNickname(item[0], item[1])
                 if nickname is not None:
                     name = nickname
                 else:
                     name = f"{names[ind].first_name} {names[ind].last_name}"
-                if not item.last_warns_causes or not literal_eval(item.last_warns_causes)[-1]:
+                if not item[2] or not literal_eval(item[2])[-1]:
                     cause = "Без указания причины"
                 else:
-                    cause = literal_eval(item.last_warns_causes)[-1]
-                addmsg = f"[{ind + 1}]. [id{item.uid}|{name}] | " \
-                         f"кол-во: {item.warns}/3 | {cause} | Выдал: " \
-                         f"{literal_eval(item.last_warns_names)[-1]}\n"
+                    cause = literal_eval(item[2])[-1]
+                addmsg = f"[{ind + 1}]. [id{item[0]}|{name}] | " \
+                         f"кол-во: {item[3]}/3 | {cause} | Выдал: " \
+                         f"{literal_eval(item[4])[-1]}\n"
                 if addmsg not in msg:
                     msg += addmsg
         except:
@@ -788,18 +792,18 @@ async def banlist(res, names, bancount):
 
     for ind, item in enumerate(res):
         if names[ind].first_name != 'DELETED' and names[ind].last_name != 'DELETED':
-            nickname = await getUserNickname(item.uid, item.chat_id)
+            nickname = await getUserNickname(item[0], item[1])
             if nickname is not None:
                 name = nickname
             else:
                 name = f"{names[ind].first_name} {names[ind].last_name}"
-            if literal_eval(item.last_bans_causes)[-1] is None or literal_eval(item.last_bans_causes)[-1] == '':
+            if literal_eval(item[2])[-1] is None or literal_eval(item[2])[-1] == '':
                 cause = "Без указания причины"
             else:
-                cause = literal_eval(item.last_bans_causes)[-1]
-            addmsg = f"[{ind + 1}]. [id{item.uid}|{name}] | " \
-                     f"{int((item.ban - time.time()) / 86400) + 1} дней | {cause} | Выдал: " \
-                     f"{literal_eval(item.last_bans_names)[-1]}\n"
+                cause = literal_eval(item[2])[-1]
+            addmsg = f"[{ind + 1}]. [id{item[0]}|{name}] | " \
+                     f"{int((item[3] - time.time()) / 86400) + 1} дней | {cause} | Выдал: " \
+                     f"{literal_eval(item[4])[-1]}\n"
             if addmsg not in msg:
                 msg += addmsg
     return msg
@@ -1522,15 +1526,14 @@ def statuslist(names, pp):
     for _ in names:
         if names[ind].first_name != 'DELETED' and names[ind].last_name != 'DELETED':
             name = f"{names[ind].first_name} {names[ind].last_name}"
-            np = pp[0]
             for i in pp:
-                if i.uid == int(names[ind].id):
-                    np = i
-                    break
-            addmsg = f"[{ind + 1}]. [id{names[ind].id}|{name}] | " \
-                     f"Осталось: {int((np.time - time.time()) / 86400) + 1} дней\n"
-            if addmsg not in msg:
-                msg += addmsg
+                if i[0] != int(names[ind].id):
+                    continue
+                addmsg = f"[{ind + 1}]. [id{names[ind].id}|{name}] | " \
+                         f"Осталось: {int((i[1] - time.time()) / 86400) + 1} дней\n"
+                if addmsg not in msg:
+                    msg += addmsg
+                break
         ind += 1
     return get('statuslist', premium_status=ind) + msg
 
@@ -1567,8 +1570,10 @@ def settings_change_countable(chat_id, setting, pos, value, value2, pos2, punish
         return get(f'settings_change_countable_{setting}', status=status, time=value2)
     elif setting == 'welcome':
         status2 = "Да" if pos2 else "Нет"
-        w: Welcome = Welcome.get_or_none(Welcome.chat_id == chat_id)
-        if not pos or w is None or (not w.msg and not w.photo):
+        with syncpool().connection() as conn:
+            with conn.cursor() as c:
+                w = c.execute('select msg, photo from welcome where chat_id=%s', (chat_id,)).fetchone()
+        if not pos or w is None or (not w[0] and not w[1]):
             value = '❌'
         else:
             value = 'Установлено'
@@ -1629,7 +1634,7 @@ def settings_setlist(setting, type):
 def settings_exceptionlist(exceptions):
     msg = ''
     for k, i in enumerate(exceptions):
-        msg += f'[{k + 1}]. {i.url}'
+        msg += f'[{k + 1}]. {i[0]}'
     return get('settings_exceptionlist', msg=msg)
 
 
@@ -1692,11 +1697,11 @@ def getnick(res, names, members, query):
             members.remove(it)
     for ind, item in enumerate(res):
         for i in members:
-            if i.member_id == item.uid and i.member_id > 0:
+            if i.member_id == item[0] and i.member_id > 0:
                 try:
                     if names[ind].first_name != 'DELETED' and names[ind].last_name != 'DELETED':
                         cnt += 1
-                        addmsg = f"{cnt}. {item.nickname} - [id{item.uid}|{names[ind].first_name} " \
+                        addmsg = f"{cnt}. {item[1]} - [id{item[0]}|{names[ind].first_name} " \
                                  f"{names[ind].last_name}]\n"
                         if addmsg not in msg:
                             msg += addmsg
@@ -1846,7 +1851,7 @@ def listprefix(uid, name, nick, prefixes):
     if len(prefixes) == 0:
         msg += 'Префиксов не обнаружено. Используйте кнопку "Добавить префикс"'
     for i in prefixes:
-        msg += f'➖ "{i.prefix}"\n'
+        msg += f'➖ "{i[0]}"\n'
     return msg
 
 
@@ -1918,7 +1923,7 @@ def ignorelist(res, names):
     msg = get('ignorelist', lres=len(res))
     k = 0
     for i in res:
-        addmsg = f'➖ [id{i.uid}|{names[k]}]'
+        addmsg = f'➖ [id{i}|{names[k]}]'
         if addmsg not in msg:
             msg += addmsg
         k += 1
@@ -2166,7 +2171,7 @@ def send_notification(text, tagging):
 
 
 def notif(notifs, activenotifs):
-    return get('notif', lnotifs=len(notifs), lactive=len(activenotifs))
+    return get('notif', lnotifs=notifs, lactive=activenotifs)
 
 
 def notif_already_exist(name):
@@ -2174,7 +2179,7 @@ def notif_already_exist(name):
 
 
 def notification(name, text, time, every, tag, status):
-    msg = get('name', name=name, text=text)
+    msg = get('notification', name=name, text=text)
 
     if every == 1440:
         msg += f'Каждый день в {datetime.fromtimestamp(time).strftime("%H:%M")}'
@@ -2254,14 +2259,9 @@ def notification_too_long_text(name):
 
 def notifs(notifs):
     msg = get('notifs')
-
     for k, i in enumerate(notifs):
-        if i.status == 1:
-            status = 'Включено'
-        else:
-            status = 'Выключено'
-        msg += f'[{k + 1}]. {i.name} | {status}\n'
-
+        status = 'Включено' if i[0] == 1 else 'Выключено'
+        msg += f'[{k + 1}]. {i[1]} | {status}\n'
     return msg
 
 

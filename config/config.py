@@ -1,11 +1,14 @@
+import pathlib
 from ast import literal_eval
 
 from vk_api import vk_api
-from vkbottle import API
+from vkbottle import API as VKAPI
 from configparser import ConfigParser
 
+PATH = '/root/StarManager/'
+
 config = ConfigParser()
-config.read('/root/StarManager/config/config.ini')  # write existing path here
+config.read(f'{PATH}config/config.ini')  # write existing path here
 
 VK_TOKEN_GROUP = config['VK']['VK_TOKEN_GROUP']
 GROUP_ID = int(config['VK']['GROUP_ID'])  # without "-"
@@ -183,8 +186,6 @@ DEVS_COLORS = literal_eval(config['SERVICE']['DEVS_COLORS'])
 
 PREFIX = ["/", "!", ".", "+"]
 
-PATH = config['SERVICE']['PATH']
-
 GWARN_TIME_LIMIT = 10
 GWARN_PUNISHMENT = 10  # in seconds
 GWARN_PUNISHMENTS_NAMES = ["5 минут", "30 минут", "48 часов", "30 дней"]
@@ -347,8 +348,8 @@ def PREMIUM_BONUS_POST_WORKS_TIL():
     return datetime.datetime(year=2024, month=2, day=17).timestamp()
 
 
-IMPLICIT_API = API(VK_TOKEN_IMPLICIT_FLOW)
-API = API(VK_TOKEN_GROUP)
+IMPLICIT_API = VKAPI(VK_TOKEN_IMPLICIT_FLOW)
+API = VKAPI(VK_TOKEN_GROUP)
 VK_API_SESSION = vk_api.VkApi(token=VK_TOKEN_GROUP, api_version='5.199')
 VK_API_IMPLICIT_SESSION = vk_api.VkApi(token=VK_TOKEN_IMPLICIT_FLOW, api_version='5.199')
 
@@ -357,6 +358,8 @@ PREMIUM_COST = {30: 99, 90: 249, 180: 499}
 USER = config['DATABASE']['USER']
 PASSWORD = config['DATABASE']['PASSWORD']
 DATABASE = config['DATABASE']['DATABASE']
+DATABASE_HOST = config['DATABASE']['DATABASE_HOST']
+DATABASE_PORT = config['DATABASE']['DATABASE_PORT']
 
 TG_TOKEN = config['TELEGRAM']['TG_TOKEN']
 TG_CHAT_ID = config['TELEGRAM']['TG_CHAT_ID']
@@ -373,7 +376,6 @@ YOOKASSA_TOKEN = config['YOOKASSA']['YOOKASSA_TOKEN']
 
 MEGA_LOGIN = config['MEGA']['MEGA_LOGIN']
 MEGA_PASSWORD = config['MEGA']['MEGA_PASSWORD']
-print(MEGA_LOGIN, MEGA_PASSWORD)
 
 data = {
     'email': config['SOCIALS']['email'],

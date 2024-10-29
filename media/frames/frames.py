@@ -18,14 +18,13 @@ def createFrame(framelvl: int, prem: int | str, wins: int | str, uid: int | str,
 
     ava = Image.open(f'{PATH}media/temp/{uid}ava.jpg')
     ava = ava.resize((132, 134))
-    avamask_im = Image.new("L", ava.size, 0)
+    avamask_im = Image.new("L", ava.size, 0)  # noqa
     avadraw = ImageDraw.Draw(avamask_im)
     avadraw.ellipse((0, 0, 132, 134), fill=255)
     if framelvl != 1:
         avadraw.rectangle((0, 126, 200, 200), fill=0)
     img.paste(ava, (79, 68), mask=avamask_im)
 
-    print(framelvl)
     frame = Image.open(f'{PATH}media/frames/frame{framelvl}.png')
     img.paste(frame, (-1, 5), mask=frame)
 
@@ -42,7 +41,6 @@ def createFrame(framelvl: int, prem: int | str, wins: int | str, uid: int | str,
     fg = (82, 151, 255)
     bg = (56, 86, 130)
     progress = 1 - ((neededxp - xp) / 200)
-    print(progress)
     draw.rectangle((x + (height / 2), y, x + width + (height / 2), y + height), fill=bg, width=10)
     draw.ellipse((x + width, y, x + height + width, y + height), fill=bg)
     draw.ellipse((x, y, x + height, y + height), fill=bg)

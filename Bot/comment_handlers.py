@@ -5,7 +5,7 @@ from vkbottle_types import GroupTypes
 import messages
 from Bot.utils import getUserName, addUserXP
 from config.config import FARM_CD, FARM_POST_ID, GROUP_ID, API
-from db import Comments
+from db import pool
 
 
 async def comment_handle(event: GroupTypes.WallReplyNew) -> None:
@@ -18,14 +18,18 @@ async def comment_handle(event: GroupTypes.WallReplyNew) -> None:
     cid = event.object.id
     name = await getUserName(uid)
 
-    c = Comments.get_or_create(uid=uid, defaults={'time': time.time()})[0]
-    if time.time() - c.time < FARM_CD:
-        msg = messages.farm_cd(name, uid, FARM_CD - (time.time() - c.time))
-        await API.wall.create_comment(owner_id=-GROUP_ID, post_id=FARM_POST_ID, from_group=GROUP_ID,
-                                      message=msg, reply_to_comment=cid)
-        return
-    c.time = time.time()
-    c.save()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if not (com := await (await c.execute('select id, time from comments where uid=%s', (uid,))).fetchone()):
+                await c.execute('insert into comments (uid, time) values (%s, %s)', (uid, int(time.time())))
+            elif time.time() - com[1] < FARM_CD:
+                msg = messages.farm_cd(name, uid, FARM_CD - (time.time() - com.time))
+                await API.wall.create_comment(owner_id=-GROUP_ID, post_id=FARM_POST_ID, from_group=GROUP_ID,
+                                              message=msg, reply_to_comment=cid)
+                return
+            else:
+                await c.execute('update comments set time = %s where uid=%s', (int(time.time()), uid))
+            await conn.commit()
     await addUserXP(uid, 50)
 
     msg = messages.farm(name, uid)

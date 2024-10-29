@@ -10,60 +10,69 @@ from vkbottle_types.objects import MessagesMessageAttachmentType
 
 import keyboard
 import messages
-from Bot.utils import getUserName, getChatName, sendMessage, editMessage, uploadImage, deleteMessages, punish, \
-    getUserNickname
+from Bot.utils import getUserName, getChatName, sendMessage, editMessage, uploadImage, deleteMessages, getUserNickname
 from config.config import REPORT_TO, SETTINGS_COUNTABLE_MULTIPLE_ARGUMENTS, PATH, SETTINGS_COUNTABLE_SPECIAL_LIMITS
-from db import ReportAnswers, Notifs, TypeQueue, Settings, AntispamURLExceptions, Welcome, Captcha, WelcomeHistory, \
-    Prefixes
+from db import pool
 
 
 async def report_handler(event: MessageNew):
     uid = event.object.message.from_id
-    repansi = ReportAnswers.get_or_none(ReportAnswers.answering_id == uid)
-    if repansi is None:
-        return False
-    answering_name = await getUserName(repansi.answering_id)
-    name = await getUserName(repansi.uid)
-    await deleteMessages([repansi.cmid, event.object.message.conversation_message_id], REPORT_TO)
-    await sendMessage(repansi.chat_id + 2000000000, messages.report_answer(
-        repansi.answering_id, answering_name, repansi.repid, event.object.message.text, repansi.uid, name))
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            repansi = await (await c.execute(
+                'select id, answering_id, uid, chat_id, repid, report_text, cmid from reportanswers '
+                'where answering_id=%s', (uid,))).fetchone()
+            if repansi is None:
+                return False
+            await c.execute('delete from reportanswers where id=%s', (repansi[0],))
+            await conn.commit()
+    answering_name = await getUserName(repansi[1])
+    name = await getUserName(repansi[2])
+    await deleteMessages([repansi[6], event.object.message.conversation_message_id], REPORT_TO)
+    await sendMessage(repansi[3] + 2000000000, messages.report_answer(
+        repansi[1], answering_name, repansi[4], event.object.message.text, repansi[2], name))
     await sendMessage(REPORT_TO + 2000000000, messages.report_answered(
-        repansi.answering_id, answering_name, repansi.repid, event.object.message.text, repansi.report_text, 
-        repansi.uid, name, repansi.chat_id, await getChatName(repansi.chat_id)))
-    repansi.delete_instance()
+        repansi[1], answering_name, repansi[4], event.object.message.text, repansi[5], 
+        repansi[2], name, repansi[3], await getChatName(repansi[3])))
     return
 
 
 async def queue_handler(event: MessageNew):
     uid = event.object.message.from_id
     chat_id = event.object.message.peer_id - 2000000000
-    queue: TypeQueue = TypeQueue.get_or_none(TypeQueue.uid == uid, TypeQueue.chat_id == chat_id)
-    if queue is None:
-        return False
-    additional = literal_eval(queue.additional)
-    if queue.type not in ('captcha',):
-        queue.delete_instance()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            queue = await (await c.execute(
+                'select id, chat_id, uid, "type", additional from typequeue where chat_id=%s and uid=%s',
+                (chat_id, uid))).fetchone()
+            if not queue:
+                return False
+            if queue[3] not in ('captcha',):
+                await c.execute('delete from typequeue where id=%s', (queue[0],))
+                await conn.commit()
+    additional = literal_eval(queue[4])
 
-    if queue.type.startswith('notification_'):
-        if queue.type == 'notification_text':
+    if queue[3].startswith('notification_'):
+        if queue[3] == 'notification_text':
             name = additional['name']
             cmid = int(additional['cmid'])
 
-            notif = Notifs.get(Notifs.name == name, Notifs.chat_id == chat_id)
-            notif.text = event.object.message.text
-            notif.save()
+            async with (await pool()).connection() as conn:
+                async with conn.cursor() as c:
+                    notif = await (await c.execute(
+                        'update notifications set text = %s where name=%s and chat_id=%s returning name, time, every, '
+                        'tag, status', (event.object.message.text, name, chat_id))).fetchone()
+                    await conn.commit()
 
             msg = messages.notification_changed_text(name)
             await editMessage(msg, event.object.message.peer_id, cmid)
 
-            notif = notif.select().where(notif.chat_id == chat_id, notif.name == name)[0]
-
-            msg = messages.notification(notif.name, notif.text, notif.time, notif.every, notif.tag,
-                                        notif.status)
-            kb = keyboard.notification(uid, notif.status, notif.name)
+            msg = messages.notification(notif[0], event.object.message.text, notif[1], notif[2], notif[3],
+                                        notif[4])
+            kb = keyboard.notification(uid, notif[4], notif[0])
             await sendMessage(chat_id + 2000000000, msg, kb)
             return
-        elif queue.type == 'notification_time_change':
+        elif queue[3] == 'notification_time_change':
             ctime = event.object.message.text
             name = additional['name']
             cmid = int(additional['cmid'])
@@ -114,22 +123,22 @@ async def queue_handler(event: MessageNew):
                 nctime = datetime.datetime.now() + datetime.timedelta(minutes=int(ctime))
                 every = ctime
 
-            notif = Notifs.get(Notifs.name == name, Notifs.chat_id == chat_id)
-            notif.time = nctime.timestamp()
-            notif.every = every
-            notif.save()
+            async with (await pool()).connection() as conn:
+                async with conn.cursor() as c:
+                    notif = await (await c.execute(
+                        'update notifications set time = %s, every = %s where name=%s and chat_id=%s '
+                        'returning name, text, time, every, tag, status',
+                        (nctime.timestamp(), every, name, chat_id))).fetchone()
+                    await conn.commit()
 
             msg = messages.notification_changed_time(name)
             await editMessage(msg, event.object.message.peer_id, cmid)
 
-            notif = notif.select().where(notif.chat_id == chat_id, notif.name == name)[0]
-
-            msg = messages.notification(notif.name, notif.text, notif.time, notif.every, notif.tag,
-                                        notif.status)
-            kb = keyboard.notification(uid, notif.status, notif.name)
+            msg = messages.notification(notif[0], notif[1], notif[2], notif[3], notif[4], notif[5])
+            kb = keyboard.notification(uid, notif[5], notif[0])
             await sendMessage(chat_id + 2000000000, msg, kb)
-    elif queue.type.startswith('settings_'):
-        if queue.type == 'settings_change_countable':
+    elif queue[3].startswith('settings_'):
+        if queue[3] == 'settings_change_countable':
             setting = additional['setting']
             category = additional['category']
             cmid = additional['cmid']
@@ -144,9 +153,11 @@ async def queue_handler(event: MessageNew):
                     await editMessage(messages.settings_change_countable_digit_error(),
                                       event.object.message.peer_id, cmid, kb)
                     return
-                chatsettings = Settings.get(Settings.chat_id == chat_id, Settings.setting == setting)
-                chatsettings.value = int(text)
-                chatsettings.save()
+                async with (await pool()).connection() as conn:
+                    async with conn.cursor() as c:
+                        await c.execute('update settings set value = %s where chat_id=%s and setting=%s',
+                                        (int(text), chat_id, setting))
+                        await conn.commit()
             else:
                 if setting == 'nightmode':
                     try:
@@ -163,16 +174,18 @@ async def queue_handler(event: MessageNew):
                         await editMessage(messages.settings_change_countable_format_error(),
                                           event.object.message.peer_id, cmid, kb)
                         return
-                    chatsettings = Settings.get(Settings.chat_id == chat_id, Settings.setting == setting)
                     val = f'0{start.hour}:' if start.hour < 10 else f'{start.hour}:'
                     val += f'0{start.minute}-' if start.minute < 10 else f'{start.minute}-'
                     val += f'0{end.hour}:' if end.hour < 10 else f'{end.hour}:'
                     val += f'0{end.minute}' if end.minute < 10 else f'{end.minute}'
-                    chatsettings.value2 = val
-                    chatsettings.save()
+                    async with (await pool()).connection() as conn:
+                        async with conn.cursor() as c:
+                            await c.execute('update settings set value2 = %s where chat_id=%s and setting=%s',
+                                            (val, chat_id, setting))
+                            await conn.commit()
             await editMessage(messages.settings_change_countable_done(setting, text),
                               event.object.message.peer_id, cmid, kb)
-        elif queue.type == 'settings_set_punishment':
+        elif queue[3] == 'settings_set_punishment':
             setting = additional['setting']
             category = additional['category']
             action = additional['action']
@@ -183,12 +196,14 @@ async def queue_handler(event: MessageNew):
                 await editMessage(messages.settings_change_countable_digit_error(), event.object.message.peer_id, cmid,
                                   kb)
                 return
-            chatsettings = Settings.get(Settings.chat_id == chat_id, Settings.setting == setting)
-            chatsettings.punishment = f'{action}|{text}'
-            chatsettings.save()
+            async with (await pool()).connection() as conn:
+                async with conn.cursor() as c:
+                    await c.execute('update settings set punishment = %s where chat_id=%s and setting=%s',
+                                    (f'{action}|{text}', chat_id, setting))
+                    await conn.commit()
             await editMessage(messages.settings_set_punishment_countable(action, int(text)),
                               event.object.message.peer_id, cmid, kb)
-        elif queue.type == 'settings_listaction':
+        elif queue[3] == 'settings_listaction':
             setting = additional['setting']
             action = additional['action']
             # type = additional['type']
@@ -199,32 +214,45 @@ async def queue_handler(event: MessageNew):
                         msg = messages.settings_change_countable_format_error()
                         await sendMessage(chat_id + 2000000000, msg)
                         return
-                    AntispamURLExceptions.get_or_create(chat_id=chat_id, url=url)
+                    async with (await pool()).connection() as conn:
+                        async with conn.cursor() as c:
+                            if not await (await c.execute(
+                                    'select id from antispammurlexceptions where chat_id=%s and url=%s',
+                                    (chat_id, url))).fetchone():
+                                await c.execute('insert into antispammurlexceptions (chat_id, url) values (%s, %s)',
+                                                (chat_id, url))
+                            await conn.commit()
                 elif action == 'remove':
                     url = event.object.message.text.replace(' ', '').replace('https://', '').replace('/', '')
-                    e = AntispamURLExceptions.get_or_none(chat_id=chat_id, url=url)
-                    if e is None:
-                        msg = messages.settings_change_countable_format_error()
-                        await sendMessage(chat_id + 2000000000, msg)
-                        return
-                    e.delete_instance()
+                    async with (await pool()).connection() as conn:
+                        async with conn.cursor() as c:
+                            if not await (await c.execute(
+                                    'delete from antispammurlexceptions where chat_id=%s and url=%s',
+                                    (chat_id, url))).fetchone():
+                                msg = messages.settings_change_countable_format_error()
+                                await sendMessage(chat_id + 2000000000, msg)
+                                return
+                            await conn.commit()
                 else:
                     raise
                 msg = messages.settings_listaction_done(setting, action, url)
                 kb = keyboard.settings_change_countable(uid, 'antispam', onlybackbutton=True)
                 await sendMessage(chat_id + 2000000000, msg, kb)
-        elif queue.type.startswith('settings_set_welcome_'):
-            welcome: Welcome = Welcome.get_or_create(chat_id=chat_id)[0]
-            if queue.type == 'settings_set_welcome_text':
+        elif queue[3].startswith('settings_set_welcome_'):
+            if queue[3] == 'settings_set_welcome_text':
                 if not event.object.message.text:
-                    msg = messages.get(queue.type + '_no_text')
+                    msg = messages.get(queue[3] + '_no_text')
                     await sendMessage(chat_id + 2000000000, msg)
                     return
-                welcome.msg = event.object.message.text
-            elif queue.type == 'settings_set_welcome_photo':
+                async with (await pool()).connection() as conn:
+                    async with conn.cursor() as c:
+                        await c.execute(
+                            'update welcome set msg = %s where chat_id=%s', (event.object.message.text, chat_id))
+                        await conn.commit()
+            elif queue[3] == 'settings_set_welcome_photo':
                 if (len(event.object.message.attachments) == 0 or
                         event.object.message.attachments[0].type != MessagesMessageAttachmentType.PHOTO):
-                    msg = messages.get(queue.type + '_not_photo')
+                    msg = messages.get(queue[3] + '_not_photo')
                     await sendMessage(chat_id + 2000000000, msg)
                     return
                 r = requests.get(event.object.message.attachments[0].photo.sizes[-1].url)
@@ -232,17 +260,26 @@ async def queue_handler(event: MessageNew):
                     f.write(r.content)
                     f.close()
                 r.close()
-                welcome.photo = await uploadImage(f'{PATH}media/temp/{uid}welcome.jpg')
-            elif queue.type == 'settings_set_welcome_url':
-                if not welcome.msg and not welcome.url:
-                    msg = messages.get(queue.type + '_empty_text_url')
+                async with (await pool()).connection() as conn:
+                    async with conn.cursor() as c:
+                        await c.execute('update welcome set photo = %s where chat_id=%s',
+                                        (await uploadImage(f'{PATH}media/temp/{uid}welcome.jpg'), chat_id))
+                        await conn.commit()
+            elif queue[3] == 'settings_set_welcome_url':
+                async with (await pool()).connection() as conn:
+                    async with conn.cursor() as c:
+                        welcome = await (await c.execute(
+                            'select msg, url from welcome where chat_id=%s', (chat_id,))).fetchone()
+                if welcome and not welcome[0] and not welcome[1]:
+                    msg = messages.get(queue[3] + '_empty_text_url')
                     await sendMessage(chat_id + 2000000000, msg)
                     return
-                if len(' '.join(welcome.msg.split()[1:])) > 40:
-                    msg = messages.get(queue.type + '_limit_text')
+                if len(' '.join(event.object.message.text.split()[1:])) > 40:
+                    msg = messages.get(queue[3] + '_limit_text')
                     await sendMessage(chat_id + 2000000000, msg)
                     return
-                if len(' '.join(welcome.msg.split()[1:])) == 0 or welcome.msg.count('\n') > 0:
+                if (len(' '.join(event.object.message.text.split()[1:])) == 0 or
+                        event.object.message.text.count('\n') > 0):
                     msg = messages.settings_change_countable_format_error()
                     await sendMessage(chat_id + 2000000000, msg)
                     return
@@ -252,58 +289,77 @@ async def queue_handler(event: MessageNew):
                     await sendMessage(chat_id + 2000000000, msg)
                     return
                 if not validators.url(text[-1]):
-                    msg = messages.get(queue.type + '_no_url')
+                    msg = messages.get(queue[3] + '_no_url')
                     await sendMessage(chat_id + 2000000000, msg)
                     return
-                welcome.url = text[-1]
-                welcome.button_label = ' '.join(text[0:-1])
-            welcome.save()
-            msg = messages.get(f'{queue.type}_done')
+                async with (await pool()).connection() as conn:
+                    async with conn.cursor() as c:
+                        await c.execute('update welcome set url = %s, button_label = %s where chat_id=%s',
+                                        (text[-1], ' '.join(text[0:-1]), chat_id))
+                        await conn.commit()
+            msg = messages.get(f'{queue[3]}_done')
             kb = keyboard.settings_change_countable(uid, "main", "welcome", onlybackbutton=True)
             await sendMessage(chat_id + 2000000000, msg, kb)
-    elif queue.type == 'captcha':
-        c: Captcha = Captcha.select().where(
-            Captcha.chat_id == chat_id, Captcha.uid == uid).order_by(Captcha.exptime.desc())[0]
-        if c is None or c.result is None:
+    elif queue[3] == 'captcha':
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                c = await (await c.execute('select result from captcha where chat_id=%s and uid=%s order by exptime '
+                                           'desc', (chat_id, uid))).fetchone()
+        if c is None or c[0] is None:
             return
-        if c.result.strip() != event.object.message.text.strip():
+        if c[0].strip() != event.object.message.text.strip():
             await deleteMessages(event.object.message.conversation_message_id, chat_id)
             return
 
         name = await getUserName(uid)
         await sendMessage(chat_id + 2000000000, messages.captcha_pass(
             uid, name, datetime.datetime.now().strftime('%H:%M:%S %Y.%m.%d')))
-        TypeQueue.delete().where(TypeQueue.uid == uid, TypeQueue.chat_id == chat_id).execute()
-
-        if s := Settings.get_or_none(Settings.chat_id == chat_id, Settings.setting == 'welcome'):
-            welcome = Welcome.get_or_none(Welcome.chat_id == chat_id)
-            if welcome is not None and s.pos:
-                await sendMessage(event.object.message.peer_id, welcome.msg.replace('%name%', f"[id{uid}|{name}]"),
-                                  keyboard.welcome(welcome.url, welcome.button_label), welcome.photo)
-        await deleteMessages([i.cmid for i in Captcha.select().where(Captcha.chat_id == chat_id, Captcha.uid == uid)],
-                             chat_id)
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                await c.execute('delete from typequeue where chat_id=%s and uid=%s', (chat_id, uid))
+                s = await (await c.execute(
+                    'select pos from settings where chat_id=%s and setting=\'welcome\'', (chat_id,))).fetchone()
+                welcome = await (await c.execute('select msg, url, button_label, photo from welcome where chat_id=%s',
+                                                 (chat_id,))).fetchone()
+                cmsgs = await (await c.execute('select cmid from captcha where chat_id=%s and uid=%s',
+                                               (chat_id, uid))).fetchall()
+                await c.execute('delete from captcha where chat_id=%s and uid=%s', (chat_id, uid))
+                await conn.commit()
+        if s and s[0] and welcome:
+            await sendMessage(event.object.message.peer_id, welcome[0].replace('%name%', f"[id{uid}|{name}]"),
+                              keyboard.welcome(welcome[1], welcome[2]), welcome[3])
+        await deleteMessages([i[0] for i in cmsgs], chat_id)
         await deleteMessages(event.object.message.conversation_message_id, chat_id)
-        Captcha.delete().where(Captcha.chat_id == chat_id, Captcha.uid == uid).execute()
-    elif queue.type.startswith('prefix'):
-        if queue.type == 'prefix_add':
+    elif queue[3].startswith('prefix'):
+        if queue[3] == 'prefix_add':
             await deleteMessages(additional['cmid'], chat_id)
             await deleteMessages(event.object.message.conversation_message_id, chat_id)
             if len(event.object.message.text) > 2:
                 await sendMessage(event.object.message.peer_id, messages.addprefix_too_long(),
                                   keyboard.prefix_back(uid))
                 return
-            Prefixes.get_or_create(uid=uid, prefix=event.object.message.text)
+            async with (await pool()).connection() as conn:
+                async with conn.cursor() as c:
+                    if not await (await c.execute('select id from prefix where uid=%s and prefix=%s',
+                                                  (uid, event.object.message.text))).fetchone():
+                        await c.execute(
+                            'insert into prefix (uid, prefix) values (%s, %s)', (uid, event.object.message.text))
+                        await conn.commit()
             await sendMessage(event.object.message.peer_id,
                               messages.addprefix(uid, await getUserName(uid), await getUserNickname(uid, chat_id),
                                                  event.object.message.text), keyboard.prefix_back(uid))
-        elif queue.type == 'prefix_del':
+        elif queue[3] == 'prefix_del':
             await deleteMessages(additional['cmid'], chat_id)
             await deleteMessages(event.object.message.conversation_message_id, chat_id)
-            if not (p := Prefixes.get_or_none(Prefixes.uid == uid, Prefixes.prefix == event.object.message.text)):
-                await sendMessage(event.object.message.peer_id, messages.delprefix_not_found(event.object.message.text),
-                                  keyboard.prefix_back(uid))
-                return
-            p.delete_instance()
+            async with (await pool()).connection() as conn:
+                async with conn.cursor() as c:
+                    if not (await c.execute('delete from prefix where uid=%s and prefix=%s',
+                                            (uid, event.object.message.text))).rowcount:
+                        await sendMessage(
+                            event.object.message.peer_id, messages.delprefix_not_found(event.object.message.text),
+                            keyboard.prefix_back(uid))
+                        return
+                    await conn.commit()
             await sendMessage(event.object.message.peer_id,
                               messages.delprefix(uid, await getUserName(uid), await getUserNickname(uid, chat_id),
                                                  event.object.message.text), keyboard.prefix_back(uid))

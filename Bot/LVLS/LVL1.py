@@ -12,7 +12,7 @@ from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserName, getUserNickname, getGroupName, isChatAdmin, \
     getUserAccessLevel, kickUser, getUserPremium, getUserMute, setChatMute, getUserBan, getUserWarns
 from config.config import API
-from db import Mute, Warn, Nickname, AccessLevel
+from db import pool
 
 bl = BotLabeler()
 
@@ -198,13 +198,16 @@ async def mute(message: Message):
     msg = messages.mute(u_name, u_nick, uid, ch_name, ch_nick, id, mute_cause, int(mute_time / 60))
     mute_date = datetime.now().strftime('%Y.%m.%d %H:%M:%S')
 
-    ms = Mute.get_or_none(Mute.uid == id, Mute.chat_id == chat_id)
-    if ms is not None and None not in (ms.last_mutes_times, ms.last_mutes_causes,
-                                       ms.last_mutes_names, ms.last_mutes_dates):
-        mute_times = literal_eval(ms.last_mutes_times)
-        mute_causes = literal_eval(ms.last_mutes_causes)
-        mute_names = literal_eval(ms.last_mutes_names)
-        mute_dates = literal_eval(ms.last_mutes_dates)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            ms = await (await c.execute(
+                'select last_mutes_times, last_mutes_causes, last_mutes_names, last_mutes_dates from mute where '
+                'chat_id=%s and uid=%s', (chat_id, id))).fetchone()
+    if ms is not None:
+        mute_times = literal_eval(ms[0])
+        mute_causes = literal_eval(ms[1])
+        mute_names = literal_eval(ms[2])
+        mute_dates = literal_eval(ms[3])
     else:
         mute_times, mute_causes, mute_names, mute_dates = [], [], [], []
 
@@ -218,13 +221,19 @@ async def mute(message: Message):
     mute_names.append(f'[id{uid}|{u_name}]')
     mute_dates.append(mute_date)
 
-    ms = Mute.get_or_create(uid=id, chat_id=chat_id)[0]
-    ms.mute = int(time.time()) + mute_time
-    ms.last_mutes_times = f"{mute_times}"
-    ms.last_mutes_causes = f"{mute_causes}"
-    ms.last_mutes_names = f"{mute_names}"
-    ms.last_mutes_dates = f"{mute_dates}"
-    ms.save()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if not (await c.execute(
+                    'update mute set mute = %s, last_mutes_times = %s, last_mutes_causes = %s, last_mutes_names = %s, '
+                    'last_mutes_dates = %s where chat_id=%s and uid=%s',
+                    (int(time.time() + mute_time), f"{mute_times}", f"{mute_causes}", f"{mute_names}", f"{mute_dates}",
+                     chat_id, id))).rowcount:
+                await c.execute(
+                    'insert into mute (uid, chat_id, mute, last_mutes_times, last_mutes_causes, last_mutes_names, '
+                    'last_mutes_dates) VALUES (%s, %s, %s, %s, %s, %s, %s)',
+                    (id, chat_id, int(time.time() + mute_time), f"{mute_times}", f"{mute_causes}", f"{mute_names}",
+                     f"{mute_dates}"))
+            await conn.commit()
 
     await setChatMute(id, chat_id, mute_time)
 
@@ -273,19 +282,20 @@ async def warn(message: Message):
     ch_name = await getUserName(id)
     ch_nick = await getUserNickname(id, chat_id)
     warn_date = datetime.now().strftime('%Y.%m.%d %H:%M:%S')
-    res = Warn.get_or_none(Warn.chat_id == chat_id, Warn.uid == id)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            res = await (await c.execute('select warns, last_warns_times, last_warns_causes, last_warns_names, '
+                                         'last_warns_dates from warn where chat_id=%s and uid=%s',
+                                         (chat_id, uid))).fetchone()
     if res is not None:
-        warns = res.warns + 1
-        warn_times = literal_eval(res.last_warns_times)
-        warn_causes = literal_eval(res.last_warns_causes)
-        warn_names = literal_eval(res.last_warns_names)
-        warn_dates = literal_eval(res.last_warns_dates)
+        warns = res[0] + 1
+        warn_times = literal_eval(res[1])
+        warn_causes = literal_eval(res[2])
+        warn_names = literal_eval(res[3])
+        warn_dates = literal_eval(res[4])
     else:
         warns = 1
-        warn_times = []
-        warn_causes = []
-        warn_names = []
-        warn_dates = []
+        warn_times, warn_causes, warn_names, warn_dates = [], [], [], []
     if warn_cause is None or warn_cause == '':
         warn_cause = 'Без указания причины'
     warn_times.append(0)
@@ -299,13 +309,19 @@ async def warn(message: Message):
         msg = messages.warn_kick(u_name, u_nickname, uid, ch_name, ch_nick, id, warn_cause)
     else:
         msg = messages.warn(u_name, u_nickname, uid, ch_name, ch_nick, id, warn_cause)
-    w = Warn.get_or_create(chat_id=chat_id, uid=id)[0]
-    w.warns = warns
-    w.last_warns_times = f"{warn_times}"
-    w.last_warns_causes = f"{warn_causes}"
-    w.last_warns_names = f"{warn_names}"
-    w.last_warns_dates = f"{warn_dates}"
-    w.save()
+
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if not (await c.execute(
+                    'update warn set warns = %s, last_warns_times = %s, last_warns_causes = %s, last_warns_names = %s, '
+                    'last_warns_dates = %s where chat_id=%s and uid=%s',
+                    (warns, f"{warn_times}", f"{warn_causes}", f"{warn_names}", f"{warn_dates}", chat_id,
+                     id))).rowcount:
+                await c.execute(
+                    'insert into warn (uid, chat_id, warns, last_warns_times, last_warns_causes, last_warns_names, '
+                    'last_warns_dates) VALUES (%s, %s, %s, %s, %s, %s, %s)',
+                    (id, chat_id, warns, f"{warn_times}", f"{warn_causes}", f"{warn_names}", f"{warn_dates}"))
+            await conn.commit()
 
     kb = keyboard.punish_unpunish(uid, id, 'warn', message.conversation_message_id)
     await message.reply(disable_mentions=1, message=msg, keyboard=kb)
@@ -402,9 +418,13 @@ async def snick(message: Message):
     u_nickname = await getUserNickname(uid, chat_id)
     ch_nickname = await getUserNickname(id, chat_id)
 
-    n = Nickname.get_or_create(uid=id, chat_id=chat_id)[0]
-    n.nickname = nickname
-    n.save()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if not (await c.execute('update nickname set nickname = %s where chat_id=%s and chat_id=%s',
+                                    (nickname, chat_id, id))).rowcount:
+                await c.execute(
+                    'insert into nickname (uid, chat_id, nickname) VALUES (%s, %s, %s)', (id, chat_id, nickname))
+            await conn.commit()
 
     u_name = await getUserName(uid)
     name = await getUserName(id)
@@ -439,9 +459,10 @@ async def rnick(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    n = Nickname.get_or_none(Nickname.uid == id, Nickname.chat_id == chat_id)
-    if n is not None:
-        n.delete_instance()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            await c.execute('delete from nickname where chat_id=%s and uid=%s', (chat_id, id))
+            await conn.commit()
     u_name = await getUserName(uid)
     name = await getUserName(id)
     u_nick = await getUserNickname(uid, chat_id)
@@ -456,11 +477,14 @@ async def nlist(message: Message):
     members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = members.items
     members_uid = [i.member_id for i in members]
-    res = Nickname.select().where(Nickname.chat_id == chat_id, Nickname.uid > 0, Nickname.uid << members_uid,
-                                  Nickname.nickname.is_null(False)).order_by(Nickname.nickname)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            res = await (await c.execute(
+                'select uid, nickname from nickname where chat_id=%s and uid>0 and uid=ANY(%s) and nickname is not null'
+                ' order by nickname', (chat_id, members_uid))).fetchall()
     count = len(res)
     res = res[:30]
-    names = await API.users.get(user_ids=[i.uid for i in res])
+    names = await API.users.get(user_ids=[i[0] for i in res])
     msg = messages.nlist(res, names)
     kb = keyboard.nlist(uid, 0, count)
     await message.reply(disable_mentions=1, message=msg, keyboard=kb)
@@ -475,10 +499,13 @@ async def getnick(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
     query = ' '.join(data[1:])
-    res = Nickname.select().where(Nickname.uid > 0, Nickname.chat_id == chat_id,
-                                  Nickname.nickname.contains(query)).order_by(Nickname.nickname).limit(30)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            res = await (await c.execute(
+                "select uid, nickname from nickname where chat_id=%s and uid>0 and nickname like %s order by nickname "
+                "limit 30", (chat_id, '%%' + query + '%%'))).fetchall()
     lres = len(res)
-    names = await API.users.get(user_ids=[f'{i.uid}' for i in res])
+    names = await API.users.get(user_ids=[i[0] for i in res])
     members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = members.items
     if lres > 0:
@@ -491,9 +518,12 @@ async def getnick(message: Message):
 @bl.chat_message(SearchCMD('staff'))
 async def staff(message: Message):
     chat_id = message.peer_id - 2000000000
-    res = AccessLevel.select().where(AccessLevel.uid > 0, AccessLevel.access_level > 0,
-                                     AccessLevel.chat_id == chat_id).order_by(AccessLevel.access_level)
-    names = await API.users.get(user_ids=[f'{i.uid}' for i in res])
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            res = await (await c.execute(
+                'select uid, access_level from accesslvl where chat_id=%s and uid>0 and access_level>0 order by '
+                'access_level desc', (chat_id,))).fetchall()
+    names = await API.users.get(user_ids=[i[0] for i in res])
     msg = await messages.staff(res, names, chat_id)
     await message.reply(disable_mentions=1, message=msg)
 

@@ -10,7 +10,7 @@ import messages
 from Bot.rules import SearchCMD
 from Bot.utils import getUserName, kickUser, getUserNickname, getIDFromMessage, getUserAccessLevel, getUserBan
 from config.config import API
-from db import SilenceMode, LastMessageDate, Ban
+from db import pool
 
 bl = BotLabeler()
 
@@ -29,9 +29,12 @@ async def timeout(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    sm = SilenceMode.get_or_create(chat_id=chat_id)[0]
-    sm.time = data[1]
-    sm.save()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if not (await c.execute(
+                    'update silencemode set time = %s where chat_id=%s', (int(data[1]), chat_id))).rowcount:
+                await c.execute('insert into silencemode (chat_id, time) values (%s, %s)', (chat_id, int(data[1])))
+            await conn.commit()
 
     u_name = await getUserName(uid)
     u_nickname = await getUserNickname(uid, chat_id)
@@ -61,8 +64,11 @@ async def inactive(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
     count = time.time() - count * 86400
-    res = LastMessageDate.select().where(LastMessageDate.chat_id == chat_id, LastMessageDate.uid > 0,
-                                         LastMessageDate.last_message < count)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            res = await (await c.execute(
+                'select uid from lastmessagedate where chat_id=%s and uid>0 and last_message<%s',
+                (chat_id, count))).fetchall()
     kicked = 0
     if len(res) <= 0:
         msg = messages.inactive_no_results()
@@ -71,9 +77,9 @@ async def inactive(message: Message):
     members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = [i.member_id for i in members.items if i.member_id > 0]
     for i in res:
-        if i.uid in members:
+        if i[0] in members:
             try:
-                x = await kickUser(i.uid, chat_id)
+                x = await kickUser(i[0], chat_id)
                 kicked += x
             except:
                 pass
@@ -151,12 +157,16 @@ async def ban(message: Message):
         return
 
     ban_date = datetime.now().strftime('%Y.%m.%d %H:%M:%S')
-    res = Ban.get_or_none(Ban.chat_id == chat_id, Ban.uid == id)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            res = await (await c.execute(
+                'select last_bans_times, last_bans_causes, last_bans_names, last_bans_dates from ban where '
+                'chat_id=%s and uid=%s', (chat_id, id))).fetchone()
     if res is not None:
-        ban_times = literal_eval(res.last_bans_times)
-        ban_causes = literal_eval(res.last_bans_causes)
-        ban_names = literal_eval(res.last_bans_names)
-        ban_dates = literal_eval(res.last_bans_dates)
+        ban_times = literal_eval(res[0])
+        ban_causes = literal_eval(res[1])
+        ban_names = literal_eval(res[2])
+        ban_dates = literal_eval(res[3])
     else:
         ban_times, ban_causes, ban_names, ban_dates = [], [], [], []
 
@@ -169,13 +179,19 @@ async def ban(message: Message):
     ban_names.append(f'[id{uid}|{u_name}]')
     ban_dates.append(ban_date)
 
-    b = Ban.get_or_create(uid=id, chat_id=chat_id)[0]
-    b.ban = int(time.time()) + ban_time
-    b.last_bans_times = f"{ban_times}"
-    b.last_bans_causes = f"{ban_causes}"
-    b.last_bans_names = f"{ban_names}"
-    b.last_bans_dates = f"{ban_dates}"
-    b.save()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if not (await c.execute(
+                    'update ban set ban = %s, last_bans_times = %s, last_bans_causes = %s, last_bans_names = %s, '
+                    'last_bans_dates = %s where chat_id=%s and uid=%s',
+                    (int(time.time() + ban_time), f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}",
+                        chat_id, id))).rowcount:
+                await c.execute(
+                    'insert into ban (uid, chat_id, ban, last_bans_times, last_bans_causes, last_bans_names, '
+                    'last_bans_dates) values (%s, %s, %s, %s, %s, %s, %s)',
+                    (id, chat_id, int(time.time() + ban_time), f"{ban_times}", f"{ban_causes}", f"{ban_names}",
+                     f"{ban_dates}"))
+            await conn.commit()
 
     msg = messages.ban(uid, u_name, u_nickname, id, ch_name, ch_nickname, ban_cause, ban_time // 86400)
     kick = await kickUser(id, chat_id)
@@ -220,10 +236,10 @@ async def unban(message: Message):
         msg = messages.unban_no_ban(id, name, ch_nickname)
         await message.reply(disable_mentions=1, message=msg)
         return
-    b = Ban.get_or_none(Ban.uid == id, Ban.chat_id == chat_id)
-    if b is not None:
-        b.ban = 0
-        b.save()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            await c.execute('update ban set ban = 0 where chat_id=%s and uid=%s', (chat_id, id))
+            await conn.commit()
     msg = messages.unban(u_name, u_nickname, uid, name, ch_nickname, id)
     await message.reply(disable_mentions=1, message=msg)
 
@@ -232,10 +248,14 @@ async def unban(message: Message):
 async def banlist(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    res = Ban.select().where(Ban.ban > int(time.time()), Ban.chat_id == chat_id)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            res = await (await c.execute(
+                'select uid, chat_id, last_bans_causes, ban, last_bans_names from ban where chat_id=%s and '
+                'ban>%s order by uid desc', (chat_id, int(time.time())))).fetchall()
     count = len(res)
-    res = res.limit(30)[::-1]
-    names = await API.users.get(user_ids=[i.uid for i in res])
+    res = res[:30]
+    names = await API.users.get(user_ids=[i[0] for i in res])
     msg = await messages.banlist(res, names, count)
     kb = keyboard.banlist(uid, 0, count)
     await message.reply(disable_mentions=1, message=msg, keyboard=kb)

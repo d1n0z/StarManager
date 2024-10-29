@@ -1,9 +1,8 @@
 import asyncio
-import sys
-import threading
 import traceback
 
-from loguru import logger
+import vkbottle.api.response_validator
+from pydantic.v1 import ValidationError
 from vkbottle import Bot, GroupEventType, GroupTypes, VKAPIError, LoopWrapper
 from vkbottle.framework.labeler import BotLabeler
 
@@ -15,7 +14,7 @@ from Bot.message_handlers import message_handle
 from Bot.middlewares import CommandMiddleware
 from Bot.reaction_handlers import reaction_handle
 from config.config import VK_TOKEN_GROUP, VK_API_SESSION
-from db import Reboot
+from db import syncpool
 
 
 class VkBot:
@@ -28,16 +27,6 @@ class VkBot:
             print(e)
 
     def run(self):
-        logger.remove()
-        logger.add(sys.stderr, level='INFO')
-
-        from Bot import scheduler
-        self.bot.loop_wrapper.add_task(scheduler.run())
-
-        from Bot.notifications import run_notifications
-        threading.Thread(target=run_notifications).start()
-        from Bot.nightmode import run_nightmode_notifications
-        threading.Thread(target=run_nightmode_notifications).start()
 
         labeler = BotLabeler()
 
@@ -57,27 +46,36 @@ class VkBot:
         async def like_add(event: GroupTypes.LikeAdd):
             await like_handle(event)
 
+        # @self.bot.error_handler.register_error_handler(VKAPIError[917])
+        # async def exception_handler(e: VKAPIError):
+        #     pass  # await exception_handle(e)
+
+        @self.bot.error_handler.register_error_handler(VKAPIError[7])
         @self.bot.error_handler.register_error_handler(VKAPIError[917])
-        async def exception_handler(e: VKAPIError):
-            await exception_handle(e)
+        @self.bot.error_handler.register_error_handler(VKAPIError[100])
+        @self.bot.error_handler.register_error_handler(ValidationError)
+        async def exception_handler(e: ValidationError):
+            pass
 
         self.bot.labeler.load(labeler)
         for i in LABELERS:
             self.bot.labeler.load(i)
         self.bot.labeler.message_view.register_middleware(CommandMiddleware)
 
-        rsl = Reboot.select().where(Reboot.sended == 0)
-        for i in rsl:
-            try:
-                VK_API_SESSION.method('messages.send', {
-                    'chat_id': i.chat_id,
-                    'message': '💚 Перезагрузка выполнена!',
-                    'random_id': 0
-                })
-            except:
-                traceback.print_exc()
-            i.sended = 1
-            i.save()
+        with syncpool().connection() as conn:
+            with conn.cursor() as c:
+                rsl = c.execute('select id, chat_id from reboots where sended=false').fetchall()
+                for i in rsl:
+                    try:
+                        VK_API_SESSION.method('messages.send', {
+                            'chat_id': i[1],
+                            'message': '💚 Перезагрузка выполнена!',
+                            'random_id': 0
+                        })
+                    except:
+                        traceback.print_exc()
+                    c.execute('update reboots set sended=true where id=%s', (i[0],))
+                conn.commit()
 
         print('Started!')
         self.bot.run_forever()

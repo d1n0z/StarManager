@@ -7,9 +7,10 @@ import keyboard
 import messages
 from Bot.checkers import haveAccess
 from Bot.rules import SearchCMD
-from Bot.utils import getIDFromMessage, getUserName, getUserNickname, getUserAccessLevel, getUserPremium, editMessage
+from Bot.utils import getIDFromMessage, getUserName, getUserNickname, getUserAccessLevel, getUserPremium, editMessage, \
+    getgpool, getpool
 from config.config import API
-from db import GPool, AccessLevel, ChatGroups, Ignore, ChatLimit, Notifs, Nickname
+from db import pool
 
 bl = BotLabeler()
 
@@ -32,12 +33,7 @@ async def gdelaccess(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    try:
-        pool = GPool.select().where(GPool.uid == GPool.get(GPool.chat_id == chat_id).uid).iterator()
-        pool = [i.chat_id for i in pool]
-        if len(pool) == 0:
-            raise
-    except:
+    if not (chats := await getgpool(chat_id)):
         msg = messages.chat_unbound()
         await message.reply(disable_mentions=1, message=msg)
         return
@@ -47,23 +43,22 @@ async def gdelaccess(message: Message):
     ch_nickname = await getUserNickname(id, chat_id)
     u_nickname = await getUserNickname(uid, chat_id)
 
-    msg = messages.gdelaccess_start(uid, u_name, u_nickname, id, name, ch_nickname, len(pool))
+    msg = messages.gdelaccess_start(uid, u_name, u_nickname, id, name, ch_nickname, len(chats))
     edit = await message.reply(disable_mentions=1, message=msg)
 
     success = 0
-    for chat_id in pool:
+    for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
-        ch_acc = await getUserAccessLevel(id, chat_id)
-        if ch_acc > u_acc or not await haveAccess('gdelaccess', chat_id, u_acc):
+        if not await haveAccess('gdelaccess', chat_id, u_acc) or await getUserAccessLevel(id, chat_id) > u_acc:
             continue
-
-        ac = AccessLevel.get_or_none(AccessLevel.uid == id, AccessLevel.chat_id == chat_id)
-        if ac is not None:
-            ac.delete_instance()
-            success += 1
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                if (await c.execute('delete from accesslvl where chat_id=%s and uid=%s', (chat_id, id))).rowcount:
+                    success += 1
+                    await conn.commit()
 
     nick = await getUserNickname(id, edit.peer_id - 2000000000)
-    msg = messages.gdelaccess(id, name, nick, len(pool), success)
+    msg = messages.gdelaccess(id, name, nick, len(chats), success)
     await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id, message=msg)
 
 
@@ -100,12 +95,7 @@ async def gsetaccess(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    try:
-        pool = GPool.select().where(GPool.uid == GPool.get(GPool.chat_id == chat_id).uid).iterator()
-        pool = [i.chat_id for i in pool]
-        if len(pool) == 0:
-            raise
-    except:
+    if not (chats := await getgpool(chat_id)):
         msg = messages.chat_unbound()
         await message.reply(disable_mentions=1, message=msg)
         return
@@ -115,23 +105,27 @@ async def gsetaccess(message: Message):
     u_nickname = await getUserNickname(uid, chat_id)
     ch_nickname = await getUserNickname(id, chat_id)
 
-    msg = messages.gsetaccess_start(uid, u_name, u_nickname, id, name, ch_nickname, len(pool))
+    msg = messages.gsetaccess_start(uid, u_name, u_nickname, id, name, ch_nickname, len(chats))
     edit = await message.reply(disable_mentions=1, message=msg)
     success = 0
-    for chat_id in pool:
+    for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
         ch_acc = await getUserAccessLevel(id, chat_id)
 
         if acc >= u_acc or ch_acc >= u_acc or ch_acc >= acc or not await haveAccess('gsetaccess', chat_id, u_acc):
             continue
 
-        ac = AccessLevel.get_or_create(uid=id, chat_id=chat_id)[0]
-        ac.access_level = acc
-        ac.save()
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                if not (await c.execute('update accesslvl set access_level = %s where chat_id=%s and uid=%s',
+                                        (acc, chat_id, id))).rowcount:
+                    await c.execute(
+                        'insert into accesslvl (uid, chat_id, access_level) values (%s, %s, %s)', (id, chat_id, acc))
+                await conn.commit()
         success += 1
 
     nick = await getUserNickname(id, edit.peer_id - 2000000000)
-    msg = messages.gsetaccess(id, name, nick, len(pool), success)
+    msg = messages.gsetaccess(id, name, nick, len(chats), success)
     await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
                             message=msg)
 
@@ -178,13 +172,7 @@ async def ssetaccess(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    try:
-        res = AccessLevel.get(AccessLevel.chat_id == chat_id, AccessLevel.access_level > 6)
-        pool = ChatGroups.select().where(ChatGroups.group == data[1], ChatGroups.uid == res.uid)
-        pool = [i.chat_id for i in pool]
-        if len(pool) == 0:
-            raise Exception
-    except:
+    if not (chats := await getpool(chat_id, data[1])):
         msg = messages.s_invalid_group(data[1])
         await message.reply(disable_mentions=1, message=msg)
         return
@@ -194,22 +182,26 @@ async def ssetaccess(message: Message):
     u_nickname = await getUserNickname(uid, chat_id)
     ch_nickname = await getUserNickname(id, chat_id)
 
-    msg = messages.ssetaccess_start(uid, u_name, u_nickname, id, name, ch_nickname, len(pool), data[1])
+    msg = messages.ssetaccess_start(uid, u_name, u_nickname, id, name, ch_nickname, len(chats), data[1])
     edit = await message.reply(disable_mentions=1, message=msg)
     success = 0
-    for chat_id in pool:
+    for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
         ch_acc = await getUserAccessLevel(id, chat_id)
         if acc >= u_acc or ch_acc >= u_acc or ch_acc >= acc or not await haveAccess('ssetaccess', chat_id, u_acc):
             continue
 
-        ac = AccessLevel.get_or_create(uid=id, chat_id=chat_id)[0]
-        ac.access_level = acc
-        ac.save()
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                if not (await c.execute('update accesslvl set access_level = %s where chat_id=%s and uid=%s',
+                                        (acc, chat_id, id))).rowcount:
+                    await c.execute(
+                        'insert into accesslvl (uid, chat_id, access_level) values (%s, %s, %s)', (id, chat_id, acc))
+                await conn.commit()
         success += 1
 
     ch_nick = await getUserNickname(id, edit.peer_id - 2000000000)
-    msg = messages.ssetaccess(id, name, ch_nick, len(pool), success)
+    msg = messages.ssetaccess(id, name, ch_nick, len(chats), success)
     await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
                             message=msg)
 
@@ -238,13 +230,7 @@ async def sdelaccess(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    try:
-        res = AccessLevel.get(AccessLevel.chat_id == chat_id, AccessLevel.access_level > 6)
-        pool = ChatGroups.select().where(ChatGroups.group == data[1], ChatGroups.uid == res.uid)
-        pool = [i.chat_id for i in pool]
-        if len(pool) == 0:
-            raise Exception
-    except:
+    if not (chats := await getpool(chat_id, data[1])):
         msg = messages.s_invalid_group(data[1])
         await message.reply(disable_mentions=1, message=msg)
         return
@@ -254,23 +240,22 @@ async def sdelaccess(message: Message):
     u_nickname = await getUserNickname(uid, chat_id)
     ch_nickname = await getUserNickname(id, chat_id)
 
-    msg = messages.sdelaccess_start(uid, u_name, u_nickname, id, name, ch_nickname, data[1], len(pool))
+    msg = messages.sdelaccess_start(uid, u_name, u_nickname, id, name, ch_nickname, data[1], len(chats))
     edit = await message.reply(disable_mentions=1, message=msg)
     success = 0
-    for chat_id in pool:
+    for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
-        ch_acc = await getUserAccessLevel(id, chat_id)
-
-        if ch_acc > u_acc or ch_acc == 0 or not await haveAccess('sdelaccess', chat_id, u_acc):
+        if not await haveAccess('sdelaccess', chat_id, u_acc) or await getUserAccessLevel(id, chat_id) > u_acc:
             continue
 
-        ac = AccessLevel.get_or_none(AccessLevel.uid == id, AccessLevel.chat_id == chat_id)
-        if ac is not None:
-            ac.delete_instance()
-            success += 1
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                if (await c.execute('delete from accesslvl where chat_id=%s and uid=%s', (chat_id, id))).rowcount:
+                    success += 1
+                    await conn.commit()
 
     nick = await getUserNickname(id, edit.peer_id - 2000000000)
-    msg = messages.sdelaccess(id, name, nick, len(pool), success)
+    msg = messages.sdelaccess(id, name, nick, len(chats), success)
     await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
                             message=msg)
 
@@ -302,7 +287,12 @@ async def ignore(message: Message):
         return
 
     name = await getUserName(id)
-    _ = Ignore.get_or_create(uid=id, chat_id=chat_id)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if await (await c.execute('select * from ignore where chat_id=%s and uid=%s',
+                                      (chat_id, id))).fetchone() is None:
+                await c.execute('insert into ignore (chat_id, uid) values (%s, %s)', (chat_id, id))
+                await conn.commit()
 
     nick = await getUserNickname(uid, chat_id)
     msg = messages.ignore(id, name, nick)
@@ -336,13 +326,13 @@ async def unignore(message: Message):
         return
 
     name = await getUserName(id)
-
-    ign = Ignore.get_or_none(Ignore.uid == id, Ignore.chat_id == chat_id)
-    if ign is None:
-        msg = messages.unignore_not_ignored()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-    ign.delete_instance()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if not (await c.execute('delete from ignore where chat_id=%s and uid=%s', (chat_id, id))).rowcount:
+                msg = messages.unignore_not_ignored()
+                await message.reply(disable_mentions=1, message=msg)
+                return
+            await conn.commit()
 
     nick = await getUserNickname(uid, chat_id)
     msg = messages.unignore(id, name, nick)
@@ -359,17 +349,16 @@ async def ignorelist(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    ign = Ignore.select().where(Ignore.chat_id == chat_id)
-    ids = []
-    for i in ign:
-        ids.append(str(i.uid))
-
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            ids = [i[0] for i in await (
+                await c.execute('select uid from ignore where chat_id=%s', (chat_id,))).fetchall()]
     raw_names = await API.users.get(user_ids=','.join(ids))
     names = []
     for i in raw_names:
         names.append(f'{i.first_name} {i.last_name}')
 
-    msg = messages.ignorelist(ign, names)
+    msg = messages.ignorelist(ids, names)
     await message.reply(disable_mentions=1, message=msg)
 
 
@@ -407,18 +396,18 @@ async def chatlimit(message: Message):
         st = 0
         tst = 0
 
-    chlim = ChatLimit.get_or_none(ChatLimit.chat_id == chat_id)
-    if chlim is not None:
-        lpos = chlim.time
-        chlim.time = st
-        chlim.save()
-    else:
-        lpos = 1
-        ChatLimit.create(chat_id=chat_id, time=st)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            chlim = await (await c.execute('select time from chatlimit where chat_id=%s', (chat_id,))).fetchone()
+            lpos = chlim[0] if chlim else 1
+            if chlim:
+                await c.execute('update chatlimit set time = %s where chat_id=%s', (st,))
+            else:
+                await c.execute('insert into chatlimit (chat_id, time) values (%s, %s)', (chat_id, st))
+            await conn.commit()
 
     name = await getUserName(uid)
     nick = await getUserNickname(uid, chat_id)
-
     msg = messages.chatlimit(uid, name, nick, tst, pfx, lpos)
     await message.reply(disable_mentions=1, message=msg)
 
@@ -454,20 +443,28 @@ async def notif(message: Message):
     data = message.text.split()
     if len(data) >= 2:
         name = ' '.join(data[1:])
-        notif = Notifs.get_or_none(Notifs.name == name)
-        if notif is not None:
-            msg = messages.notif_already_exist(notif.name)
-            await message.reply(disable_mentions=1, message=msg)
-            return
-        else:
-            Notifs.create(chat_id=chat_id, tag=1, every=-1, status=1, time=time.time() - 5,
-                          name=name, description='', text='')
-            msg = messages.notification(name, '', time.time(), -1, 1, 1)
-            kb = keyboard.notification(uid, 1, name)
-            await message.reply(disable_mentions=1, message=msg, keyboard=kb)
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                notif = (await (await c.execute('select count(*) as c from notifications where chat_id=%s and name=%s',
+                                                (chat_id, name))).fetchone())[0]
+                if not notif:
+                    await c.execute(
+                        "insert into notifications (chat_id, tag, every, status, time, name, description, text) "
+                        "values (%s, 1, -1, 1, %s, %s, '', '')", (chat_id, int(time.time() - 5), name))
+                    await conn.commit()
+                    msg = messages.notification(name, '', time.time(), -1, 1, 1)
+                    kb = keyboard.notification(uid, 1, name)
+                    await message.reply(disable_mentions=1, message=msg, keyboard=kb)
+                    return
+        msg = messages.notif_already_exist(notif.name)
+        await message.reply(disable_mentions=1, message=msg)
         return
-    activenotifs = [i for i in Notifs.select().where(Notifs.chat_id == chat_id, Notifs.status == 1)]
-    notifs = [i for i in Notifs.select().where(Notifs.chat_id == chat_id)]
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            activenotifs = (await (await c.execute(
+                'select count(*) as c from notifications where chat_id=%s and status=1', (chat_id,))).fetchone())[0]
+            notifs = (await (await c.execute(
+                'select count(*) as c from notifications where chat_id=%s', (chat_id,))).fetchone())[0]
     msg = messages.notif(notifs, activenotifs)
     kb = keyboard.notif(uid)
     await message.reply(disable_mentions=1, message=msg, keyboard=kb)
@@ -480,14 +477,17 @@ async def purge(message: Message):
     users = [i.member_id for i in (await API.messages.get_conversation_members(peer_id=message.peer_id)).items]
     dtdnicknames = 0
     dtdaccesslevels = 0
-    for i in Nickname.select().where(Nickname.chat_id == chat_id).iterator():
-        if i.uid not in users:
-            i.delete_instance()
-            dtdnicknames += 1
-    for i in AccessLevel.select().where(AccessLevel.chat_id == chat_id).iterator():
-        if i.uid not in users:
-            i.delete_instance()
-            dtdaccesslevels += 1
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            for i in await (await c.execute('select id, uid from nickname where chat_id=%s', (chat_id,))).fetchall():
+                if i[1] not in users:
+                    await c.execute('delete from nickname where id=%s', (i[0]))
+                    dtdnicknames += 1
+            for i in await (await c.execute('select id, uid from accesslvl where chat_id=%s', (chat_id,))).fetchall():
+                if i[1] not in users:
+                    await c.execute('delete from accesslvl where id=%s', (i[0]))
+                    dtdaccesslevels += 1
+            await conn.commit()
 
     msg = messages.purge_start()
     edit = await message.reply(disable_mentions=1, message=msg)

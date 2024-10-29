@@ -4,4 +4,4 @@ from django.forms import HiddenInput
 
 class CostForm(forms.Form):
     class Meta:
-        widgets = {'any_field': HiddenInput(),}
+        widgets = {'any_field': HiddenInput(), }
