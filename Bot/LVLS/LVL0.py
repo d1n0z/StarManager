@@ -197,7 +197,7 @@ async def report(message: Message):
 
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
-            repid = await (await c.execute('select id from reports order by id limit 1')).fetchone()
+            repid = await (await c.execute('select id from reports order by id desc limit 1')).fetchone()
             if repid:
                 repid = repid[0] + 1
             else:

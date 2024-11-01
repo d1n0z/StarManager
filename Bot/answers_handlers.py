@@ -246,8 +246,10 @@ async def queue_handler(event: MessageNew):
                     return
                 async with (await pool()).connection() as conn:
                     async with conn.cursor() as c:
-                        await c.execute(
-                            'update welcome set msg = %s where chat_id=%s', (event.object.message.text, chat_id))
+                        if not (await c.execute('update welcome set msg = %s where chat_id=%s',
+                                                (event.object.message.text, chat_id))).rowcount:
+                            await c.execute('insert into welcome (chat_id, msg) values (%s, %s)',
+                                            (chat_id, event.object.message.text))
                         await conn.commit()
             elif queue[3] == 'settings_set_welcome_photo':
                 if (len(event.object.message.attachments) == 0 or
@@ -260,10 +262,12 @@ async def queue_handler(event: MessageNew):
                     f.write(r.content)
                     f.close()
                 r.close()
+                photo = await uploadImage(f'{PATH}media/temp/{uid}welcome.jpg')
                 async with (await pool()).connection() as conn:
                     async with conn.cursor() as c:
-                        await c.execute('update welcome set photo = %s where chat_id=%s',
-                                        (await uploadImage(f'{PATH}media/temp/{uid}welcome.jpg'), chat_id))
+                        if not (await c.execute('update welcome set photo = %s where chat_id=%s',
+                                                (photo, chat_id))).rowcount:
+                            await c.execute('insert into welcome (chat_id, photo) values (%s, %s)', (chat_id, photo))
                         await conn.commit()
             elif queue[3] == 'settings_set_welcome_url':
                 async with (await pool()).connection() as conn:
@@ -294,8 +298,10 @@ async def queue_handler(event: MessageNew):
                     return
                 async with (await pool()).connection() as conn:
                     async with conn.cursor() as c:
-                        await c.execute('update welcome set url = %s, button_label = %s where chat_id=%s',
-                                        (text[-1], ' '.join(text[0:-1]), chat_id))
+                        if not (await c.execute('update welcome set url = %s, button_label = %s where chat_id=%s',
+                                                (text[-1], ' '.join(text[0:-1]), chat_id))).rowcount:
+                            await c.execute('insert into welcome (chat_id, url, button_label) values (%s, %s, %s)',
+                                            (chat_id, text[-1], ' '.join(text[0:-1])))
                         await conn.commit()
             msg = messages.get(f'{queue[3]}_done')
             kb = keyboard.settings_change_countable(uid, "main", "welcome", onlybackbutton=True)

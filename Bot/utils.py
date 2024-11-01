@@ -204,20 +204,20 @@ async def setChatMute(id: int | Iterable[int], chat_id: int, mute_time: int | fl
         return
 
 
-async def uploadImage(file: str) -> str | None:
+async def uploadImage(file: str, c: int = 0) -> str | None:
     bot = Bot(VK_TOKEN_GROUP)
     photo_uploader = PhotoMessageUploader(bot.api)
     try:
         photo = await photo_uploader.upload(file_source=file)
-        c = 0
-        while photo is None:
-            c += 1
-            if c == 6:
-                break
-            photo = await photo_uploader.upload(file_source=file)
+        if photo is None:
+            raise ValueError
+        if c == 6:
+            raise Exception
         return photo
-    except:
-        return None
+    except ValueError:
+        return await uploadImage(file, c + 1)
+    except Exception as e:
+        raise Exception('Uploading failed after 6 retries') from e
 
 
 async def getRegDate(id: int, format: str = '%d %B %Y', none: Any = 'Не удалось определить') -> str | Any:
@@ -494,16 +494,16 @@ async def addDailyTask(uid, task, count=1, checklvlbanned=True):
                 await c.execute('update tasksdaily set count=count+%s where uid=%s and task=%s', (count, uid, task))
             else:
                 await c.execute('insert into tasksdaily (uid, task, count) values (%s, %s, %s)', (uid, task, count))
-            t = t[0] if t else 0
-            if t + count == (TASKS_DAILY | PREMIUM_TASKS_DAILY)[task]:
-                if uid == 746110579:
-                    print(t + c, task)
-                if task in PREMIUM_TASKS_DAILY and await getUserPremium(uid):
-                    if not (await c.execute('update coins set coins=coins+10 where uid=%s', (uid,))).rowcount:
-                        await c.execute('insert into coins (uid, coins) values (%s, 10)', (uid,))
-                elif task in TASKS_WEEKLY:
-                    if not (await c.execute('update coins set coins=coins+5 where uid=%s', (uid,))).rowcount:
-                        await c.execute('insert into coins (uid, coins) values (%s, 5)', (uid,))
+            # t = t[0] if t else 0
+            # if t + count == (TASKS_DAILY | PREMIUM_TASKS_DAILY)[task]:
+            #     if uid == 746110579:
+            #         print(t + count, task)
+            #     if task in PREMIUM_TASKS_DAILY and await getUserPremium(uid):
+            #         if not (await c.execute('update coins set coins=coins+10 where uid=%s', (uid,))).rowcount:
+            #             await c.execute('insert into coins (uid, coins) values (%s, 10)', (uid,))
+            #     elif task in TASKS_DAILY:
+            #         if not (await c.execute('update coins set coins=coins+5 where uid=%s', (uid,))).rowcount:
+            #             await c.execute('insert into coins (uid, coins) values (%s, 5)', (uid,))
             await conn.commit()
 
 
@@ -518,12 +518,12 @@ async def addWeeklyTask(uid, task, count=1, checklvlbanned=True):
                                     (count, uid, task))).rowcount:
                 await c.execute('insert into tasksweekly (uid, task, count) values (%s, %s, %s)', (uid, task, count))
 
-            if ((await (await c.execute(
-                    'select count from tasksweekly where uid=%s and task=%s', (uid, task))).fetchone()
-                 )[0] == (TASKS_WEEKLY | PREMIUM_TASKS_WEEKLY)[task] and
-                    (task in TASKS_WEEKLY or (task in PREMIUM_TASKS_WEEKLY and await getUserPremium(uid)))):
-                if not (await c.execute('update coins set coins=coins+10 where uid=%s', (uid,))).rowcount:
-                    await c.execute('insert into coins (uid, coins) values (%s, 10)', (uid,))
+            # if ((await (await c.execute(
+            #         'select count from tasksweekly where uid=%s and task=%s', (uid, task))).fetchone()
+            #      )[0] == (TASKS_WEEKLY | PREMIUM_TASKS_WEEKLY)[task] and
+            #         (task in TASKS_WEEKLY or (task in PREMIUM_TASKS_WEEKLY and await getUserPremium(uid)))):
+            #     if not (await c.execute('update coins set coins=coins+10 where uid=%s', (uid,))).rowcount:
+            #         await c.execute('insert into coins (uid, coins) values (%s, 10)', (uid,))
             await conn.commit()
 
 

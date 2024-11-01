@@ -275,6 +275,7 @@ def load():
         {'key': 'settings_change_countable_format_error', 'text': '❌ Вы ввели неверные данные.'},
         {'key': 'settings_set_welcome_photo_not_photo', 'text': '❌ В вашем сообщении нет фотографии. Возможно, вы отправили изображение без сжатия.'},
         {'key': 'settings_set_welcome_text_empty_text_img', 'text': '❌ Нельзя установить кнопку с ссылкой без текста или изображения.'},
+        {'key': 'settings_set_welcome_text_no_text', 'text': '❌ Вы отправили пустое сообщение.'},
         {'key': 'settings_set_punishment', 'text': '⚙️ Вы успешно применили {punishment} в качестве наказания за нарушение.'},
         {'key': 'settings_set_welcome_url_no_url', 'text': '❌ Вы ввели неверный URL.'},
         {'key': 'settings_set_welcome_url_limit_text', 'text': '❌ Название кнопки не может быть длиннее 40 символов.'},

@@ -286,7 +286,7 @@ async def warn(message: Message):
         async with conn.cursor() as c:
             res = await (await c.execute('select warns, last_warns_times, last_warns_causes, last_warns_names, '
                                          'last_warns_dates from warn where chat_id=%s and uid=%s',
-                                         (chat_id, uid))).fetchone()
+                                         (chat_id, id))).fetchone()
     if res is not None:
         warns = res[0] + 1
         warn_times = literal_eval(res[1])

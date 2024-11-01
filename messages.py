@@ -2167,7 +2167,7 @@ def lock(time):
 
 
 def send_notification(text, tagging):
-    return get('send_notification', text=text, tagging=tagging)
+    return get('send_notification', text=text, tagging='' if tagging is True else tagging)
 
 
 def notif(notifs, activenotifs):

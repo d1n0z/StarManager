@@ -93,6 +93,8 @@ async def action_handle(event: MessageNew) -> None:
                         await c.execute('insert into typequeue (chat_id, uid, "type", additional) '
                                         'values (%s, %s, \'captcha\', \'{}\')', (chat_id, uid))
                         await conn.commit()
+                        if m:
+                            return
 
                 if s := await (await c.execute(
                         'select pos, pos2 from settings where chat_id=%s and setting=\'welcome\'',

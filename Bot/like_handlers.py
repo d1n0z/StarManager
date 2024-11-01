@@ -12,6 +12,8 @@ async def like_handle(event) -> None:
         uid = event.object.liker_id
         async with (await pool()).connection() as conn:
             async with conn.cursor() as c:
+                if await (await c.execute('select id from likes where uid=%s and post_id=%s', (uid, pid))).fetchone():
+                    return
                 await c.execute('insert into likes (uid, post_id) values (%s, %s)', (uid, pid))
                 await conn.commit()
         await addUserXP(uid, 200)

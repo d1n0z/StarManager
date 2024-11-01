@@ -161,7 +161,7 @@ async def duel(message: MessageEvent):
     await editMessage(msg, peer_id, message.conversation_message_id)
 
 
-@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['answer_report']))
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['answer_report'], checksender=False))
 async def answer_report(message: MessageEvent):
     payload = message.payload
     peer_id = message.object.peer_id

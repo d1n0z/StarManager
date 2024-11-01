@@ -28,6 +28,7 @@ async def deleteTempdataDB():
                 await c.execute('update xp set xp=0 where xp<0')
                 await conn.commit()
     except Exception as e:
+        traceback.print_exc()
         await sendMessage(DAILY_TO + 2000000000, f'e from schedule resetAntispamMessages:\n{e}')
 
 
@@ -70,6 +71,7 @@ async def dailyTasks():
                 await conn.commit()
         await sendMessage(DAILY_TO + 2000000000, 'daily tasks reset: 100%')
     except Exception as e:
+        traceback.print_exc()
         await sendMessage(DAILY_TO + 2000000000, f'e from schedule dailyTasks:\n{e}')
 
 
@@ -81,6 +83,7 @@ async def weeklyTasks():
                 await conn.commit()
         await sendMessage(DAILY_TO + 2000000000, 'weekly tasks reset: 100%')
     except Exception as e:
+        traceback.print_exc()
         await sendMessage(DAILY_TO + 2000000000, f'e from schedule everyday:\n{e}')
 
 
@@ -114,6 +117,7 @@ async def backup() -> None:
 
         await sendMessage(DAILY_TO + 2000000000, 'backup: 100%')
     except Exception as e:
+        traceback.print_exc()
         await sendMessage(DAILY_TO + 2000000000, f'e from schedule backup:\n{e}')
 
 
@@ -123,9 +127,9 @@ async def updateNames():
 
         async with (await pool()).connection() as conn:
             async with conn.cursor() as c:
-                users = chunks(c.execute('select uid from usernames'), 999)
-                chats = chunks(c.execute('select chat_id from chatnames'), 99)
-                groups = chunks(c.execute('select group_id from groupnames'), 499)
+                users = chunks(await (await c.execute('select uid from usernames')).fetchall(), 999)
+                chats = chunks(await (await c.execute('select chat_id from chatnames')).fetchall(), 99)
+                groups = chunks(await (await c.execute('select group_id from groupnames')).fetchall(), 499)
 
                 for i in users:
                     try:
@@ -154,6 +158,7 @@ async def updateNames():
                 await conn.commit()
         await sendMessage(DAILY_TO + 2000000000, 'update_names: 100%')
     except Exception as e:
+        traceback.print_exc()
         await sendMessage(DAILY_TO + 2000000000, f'e from schedule update_names:\n{e}')
 
 
@@ -171,6 +176,7 @@ async def reboot():
         os.system('sudo reboot')
         await sendMessage(DAILY_TO + 2000000000, 'reboot: 100%')
     except Exception as e:
+        traceback.print_exc()
         await sendMessage(DAILY_TO + 2000000000, f'e from schedule reboot:\n{e}')
 
 
@@ -214,6 +220,7 @@ async def new_season():
                 await conn.commit()
         await sendMessage(DAILY_TO + 2000000000, '@all new_season: 100%')
     except:
+        traceback.print_exc()
         await sendMessage(DAILY_TO + 2000000000, f'e from scheduler:\n' + traceback.format_exc())
 
 
@@ -221,10 +228,10 @@ async def everyminute():
     try:
         async with (await pool()).connection() as conn:
             async with conn.cursor() as c:
-                await c.execute('delete from premium where time<%s', (int(time.time(),)))
+                await c.execute('delete from premium where time<%s', (int(time.time()),))
                 unique = []
                 for cp in await (await c.execute(
-                        'select uid, chat_id from captcha where exptime<%s', (int(time.time())),)).fetchall():
+                        'select uid, chat_id from captcha where exptime<%s', (int(time.time()),))).fetchall():
                     try:
                         if cp in unique:
                             continue
@@ -232,7 +239,7 @@ async def everyminute():
                                             (cp[1], cp[0]))).rowcount:
                             unique.append(cp)
                             s = await (await c.execute(
-                                'select id, punishment from settings where chat_id=%s and setting=\'captcha\'', (cp[1])
+                                'select id, punishment from settings where chat_id=%s and setting=\'captcha\'', (cp[1],)
                             )).fetchone()
                             await punish(cp[0], cp[1], s[0])
                             await sendMessage(
@@ -242,6 +249,7 @@ async def everyminute():
                 await c.execute('delete from captcha where exptime<%s', (int(time.time()),))
                 await conn.commit()
     except:
+        traceback.print_exc()
         await sendMessage(DAILY_TO + 2000000000, f'e from scheduler:\n' + traceback.format_exc())
 
 
