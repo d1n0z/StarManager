@@ -3,6 +3,10 @@
 .__pycache__
 .config
 /config/config.ini
+/vkminiapp
+migrations/
+temp/
+tmp/
 dev
 *old.py
 *new.py
