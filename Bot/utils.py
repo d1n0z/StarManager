@@ -21,7 +21,7 @@ from vkbottle_types.objects import MessagesMessage, MessagesMessageAttachmentTyp
 
 from config.config import (API, VK_API_SESSION, VK_TOKEN_GROUP, GROUP_ID, TASKS_DAILY, PREMIUM_TASKS_DAILY,
                            PREMIUM_TASKS_DAILY_TIERS, TASKS_WEEKLY, PREMIUM_TASKS_WEEKLY, SETTINGS, PATH,
-                           NSFW_CATEGORIES, SETTINGS_ALT, SETTINGS_DEFAULTS, DEVS)
+                           NSFW_CATEGORIES, SETTINGS_ALT, SETTINGS_DEFAULTS, MAIN_DEVS)
 from db import pool
 
 
@@ -494,16 +494,14 @@ async def addDailyTask(uid, task, count=1, checklvlbanned=True):
                 await c.execute('update tasksdaily set count=count+%s where uid=%s and task=%s', (count, uid, task))
             else:
                 await c.execute('insert into tasksdaily (uid, task, count) values (%s, %s, %s)', (uid, task, count))
-            # t = t[0] if t else 0
-            # if t + count == (TASKS_DAILY | PREMIUM_TASKS_DAILY)[task]:
-            #     if uid == 746110579:
-            #         print(t + count, task)
-            #     if task in PREMIUM_TASKS_DAILY and await getUserPremium(uid):
-            #         if not (await c.execute('update coins set coins=coins+10 where uid=%s', (uid,))).rowcount:
-            #             await c.execute('insert into coins (uid, coins) values (%s, 10)', (uid,))
-            #     elif task in TASKS_DAILY:
-            #         if not (await c.execute('update coins set coins=coins+5 where uid=%s', (uid,))).rowcount:
-            #             await c.execute('insert into coins (uid, coins) values (%s, 5)', (uid,))
+            t = t[0] if t else 0
+            if t + count == (TASKS_DAILY | PREMIUM_TASKS_DAILY)[task] or t + count == PREMIUM_TASKS_DAILY_TIERS:
+                if (task in PREMIUM_TASKS_DAILY or task in PREMIUM_TASKS_DAILY_TIERS) and await getUserPremium(uid):
+                    if not (await c.execute('update coins set coins=coins+10 where uid=%s', (uid,))).rowcount:
+                        await c.execute('insert into coins (uid, coins) values (%s, 10)', (uid,))
+                elif task in TASKS_DAILY:
+                    if not (await c.execute('update coins set coins=coins+5 where uid=%s', (uid,))).rowcount:
+                        await c.execute('insert into coins (uid, coins) values (%s, 5)', (uid,))
             await conn.commit()
 
 
@@ -517,13 +515,12 @@ async def addWeeklyTask(uid, task, count=1, checklvlbanned=True):
             if not (await c.execute('update tasksweekly set count=count+%s where uid=%s and task=%s',
                                     (count, uid, task))).rowcount:
                 await c.execute('insert into tasksweekly (uid, task, count) values (%s, %s, %s)', (uid, task, count))
-
-            # if ((await (await c.execute(
-            #         'select count from tasksweekly where uid=%s and task=%s', (uid, task))).fetchone()
-            #      )[0] == (TASKS_WEEKLY | PREMIUM_TASKS_WEEKLY)[task] and
-            #         (task in TASKS_WEEKLY or (task in PREMIUM_TASKS_WEEKLY and await getUserPremium(uid)))):
-            #     if not (await c.execute('update coins set coins=coins+10 where uid=%s', (uid,))).rowcount:
-            #         await c.execute('insert into coins (uid, coins) values (%s, 10)', (uid,))
+            if ((await (await c.execute(
+                    'select count from tasksweekly where uid=%s and task=%s', (uid, task))).fetchone()
+            )[0] == (TASKS_WEEKLY | PREMIUM_TASKS_WEEKLY)[task] and
+                    (task in TASKS_WEEKLY or (task in PREMIUM_TASKS_WEEKLY and await getUserPremium(uid)))):
+                if not (await c.execute('update coins set coins=coins+10 where uid=%s', (uid,))).rowcount:
+                    await c.execute('insert into coins (uid, coins) values (%s, 10)', (uid,))
             await conn.commit()
 
 
@@ -599,6 +596,8 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings):
 
 
 async def speccommandscheck(uid: int, cmd: str, cd: int) -> int | bool:
+    if uid in MAIN_DEVS:
+        return False
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             if s := await (await c.execute('select time from speccommandscooldown where uid=%s and time>%s and cmd=%s',

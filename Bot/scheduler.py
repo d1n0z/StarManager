@@ -189,7 +189,7 @@ async def new_season():
         season_end = now.replace(day=ld).strftime('%d.%m.%Y')
         async with (await pool()).connection() as conn:
             async with conn.cursor() as c:
-                top = await (await c.execute('select uid from xp where uid>1 order by xp desc limit 10')).fetchall()
+                top = await (await c.execute('select uid, xp from xp where uid>1 order by xp desc limit 10')).fetchall()
                 for k, i in enumerate(top):
                     if not (await c.execute('update premium set time=time+%s where uid=%s',
                                             (NEWSEASON_REWARDS[k] * 86400, i[0]))).rowcount:

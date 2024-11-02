@@ -1250,7 +1250,8 @@ async def task(message: MessageEvent):
     await editMessage(msg, peer_id, message.conversation_message_id, kb)
 
 
-@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['task_trade']))
+# @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['task_trade']))
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['task_trade'], answer=False))
 async def task_trade(message: MessageEvent):
     uid = message.user_id
     peer_id = message.peer_id

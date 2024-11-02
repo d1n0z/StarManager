@@ -1887,6 +1887,10 @@ def ignore_hint():
     return get('ignore_hint')
 
 
+def ignore_higher():
+    return get('ignore_higher')
+
+
 def ignore_not_found():
     return get('ignore_not_found')
 
@@ -2396,7 +2400,7 @@ def newseason_top(top, reward):
 async def newseason_post(top, season_start, season_end):
     msg = get('newseason_post_f')
     for i in top:
-        msg += f'[id{i.uid}|{await getUserName(i.uid)}] - {await getUserLVL(i.xp)} уровень\n'
+        msg += f'[id{i[0]}|{await getUserName(i[0])}] - {await getUserLVL(i[1])} уровень\n'
     msg += get('newseason_post_s', season_start=season_start, season_end=season_end)
     return msg
 

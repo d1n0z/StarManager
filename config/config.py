@@ -1,4 +1,3 @@
-import pathlib
 from ast import literal_eval
 
 from vk_api import vk_api

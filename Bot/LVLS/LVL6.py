@@ -270,15 +270,13 @@ async def ignore(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    data = message.text.split()
-    if len(data) != 2:
-        msg = messages.ignore_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
     id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
         msg = messages.ignore_hint()
+        await message.reply(disable_mentions=1, message=msg)
+        return
+    if await getUserAccessLevel(uid, chat_id) <= await getUserAccessLevel(id, chat_id):
+        msg = messages.ignore_higher()
         await message.reply(disable_mentions=1, message=msg)
         return
     if id < 0:
