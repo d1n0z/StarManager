@@ -181,7 +181,6 @@ TASKS_LOTS = {5: 1, 20: 5, 40: 10, 80: 3}
 DEVS = literal_eval(config['SERVICE']['DEVS'])
 ADMINS = literal_eval(config['SERVICE']['ADMINS'])
 MAIN_DEVS = literal_eval(config['SERVICE']['MAIN_DEVS'])
-DEVS_COLORS = literal_eval(config['SERVICE']['DEVS_COLORS'])
 
 PREFIX = ["/", "!", ".", "+"]
 
@@ -324,6 +323,10 @@ SETTINGS_COUNTABLE_CHANGEPUNISHMENTMESSAGE = {
     "mute": "мут на {count} минут",
     "ban": "бан на {count} дней",
 }
+
+PREMMENU = ["clear_by_fire", "border_color"]
+PREMMENU_DEFAULT = {"clear_by_fire": True, "border_color": None}
+PREMMENU_TURN = ["clear_by_fire"]
 
 TASKS = []
 

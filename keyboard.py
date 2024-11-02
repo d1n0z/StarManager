@@ -1,7 +1,8 @@
 from vkbottle import Keyboard, Callback, OpenLink, KeyboardButtonColor
 
 from config.config import (TASKS_LOTS, SETTINGS_POSITIONS, SETTINGS_COUNTABLE_CHANGEMENU, SETTINGS_COUNTABLE,
-                           SETTINGS_COUNTABLE_NO_CATEGORY, SETTINGS_COUNTABLE_PUNISHMENT_NO_DELETE_MESSAGE)
+                           SETTINGS_COUNTABLE_NO_CATEGORY, SETTINGS_COUNTABLE_PUNISHMENT_NO_DELETE_MESSAGE,
+                           PREMMENU_TURN)
 
 
 def join(chid):
@@ -344,9 +345,20 @@ def premmenu(uid, settings):
         k += 1
         if i:
             color = KeyboardButtonColor.POSITIVE
-        else:
+        elif i is not None:
             color = KeyboardButtonColor.NEGATIVE
-        kb.add(Callback(f'{k}', {"uid": uid, "cmd": f"{e}", "setting": i}), color)
+        else:
+            color = KeyboardButtonColor.PRIMARY
+        kb.add(Callback(f'{k}', {"uid": uid, "cmd": "premmenu_turn" if e in PREMMENU_TURN else "premmenu_action",
+                                 "setting": e, "pos": i}), color)
+
+    return kb.get_json()
+
+
+def premmenu_back(uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback(f'Назад', {"uid": uid, "cmd": "premmenu"}))
 
     return kb.get_json()
 

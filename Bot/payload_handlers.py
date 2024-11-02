@@ -17,7 +17,7 @@ from Bot.tgbot import tgbot
 from Bot.utils import sendMessageEventAnswer, editMessage, getUserAccessLevel, getUserXP, getUserPremium, addUserXP, \
     getUserName, getUserNickname, kickUser, getXPTop, getChatName, addWeeklyTask, \
     addDailyTask, getUserBan, getUserWarns, getUserMute, getULvlBanned, getChatSettings, turnChatSetting, \
-    deleteMessages, setChatMute, getChatAltSettings, getChatMembers, getChatOwner
+    deleteMessages, setChatMute, getChatAltSettings, getChatMembers, getChatOwner, getUserPremmenuSettings
 from config.config import API, COMMANDS, DEVS, TASKS_LOTS, TASKS_DAILY, PREMIUM_TASKS_DAILY, SETTINGS_COUNTABLE, \
     TG_CHAT_ID, TG_NEWCHAT_THREAD_ID, SETTINGS_PREMIUM
 from db import pool
@@ -180,6 +180,60 @@ async def answer_report(message: MessageEvent):
     msg = messages.report_answering(repid)
     await editMessage(msg, peer_id, message.conversation_message_id)
     await API.messages.mark_as_important(message_ids=message.conversation_message_id, important=1)
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['premmenu']))
+async def premmenu(message: MessageEvent):
+    uid = message.user_id
+    peer_id = message.peer_id
+    settings = await getUserPremmenuSettings(uid)
+    msg = messages.premmenu(settings)
+    kb = keyboard.premmenu(uid, settings)
+    await editMessage(msg, peer_id, message.conversation_message_id, kb)
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['premmenu_turn']))
+async def premmenu_turn(message: MessageEvent):
+    uid = message.user_id
+    peer_id = message.peer_id
+    payload = message.payload
+    setting = payload['setting']
+    pos = payload['pos']
+
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            await c.execute('update premmenu set pos = %s where uid=%s and setting=%s',
+                            (int(not bool(pos)), uid, setting))
+    settings = await getUserPremmenuSettings(uid)
+    msg = messages.premmenu(settings)
+    kb = keyboard.premmenu(uid, settings)
+    await editMessage(msg, peer_id, message.conversation_message_id, kb)
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['premmenu_action']))
+async def premmenu_action(message: MessageEvent):
+    uid = message.user_id
+    peer_id = message.peer_id
+    chat_id = peer_id - 2000000000
+    payload = message.payload
+    setting = payload['setting']
+
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if (await c.execute("delete from premmenu where uid=%s and setting=%s and value is not null and value!=''",
+                                (uid, setting))).rowcount:
+                await conn.commit()
+                settings = await getUserPremmenuSettings(uid)
+                msg = messages.premmenu(settings)
+                kb = keyboard.premmenu(uid, settings)
+                await editMessage(msg, peer_id, message.conversation_message_id, kb)
+                return
+            await c.execute(
+                'insert into typequeue (chat_id, uid, type, additional) values (%s, %s, %s, %s)',
+                (chat_id, uid, f'premmenu_action_{setting}', '{}'))
+            await conn.commit()
+            msg = messages.premmenu_action(setting)
+            await editMessage(msg, peer_id, message.conversation_message_id)
 
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['settings_menu']))

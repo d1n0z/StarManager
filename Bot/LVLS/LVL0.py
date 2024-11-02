@@ -16,7 +16,7 @@ from Bot.utils import (getIDFromMessage, getUserName, getRegDate, kickUser, getU
                        getUserLastMessage, getUserMute, getUserBan, getUserXP, getUserLVL, getUserNeededXP,
                        getUserPremium, getXPTop, uploadImage, addUserXP, isChatAdmin, getUserWarns, getUserMessages,
                        setUserAccessLevel, getChatName, addWeeklyTask, getULvlBanned, getChatSettings, deleteMessages,
-                       speccommandscheck)
+                       speccommandscheck, getUserPremmenuSettings, getUserPremmenuSetting)
 from config.config import (API, LVL_NAMES, PATH, REPORT_CD, REPORT_TO, COMMANDS, PREMIUM_TASKS_DAILY, TASKS_DAILY,
                            TG_CHAT_ID, TG_TRANSFER_THREAD_ID)
 from db import pool
@@ -160,14 +160,11 @@ async def stats(message: Message):
             invites = await (await c.execute(
                 'select count(*) as c from refferal where from_id=%s and chat_id=%s',
                 (id, chat_id))).fetchone()
-    date = await getRegDate(id, '%d.%m.%Y', 'Неизвестно')
-    name = await getUserName(id)
-    warns = await getUserWarns(id, chat_id)
-    messages_count = await getUserMessages(id, chat_id)
-    access_level = await getUserAccessLevel(id, chat_id)
-    nickname = await getUserNickname(id, chat_id)
-    statsimg = await createStatsImage(warns, messages_count, id, access_level, nickname, date, last_message, prem, xp,
-                                      userlvl, invites[0], name, top, mute, ban, lvl_name, neededxp)
+    statsimg = await createStatsImage(
+        await getUserWarns(id, chat_id), await getUserMessages(id, chat_id), id, await getUserAccessLevel(id, chat_id),
+        await getUserNickname(id, chat_id), await getRegDate(id, '%d.%m.%Y', 'Неизвестно'), last_message, prem, xp,
+        userlvl, invites[0], await getUserName(id), top, mute, ban, lvl_name, neededxp,
+        await getUserPremmenuSetting(id, 'border_color', False))
     await deleteMessages(reply.conversation_message_id, chat_id)
     await message.reply(disable_mentions=1, attachment=await uploadImage(statsimg))
 
@@ -373,15 +370,7 @@ async def premmenu(message: Message):
         msg = messages.no_prem()
         await message.reply(disable_mentions=1, message=msg)
         return
-    settings = {}
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            pm = await (await c.execute(
-                'select pos from premmenu where uid=%s and setting=%s', (uid, 'clear_by_fire'))).fetchone()
-    settings['clear_by_fire'] = True
-    if pm is not None:
-        settings['clear_by_fire'] = pm[0]
-    settings['border_color'] = True
+    settings = await getUserPremmenuSettings(uid)
     msg = messages.premmenu(settings)
     kb = keyboard.premmenu(uid, settings)
     await message.reply(disable_mentions=1, message=msg, keyboard=kb)

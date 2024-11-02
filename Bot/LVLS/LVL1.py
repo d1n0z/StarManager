@@ -420,7 +420,7 @@ async def snick(message: Message):
 
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
-            if not (await c.execute('update nickname set nickname = %s where chat_id=%s and chat_id=%s',
+            if not (await c.execute('update nickname set nickname = %s where chat_id=%s and uid=%s',
                                     (nickname, chat_id, id))).rowcount:
                 await c.execute(
                     'insert into nickname (uid, chat_id, nickname) VALUES (%s, %s, %s)', (id, chat_id, nickname))

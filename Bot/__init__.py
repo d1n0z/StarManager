@@ -1,7 +1,6 @@
 import asyncio
 import traceback
 
-import vkbottle.api.response_validator
 from pydantic.v1 import ValidationError
 from vkbottle import Bot, GroupEventType, GroupTypes, VKAPIError, LoopWrapper
 from vkbottle.framework.labeler import BotLabeler

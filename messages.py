@@ -1815,8 +1815,16 @@ def premmenu(settings):
             else:
                 msg += '| ❌'
         elif e == 'border_color':
-            msg += f'\n[{k}]. Смена цвета рамки в /stats | 🛠 В разработке'
+            msg += f'\n[{k}]. Смена цвета рамки в /stats | {i if i else "Выкл."}'
     return msg
+
+
+def premmenu_action(setting):
+    return get(f'premmenu_action_{setting}')
+
+
+def premmenu_action_complete(setting, value):
+    return get(f'premmenu_action_complete_{setting}', value=value)
 
 
 def prefix():

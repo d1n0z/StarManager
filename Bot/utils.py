@@ -21,7 +21,7 @@ from vkbottle_types.objects import MessagesMessage, MessagesMessageAttachmentTyp
 
 from config.config import (API, VK_API_SESSION, VK_TOKEN_GROUP, GROUP_ID, TASKS_DAILY, PREMIUM_TASKS_DAILY,
                            PREMIUM_TASKS_DAILY_TIERS, TASKS_WEEKLY, PREMIUM_TASKS_WEEKLY, SETTINGS, PATH,
-                           NSFW_CATEGORIES, SETTINGS_ALT, SETTINGS_DEFAULTS, MAIN_DEVS)
+                           NSFW_CATEGORIES, SETTINGS_ALT, SETTINGS_DEFAULTS, MAIN_DEVS, PREMMENU_DEFAULT, PREMMENU_TURN)
 from db import pool
 
 
@@ -32,6 +32,8 @@ async def getUserName(uid: int) -> str:
             if name := await name.fetchone():
                 return name[0]
             name = await API.users.get(user_ids=uid)
+            if not name:
+                return 'UNKNOWN'
             await c.execute('insert into usernames (uid, name) values (%s, %s)',
                             (uid, f"{name[0].first_name} {name[0].last_name}"))
             await conn.commit()
@@ -380,10 +382,30 @@ async def getUserPremium(uid, none=0) -> int:
 async def getUserPremmenuSetting(uid, setting, none):
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
-            if pm := await (await c.execute('select pos from premmenu where uid=%s and setting=%s',
-                                            (uid, setting))).fetchone():
-                return pm[0]
+            if setting in PREMMENU_TURN:
+                if pm := await (await c.execute('select pos from premmenu where uid=%s and setting=%s',
+                                                (uid, setting))).fetchone():
+                    return pm[0]
+            else:
+                if pm := await (await c.execute('select "value" from premmenu where uid=%s and setting=%s',
+                                                (uid, setting))).fetchone():
+                    return pm[0]
             return none
+
+
+async def getUserPremmenuSettings(uid):
+    settings = PREMMENU_DEFAULT.copy()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            clear_by_fire = await (await c.execute(
+                'select pos from premmenu where uid=%s and setting=%s', (uid, 'clear_by_fire'))).fetchone()
+            if clear_by_fire is not None:
+                settings['clear_by_fire'] = clear_by_fire[0]
+            border_color = await (await c.execute(
+                'select "value" from premmenu where uid=%s and setting=%s', (uid, 'border_color'))).fetchone()
+            if border_color is not None:
+                settings['border_color'] = border_color[0]
+    return settings
 
 
 async def getChatCommandLevel(chat_id, cmd, none):
@@ -796,3 +818,9 @@ async def getpool(chat_id, group):
         return chats
     except:
         return False
+
+
+def hex_to_rgb(value):
+    value = value.lstrip('#')
+    lv = len(value)
+    return tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))

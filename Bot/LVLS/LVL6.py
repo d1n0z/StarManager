@@ -307,12 +307,6 @@ async def unignore(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    data = message.text.split()
-    if len(data) != 2:
-        msg = messages.unignore_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
     id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
         msg = messages.ignore_hint()

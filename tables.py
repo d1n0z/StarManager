@@ -227,7 +227,8 @@ class XP(Model):
 class PremMenu(Model):
     uid = IntegerField(default=0, index=True)
     setting = TextField(null=True)
-    pos = IntegerField(default=0)
+    pos = IntegerField(null=True)
+    value = TextField(null=True)
 
     class Meta:
         database = dbhandle

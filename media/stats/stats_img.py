@@ -1,12 +1,12 @@
 import time
-import traceback
+from ast import literal_eval
 
 from PIL import Image, ImageDraw, ImageFont
-from config.config import PATH, DEVS_COLORS
+from config.config import PATH
 
 
 async def createStatsImage(warns, messages, uid, access_level, nickname, reg_date, last_activity, prem, xp, userlvl,
-                           invites, name, top, mute, ban, lvl_name, neededxp):
+                           invites, name, top, mute, ban, lvl_name, neededxp, color):
     pss = list('xxx')
     if warns > 0:
         pss[2] = 'w'
@@ -41,28 +41,30 @@ async def createStatsImage(warns, messages, uid, access_level, nickname, reg_dat
     if nickname is not None:
         draw.text((img.size[0] // 2, 366), f'{nickname}', font=font, fill=(255, 255, 255), anchor='ma')
 
-    if access_level == 1:
-        color = (37, 72, 161)
-    elif access_level == 2:
-        color = (67, 64, 238)
-    elif access_level == 3:
-        color = (5, 0, 255)
-    elif access_level == 4:
-        color = (56, 157, 48)
-    elif access_level == 5:
-        color = (255, 107, 0)
-    elif access_level == 6:
-        color = (87, 0, 155)
-    elif access_level == 7:
-        color = (181, 86, 255)
-    elif access_level == 8:
+    if color:
         try:
-            color = DEVS_COLORS[uid]
+            color = literal_eval(color)
         except:
-            traceback.print_exc()
+            color = False
+    if not color:
+        if access_level == 1:
+            color = (37, 72, 161)
+        elif access_level == 2:
+            color = (67, 64, 238)
+        elif access_level == 3:
+            color = (5, 0, 255)
+        elif access_level == 4:
+            color = (56, 157, 48)
+        elif access_level == 5:
+            color = (255, 107, 0)
+        elif access_level == 6:
+            color = (87, 0, 155)
+        elif access_level == 7:
+            color = (181, 86, 255)
+        elif access_level == 8:
             color = (255, 0, 0)
-    else:
-        color = (84, 84, 84)
+        else:
+            color = (84, 84, 84)
 
     draw.text((img.size[0] // 2, 408), f'{lvl_name}', font=font, fill=(255, 255, 255), anchor='ma')
 
