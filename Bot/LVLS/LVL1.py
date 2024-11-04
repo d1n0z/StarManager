@@ -31,14 +31,9 @@ async def kick(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    if id > 0:
-        kicking_acc = await getUserAccessLevel(id, chat_id)
-        kicking_name = await getUserName(id)
-        kicking_nick = await getUserNickname(id, chat_id)
-    else:
-        kicking_acc = 0
-        kicking_name = await getGroupName(id)
-        kicking_nick = None
+    kicking_acc = await getUserAccessLevel(id, chat_id)
+    kicking_name = await getUserName(id)
+    kicking_nick = await getUserNickname(id, chat_id)
 
     if await isChatAdmin(id, chat_id):
         msg = messages.kick_access(id, kicking_name, kicking_nick)
@@ -344,23 +339,21 @@ async def clear(message: Message):
         msg = messages.clear_hint()
         await message.reply(disable_mentions=1, message=msg)
         return
-    name = await API.users.get(user_ids=u_ids)
     u_name = await getUserName(uid)
-    names = []
-    for i in name:
-        names.append(f"{i.first_name} {i.last_name}")
+    names = {}
+    for i in u_ids:
+        names[i] = await getUserName(int(i))
 
     for ind, i in enumerate(u_ids):
         if int(i) < 0:
             continue
         if await getUserAccessLevel(uid, chat_id) < await getUserAccessLevel(i, chat_id):
-            u_ids.pop(ind)
             cmids.pop(ind)
 
     if len(cmids) > 0:
         try:
             await API.messages.delete(peer_id=2000000000 + chat_id, cmids=cmids, delete_for_all=True)
-            msg = messages.clear(names, u_ids, u_name, uid)
+            msg = messages.clear(names, u_name, uid)
             await message.reply(disable_mentions=1, message=msg)
         except VKAPIError[15]:
             msg = messages.clear_admin()
@@ -371,11 +364,6 @@ async def clear(message: Message):
     else:
         msg = messages.clear_higher()
         await message.reply(disable_mentions=1, message=msg)
-
-    for i in u_ids:
-        if int(i) < 0:
-            msg = messages.clear_hint()
-            await message.reply(disable_mentions=1, message=msg)
 
 
 @bl.chat_message(SearchCMD('snick'))

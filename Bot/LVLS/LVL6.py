@@ -473,11 +473,11 @@ async def purge(message: Message):
         async with conn.cursor() as c:
             for i in await (await c.execute('select id, uid from nickname where chat_id=%s', (chat_id,))).fetchall():
                 if i[1] not in users:
-                    await c.execute('delete from nickname where id=%s', (i[0]))
+                    await c.execute('delete from nickname where id=%s', (i[0],))
                     dtdnicknames += 1
             for i in await (await c.execute('select id, uid from accesslvl where chat_id=%s', (chat_id,))).fetchall():
                 if i[1] not in users:
-                    await c.execute('delete from accesslvl where id=%s', (i[0]))
+                    await c.execute('delete from accesslvl where id=%s', (i[0],))
                     dtdaccesslevels += 1
             await conn.commit()
 

@@ -21,6 +21,7 @@ LVL_NAMES = ["Обычный Пользователь", "Смотрящий", "�
 COMMANDS = {
     "start": 0, "help": 0, "id": 0, "stats": 0, "report": 0, "mtop": 0, "q": 0, "premium": 0, "bonus": 0, "transfer": 0,
     "duel": 0, "cmd": 0, "premmenu": 0, "test": 0, "task": 0, "getdev": 0, "anon": 0, "chatid": 0, "prefix": 0,
+    "deanon": 0,
 
     "kick": 1, "mute": 1, "warn": 1, "clear": 1, "staff": 1, "olist": 1, "getnick": 1, "snick": 1, "rnick": 1,
     "nlist": 1, "check": 1, "mkick": 1,
@@ -99,6 +100,7 @@ COMMANDS_DESC = {
     "gdelaccess": "/gdelaccess - Снять уровень прав пользователю глобально.",
     "ssetaccess": "/ssetaccess - Выдать уровень прав пользователю в группе бесед.",
     "sdelaccess": "/sdelaccess - Снять уровень прав пользователю в группе бесед.",
+    "settings": "/settings - Настройки беседы.",
     "mygroups": "/mygroups - Список созданных групп.",
     "creategroup": "/creategroup - Создать группу бесед.",
     "delgroup": "/delgroup - Удалить группу бесед.",

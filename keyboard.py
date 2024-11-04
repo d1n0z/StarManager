@@ -59,6 +59,9 @@ def nnlist(uid, page, count):
 def mutelist(uid, page, count):
     kb = Keyboard(inline=True)
 
+    if count:
+        kb.add(Callback('Снять все муты', {"cmd": "mutelist_delall", "uid": uid}), KeyboardButtonColor.POSITIVE)
+        kb.row()
     if page != 0:
         kb.add(Callback('⏪', {"cmd": "prev_page_mutelist", "page": page - 1, "uid": uid}), KeyboardButtonColor.NEGATIVE)
     if count > (30 * (page + 1)):
@@ -70,6 +73,9 @@ def mutelist(uid, page, count):
 def warnlist(uid, page, count):
     kb = Keyboard(inline=True)
 
+    if count:
+        kb.add(Callback('Снять все варны', {"cmd": "warnlist_delall", "uid": uid}), KeyboardButtonColor.POSITIVE)
+        kb.row()
     if page != 0:
         kb.add(Callback('⏪', {"cmd": "prev_page_warnlist", "page": page - 1, "uid": uid}), KeyboardButtonColor.NEGATIVE)
     if count > 30:
@@ -81,6 +87,9 @@ def warnlist(uid, page, count):
 def banlist(uid, page, count):
     kb = Keyboard(inline=True)
 
+    if count:
+        kb.add(Callback('Снять все баны', {"cmd": "banlist_delall", "uid": uid}), KeyboardButtonColor.POSITIVE)
+        kb.row()
     if page != 0:
         kb.add(Callback('⏪', {"cmd": "prev_page_banlist", "page": page, "uid": uid}), KeyboardButtonColor.NEGATIVE)
     if count > (30 * (page + 1)):

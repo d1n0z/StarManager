@@ -125,7 +125,6 @@ async def duel(message: MessageEvent):
     elif uxp < duelxp:
         await message.show_snackbar("У вашего соперника недостаточно XP")
         return
-    await sendMessageEventAnswer(message.event_id, id, peer_id)
 
     rid = (id, uid)[int.from_bytes(os.urandom(1)) % 2]
     if rid == id:
@@ -144,21 +143,24 @@ async def duel(message: MessageEvent):
         async with conn.cursor() as c:
             if not (await c.execute('update duelwins set wins=wins+1 where uid=%s', (winid,))).rowcount:
                 await c.execute('insert into duelwins (uid, wins) values (%s, 1)', (winid,))
-            await conn.commit()
-    await addWeeklyTask(winid, 'duelwin')
-    await addDailyTask(winid, 'duelwin')
+            await addWeeklyTask(winid, 'duelwin')
+            await addDailyTask(winid, 'duelwin')
 
-    await addUserXP(winid, xtw)
-    await addUserXP(loseid, -duelxp)
+            await addUserXP(winid, xtw)
+            await addUserXP(loseid, -duelxp)
 
-    uname = await getUserName(winid)
-    name = await getUserName(loseid)
+            uname = await getUserName(winid)
+            name = await getUserName(loseid)
 
-    unick = await getUserNickname(winid, chat_id)
-    nick = await getUserNickname(loseid, chat_id)
+            unick = await getUserNickname(winid, chat_id)
+            nick = await getUserNickname(loseid, chat_id)
 
-    msg = messages.duel_res(winid, uname, unick, loseid, name, nick, xtw, u_premium)
-    await editMessage(msg, peer_id, message.conversation_message_id)
+            msg = messages.duel_res(winid, uname, unick, loseid, name, nick, xtw, u_premium)
+            if await editMessage(msg, peer_id, message.conversation_message_id):
+                await conn.commit()
+                await sendMessageEventAnswer(message.event_id, id, peer_id)
+            else:
+                await conn.rollback()
 
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['answer_report'], checksender=False))
@@ -658,6 +660,35 @@ async def page_banlist(message: MessageEvent):
     msg = await messages.banlist(res, names, banned_count)
     kb = keyboard.banlist(uid, page, banned_count)
     await editMessage(msg, peer_id, message.conversation_message_id, kb)
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent,
+              SearchPayloadCMD(['mutelist_delall', 'warnlist_delall', 'banlist_delall'], answer=False))
+async def punishlist_delall(message: MessageEvent):
+    payload = message.payload
+    cmd: str = payload['cmd']
+    uid = message.object.user_id
+    peer_id = message.object.peer_id
+    chat_id = peer_id - 2000000000
+
+    if await getUserAccessLevel(uid, chat_id) < 6:
+        await message.show_snackbar('❌ Для данной функции требуется 6 уровень прав')
+        return
+    await sendMessageEventAnswer(message.event_id, uid, peer_id)
+
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if cmd.startswith('mute'):
+                await c.execute('update mute set mute=0 where chat_id=%s', (chat_id,))
+            elif cmd.startswith('warn'):
+                await c.execute('update warn set warns=0 where chat_id=%s', (chat_id,))
+            elif cmd.startswith('ban'):
+                await c.execute('update ban set ban=0 where chat_id=%s', (chat_id,))
+            else:
+                raise Exception('cmd.startswith(mute or warn or ban)')
+            await conn.commit()
+    msg = await messages.punishlist_delall_done(cmd.replace('list_delall', ''))
+    await editMessage(msg, peer_id, message.conversation_message_id)
 
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent,

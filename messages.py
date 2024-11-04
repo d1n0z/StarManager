@@ -259,10 +259,10 @@ def unwarn_myself():
     return get('unwarn_myself')
 
 
-def clear(names, u_ids, u_name, uid):
+def clear(names, u_name, uid):
     users = []
-    for ind, item in enumerate(names):
-        user = f"[id{u_ids[ind]}|{item}]"
+    for uid, name in names.items():
+        user = f"[{'id' if int(uid) > 0 else 'club'}{uid}|{name}]"
         if user not in users:
             users.append(user)
     users = ", ".join(users)
@@ -582,7 +582,7 @@ def setacc_higher():
     return get('setacc_higher')
 
 
-def setacc(uid, u_name, u_nick, acc, id, name, nick):
+def setacc(uid, u_name, u_nick, acc, id, name, nick, lvlname=None):
     if u_nick is not None:
         u_n = f'[id{uid}|{u_nick}]'
     else:
@@ -591,7 +591,7 @@ def setacc(uid, u_name, u_nick, acc, id, name, nick):
         n = f'[id{id}|{nick}]'
     else:
         n = f'[id{id}|{name}]'
-    acc = LVL_NAMES[acc]
+    acc = LVL_NAMES[acc] if lvlname is None else lvlname
     return get('setacc', u_n=u_n, acc=acc, n=n)
 
 
@@ -2736,3 +2736,7 @@ def captcha_punish(uid, n, punishment):
 
 def captcha_pass(uid, n, date):
     return get('captcha_pass', uid=uid, n=n, date=date)
+
+
+def punishlist_delall_done(punish):
+    return get('punishlist_delall_done', punish={"mute": "муты", "ban": "баны", "warn": "варны"}[punish])

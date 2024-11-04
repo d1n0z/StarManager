@@ -544,3 +544,9 @@ async def task(message: Message):
 async def anon(message: Message):
     msg = messages.anon_not_pm()
     await message.reply(msg, disable_mentions=1)
+
+
+@bl.chat_message(SearchCMD('deanon'))
+async def deanon(message: Message):
+    msg = messages.anon_not_pm()
+    await message.reply(msg, disable_mentions=1)

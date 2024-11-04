@@ -6,7 +6,8 @@ from vkbottle.framework.labeler import BotLabeler
 import keyboard
 import messages
 from Bot.rules import SearchCMD
-from Bot.utils import getIDFromMessage, getUserAccessLevel, getUserNickname, getUserMute, getUserName, setChatMute
+from Bot.utils import getIDFromMessage, getUserAccessLevel, getUserNickname, getUserMute, getUserName, setChatMute, \
+    getChatAccessName
 from config.config import API, MAIN_DEVS, DEVS
 from db import pool
 
@@ -187,7 +188,8 @@ async def setaccess(message: Message):
                     'insert into accesslvl (uid, chat_id, access_level) values (%s, %s, %s)', (id, chat_id, acc))
             await conn.commit()
     ch_nickname = await getUserNickname(id, chat_id)
-    msg = messages.setacc(uid, u_name, u_nickname, acc, id, name, ch_nickname)
+    lvlname = await getChatAccessName(chat_id, acc)
+    msg = messages.setacc(uid, u_name, u_nickname, acc, id, name, ch_nickname, lvlname)
     await message.reply(disable_mentions=1, message=msg)
 
 

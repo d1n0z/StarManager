@@ -57,8 +57,8 @@ async def anon(message: GroupTypes.MessageNew):
 
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
-            if await (await c.execute('select count(*) as c from anonmessages where fromid=%s and time>%s',
-                                      (uid, date.timestamp()))).fetchone[0] >= 25:
+            if (cnt := await (await c.execute('select count(*) as c from anonmessages where fromid=%s and time>%s',
+                                              (uid, date.timestamp()))).fetchone()) and cnt[0] >= 25:
                 msg = messages.anon_limit()
                 await sendMessage(message.peer_id, msg)
                 return
@@ -91,8 +91,8 @@ async def deanon(message: GroupTypes.MessageNew):
 
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
-            deanon_target = (await (await c.execute(
-                'select chat_id, fromid, time from anonmessages where id=%s', (id,))).fetchone())[0]
+            deanon_target = await (await c.execute(
+                'select chat_id, fromid, time from anonmessages where id=%s', (id,))).fetchone()
     if deanon_target is None:
         msg = messages.deanon_target_not_found()
         await sendMessage(message.peer_id, msg)

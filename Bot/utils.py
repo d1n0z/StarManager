@@ -26,6 +26,8 @@ from db import pool
 
 
 async def getUserName(uid: int) -> str:
+    if uid < 0:
+        return await getGroupName(uid)
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             name = await c.execute('select name from usernames where uid=%s', (uid,))
@@ -152,12 +154,12 @@ async def getChatName(chat_id: int = None) -> str:
 async def getGroupName(group_id: int) -> str:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
-            name = await c.execute('select name from groupnames where group_id=%s', (group_id,))
+            name = await c.execute('select name from groupnames where group_id=%s', (-abs(group_id),))
             if name := await name.fetchone():
                 return name[0]
             name = await API.groups.get_by_id(group_ids=abs(group_id))
             name = name.groups[0].name
-            await c.execute('insert into groupnames (group_id, name) values (%s, %s)', (group_id, name))
+            await c.execute('insert into groupnames (group_id, name) values (%s, %s)', (-abs(group_id), name))
             await conn.commit()
             return name
 
@@ -309,6 +311,15 @@ async def getUserBan(uid, chat_id, none=0) -> int:
             if ban := await (await c.execute('select ban from ban where chat_id=%s and uid=%s',
                                              (chat_id, uid))).fetchone():
                 return ban[0]
+            return none
+
+
+async def getChatAccessName(chat_id: int, lvl: int, none: Any = None) -> int | None:
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if an := await (await c.execute('select name from accessnames where chat_id=%s and lvl=%s',
+                                            (chat_id, lvl))).fetchone():
+                return an[0]
             return none
 
 
