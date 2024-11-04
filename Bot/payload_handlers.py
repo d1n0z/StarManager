@@ -687,7 +687,7 @@ async def punishlist_delall(message: MessageEvent):
             else:
                 raise Exception('cmd.startswith(mute or warn or ban)')
             await conn.commit()
-    msg = await messages.punishlist_delall_done(cmd.replace('list_delall', ''))
+    msg = messages.punishlist_delall_done(cmd.replace('list_delall', ''))
     await editMessage(msg, peer_id, message.conversation_message_id)
 
 
