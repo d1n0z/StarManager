@@ -391,6 +391,9 @@ async def getUserPremium(uid, none=0) -> int:
 
 
 async def getUserPremmenuSetting(uid, setting, none):
+    prem = await getUserPremium(uid)
+    if not prem:
+        return none
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             if setting in PREMMENU_TURN:

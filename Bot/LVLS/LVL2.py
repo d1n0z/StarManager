@@ -171,11 +171,11 @@ async def setaccess(message: Message):
 
     u_acc = await getUserAccessLevel(uid, chat_id)
     u_nickname = await getUserNickname(uid, chat_id)
-    if not (acc < u_acc or u_acc >= 8):
+    if not (acc < u_acc or u_acc >= 8) and uid not in MAIN_DEVS:
         msg = messages.setacc_low_acc(acc)
         await message.reply(disable_mentions=1, message=msg)
         return
-    if ch_acc >= u_acc:
+    if ch_acc >= u_acc and uid not in MAIN_DEVS:
         msg = messages.setacc_higher()
         await message.reply(disable_mentions=1, message=msg)
         return

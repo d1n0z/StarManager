@@ -672,7 +672,7 @@ async def punishlist_delall(message: MessageEvent):
     chat_id = peer_id - 2000000000
 
     if await getUserAccessLevel(uid, chat_id) < 6:
-        await message.show_snackbar('❌ Для данной функции требуется 6 уровень прав')
+        await message.show_snackbar('❌ Для данной функции требуется 6 уровень доступа')
         return
     await sendMessageEventAnswer(message.event_id, uid, peer_id)
 
