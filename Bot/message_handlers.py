@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 
 from vkbottle_types.events.bot_events import MessageNew
@@ -10,7 +11,7 @@ from Bot.add_msg_count import add_msg_counter
 from Bot.answers_handlers import answer_handler
 from Bot.checkers import getUChatLimit, getSilence
 from Bot.utils import getUserLastMessage, getUserAccessLevel, getUserMute, addDailyTask, sendMessage, deleteMessages, \
-    getChatSettings, kickUser, getUserName, getUserNickname, antispamChecker, punish
+    getChatSettings, kickUser, getUserName, getUserNickname, antispamChecker, punish, getUserBan
 from config.config import ADMINS, PM_COMMANDS
 from db import pool
 
@@ -55,15 +56,16 @@ async def message_handle(event: MessageNew) -> None:
                 await deleteMessages(event.object.message.conversation_message_id, chat_id)
                 return
 
+    ban = await getUserBan(uid, chat_id) > time.time()
     uacc = await getUserAccessLevel(uid, chat_id)
     if uacc == 0 and await getUChatLimit(msgtime, await getUserLastMessage(uid, chat_id, 0), uacc, chat_id):
         await deleteMessages(event.object.message.conversation_message_id, chat_id)
         return
     settings = await getChatSettings(chat_id)
-    if await getUserMute(uid, chat_id) > int(msgtime):
+    if await getUserMute(uid, chat_id) > int(msgtime) or ban:
         await deleteMessages(event.object.message.conversation_message_id, chat_id)
-        if settings['main']['kickBlockingViolator']:
-            if await kickUser(uid, chat_id):
+        if settings['main']['kickBlockingViolator'] or ban:
+            if await kickUser(uid, chat_id) and not ban:
                 await sendMessage(event.object.message.peer_id,
                                   messages.kicked(uid, await getUserName(uid), await getUserNickname(uid, chat_id)))
         return

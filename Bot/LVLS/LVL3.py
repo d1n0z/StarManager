@@ -222,7 +222,6 @@ async def unban(message: Message):
         return
 
     ch_acc = await getUserAccessLevel(id, chat_id)
-    ch_ban = await getUserBan(id, chat_id)
     u_acc = await getUserAccessLevel(uid, chat_id)
     if ch_acc >= u_acc:
         msg = messages.unban_higher()
@@ -232,6 +231,7 @@ async def unban(message: Message):
     u_nickname = await getUserNickname(uid, chat_id)
     name = await getUserName(id)
     ch_nickname = await getUserNickname(id, chat_id)
+    ch_ban = await getUserBan(id, chat_id)
     if ch_ban <= time.time():
         msg = messages.unban_no_ban(id, name, ch_nickname)
         await message.reply(disable_mentions=1, message=msg)
