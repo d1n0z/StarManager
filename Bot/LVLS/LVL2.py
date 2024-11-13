@@ -7,7 +7,7 @@ import keyboard
 import messages
 from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserAccessLevel, getUserNickname, getUserMute, getUserName, setChatMute, \
-    getChatAccessName
+    getChatAccessName, setUserAccessLevel, getSilence, getSilenceAllowed
 from config.config import API, MAIN_DEVS, DEVS
 from db import pool
 
@@ -180,13 +180,7 @@ async def setaccess(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            if not (await c.execute(
-                    'update accesslvl set access_level = %s where chat_id=%s and uid=%s', (acc, chat_id, id))).rowcount:
-                await c.execute(
-                    'insert into accesslvl (uid, chat_id, access_level) values (%s, %s, %s)', (id, chat_id, acc))
-            await conn.commit()
+    await setUserAccessLevel(id, chat_id, acc)
     ch_nickname = await getUserNickname(id, chat_id)
     lvlname = await getChatAccessName(chat_id, acc)
     msg = messages.setacc(uid, u_name, u_nickname, acc, id, name, ch_nickname, lvlname)
@@ -225,9 +219,6 @@ async def delaccess(message: Message):
         msg = messages.delaccess_noacc(id, name, ch_nickname)
         await message.reply(disable_mentions=1, message=msg)
         return
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            await c.execute('delete from accesslvl where chat_id=%s and uid=%s', (chat_id, id))
-            await conn.commit()
+    await setUserAccessLevel(id, chat_id, 0)
     msg = messages.delaccess(uid, u_name, u_nickname, id, name, ch_nickname)
     await message.reply(disable_mentions=1, message=msg)

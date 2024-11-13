@@ -5,7 +5,7 @@ import traceback
 from ast import literal_eval
 
 import requests
-import validators
+import whois
 from vkbottle_types.events.bot_events import MessageNew
 from vkbottle_types.objects import MessagesMessageAttachmentType
 
@@ -205,41 +205,6 @@ async def queue_handler(event: MessageNew):
                     await conn.commit()
             await editMessage(messages.settings_set_punishment_countable(action, int(text)),
                               event.object.message.peer_id, cmid, kb)
-        elif queue[3] == 'settings_listaction':
-            setting = additional['setting']
-            action = additional['action']
-            # type = additional['type']
-            if setting == 'disallowLinks':
-                if action == 'add':
-                    url = event.object.message.text.replace(' ', '').replace('https://', '').replace('/', '')
-                    if not (validators.url(url) or validators.domain(url)):
-                        msg = messages.settings_change_countable_format_error()
-                        await sendMessage(chat_id + 2000000000, msg)
-                        return
-                    async with (await pool()).connection() as conn:
-                        async with conn.cursor() as c:
-                            if not await (await c.execute(
-                                    'select id from antispammurlexceptions where chat_id=%s and url=%s',
-                                    (chat_id, url))).fetchone():
-                                await c.execute('insert into antispammurlexceptions (chat_id, url) values (%s, %s)',
-                                                (chat_id, url))
-                            await conn.commit()
-                elif action == 'remove':
-                    url = event.object.message.text.replace(' ', '').replace('https://', '').replace('/', '')
-                    async with (await pool()).connection() as conn:
-                        async with conn.cursor() as c:
-                            if not await (await c.execute(
-                                    'delete from antispammurlexceptions where chat_id=%s and url=%s',
-                                    (chat_id, url))).fetchone():
-                                msg = messages.settings_change_countable_format_error()
-                                await sendMessage(chat_id + 2000000000, msg)
-                                return
-                            await conn.commit()
-                else:
-                    raise
-                msg = messages.settings_listaction_done(setting, action, url)
-                kb = keyboard.settings_change_countable(uid, 'antispam', onlybackbutton=True)
-                await sendMessage(chat_id + 2000000000, msg, kb)
         elif queue[3].startswith('settings_set_welcome_'):
             if queue[3] == 'settings_set_welcome_text':
                 if not event.object.message.text:
@@ -294,7 +259,10 @@ async def queue_handler(event: MessageNew):
                     msg = messages.settings_change_countable_format_error()
                     await sendMessage(chat_id + 2000000000, msg)
                     return
-                if not validators.url(text[-1]):
+                try:
+                    if whois.whois(text[-1])['domain_name'] is None:
+                        raise
+                except:
                     msg = messages.get(queue[3] + '_no_url')
                     await sendMessage(chat_id + 2000000000, msg)
                     return
@@ -308,72 +276,6 @@ async def queue_handler(event: MessageNew):
             msg = messages.get(f'{queue[3]}_done')
             kb = keyboard.settings_change_countable(uid, "main", "welcome", onlybackbutton=True)
             await sendMessage(chat_id + 2000000000, msg, kb)
-    elif queue[3].startswith('settings_'):
-        if queue[3] == 'settings_change_countable':
-            setting = additional['setting']
-            category = additional['category']
-            cmid = additional['cmid']
-            text = event.object.message.text
-            kb = keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True)
-            if setting not in SETTINGS_COUNTABLE_MULTIPLE_ARGUMENTS:
-                if setting not in SETTINGS_COUNTABLE_SPECIAL_LIMITS:
-                    limit = range(0, 10001)
-                else:
-                    limit = SETTINGS_COUNTABLE_SPECIAL_LIMITS[setting]
-                if not text.isdigit() or int(text) not in limit:
-                    await editMessage(messages.settings_change_countable_digit_error(),
-                                      event.object.message.peer_id, cmid, kb)
-                    return
-                async with (await pool()).connection() as conn:
-                    async with conn.cursor() as c:
-                        await c.execute('update settings set value = %s where chat_id=%s and setting=%s',
-                                        (int(text), chat_id, setting))
-                        await conn.commit()
-            else:
-                if setting == 'nightmode':
-                    try:
-                        text = text.replace(' ', '')
-                        args = text.split('-')
-                        start = datetime.datetime.strptime(args[0], '%H:%M').replace(year=2024)
-                        end = datetime.datetime.strptime(args[1], '%H:%M').replace(year=2024)
-                        if end.hour <= start.hour:
-                            end = end.replace(day=2)
-                        if start.timestamp() >= end.timestamp():
-                            raise
-                    except:
-                        traceback.print_exc()
-                        await editMessage(messages.settings_change_countable_format_error(),
-                                          event.object.message.peer_id, cmid, kb)
-                        return
-                    val = f'0{start.hour}:' if start.hour < 10 else f'{start.hour}:'
-                    val += f'0{start.minute}-' if start.minute < 10 else f'{start.minute}-'
-                    val += f'0{end.hour}:' if end.hour < 10 else f'{end.hour}:'
-                    val += f'0{end.minute}' if end.minute < 10 else f'{end.minute}'
-                    async with (await pool()).connection() as conn:
-                        async with conn.cursor() as c:
-                            await c.execute('update settings set value2 = %s where chat_id=%s and setting=%s',
-                                            (val, chat_id, setting))
-                            await conn.commit()
-            await editMessage(messages.settings_change_countable_done(setting, text),
-                              event.object.message.peer_id, cmid, kb)
-        elif queue[3] == 'settings_set_punishment':
-            setting = additional['setting']
-            category = additional['category']
-            action = additional['action']
-            cmid = additional['cmid']
-            text = event.object.message.text
-            kb = keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True)
-            if not text.isdigit() or int(text) <= 0 or int(text) >= 10000:
-                await editMessage(messages.settings_change_countable_digit_error(), event.object.message.peer_id, cmid,
-                                  kb)
-                return
-            async with (await pool()).connection() as conn:
-                async with conn.cursor() as c:
-                    await c.execute('update settings set punishment = %s where chat_id=%s and setting=%s',
-                                    (f'{action}|{text}', chat_id, setting))
-                    await conn.commit()
-            await editMessage(messages.settings_set_punishment_countable(action, int(text)),
-                              event.object.message.peer_id, cmid, kb)
         elif queue[3] == 'settings_listaction':
             setting = additional['setting']
             action = additional['action']
@@ -381,18 +283,21 @@ async def queue_handler(event: MessageNew):
             if setting == 'disallowLinks':
                 if action == 'add':
                     url = event.object.message.text.replace(' ', '').replace('https://', '').replace('/', '')
-                    if not (validators.url(url) or validators.domain(url)):
+                    try:
+                        if whois.whois(url)['domain_name'] is None:
+                            raise
+                    except:
                         msg = messages.settings_change_countable_format_error()
                         await sendMessage(chat_id + 2000000000, msg)
                         return
                     async with (await pool()).connection() as conn:
                         async with conn.cursor() as c:
-                            if not await (await c.execute(
-                                    'select id from antispammurlexceptions where chat_id=%s and url=%s',
-                                    (chat_id, url))).fetchone():
-                                await c.execute('insert into antispammurlexceptions (chat_id, url) values (%s, %s)',
+                            if await (await c.execute(
+                                    'select id from antispamurlexceptions where chat_id=%s and url=%s',
+                                    (chat_id, url))).fetchone() is None:
+                                await c.execute('insert into antispamurlexceptions (chat_id, url) values (%s, %s)',
                                                 (chat_id, url))
-                            await conn.commit()
+                                await conn.commit()
                 elif action == 'remove':
                     url = event.object.message.text.replace(' ', '').replace('https://', '').replace('/', '')
                     async with (await pool()).connection() as conn:

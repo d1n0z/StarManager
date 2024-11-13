@@ -1,7 +1,7 @@
 import time
 from datetime import datetime
 
-import validators
+import whois
 from vkbottle.framework.labeler import BotLabeler
 from vkbottle_types import GroupTypes
 from vkbottle_types.events import GroupEventType
@@ -40,10 +40,14 @@ async def anon(message: GroupTypes.MessageNew):
         return
     for i in data:
         for y in i.split('/'):
-            if validators.url(y) or validators.domain(y):
-                msg = messages.anon_link()
-                await sendMessage(message.peer_id, msg)
-                return
+            try:
+                if whois.whois(y)['domain_name'] is None:
+                    continue
+            except:
+                continue
+            msg = messages.anon_link()
+            await sendMessage(message.peer_id, msg)
+            return
     if len(message.attachments) > 0:
         msg = messages.anon_attachments()
         await sendMessage(message.peer_id, msg)

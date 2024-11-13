@@ -88,7 +88,8 @@ class LastMessageDate(Model):
 
 class SilenceMode(Model):
     chat_id = IntegerField(default=0, index=True, unique=True)
-    time = BigIntegerField(default=0)
+    activated = BooleanField(default=False)
+    allowed = TextField(default='[]')
 
     class Meta:
         database = dbhandle

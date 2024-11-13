@@ -1,4 +1,5 @@
 import traceback
+from ast import literal_eval
 from datetime import datetime
 
 import messages
@@ -70,13 +71,6 @@ async def getULvlBanned(uid) -> bool:
             return bool(await (await c.execute('select id from lvlbanned where uid=%s', (uid,))).fetchone())
 
 
-async def getSilence(chat_id) -> bool:
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            return bool(await (await c.execute('select id from silencemode where chat_id=%s and time>0',
-                                               (chat_id,))).fetchone())
-
-
 async def getUChatLimit(msgtime, last_message, u_acc, chat_id) -> bool:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
@@ -134,8 +128,7 @@ async def checkCMD(message, chat_id, fixing=False, accesstoalldevs=False, return
             (await getUserMute(uid, chat_id) > message.date) or
             (await getUserIgnore(uid, chat_id)) or
             (await getUInfBanned(uid, chat_id)) or
-            (await getUChatLimit(message.date, await getUserLastMessage(uid, chat_id, 0), u_acc, chat_id)) or
-            (await getSilence(chat_id) and u_acc == 0)):
+            (await getUChatLimit(message.date, await getUserLastMessage(uid, chat_id, 0), u_acc, chat_id))):
         return False
     settings = await getChatSettings(chat_id)
 

@@ -9,7 +9,7 @@ import messages
 from Bot.action_handlers import action_handle
 from Bot.add_msg_count import add_msg_counter
 from Bot.answers_handlers import answer_handler
-from Bot.checkers import getUChatLimit, getSilence
+from Bot.checkers import getUChatLimit
 from Bot.utils import getUserLastMessage, getUserAccessLevel, getUserMute, addDailyTask, sendMessage, deleteMessages, \
     getChatSettings, kickUser, getUserName, getUserNickname, antispamChecker, punish, getUserBan, getUserBanInfo
 from config.config import ADMINS, PM_COMMANDS
@@ -92,10 +92,6 @@ async def message_handle(event: MessageNew) -> None:
                 await deleteMessages(event.object.message.conversation_message_id, chat_id)
                 return
 
-    if uacc == 0 and await getSilence(chat_id):
-        await deleteMessages(event.object.message.conversation_message_id, chat_id)
-        return
-
     try:
         if event.object.message.attachments[0].type == MessagesMessageAttachmentType.AUDIO_MESSAGE:
             audio = True
@@ -135,8 +131,10 @@ async def message_handle(event: MessageNew) -> None:
             name = await getUserName(uid)
             nick = await getUserNickname(uid, chat_id)
             await deleteMessages(event.object.message.conversation_message_id, chat_id)
-            await sendMessage(chat_id + 2000000000, messages.antispam_punishment(
-                uid, name, nick, setting[1], punishment[0], setting[2], punishment[1] if len(punishment) > 1 else None))
+            if punishment != 'del':
+                await sendMessage(chat_id + 2000000000, messages.antispam_punishment(
+                    uid, name, nick, setting[1], punishment[0], setting[2],
+                    punishment[1] if len(punishment) > 1 else None))
 
     await add_msg_counter(chat_id, uid, audio)
 

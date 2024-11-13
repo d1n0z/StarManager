@@ -7,6 +7,7 @@ from vkbottle.framework.labeler import BotLabeler
 
 import keyboard
 import messages
+from Bot.utils import getSilence
 from Bot.rules import SearchCMD
 from Bot.utils import getUserName, kickUser, getUserNickname, getIDFromMessage, getUserAccessLevel, getUserBan
 from config.config import API
@@ -19,30 +20,10 @@ bl = BotLabeler()
 async def timeout(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    data = message.text.split()
-    if len(data) != 2:
-        msg = messages.timeout_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-    if int(data[1]) not in [0, 1]:
-        msg = messages.timeout_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            if not (await c.execute(
-                    'update silencemode set time = %s where chat_id=%s', (int(data[1]), chat_id))).rowcount:
-                await c.execute('insert into silencemode (chat_id, time) values (%s, %s)', (chat_id, int(data[1])))
-            await conn.commit()
-
-    u_name = await getUserName(uid)
-    u_nickname = await getUserNickname(uid, chat_id)
-    if int(data[1]) == 1:
-        msg = messages.timeouton(uid, u_name, u_nickname)
-    else:
-        msg = messages.timeoutoff(uid, u_name, u_nickname)
-    await message.reply(disable_mentions=1, message=msg)
+    activated = await getSilence(chat_id)
+    msg = messages.timeout(activated)
+    kb = keyboard.timeout(uid, activated)
+    await message.reply(disable_mentions=1, message=msg, keyboard=kb)
 
 
 @bl.chat_message(SearchCMD('inactive'))

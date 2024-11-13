@@ -67,11 +67,11 @@ async def q(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
 
-    await setUserAccessLevel(uid, chat_id, 0)
     kick_res = await kickUser(uid, chat_id)
     name = await getUserName(uid)
     nick = await getUserNickname(uid, chat_id)
     if kick_res:
+        await setUserAccessLevel(uid, chat_id, 0)
         msg = messages.q(uid, name, nick)
     else:
         msg = messages.q_fail(uid, name, nick)

@@ -9,7 +9,7 @@ from typing import Iterable, Any
 
 import requests
 import urllib3
-import validators
+import whois
 import xmltodict
 from memoization import cached
 from multicolorcaptcha import CaptchaGenerator
@@ -51,6 +51,7 @@ async def kickUser(uid: int, chat_id: int) -> bool:
                     await c.execute('delete from accesslvl where chat_id=%s and uid=%s', (chat_id, uid))
                     await c.execute('delete from nickname where chat_id=%s and uid=%s', (chat_id, uid))
                     await conn.commit()
+            await setChatMute(uid, chat_id, 0)
     except:
         return False
     return True
@@ -194,15 +195,16 @@ async def getChatMembers(chat_id: int) -> int | bool:
         return False
 
 
-async def setChatMute(id: int | Iterable[int], chat_id: int, mute_time: int | float) -> Any:
+async def setChatMute(uid: int | Iterable[int], chat_id: int, mute_time: int | float | None = None) -> Any:
     try:
-        if mute_time > 0:
-            return VK_API_SESSION.method('messages.changeConversationMemberRestrictions',
-                                         {'peer_id': chat_id + 2000000000, 'member_ids': id, 'for': int(mute_time),
-                                          'action': 'ro'})
+        if mute_time is None or mute_time > 0:
+            payload = {'peer_id': chat_id + 2000000000, 'member_ids': uid, 'action': 'ro'}
+            if mute_time is not None:
+                payload['for'] = int(mute_time)
+            return VK_API_SESSION.method('messages.changeConversationMemberRestrictions', payload)
         else:
             return VK_API_SESSION.method('messages.changeConversationMemberRestrictions',
-                                         {'peer_id': chat_id + 2000000000, 'member_ids': id, 'action': 'rw'})
+                                         {'peer_id': chat_id + 2000000000, 'member_ids': uid, 'action': 'rw'})
     except:
         traceback.print_exc()
         return
@@ -517,6 +519,18 @@ async def setUserAccessLevel(uid, chat_id, access_level):
                     await c.execute('insert into accesslvl (uid, chat_id, access_level) values (%s, %s, %s)',
                                     (uid, chat_id, access_level))
             await conn.commit()
+    if await getSilence(chat_id):
+        if access_level in await getSilenceAllowed(chat_id):
+            await setChatMute(uid, chat_id, 0)
+        else:
+            await setChatMute(uid, chat_id)
+
+
+async def getSilence(chat_id) -> bool:
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            return bool(await (await c.execute('select id from silencemode where chat_id=%s and activated=True',
+                                               (chat_id,))).fetchone())
 
 
 async def addDailyTask(uid, task, count=1, checklvlbanned=True):
@@ -553,7 +567,7 @@ async def addWeeklyTask(uid, task, count=1, checklvlbanned=True):
                 await c.execute('insert into tasksweekly (uid, task, count) values (%s, %s, %s)', (uid, task, count))
             if ((await (await c.execute(
                     'select count from tasksweekly where uid=%s and task=%s', (uid, task))).fetchone()
-            )[0] == (TASKS_WEEKLY | PREMIUM_TASKS_WEEKLY)[task] and
+                 )[0] == (TASKS_WEEKLY | PREMIUM_TASKS_WEEKLY)[task] and
                     (task in TASKS_WEEKLY or (task in PREMIUM_TASKS_WEEKLY and await getUserPremium(uid)))):
                 if not (await c.execute('update coins set coins=coins+10 where uid=%s', (uid,))).rowcount:
                     await c.execute('insert into coins (uid, coins) values (%s, 10)', (uid,))
@@ -605,7 +619,10 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings):
                 data = message.text.split()
                 for i in data:
                     for y in i.split('/'):
-                        if not validators.url(y) and not validators.domain(y) or y in ['vk.com', 'vk.ru']:
+                        try:
+                            if whois.whois(y)['domain_name'] is None or y in ['vk.com', 'vk.ru']:
+                                continue
+                        except:
                             continue
                         if not await (await c.execute(
                                 'select id from antispamurlexceptions where chat_id=%s and '
@@ -731,7 +748,7 @@ async def punish(uid, chat_id, setting_id):
                 return False
             punishment = setting[0].split('|')
             if punishment[0] == 'deletemessage':
-                return False
+                return 'del'
             if punishment[0] == 'kick':
                 await kickUser(uid, chat_id)
                 return punishment
@@ -832,6 +849,16 @@ async def getpool(chat_id, group):
         return chats
     except:
         return False
+
+
+async def getSilenceAllowed(chat_id):
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            lvls = await (await c.execute('select allowed from silencemode where chat_id=%s',
+                                          (chat_id,))).fetchone()
+    if lvls is not None:
+        return literal_eval(lvls[0])
+    return []
 
 
 def hex_to_rgb(value):

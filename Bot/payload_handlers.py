@@ -17,7 +17,8 @@ from Bot.tgbot import tgbot
 from Bot.utils import sendMessageEventAnswer, editMessage, getUserAccessLevel, getUserXP, getUserPremium, addUserXP, \
     getUserName, getUserNickname, kickUser, getXPTop, getChatName, addWeeklyTask, \
     addDailyTask, getUserBan, getUserWarns, getUserMute, getULvlBanned, getChatSettings, turnChatSetting, \
-    deleteMessages, setChatMute, getChatAltSettings, getChatMembers, getChatOwner, getUserPremmenuSettings
+    deleteMessages, setChatMute, getChatAltSettings, getChatMembers, getChatOwner, getUserPremmenuSettings, \
+    getSilenceAllowed, sendMessage, getSilence, setUserAccessLevel
 from config.config import API, COMMANDS, DEVS, TASKS_LOTS, TASKS_DAILY, PREMIUM_TASKS_DAILY, SETTINGS_COUNTABLE, \
     TG_CHAT_ID, TG_NEWCHAT_THREAD_ID, SETTINGS_PREMIUM
 from db import pool
@@ -59,7 +60,10 @@ async def join(message: MessageEvent):
                 for i in await (await c.execute(
                         'select uid from mute where chat_id=%s and mute>%s', (chat_id, time.time()))).fetchall():
                     await setChatMute(i[0], chat_id, 0)
-                await c.execute('delete from accesslvl where chat_id=%s', (chat_id,))
+                x = await (await c.execute('delete from accesslvl where chat_id=%s returning uid',
+                                           (chat_id,))).fetchall()
+                for id in x:
+                    await setChatMute(id[0], chat_id, 0)
                 await c.execute('delete from nickname where chat_id=%s', (chat_id,))
                 await c.execute('delete from settings where chat_id=%s', (chat_id,))
                 await c.execute('delete from welcome where chat_id=%s', (chat_id,))
@@ -679,7 +683,10 @@ async def punishlist_delall(message: MessageEvent):
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             if cmd.startswith('mute'):
-                await c.execute('update mute set mute=0 where chat_id=%s', (chat_id,))
+                uids = await (await c.execute('update mute set mute=0 where chat_id=%s returning uid',
+                                              (chat_id,))).fetchall()
+                for i in uids:
+                    await setChatMute(i[0], chat_id, 0)
             elif cmd.startswith('warn'):
                 await c.execute('update warn set warns=0 where chat_id=%s', (chat_id,))
             elif cmd.startswith('ban'):
@@ -787,10 +794,13 @@ async def giveowner(message: MessageEvent):
         async with conn.cursor() as c:
             if not (await c.execute('delete from accesslvl where chat_id=%s and uid=%s', (chat_id, uid))).rowcount:
                 return
-            if not (await c.execute('update accesslvl set access_level=7 where chat_id=%s and uid=%s',
-                                    (chat_id, id))).rowcount:
-                await c.execute('insert into accesslvl (uid, chat_id, access_level) values (%s, %s, 7)',
-                                (id, chat_id))
+            if await getSilence(chat_id):
+                if 0 in await getSilenceAllowed(chat_id):
+                    await setChatMute(uid, chat_id, 0)
+                else:
+                    await setChatMute(uid, chat_id)
+            await setUserAccessLevel(id, chat_id, 7)
+            await setChatMute(id, chat_id, 0)
             await c.execute('delete from gpool where chat_id=%s', (chat_id,))
             await c.execute('delete from chatgroups where chat_id=%s', (chat_id,))
             await conn.commit()
@@ -927,8 +937,16 @@ async def resetaccess_accept(message: MessageEvent):
 
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
-            await c.execute('delete from accesslvl where chat_id=%s and access_level=%s', (chat_id, lvl))
+            x = await (await c.execute('delete from accesslvl where chat_id=%s and access_level=%s returning uid',
+                                       (chat_id, lvl))).fetchall()
             await conn.commit()
+    if await getSilence(chat_id):
+        if 0 in await getSilenceAllowed(chat_id):
+            for id in x:
+                await setChatMute(id[0], chat_id, 0)
+        else:
+            for id in x:
+                await setChatMute(id[0], chat_id)
     name = await getUserName(uid)
 
     msg = messages.resetaccess_accept(uid, name, lvl)
@@ -1697,3 +1715,101 @@ async def addprefix(message: MessageEvent):
                     peer_id, message.conversation_message_id, keyboard.prefix_back(uid))
             else:
                 await editMessage(messages.prefix(), peer_id, message.conversation_message_id, keyboard.prefix(uid))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['timeout_turn']))
+async def timeout_turn(message: MessageEvent):
+    uid = message.user_id
+    peer_id = message.object.peer_id
+    chat_id = peer_id - 2000000000
+
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if not (await c.execute(
+                    'update silencemode set activated=not activated where chat_id=%s returning activated',
+                    (chat_id,))).rowcount:
+                await c.execute('insert into silencemode (chat_id, activated) values (%s, True)', (chat_id,))
+                activated = True
+            else:
+                activated = (await c.fetchone())[0]
+
+            allowed = await getSilenceAllowed(chat_id)
+            lvls = await (await c.execute('select uid, access_level from accesslvl where chat_id=%s',
+                                          (chat_id,))).fetchall()
+            lvls = {i[0]: i[1] for i in lvls}
+            for i in (await API.messages.get_conversation_members(peer_id)).items:
+                if i.member_id < 0:
+                    continue
+                if i.member_id in lvls:
+                    if lvls[i.member_id] in allowed or lvls[i.member_id] not in range(0, 7):
+                        continue
+                elif 0 in allowed:
+                    continue
+                if activated:
+                    await setChatMute(i.member_id, chat_id)
+                else:
+                    await setChatMute(i.member_id, chat_id, 0)
+
+            if activated:
+                await sendMessage(peer_id, messages.timeouton(
+                    uid, await getUserName(uid), await getUserNickname(uid, chat_id)))
+            else:
+                await sendMessage(peer_id, messages.timeoutoff(
+                    uid, await getUserName(uid), await getUserNickname(uid, chat_id)))
+
+            await conn.commit()
+    await editMessage(messages.timeout(activated), peer_id, message.conversation_message_id,
+                      keyboard.timeout(uid, activated))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['timeout']))
+async def timeout(message: MessageEvent):
+    peer_id = message.object.peer_id
+    activated = await getSilence(peer_id - 2000000000)
+    await editMessage(messages.timeout(activated), peer_id, message.conversation_message_id,
+                      keyboard.timeout(message.user_id, activated))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['timeout_settings']))
+async def timeout_settings(message: MessageEvent):
+    peer_id = message.object.peer_id
+    chat_id = peer_id - 2000000000
+
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if await (await c.execute('select id from silencemode where chat_id=%s and activated=true',
+                                      (chat_id,))).fetchone():
+                return
+
+    await editMessage(messages.timeout_settings(), peer_id, message.conversation_message_id,
+                      keyboard.timeout_settings(message.user_id, await getSilenceAllowed(chat_id)))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['timeout_settings_turn']))
+async def timeout_settings(message: MessageEvent):
+    payload = message.payload
+    lvl = payload['lvl']
+    peer_id = message.object.peer_id
+    chat_id = peer_id - 2000000000
+    
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if await (await c.execute('select id from silencemode where chat_id=%s and activated=true',
+                                      (chat_id,))).fetchone():
+                return
+
+    allowed = await getSilenceAllowed(chat_id)
+    if lvl in allowed:
+        allowed.remove(lvl)
+    else:
+        allowed.append(lvl)
+
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if not (await c.execute('update silencemode set allowed = %s where chat_id=%s',
+                                    (f'{sorted(allowed)}', chat_id))).rowcount:
+                await c.execute('insert into silencemode (chat_id, activated, allowed) values (%s, false, %s)',
+                                (chat_id, f'{sorted(allowed)}'))
+            await conn.commit()
+    await editMessage(messages.timeout_settings(), peer_id, message.conversation_message_id,
+                      keyboard.timeout_settings(message.user_id, allowed))

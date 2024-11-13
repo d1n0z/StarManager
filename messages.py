@@ -2740,3 +2740,12 @@ def captcha_pass(uid, n, date):
 
 def punishlist_delall_done(punish):
     return get('punishlist_delall_done', punish={"mute": "муты", "ban": "баны", "warn": "варны"}[punish])
+
+
+def timeout(activated):
+    activated = 'Для активации нажмите "Включить"' if not activated else 'Для деактивации нажмите "Выключить"'
+    return get('timeout', activated=activated)
+
+
+def timeout_settings():
+    return get('timeout_settings')

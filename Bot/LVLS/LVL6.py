@@ -8,7 +8,7 @@ import messages
 from Bot.checkers import haveAccess
 from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserName, getUserNickname, getUserAccessLevel, getUserPremium, editMessage, \
-    getgpool, getpool
+    getgpool, getpool, setUserAccessLevel, setChatMute
 from config.config import API
 from db import pool
 
@@ -51,11 +51,8 @@ async def gdelaccess(message: Message):
         u_acc = await getUserAccessLevel(uid, chat_id)
         if not await haveAccess('gdelaccess', chat_id, u_acc) or await getUserAccessLevel(id, chat_id) > u_acc:
             continue
-        async with (await pool()).connection() as conn:
-            async with conn.cursor() as c:
-                if (await c.execute('delete from accesslvl where chat_id=%s and uid=%s', (chat_id, id))).rowcount:
-                    success += 1
-                    await conn.commit()
+        await setUserAccessLevel(id, chat_id, 0)
+        success += 1
 
     nick = await getUserNickname(id, edit.peer_id - 2000000000)
     msg = messages.gdelaccess(id, name, nick, len(chats), success)
@@ -111,17 +108,10 @@ async def gsetaccess(message: Message):
     for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
         ch_acc = await getUserAccessLevel(id, chat_id)
-
         if acc >= u_acc or ch_acc >= u_acc or ch_acc >= acc or not await haveAccess('gsetaccess', chat_id, u_acc):
             continue
 
-        async with (await pool()).connection() as conn:
-            async with conn.cursor() as c:
-                if not (await c.execute('update accesslvl set access_level = %s where chat_id=%s and uid=%s',
-                                        (acc, chat_id, id))).rowcount:
-                    await c.execute(
-                        'insert into accesslvl (uid, chat_id, access_level) values (%s, %s, %s)', (id, chat_id, acc))
-                await conn.commit()
+        await setUserAccessLevel(id, chat_id, acc)
         success += 1
 
     nick = await getUserNickname(id, edit.peer_id - 2000000000)
@@ -191,13 +181,7 @@ async def ssetaccess(message: Message):
         if acc >= u_acc or ch_acc >= u_acc or ch_acc >= acc or not await haveAccess('ssetaccess', chat_id, u_acc):
             continue
 
-        async with (await pool()).connection() as conn:
-            async with conn.cursor() as c:
-                if not (await c.execute('update accesslvl set access_level = %s where chat_id=%s and uid=%s',
-                                        (acc, chat_id, id))).rowcount:
-                    await c.execute(
-                        'insert into accesslvl (uid, chat_id, access_level) values (%s, %s, %s)', (id, chat_id, acc))
-                await conn.commit()
+        await setUserAccessLevel(id, chat_id, acc)
         success += 1
 
     ch_nick = await getUserNickname(id, edit.peer_id - 2000000000)
@@ -247,12 +231,8 @@ async def sdelaccess(message: Message):
         u_acc = await getUserAccessLevel(uid, chat_id)
         if not await haveAccess('sdelaccess', chat_id, u_acc) or await getUserAccessLevel(id, chat_id) > u_acc:
             continue
-
-        async with (await pool()).connection() as conn:
-            async with conn.cursor() as c:
-                if (await c.execute('delete from accesslvl where chat_id=%s and uid=%s', (chat_id, id))).rowcount:
-                    success += 1
-                    await conn.commit()
+        await setUserAccessLevel(id, chat_id, 0)
+        success += 1
 
     nick = await getUserNickname(id, edit.peer_id - 2000000000)
     msg = messages.sdelaccess(id, name, nick, len(chats), success)
@@ -477,7 +457,8 @@ async def purge(message: Message):
                     dtdnicknames += 1
             for i in await (await c.execute('select id, uid from accesslvl where chat_id=%s', (chat_id,))).fetchall():
                 if i[1] not in users:
-                    await c.execute('delete from accesslvl where id=%s', (i[0],))
+                    x = await (await c.execute('delete from accesslvl where id=%s returning uid', (i[0],))).fetchone()
+                    await setChatMute(x[0], chat_id, 0)
                     dtdaccesslevels += 1
             await conn.commit()
 

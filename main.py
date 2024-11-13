@@ -1,18 +1,20 @@
-import asyncio
 import sys
+import time
 import traceback
 
 from loguru import logger
+from whois.whois import logger as whoislogger
 
 from Bot import VkBot
-from config.config import DATABASE, PATH
+from config.config import DATABASE, PATH, VK_API_SESSION, DAILY_TO
 import os
 
-from db import pool
 from tables import dbhandle, Model
 from load_messages import load
 
-if __name__ == '__main__':
+
+def main(retry=0):
+    whoislogger.disabled = True
     logger.remove()
     logger.add(sys.stderr, level='INFO')
 
@@ -34,10 +36,25 @@ if __name__ == '__main__':
     try:
         try:
             VkBot().run()
+        except KeyboardInterrupt:
+            raise
         except:
             os.system("tmux kill-session -t botscheduler")
-            raise
+        if retry < 10:
+            time.sleep(15)
+            main(retry + 1)
     except KeyboardInterrupt:
         logger.info('bye-bye')
-    except Exception as e:
+        return
+    except:
+        VK_API_SESSION.method('messages.send', {
+            'chat_id': DAILY_TO,
+            'message': f'Unexpected exception caught in VkBot.run():\n{traceback.format_exc()}',
+            'random_id': 0
+        })
         logger.exception(traceback.format_exc())
+        return
+
+
+if __name__ == '__main__':
+    main()

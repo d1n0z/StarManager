@@ -735,3 +735,27 @@ def prefix_back(uid):
     kb.add(Callback('Назад', {"cmd": "prefix", "uid": uid}))
 
     return kb.get_json()
+
+
+def timeout(uid, silence):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('Выключить' if silence else 'Включить', {"cmd": "timeout_turn", "uid": uid}),
+           KeyboardButtonColor.NEGATIVE if silence else KeyboardButtonColor.POSITIVE)
+    if not silence:
+        kb.add(Callback('Настройки', {"cmd": "timeout_settings", "uid": uid}))
+
+    return kb.get_json()
+
+
+def timeout_settings(uid, allowed):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('Назад', {"cmd": "timeout", "uid": uid}))
+    for i in range(0, 7):
+        kb.add(Callback(f'Уровень {i}', {"cmd": "timeout_settings_turn", "uid": uid, "lvl": i}),
+               KeyboardButtonColor.POSITIVE if i in allowed else KeyboardButtonColor.NEGATIVE)
+        if i % 2 == 0:
+            kb.row()
+
+    return kb.get_json()
