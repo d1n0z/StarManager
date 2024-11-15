@@ -506,7 +506,7 @@ async def reboot(message: Message):
             await conn.commit()
     msg = messages.reboot()
     await message.reply(msg)
-    os.system('/root/startup.sh')
+    os.system('reboot')
 
 
 @bl.chat_message(SearchCMD('sudo'))
