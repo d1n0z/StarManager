@@ -1,3 +1,4 @@
+import asyncio
 import sys
 import time
 import traceback
@@ -13,7 +14,7 @@ from tables import dbhandle, Model
 from load_messages import load
 
 
-def main(retry=0):
+def main(retry=0, vkbot=VkBot()):
     whoislogger.disabled = True
     logger.remove()
     logger.add(sys.stderr, level='INFO')
@@ -35,14 +36,14 @@ def main(retry=0):
     logger.info('Starting the bot...')
     try:
         try:
-            VkBot().run()
+            vkbot.run()
         except KeyboardInterrupt:
             raise
         except:
             os.system("tmux kill-session -t botscheduler")
-        if retry < 10:
-            time.sleep(15)
-            main(retry + 1)
+        logger.info('Retarting the bot in 15 seconds...')
+        time.sleep(15)
+        main(retry + 1, vkbot)
     except KeyboardInterrupt:
         logger.info('bye-bye')
         return

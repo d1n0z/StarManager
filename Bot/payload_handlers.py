@@ -937,8 +937,9 @@ async def resetaccess_accept(message: MessageEvent):
 
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
-            x = await (await c.execute('delete from accesslvl where chat_id=%s and access_level=%s returning uid',
-                                       (chat_id, lvl))).fetchall()
+            x = await (await c.execute(
+                'delete from accesslvl where chat_id=%s and access_level=%s and uid!=%s returning uid',
+                (chat_id, lvl, uid))).fetchall()
             await conn.commit()
     if await getSilence(chat_id):
         if 0 in await getSilenceAllowed(chat_id):

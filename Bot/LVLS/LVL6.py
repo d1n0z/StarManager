@@ -325,7 +325,7 @@ async def ignorelist(message: Message):
         async with conn.cursor() as c:
             ids = [i[0] for i in await (
                 await c.execute('select uid from ignore where chat_id=%s', (chat_id,))).fetchall()]
-    raw_names = await API.users.get(user_ids=','.join(ids))
+    raw_names = await API.users.get(user_ids=ids)
     names = []
     for i in raw_names:
         names.append(f'{i.first_name} {i.last_name}')
@@ -373,7 +373,7 @@ async def chatlimit(message: Message):
             chlim = await (await c.execute('select time from chatlimit where chat_id=%s', (chat_id,))).fetchone()
             lpos = chlim[0] if chlim else 1
             if chlim:
-                await c.execute('update chatlimit set time = %s where chat_id=%s', (st,))
+                await c.execute('update chatlimit set time = %s where chat_id=%s', (st, chat_id,))
             else:
                 await c.execute('insert into chatlimit (chat_id, time) values (%s, %s)', (chat_id, st))
             await conn.commit()
