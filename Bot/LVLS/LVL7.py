@@ -373,12 +373,12 @@ async def editlevel(message: Message):
         msg = messages.editlvl_hint()
         await message.reply(disable_mentions=1, message=msg)
         return
-    if given_lvl < 0 or given_lvl > 7:
-        msg = messages.editlvl_hint()
+    if command not in COMMANDS or COMMANDS[command] not in range(0, 8):
+        msg = messages.editlvl_command_not_found()
         await message.reply(disable_mentions=1, message=msg)
         return
-    if command not in COMMANDS:
-        msg = messages.editlvl_command_not_found()
+    if given_lvl not in range(0, 8):
+        msg = messages.editlvl_hint()
         await message.reply(disable_mentions=1, message=msg)
         return
     async with (await pool()).connection() as conn:

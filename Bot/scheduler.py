@@ -168,7 +168,6 @@ async def reboot():
             async with conn.cursor() as c:
                 await c.execute('insert into reboots (chat_id, time, sended) VALUES (%s, %s, false)',
                                 (DAILY_TO + 2000000000, int(time.time())))
-                await c.execute('delete from commandsstatistics')
                 await c.execute('delete from messagesstatistics')
                 await c.execute('delete from middlewaresstatistics')
                 await conn.commit()

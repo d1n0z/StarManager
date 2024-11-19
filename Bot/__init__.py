@@ -2,6 +2,8 @@ import asyncio
 import traceback
 
 import pydantic
+import vk_api.exceptions
+import vkbottle.api.response_validator
 from pydantic import v1
 from vkbottle import Bot, GroupEventType, GroupTypes, VKAPIError, LoopWrapper
 from vkbottle.framework.labeler import BotLabeler
@@ -56,6 +58,8 @@ class VkBot:
         @self.bot.error_handler.register_error_handler(pydantic.ValidationError)
         @self.bot.error_handler.register_error_handler(v1.ValidationError)
         @self.bot.error_handler.register_error_handler(v1.error_wrappers.ValidationError)
+        @self.bot.error_handler.register_error_handler(vkbottle.api.response_validator.VKAPIErrorResponseValidator)
+        @self.bot.error_handler.register_error_handler(vk_api.exceptions.ApiError)
         async def exception_handler(e: Exception):  # noqa
             pass
 
