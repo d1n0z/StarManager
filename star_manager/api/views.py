@@ -28,7 +28,7 @@ class AllChatsView(viewsets.ViewSet):
     """
     API endpoint that allows groups to be viewed or edited.
     """
-    def getresponse(self, *args, **kwargs):
+    def getresponse(self, *args, **kwargs):  # noqa
         if 'user_id' not in self.kwargs:
             with sdb.syncpool().connection() as conn:
                 with conn.cursor() as c:
@@ -47,7 +47,7 @@ class AccessLvlView(viewsets.ViewSet):
     """
     API endpoint that allows groups to be viewed or edited.
     """
-    def getresponse(self, *args, **kwargs):
+    def getresponse(self, *args, **kwargs):  # noqa
         data = {"status": False, "error": 404}
         if 'user_id' in self.kwargs:
             with sdb.syncpool().connection() as conn:
@@ -66,5 +66,5 @@ class AccessLvlView(viewsets.ViewSet):
         return JsonResponse(data)
 
 
-def handler404():
+def handler404(request, exception):  # noqa
     return JsonResponse({'error': 'method not found'})

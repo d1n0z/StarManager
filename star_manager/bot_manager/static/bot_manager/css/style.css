@@ -1,8 +1,10 @@
 body {
+    height: 100%;
     font-family: 'Montserrat', serif;
     font-size: 24px;
     background-color: #141416;
     background-image: url("../materials/bnd.jpg");
+    margin: 0;
 }
 
 input[type=button] {
@@ -10,6 +12,7 @@ input[type=button] {
 }
 
 .menu {
+    top: 0;
     position: sticky;
 }
 
@@ -17,7 +20,6 @@ input[type=button] {
     width: 100%;
     position: sticky;
     background-color: #212121;
-    display: flex;
     align-items: center;
 }
 
@@ -29,25 +31,21 @@ input[type=button] {
 
 
 .menu nav a {
+    height: 100%;
     position: sticky;
     top: 0;
 }
 
 .menu nav img {
-    position: sticky;
-    top: 0;
-    margin-top: -5.8%;
-    /*margin-left: 0.5%;*/
     padding-left: 0.5%;
     width: 300px;
     height: auto;
-    /*object-fit: cover;*/
 }
 
 .menu nav ul {
-    margin-top: 0.7%;
+    margin-top: 0;
+    top: 0;
     right: 0;
-    /*margin-left: 31.9%;*/
 }
 
 .menu nav ul li {
@@ -77,8 +75,6 @@ input[type=button] {
     color: #ffffff;
     float: left;
     top: 5px;
-    /*right: -5px;*/
-    /*right: -220px;*/
     padding: 10px 25px 10px 25px;
     border-style: none;
     background: transparent;
@@ -117,6 +113,7 @@ input[type=button] {
 }
 
 .info {
+    margin-top: -0.5%;
     margin-left: 9.6%;
     margin-right: 9.6%;
     font-size: 20px;
@@ -209,9 +206,6 @@ body p {
     font-family: "Montserrat", sans-serif;
     font-weight: normal;
     font-size: 24px;
-    float: left;
-    top: 5px;
-    right: -5px;
     padding: 10px 25px 10px 25px;
     margin-top: 1.2%;
     margin-bottom: 1.2%;
@@ -271,25 +265,23 @@ body p {
     margin: auto;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    grid-gap: 25px;
+    grid-gap: 30px;
+}
+
+.btn-text {
+    width: 79%;
 }
 
 .price-col {
     position: static;
     background: transparent;
-    padding: 15% 15% 15% 15%;
-    border-radius: 10px;
-    border: 2px solid #FFE55C;
     color: #ffffff;
-    height: 1%;
+    height: 40%;
     text-align: center;
-    transition: 0.3s;
-    -webkit-transition: .3s;
 }
 
 @media only screen and (max-width: 1100px) {
     .price-row {
-        /*display: block;*/
         width: 100%;
         margin-right: 0;
         margin-left: 0;
@@ -304,7 +296,6 @@ body p {
         bottom: 9px;
     }
 
-
     .btn {
         width: 40%;
     }
@@ -312,11 +303,28 @@ body p {
     .price .btn {
         width: 100%;
         text-align: center;
-        right: 30px;
+    }
+
+    .btn-text > input {
+        width: 110% !important;
+    }
+
+    .btn-text {
+        right: 18%;
     }
 }
 
-.price-col:hover {
+.price-ul {
+    list-style-type: none;
+    padding-bottom: 11%;
+    padding-top: 6%;
+    border-radius: 10px;
+    border: 2px solid #FFE55C;
+    transition: 0.3s;
+    -webkit-transition: .3s;
+}
+
+.price-col-container:hover .price-ul, .price-col-container:hover .price-btn {
     transform: translateY(-3px);
     color: #212121;
     background-color: #FFE55C;
@@ -324,19 +332,20 @@ body p {
     box-shadow: 0 0 10px #FFE55C;
 }
 
-.price-ul {
-    list-style-type: none;
+.price-li {
+    height: 30px;
+    margin-left: -2em;
 }
 
-.price-li {
-    height: 0;
-    margin-left: -2em;
-    margin-top: -15%;
+.price-btn {
+    margin: 9.9% auto 0;
 }
 
 .price-p {
     text-align: center;
     font-size: 16px;
+    margin-bottom: 0;
+    margin-top: 0;
 }
 
 @media only screen and (max-width: 1100px) {
@@ -522,7 +531,6 @@ body p {
     background-color: #141414;
     padding: 0;
     width: 100%;
-    /*border-bottom: 1px solid #000000;*/
     border: 1px solid #000000;
     border-right: none;
 }
@@ -593,4 +601,174 @@ footer {
 .footer-data {
     padding-right: 15px;
     float: right;
+}
+
+.chats-container {
+    padding-left: 3%;
+    padding-right: 3%;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-gap: 30px;
+}
+
+.chats-block {
+    width: 100%;
+    display: inline-block;
+}
+
+.chats-h1  {
+    width: 100%;
+    line-height: 100%;
+    text-align: center;
+    font-size: 120%;
+    color: #FFFFFF;
+}
+
+.h1-premium {
+    color: #FFE55C!important;
+}
+
+.chats {
+    float: left;
+    width: 100%;
+    height: 80vh;
+    margin-left: 1.5%;
+    margin-right: 1.5%;
+    background-color: #272727;
+    outline: 4px solid #FFFFFF;
+    border-radius: 5px;
+    overflow-y: auto;
+    position: relative;
+}
+
+.chats::-webkit-scrollbar {
+  width: 5px;
+}
+
+.chats::-webkit-scrollbar-track {
+  background-color: #a9a9a9;
+}
+
+.chats::-webkit-scrollbar-thumb {
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+}
+
+.chat {
+    padding: 10px 5px 5px 10px;
+    border-bottom: 1px solid #000000;
+}
+
+.chat img {
+    width: 80px;
+    border-radius: 15%;
+    outline: 2px solid #FFFFFF;
+}
+
+.chat-info-photo-premium {
+    outline: 2px solid #FFE55C !important;
+}
+
+.premium-border {
+    outline: 4px solid #FFE55C;
+    border-radius: 5px;
+}
+
+.chat-info {
+    overflow-y: visible;
+    color: #DCDCDC;
+    vertical-align: top;
+    display: inline-block;
+    width: 80%;
+    height: 80px;
+    margin-left: 10px;
+}
+
+.chat-info h1 {
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow-x: hidden;
+    font-size: 24px;
+    height: 22px;
+    padding-top: 6px;
+    margin-top: 0;
+    margin-bottom: -10px;
+}
+
+.chat-info p {
+    font-size: 16px;
+    color: #C0C0C0;
+    vertical-align: top;
+    margin-top: 4px;
+    margin-bottom: 4px;
+    width: 49%;
+    display: inline-block;
+}
+
+.chat-info a {
+    display: flex;
+    vertical-align: top;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    text-decoration: none;
+    height: 25px;
+    text-align: center;
+    border-radius: 5px;
+}
+
+.chat-info a > p {
+    text-align: center;
+    flex: 0 0 120px;
+    color: #000000;
+}
+
+.chat-info-join {
+    background: #FFFFFF;
+}
+
+.chat-info-join-premium {
+    background: #FFE55C;
+}
+
+@media only screen and (max-width: 1100px) {
+    .chat {
+        height: 9.5%;
+    }
+    .chats-h1 {
+        margin-bottom: 100px;
+        height: 1px;
+    }
+    .chat-info {
+        float: right;
+        margin-top: -90px;
+        width: 102%;
+        margin-left: 0;
+    }
+    .chat-info h1 {
+        font-size: 120%;
+        margin-bottom: 0;
+        margin-top: 15px;
+        height: 50%;
+    }
+    .chat-info p {
+        margin-top: 0;
+        margin-bottom: 5px;
+        font-size: 80%;
+    }
+    .chat-info p, .chat-info h1 {
+        float: right;
+        width: 65%;
+        height: 20px;
+    }
+    .chat-info a {
+        width: 100%;
+        margin-top: 10px;
+        height: 80%;
+        float: left;
+    }
+    .chat-info a > p {
+        font-size: 100%;
+        width: 100%;
+        margin-bottom: 10px;
+    }
 }

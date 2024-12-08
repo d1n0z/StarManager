@@ -1684,9 +1684,9 @@ def premium_sent(uid, name, nickname):
     return get('premium_sent', uid=uid, n=n)
 
 
-def chat(uid, uname, chat_id, bind, gbind, muted, banned, users, time, prefix, chat_name):
+def chat(uid, uname, chat_id, bind, gbind, public, muted, banned, users, time, prefix, chat_name):
     return get('chat', prefix=prefix, uid=uid, uname=uname, chat_id=chat_id, chat_name=chat_name, bind=bind,
-               gbind=gbind, banned=banned, muted=muted, users=users, time=time)
+               gbind=gbind, public=public, banned=banned, muted=muted, users=users, time=time)
 
 
 def getnick(res, names, members, query):
@@ -2298,11 +2298,9 @@ def transfer_community():
     return get('transfer_community')
 
 
-def transfer(uid, uname, id, name, xp, u_prem):
-    if int(u_prem) == 0:
-        return get('transfer', uid=uid, uname=uname, xp=xp, id=id, name=name)
-    else:
-        return get('transfer_nocom', uid=uid, uname=uname, xp=xp, id=id, name=name)
+def transfer(uid, uname, id, name, xp, com):
+    com = '' if com == 0 else f' с учётом комиссии {com}%'
+    return get('transfer', uid=uid, uname=uname, xp=xp, id=id, name=name, com=com)
 
 
 def transfer_not_allowed():
@@ -2749,3 +2747,31 @@ def timeout(activated):
 
 def timeout_settings():
     return get('timeout_settings')
+
+
+def chats():
+    return get('chats')
+
+
+def setprem(id):
+    return get('setprem', id=id)
+
+
+def setprem_hint():
+    return get('setprem_hint')
+
+
+def delprem(id):
+    return get('delprem', id=id)
+
+
+def delprem_hint():
+    return get('delprem_hint')
+
+
+def premchat(uid, name):
+    return get('premchat', uid=uid, name=name)
+
+
+def premlist(prem):
+    return get('premlist') + '\n' + '\n'.join(str(i[0]) for i in prem)

@@ -10,7 +10,7 @@ import messages
 from Bot.checkers import haveAccess
 from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserAccessLevel, getUserName, getUserNickname, kickUser, \
-    getUserBan, getChatName, getGroupName, getpool, sendMessage
+    getUserBan, getChatName, getGroupName, getpool, sendMessage, ischatPubic
 from config.config import API
 from db import pool
 
@@ -57,7 +57,7 @@ async def skick(message: Message):
     success = 0
     for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
-        if not await haveAccess('skick', chat_id, u_acc):
+        if not await haveAccess('skick', chat_id, u_acc) or await getUserAccessLevel(id, chat_id) >= u_acc:
             continue
 
         kick_res = await kickUser(id, chat_id)
@@ -125,7 +125,7 @@ async def sban(message: Message):
     success = 0
     for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
-        if not await haveAccess('sban', chat_id, u_acc):
+        if not await haveAccess('sban', chat_id, u_acc) or await getUserAccessLevel(id, chat_id) >= u_acc:
             continue
 
         if await getUserBan(id, chat_id) >= time.time():
@@ -216,7 +216,7 @@ async def sunban(message: Message):
     success = 0
     for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
-        if (u_acc < await haveAccess('sunban', chat_id, u_acc) or
+        if (not await haveAccess('sunban', chat_id, u_acc) or
                 await getUserAccessLevel(id, chat_id) >= u_acc or
                 await getUserBan(id, chat_id) <= time.time()):
             continue
@@ -269,7 +269,7 @@ async def ssnick(message: Message):
     success = 0
     for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
-        if not await haveAccess('ssnick', chat_id, u_acc) or await getUserAccessLevel(id, chat_id) > u_acc:
+        if not await haveAccess('ssnick', chat_id, u_acc) or await getUserAccessLevel(id, chat_id) >= u_acc:
             continue
         async with (await pool()).connection() as conn:
             async with conn.cursor() as c:
@@ -322,7 +322,7 @@ async def srnick(message: Message):
     success = 0
     for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
-        if not await haveAccess('srnick', chat_id, u_acc):
+        if not await haveAccess('srnick', chat_id, u_acc) or await getUserAccessLevel(id, chat_id) >= u_acc:
             continue
         ch_acc = await getUserAccessLevel(id, chat_id)
         if ch_acc > u_acc:
@@ -390,6 +390,7 @@ async def chat(message: Message):
     members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = members.items
     id = [i for i in members if i.is_admin and i.is_owner][0].member_id
+    title = await getChatName(chat_id)
 
     names = await API.users.get(user_ids=id)
     try:
@@ -416,12 +417,15 @@ async def chat(message: Message):
             else:
                 bjd = 'Невозможно определить'
 
-    members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
-    members = members.items
-    title = await getChatName(chat_id)
+            if await (await c.execute('select id from publicchats where chat_id=%s and isopen=true',
+                                      (chat_id,))).fetchone():
+                public = 'Открытый'
+            else:
+                public = 'Приватный'
 
     if prefix == 'club':
         id = -int(id)
-    msg = messages.chat(id, name, chat_id, chatgroup, gpool, muted, banned, len(members), bjd, prefix, title)
-    kb = None if await getUserAccessLevel(message.from_id, chat_id) < 7 else keyboard.settings_goto(message.from_id)
+    msg = messages.chat(id, name, chat_id, chatgroup, gpool, public, muted, banned, len(members), bjd, prefix, title)
+    kb = None if not await haveAccess('settings', chat_id, await getUserAccessLevel(message.from_id, chat_id)) else (
+        keyboard.chat(message.from_id, public == 'Открытый'))
     await message.reply(disable_mentions=1, message=msg, keyboard=kb)

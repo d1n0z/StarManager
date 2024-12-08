@@ -13,32 +13,62 @@
     {% csrf_token %}
     <div class="price">
         <div class="price-row">
-            <div class="price-col">
-                <ul class="price-ul">
-                    <li class="price-li"><a>99 ₽ <s>120 ₽</s></a></li>
-                    <li class="price-li"><a>30 Дней</a></li>
-                    <li>
-                        <input class="btn btn-white btn-animate input-btn" type="submit" value="Купить" name="99"/>
-                        <br class="btnbr"></li>
-                </ul>
+            <div class="price-col-container">
+                <div class="price-col">
+                    <ul class="price-ul">
+                        <li class="price-li"><a>99 ₽ <s>120 ₽</s></a></li>
+                        <li class="price-li"><a>30 Дней</a></li>
+                    </ul>
+                    <input class="btn btn-white btn-animate input-btn price-btn"
+                           type="submit" value="Купить" name="99"/>
+                </div>
             </div>
-            <div class="price-col">
-                <ul class="price-ul">
-                    <li class="price-li"><a>499 ₽ <s>720 ₽</s></a></li>
-                    <li class="price-li"><a>180 Дней</a></li>
-                    <li>
-                        <input class="btn btn-white btn-animate input-btn" type="submit" value="Купить" name="499"/>
-                        <br class="btnbr"></li>
-                </ul>
+            <div class="price-col-container">
+                <div class="price-col">
+                    <ul class="price-ul">
+                        <li class="price-li"><a>499 ₽ <s>720 ₽</s></a></li>
+                        <li class="price-li"><a>180 Дней</a></li>
+                    </ul>
+                    <input class="btn btn-white btn-animate input-btn price-btn"
+                           type="submit" value="Купить" name="499"/>
+                </div>
             </div>
-            <div class="price-col" onclick="">
-                <ul class="price-ul">
-                    <li class="price-li"><a>249 ₽ <s>360 ₽</s></a></li>
-                    <li class="price-li"><a>90 Дней</a></li>
-                    <li>
-                        <input class="btn btn-white btn-animate input-btn" type="submit" value="Купить" name="249"/>
-                        <br class="btnbr"></li>
-                </ul>
+            <div class="price-col-container">
+                <div class="price-col" onclick="">
+                    <ul class="price-ul">
+                        <li class="price-li"><a>249 ₽ <s>360 ₽</s></a></li>
+                        <li class="price-li"><a>90 Дней</a></li>
+                    </ul>
+                    <input class="btn btn-white btn-animate input-btn price-btn"
+                           type="submit" value="Купить" name="249"/>
+                </div>
+            </div>
+            <div class="price-col-container">
+                <div class="price-col" onclick="">
+                    <ul class="price-ul">
+                        <li class="price-li"><a>199 ₽ <s>300 ₽</s></a></li>
+                        <li class="price-li"><a>Premium-чат</a></li>
+                    </ul>
+                    {% if error %}
+                        {% if error == "chatid" %}
+                            <p class="price-p" style="color: #ff0000;">Вы не являетесь владельцем этой беседы!</p>
+                        {% elif error == "chatnone" %}
+                            <p class="price-p" style="color: #ff0000;">Введите ID беседы!</p>
+                        {% elif error == "chatnoacc" %}
+                            <p class="price-p" style="color: #ff0000;">Беседы с данным ID не существует!</p>
+                        {% elif error == "chatalready" %}
+                            <p class="price-p" style="color: #ff0000;">Данная беседа уже имеет Premium-статус.</p>
+                        {% else %}
+                            <p class="price-p" style="color: #ff0000;">Неизвестная ошибка.</p>
+                        {% endif %}
+                    {% endif %}
+                    <label class="btn-text">
+                        <input class="btn btn-text btn-white btn-animate input-btn price-btn" type="text" value=""
+                               name="chatid" minlength="1" maxlength="9" placeholder="Введите ID чата..."/>
+                    </label>
+                    <input class="btn btn-multiform btn-white btn-animate input-btn price-btn" type="submit"
+                           value="Купить" name="199"/>
+                </div>
             </div>
         </div>
     </div>

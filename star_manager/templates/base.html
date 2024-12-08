@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <title>Star Manager</title>
     <link href='https://fonts.googleapis.com/css?family=Montserrat' rel='stylesheet'>
-    <link rel="stylesheet" href="{% static 'bot_manager/css/style.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'bot_manager/css/style.css' %}?{% now "U" %}" />
     <link rel="icon" href="{% static 'bot_manager/materials/shortlogo.png' %}" type="image/x-icon">
 </head>
 <body>
@@ -13,6 +13,9 @@
     <nav>
         <a href="{% url 'home' %}"><img src="{% static 'bot_manager/materials/logo.jpg' %}" alt="logo"></a>
         <ul>
+            <li>
+                <button><a href="{% url 'chats' %}">Чаты</a></button>
+            </li>
             <li>
                 <button><a href="{{ vk }}" target="_blank">ВКонтакте</a></button>
             </li>
@@ -30,31 +33,5 @@
     </nav>
 </div>
 {% block content %} {% endblock %}
-<!--<footer>-->
-<!--    <div class="footer-container">-->
-<!--        <div class="contact">-->
-<!--            <p>Email - <a href="mailto:{{ email }}" target="_blank">{{ email }}</a></p>-->
-<!--            <p>ВКонтакте - <a href="{{ vk }}" target="_blank">https://vk.com/star_manager</a></p>-->
-<!--            <p>Телеграм - <a href="{{ tg }}" target="_blank">https://t.me/star_manager_news</a></p>-->
-<!--        </div>-->
-
-<!--        <div class="privacy">-->
-<!--            <p><a href="{% static 'bot_manager/docs/privacy.pdf' %}" target="_blank">-->
-<!--                Политика обработки <br>персональных данных-->
-<!--            </a></p>-->
-<!--            <p><a href="{% static 'bot_manager/docs/aferta.pdf' %}" target="_blank">-->
-<!--                Аферта-->
-<!--            </a></p>-->
-<!--        </div>-->
-
-<!--        <div class="footer-data">-->
-<!--            <p>Самозанятость - Копытов Илья Александрович</p>-->
-<!--            <p>ИНН - 632139420955</p>-->
-<!--            <p><a href="{% static 'bot_manager/docs/uchet.pdf' %}" target="_blank">-->
-<!--                    Справка о постановке на учёт-->
-<!--            </a></p>-->
-<!--        </div>-->
-<!--    </div>-->
-<!--</footer>-->
 </body>
 </html>

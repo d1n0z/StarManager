@@ -49,7 +49,7 @@ async def gdelaccess(message: Message):
     success = 0
     for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
-        if not await haveAccess('gdelaccess', chat_id, u_acc) or await getUserAccessLevel(id, chat_id) > u_acc:
+        if not await haveAccess('gdelaccess', chat_id, u_acc) or await getUserAccessLevel(id, chat_id) >= u_acc:
             continue
         await setUserAccessLevel(id, chat_id, 0)
         success += 1
@@ -229,7 +229,7 @@ async def sdelaccess(message: Message):
     success = 0
     for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
-        if not await haveAccess('sdelaccess', chat_id, u_acc) or await getUserAccessLevel(id, chat_id) > u_acc:
+        if not await haveAccess('sdelaccess', chat_id, u_acc) or await getUserAccessLevel(id, chat_id) >= u_acc:
             continue
         await setUserAccessLevel(id, chat_id, 0)
         success += 1

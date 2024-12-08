@@ -15,7 +15,7 @@ from Bot.megadrive import mega_drive
 from Bot.tgbot import tgbot
 from Bot.utils import sendMessage, chunks, punish, getUserName
 from config.config import DATABASE, PASSWORD, USER, TG_CHAT_ID, NEWSEASON_REWARDS, TASKS_DAILY, \
-    PREMIUM_TASKS_DAILY, DAILY_TO, API, IMPLICIT_API, GROUP_ID, TG_BACKUP_THREAD_ID
+    PREMIUM_TASKS_DAILY, DAILY_TO, API, IMPLICIT_API, GROUP_ID, TG_BACKUP_THREAD_ID, PHOTO_NOT_FOUND
 from db import pool
 
 
@@ -121,9 +121,9 @@ async def backup() -> None:
         await sendMessage(DAILY_TO + 2000000000, f'e from schedule backup:\n{e}')
 
 
-async def updateNames():
+async def updateInfo():
     try:
-        await sendMessage(DAILY_TO + 2000000000, 'update_names: 0%')
+        await sendMessage(DAILY_TO + 2000000000, 'update_info: 0%')
 
         async with (await pool()).connection() as conn:
             async with conn.cursor() as c:
@@ -155,11 +155,34 @@ async def updateNames():
                                             [(name.name, -abs(name.id)) for name in names.groups])
                     except:
                         traceback.print_exc()
+
+                for i in await c.execute('select chat_id from publicchatssettings where last_update>%s',
+                                         (int(time.time()) - 43200,)):
+                    try:
+                        link = (await API.messages.get_invite_link(peer_id=2000000000 + i[0])).link
+                        preview = await IMPLICIT_API.messages.get_chat_preview(link=link)
+                        photo = PHOTO_NOT_FOUND
+                        if preview.preview and preview.preview.photo:
+                            if preview.preview.photo.photo_200:
+                                photo = preview.preview.photo.photo_200
+                            if preview.preview.photo.photo_100:
+                                photo = preview.preview.photo.photo_100
+                            if preview.preview.photo.photo_50:
+                                photo = preview.preview.photo.photo_50
+                        await c.execute(
+                            'update publicchatssettings set link = %s, photo = %s, name = %s, members = %s, '
+                            'last_update = %s where chat_id=%s',
+                            (link, photo, preview.preview.title, preview.preview.members_count, int(time.time()), i[0]))
+                    except:
+                        await c.execute('delete from publicchatssettings where chat_id=%s', (i[0],))
+                        await c.execute('delete from publicchats where chat_id=%s', (i[0],))
+                    await asyncio.sleep(0.2)
+
                 await conn.commit()
-        await sendMessage(DAILY_TO + 2000000000, 'update_names: 100%')
+        await sendMessage(DAILY_TO + 2000000000, 'update_info: 100%')
     except Exception as e:
         traceback.print_exc()
-        await sendMessage(DAILY_TO + 2000000000, f'e from schedule update_names:\n{e}')
+        await sendMessage(DAILY_TO + 2000000000, f'e from schedule update_info:\n{e}')
 
 
 async def reboot():
@@ -323,6 +346,6 @@ async def run():
     aiocron.crontab('0 0 * * *', func=dailyTasks, loop=loop)
     aiocron.crontab('0 0 * * 1', func=weeklyTasks, loop=loop)
     aiocron.crontab('0 3/6 * * *', func=backup, loop=loop)
-    aiocron.crontab('0 1/3 * * *', func=updateNames, loop=loop)
+    aiocron.crontab('0 1/3 * * *', func=updateInfo, loop=loop)
     aiocron.crontab('50 23 * * *', func=reboot, loop=loop)
     aiocron.crontab('0 0 1 * *', func=new_season, loop=loop)

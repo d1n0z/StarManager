@@ -18,7 +18,7 @@ from Bot.utils import sendMessageEventAnswer, editMessage, getUserAccessLevel, g
     getUserName, getUserNickname, kickUser, getXPTop, getChatName, addWeeklyTask, \
     addDailyTask, getUserBan, getUserWarns, getUserMute, getULvlBanned, getChatSettings, turnChatSetting, \
     deleteMessages, setChatMute, getChatAltSettings, getChatMembers, getChatOwner, getUserPremmenuSettings, \
-    getSilenceAllowed, sendMessage, getSilence, setUserAccessLevel
+    getSilenceAllowed, sendMessage, getSilence, setUserAccessLevel, getGroupName
 from config.config import API, COMMANDS, DEVS, TASKS_LOTS, TASKS_DAILY, PREMIUM_TASKS_DAILY, SETTINGS_COUNTABLE, \
     TG_CHAT_ID, TG_NEWCHAT_THREAD_ID, SETTINGS_PREMIUM
 from db import pool
@@ -96,7 +96,7 @@ async def join(message: MessageEvent):
                                           f'{datetime.now().strftime("%H:%M:%S")}',
                                      disable_web_page_preview=True, parse_mode='HTML')
         except:
-            traceback.print_exc()
+            pass
 
         msg = messages.start()
         await editMessage(msg, peer_id, message.conversation_message_id)
@@ -265,7 +265,7 @@ async def settings(message: MessageEvent):
         setting = payload['setting']
         if setting in SETTINGS_PREMIUM and not await getUserPremium(uid):
             await editMessage(messages.no_prem(), peer_id, message.conversation_message_id,
-                              keyboard.settings_goto(uid, True))
+                              keyboard.settings_goto(uid))
             return
         if setting not in SETTINGS_COUNTABLE:
             await turnChatSetting(chat_id, category, setting)
@@ -305,7 +305,7 @@ async def settings_change_countable(message: MessageEvent):
 
     if setting in SETTINGS_PREMIUM and not await getUserPremium(uid):
         await editMessage(messages.no_prem(), peer_id, message.conversation_message_id,
-                          keyboard.settings_goto(uid, True))
+                          keyboard.settings_goto(uid))
         return
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
@@ -376,7 +376,7 @@ async def settings_set_punishment(message: MessageEvent):
 
     if setting in SETTINGS_PREMIUM and not await getUserPremium(uid):
         await editMessage(messages.no_prem(), peer_id, message.conversation_message_id,
-                          keyboard.settings_goto(uid, True))
+                          keyboard.settings_goto(uid))
         return
     if action in ['deletemessage', 'kick']:
         async with (await pool()).connection() as conn:
@@ -411,7 +411,7 @@ async def settings_exceptionlist(message: MessageEvent):
 
     if setting in SETTINGS_PREMIUM and not await getUserPremium(uid):
         await editMessage(messages.no_prem(), peer_id, message.conversation_message_id,
-                          keyboard.settings_goto(uid, True))
+                          keyboard.settings_goto(uid))
         return
     if setting == 'disallowLinks':
         async with (await pool()).connection() as conn:
@@ -435,7 +435,7 @@ async def settings_listaction(message: MessageEvent):
 
     if setting in SETTINGS_PREMIUM and not await getUserPremium(uid):
         await editMessage(messages.no_prem(), peer_id, message.conversation_message_id,
-                          keyboard.settings_goto(uid, True))
+                          keyboard.settings_goto(uid))
         return
 
     async with (await pool()).connection() as conn:
@@ -1814,3 +1814,56 @@ async def timeout_settings(message: MessageEvent):
             await conn.commit()
     await editMessage(messages.timeout_settings(), peer_id, message.conversation_message_id,
                       keyboard.timeout_settings(message.user_id, allowed))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['turnpublic']))
+async def turnpublic(message: MessageEvent):
+    peer_id = message.object.peer_id
+    chat_id = peer_id - 2000000000
+
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if not (await c.execute('update publicchats set isopen=not isopen where chat_id=%s', (chat_id,))).rowcount:
+                await c.execute('insert into publicchats (chat_id, premium, isopen) values (%s, false, true)',
+                                (chat_id,))
+            await conn.commit()
+
+            chatgroup = 'Привязана' if (await (await c.execute(
+                'select count(*) as c from chatgroups where chat_id=%s', (chat_id,))).fetchone())[0] else 'Не привязана'
+            gpool = 'Привязана' if (await (await c.execute(
+                'select count(*) as c from gpool where chat_id=%s', (chat_id,))).fetchone())[0] else 'Не привязана'
+
+            muted = (await (await c.execute('select count(*) as c from mute where chat_id=%s and mute>%s',
+                                            (chat_id, int(time.time())))).fetchone())[0]
+            banned = (await (await c.execute('select count(*) as c from ban where chat_id=%s and ban>%s',
+                                             (chat_id, int(time.time())))).fetchone())[0]
+
+            if bjd := await (await c.execute('select time from botjoineddate where chat_id=%s', (chat_id,))).fetchone():
+                bjd = datetime.utcfromtimestamp(bjd[0]).strftime('%d.%m.%Y %H:%M')
+            else:
+                bjd = 'Невозможно определить'
+
+            if await (await c.execute('select id from publicchats where chat_id=%s and isopen=true',
+                                      (chat_id,))).fetchone():
+                public = 'Открытый'
+            else:
+                public = 'Приватный'
+                await c.execute('delete from publicchatssettings where chat_id=%s', (chat_id,))
+                await conn.commit()
+
+    members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
+    members = members.items
+    id = [i for i in members if i.is_admin and i.is_owner][0].member_id
+    title = await getChatName(chat_id)
+
+    names = await API.users.get(user_ids=id)
+    try:
+        name = f"{names[0].first_name} {names[0].last_name}"
+        prefix = 'id'
+    except:
+        prefix = 'club'
+        name = await getGroupName(-int(id))
+
+    msg = messages.chat(id, name, chat_id, chatgroup, gpool, public, muted, banned, len(members), bjd, prefix, title)
+    kb = keyboard.chat(message.user_id, public == 'Открытый')
+    await editMessage(msg, peer_id, message.conversation_message_id, kb)

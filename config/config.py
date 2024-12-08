@@ -4,16 +4,18 @@ from vk_api import vk_api
 from vkbottle import API as VKAPI
 from configparser import ConfigParser
 
-PATH = '/root/StarManager/'
 
 config = ConfigParser()
-config.read(f'{PATH}config/config.ini')  # write existing path here
+config.read(f'{__file__.replace("config.py", "")}config.ini')
+
+PATH = config['SERVICE']['PATH']
 
 VK_TOKEN_GROUP = config['VK']['VK_TOKEN_GROUP']
-GROUP_ID = int(config['VK']['GROUP_ID'])  # without "-"
+GROUP_ID = abs(int(config['VK']['GROUP_ID']))
 VK_TOKEN_IMPLICIT_FLOW = config['VK']['VK_TOKEN_IMPLICIT_FLOW']
 VK_APP_ID = config['VK']['VK_APP_ID']
 VK_APP_SECRET = config['VK']['VK_APP_SECRET']
+
 
 LVL_NAMES = ["Обычный Пользователь", "Смотрящий", "Модератор", "Старший Модератор", "Администратор",
              "Спец администратор", "Руководитель", "Владелец", "DEV"]
@@ -21,7 +23,7 @@ LVL_NAMES = ["Обычный Пользователь", "Смотрящий", "�
 COMMANDS = {
     "start": 0, "help": 0, "id": 0, "stats": 0, "report": 0, "mtop": 0, "q": 0, "premium": 0, "bonus": 0, "transfer": 0,
     "duel": 0, "cmd": 0, "premmenu": 0, "test": 0, "task": 0, "getdev": 0, "anon": 0, "chatid": 0, "prefix": 0,
-    "deanon": 0,
+    "deanon": 0, "chats": 0, "catalog": 0,
 
     "kick": 1, "mute": 1, "warn": 1, "clear": 1, "staff": 1, "olist": 1, "getnick": 1, "snick": 1, "rnick": 1,
     "nlist": 1, "check": 1, "mkick": 1,
@@ -47,7 +49,7 @@ COMMANDS = {
     "reportwarn": 8, "reboot": 8, "sudo": 8, "givexp": 8, "reimport": 8, "resetlvl": 8, "getuserchats": 8, "helpdev": 8,
     "getchats": 8, "gettransferhistory": 8, "gettransferhistoryto": 8, "gettransferhistoryfrom": 8, "lvlunban": 8,
     "getmessageshistory": 8, "lvlban": 8, "lvlbanlist": 8, "msgscount": 8, "msgsaverage": 8, "mwaverage": 8,
-    "chatsstats": 8,
+    "chatsstats": 8, "setprem": 8, "delprem": 8, "premlist": 8,
 }
 PM_COMMANDS = [
     "anon", "deanon",
@@ -147,6 +149,7 @@ DAILY_TO = int(config['SERVICE']['DAILY_TO'])
 BACKUPS_TO = int(config['SERVICE']['BACKUPS_TO'])
 REPORT_TO = int(config['SERVICE']['REPORT_TO'])
 CHEATING_TO = int(config['SERVICE']['CHEATING_TO'])
+PHOTO_NOT_FOUND = config['SERVICE']['PHOTO_NOT_FOUND']
 
 REPORT_CD = 300  # cooldown in seconds
 

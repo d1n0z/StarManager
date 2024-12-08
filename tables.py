@@ -646,3 +646,30 @@ class Captcha(Model):
     class Meta:
         database = dbhandle
         table_name = f'captcha'
+
+
+class PublicChats(Model):
+    chat_id = IntegerField(index=True, unique=True)
+    premium = BooleanField()
+    isopen = BooleanField(default=False)
+
+    class Meta:
+        database = dbhandle
+        table_name = f'publicchats'
+
+
+class PublicChatsSettings(Model):
+    chat_id = IntegerField(index=True, unique=True)
+    link = TextField()
+    photo = TextField()
+    name = TextField()
+    members = IntegerField()
+    last_update = BigIntegerField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'publicchatssettings'
+
+
+if __name__ == '__main__':
+    dbhandle.create_tables(Model.__subclasses__())

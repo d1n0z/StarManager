@@ -51,7 +51,7 @@ async def delasync(message: Message):
     uid = message.from_id
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
-            if not (await c.execute('delete from gpool where uid=%s and chat_id=%s', (uid, chat_id))).rowcount:
+            if not (await c.execute('delete from gpool where uid=%s and chat_id=%s', (uid, delchid))).rowcount:
                 msg = messages.delasync_already_unbound()
                 await message.reply(disable_mentions=1, message=msg)
                 return
@@ -72,7 +72,7 @@ async def creategroup(message: Message):
         await message.reply(disable_mentions=1, message=msg)
         return
 
-    group_name = message.text[13:]
+    group_name = ''.join(message.text.split()[1:])
     pattern = re.compile(r"[a-zA-Z0-9]")
     if len(pattern.findall(group_name)) != len(group_name) or len(group_name) > 16:
         msg = messages.creategroup_incorrect_name()
@@ -148,7 +148,7 @@ async def unbind(message: Message):
                 msg = messages.unbind_group_not_found(group_name)
                 await message.reply(disable_mentions=1, message=msg)
                 return
-            if not await (await c.execute('delete from chatgroups where "group"=%s and chat_id=%s',
+            if not (await c.execute('delete from chatgroups where "group"=%s and chat_id=%s',
                                           (group_name, chat_id))).rowcount:
                 msg = messages.unbind_chat_already_unbound(group_name)
                 await message.reply(disable_mentions=1, message=msg)
@@ -403,13 +403,13 @@ async def editlevel(message: Message):
 async def giveowner(message: Message):
     chat_id = message.peer_id - 2000000000
     id = await getIDFromMessage(message.text, message.reply_message)
-    if id is not None:
-        kb = keyboard.giveowner(chat_id, id, message.from_id)
-        msg = messages.giveowner_ask()
-        await message.reply(disable_mentions=1, message=msg, keyboard=kb)
-    else:
+    if not id or id < 0:
         msg = messages.giveowner_hint()
         await message.reply(disable_mentions=1, message=msg)
+        return
+    kb = keyboard.giveowner(chat_id, id, message.from_id)
+    msg = messages.giveowner_ask()
+    await message.reply(disable_mentions=1, message=msg, keyboard=kb)
 
 
 @bl.chat_message(SearchCMD('levelname'))

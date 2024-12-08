@@ -1,3 +1,5 @@
+from typing import Iterable
+
 from vkbottle import ABCRule
 from vkbottle.bot import Message, MessageEvent
 from vkbottle_types.events.bot_events import MessageNew

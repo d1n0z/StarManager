@@ -1,15 +1,15 @@
 import time
-import traceback
 from datetime import datetime
+from math import ceil
 
 from Bot.checkers import getUInfBanned, getULvlBanned
 from Bot.tgbot import tgbot
-from Bot.utils import getUserPremium, addUserXP, addWeeklyTask, addDailyTask, getChatName, getUserName
+from Bot.utils import getUserPremium, addUserXP, addWeeklyTask, addDailyTask, getChatName, getUserName, chatPremium
 from config.config import TG_CHAT_ID, TG_AUDIO_THREAD_ID
 from db import pool
 
 
-async def add_msg_counter(chat_id, uid, audio=False) -> None:
+async def add_msg_counter(chat_id, uid, audio=False) -> bool:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             if not (await c.execute('update messages set messages=messages+1 where chat_id=%s and uid=%s',
@@ -22,7 +22,18 @@ async def add_msg_counter(chat_id, uid, audio=False) -> None:
             await conn.commit()
 
     if await getUInfBanned(uid, chat_id) or await getULvlBanned(uid):
-        return
+        return False
+
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            lmt = await (await c.execute('select id, lm from xp where uid=%s', (uid,))).fetchone()
+            if lmt and time.time() - lmt[1] < 15:
+                return False
+            elif lmt:
+                await c.execute('update xp set lm = %s where uid=%s', (int(time.time()), uid))
+            else:
+                await c.execute('insert into xp (uid, xp, lm) values (%s, 0, %s)', (uid, int(time.time())))
+            await conn.commit()
 
     u_prem = await getUserPremium(uid)
     if audio:
@@ -35,24 +46,15 @@ async def add_msg_counter(chat_id, uid, audio=False) -> None:
                                           f'{datetime.now().strftime("%H:%M:%S")}',
                                      disable_web_page_preview=True, parse_mode='HTML')
         except:
-            traceback.print_exc()
+            pass
     else:
         addxp = 2
         await addWeeklyTask(uid, 'sendmsgs', checklvlbanned=False)
         await addDailyTask(uid, 'sendmsgs', checklvlbanned=False)
     if u_prem:
         addxp *= 2
-
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            lmt = await (await c.execute('select id, lm from xp where uid=%s', (uid,))).fetchone()
-            if lmt and time.time() - lmt[1] < 15:
-                return
-            elif lmt:
-                await c.execute('update xp set lm = %s where id=%s', (int(time.time()), uid))
-            else:
-                await c.execute('insert into xp (uid, xp, lm) values (%s, 0, %s)', (uid, int(time.time())))
-            await conn.commit()
+    if await chatPremium(chat_id):
+        addxp = ceil(addxp * 1.5)
 
     await addUserXP(uid, addxp, checklvlbanned=False)
-    return
+    return True

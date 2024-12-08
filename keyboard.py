@@ -149,11 +149,21 @@ def settings(uid):
     return kb.get_json()
 
 
-def settings_goto(uid, back=False):
+def chat(uid, ispublic=False):
     kb = Keyboard(inline=True)
 
-    name = 'Назад' if back else '⚙️ Настройки беседы'
-    kb.add(Callback(name, {"uid": uid, "cmd": "settings_menu"}))
+    kb.add(Callback('⚙️ Настройки беседы', {"uid": uid, "cmd": "settings_menu"}))
+    kb.row()
+    kb.add(Callback('Сделать приватной' if ispublic else 'Сделать публичной', {"uid": uid, "cmd": "turnpublic"}),
+           KeyboardButtonColor.POSITIVE if ispublic else KeyboardButtonColor.NEGATIVE)
+
+    return kb.get_json()
+
+
+def settings_goto(uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('Назад', {"uid": uid, "cmd": "settings_menu"}))
 
     return kb.get_json()
 
@@ -758,4 +768,10 @@ def timeout_settings(uid, allowed):
         if i % 2 == 0:
             kb.row()
 
+    return kb.get_json()
+
+
+def chats():
+    kb = Keyboard(inline=True)
+    kb.add(OpenLink(label='Список бесед', link='https://star-manager.ru/chats/'))
     return kb.get_json()

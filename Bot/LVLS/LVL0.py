@@ -1,7 +1,6 @@
 import random
 import re
 import time
-import traceback
 from datetime import datetime
 
 from vkbottle import AiohttpClient
@@ -16,7 +15,7 @@ from Bot.utils import (getIDFromMessage, getUserName, getRegDate, kickUser, getU
                        getUserLastMessage, getUserMute, getUserBan, getUserXP, getUserLVL, getUserNeededXP,
                        getUserPremium, getXPTop, uploadImage, addUserXP, isChatAdmin, getUserWarns, getUserMessages,
                        setUserAccessLevel, getChatName, addWeeklyTask, getULvlBanned, getChatSettings, deleteMessages,
-                       speccommandscheck, getUserPremmenuSettings, getUserPremmenuSetting)
+                       speccommandscheck, getUserPremmenuSettings, getUserPremmenuSetting, chatPremium)
 from config.config import (API, LVL_NAMES, PATH, REPORT_CD, REPORT_TO, COMMANDS, PREMIUM_TASKS_DAILY, TASKS_DAILY,
                            TG_CHAT_ID, TG_TRANSFER_THREAD_ID)
 from db import pool
@@ -240,10 +239,11 @@ async def bonus(message: Message):
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             bonus = await (await c.execute('select time from bonus where uid=%s', (uid,))).fetchone()
-    ltb = bonus[0] if bonus is not None else 0
+    lasttime = bonus[0] if bonus is not None else 0
 
-    if time.time() - ltb < 86400:
-        timeleft = ltb + 86400 - time.time()
+    reqtime = (28800 if await chatPremium(chat_id) else 86400)
+    if time.time() - lasttime < reqtime:
+        timeleft = lasttime + reqtime - time.time()
         msg = messages.bonus_time(uid, None, name, timeleft)
         await message.reply(disable_mentions=1, message=msg)
         return
@@ -478,9 +478,15 @@ async def transfer(message: Message):
         return
 
     if not u_prem:
-        ftxp = int(txp / 100 * 95)
+        if await chatPremium(chat_id):
+            ftxp = int(txp / 100 * 97.5)
+            com = 2.5
+        else:
+            ftxp = int(txp / 100 * 95)
+            com = 5
     else:
         ftxp = txp
+        com = 0
 
     await addUserXP(uid, -txp)
     await addUserXP(id, ftxp)
@@ -495,13 +501,13 @@ async def transfer(message: Message):
     try:
         await tgbot.send_message(chat_id=TG_CHAT_ID, message_thread_id=TG_TRANSFER_THREAD_ID,
                                  text=f'{chat_id} | <a href="vk.com/id{uid}">{uname}</a> | '
-                                      f'<a href="vk.com/id{id}">{name}</a> | {ftxp} | К: {not u_prem} | '
+                                      f'<a href="vk.com/id{id}">{name}</a> | {ftxp} | К: {com} | '
                                       f'{datetime.now().strftime("%H:%M:%S")}',
                                  disable_web_page_preview=True, parse_mode='HTML')
     except:
-        traceback.print_exc()
+        pass
 
-    msg = messages.transfer(uid, uname, id, name, ftxp, u_prem)
+    msg = messages.transfer(uid, uname, id, name, ftxp, com)
     await message.reply(disable_mentions=1, message=msg)
 
 
@@ -550,3 +556,10 @@ async def anon(message: Message):
 async def deanon(message: Message):
     msg = messages.anon_not_pm()
     await message.reply(msg, disable_mentions=1)
+
+
+@bl.chat_message(SearchCMD('chats'))
+async def deanon(message: Message):
+    msg = messages.chats()
+    kb = keyboard.chats()
+    await message.reply(msg, keyboard=kb, disable_mentions=1)

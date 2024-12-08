@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+<!--{% load static %}-->
+{% block content %}
+<div class="chats-container">
+    <div class="chats-block">
+        <h1 class="chats-h1">Чаты по сообщениям</h1>
+        <div class="chats">
+            {% for chat in chatsmessages %}
+            <div class="chat">
+                <img alt="photo" src="{{ chat.photo }}">
+                <div class="chat-info">
+                    <h1>{{ chat.name }}</h1>
+                    <p>Участников: {{ chat.members }}</p>
+                    <p>Сообщений: {{ chat.messages }}</p>
+                    <a href="{{ chat.url }}" target="_blank" class="chat-info-join"><p>Присоединиться</p></a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="chats-block">
+        <h1 class="chats-h1 h1-premium">Premium-чаты</h1>
+        <div class="chats chats-premium premium-border">
+            {% for chat in premiumchats %}
+            <div class="chat">
+                <img alt="photo" class="chat-info-photo-premium" src="{{ chat.photo }}">
+                <div class="chat-info">
+                    <h1>{{ chat.name }}</h1>
+                    <p>Участников: {{ chat.members }}</p>
+                    <p>Сообщений: {{ chat.messages }}</p>
+                    <a href="{{ chat.url }}" target="_blank" class="chat-info-join-premium"><p>Присоединиться</p></a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="chats-block">
+        <h1 class="chats-h1">Чаты по участникам</h1>
+        <div class="chats">
+            {% for chat in chatsmembers %}
+            <div class="chat">
+                <img alt="photo" src="{{ chat.photo }}">
+                <div class="chat-info">
+                    <h1>{{ chat.name }}</h1>
+                    <p>Участников: {{ chat.members }}</p>
+                    <p>Сообщений: {{ chat.messages }}</p>
+                    <a href="{{ chat.url }}" target="_blank" class="chat-info-join"><p>Присоединиться</p></a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        </>
+</div>
+{% endblock %}

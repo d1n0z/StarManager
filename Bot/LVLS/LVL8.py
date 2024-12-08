@@ -253,6 +253,96 @@ async def setstatus(message: Message):
     await sendMessage(id, msg)
 
 
+@bl.chat_message(SearchCMD('delstatus'))
+async def delstatus(message: Message):
+    chat_id = message.peer_id - 2000000000
+    uid = message.from_id
+    id = await getIDFromMessage(message.text, message.reply_message)
+    data = message.text.split()
+    if id == 0:
+        msg = messages.delstatus_hint()
+        await message.reply(msg)
+        return
+    if id < 0:
+        msg = messages.id_group()
+        await message.reply(msg)
+        return
+    dev_name = await getUserName(uid)
+    u_nickname = await getUserNickname(uid, chat_id)
+    u_name = await getUserName(id)
+    nick = await getUserNickname(id, chat_id)
+
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            await c.execute('delete from premium where uid=%s', (id,))
+            await conn.commit()
+
+    msg = messages.setstatus(uid, dev_name, u_nickname, id, u_name, nick)
+    await message.reply(msg)
+    msg = messages.ugiveStatus(data[2], uid, dev_name)
+    await sendMessage(id, msg)
+
+
+@bl.chat_message(SearchCMD('statuslist'))
+async def statuslist(message: Message):
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            prem = await (await c.execute('select uid, time from premium')).fetchall()
+    premium_uids = [i[0] for i in prem]
+    names = await API.users.get(user_ids=','.join([f'{i}' for i in premium_uids]))
+    msg = messages.statuslist(names, prem)
+    kb = keyboard.statuslist(message.from_id, 0, len(names))
+    await message.reply(msg, keyboard=kb)
+
+
+@bl.chat_message(SearchCMD('setprem'))
+async def setprem(message: Message):
+    uid = message.from_id
+    chat_id = await getIDFromMessage(message.text, message.reply_message)
+    if chat_id <= 0:
+        msg = messages.setprem_hint()
+        await message.reply(msg)
+        return
+
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if not (await c.execute('update publicchats set premium = true where chat_id=%s', (chat_id,))).rowcount:
+                await c.execute('insert into publicchats (chat_id, premium, isopen) values (%s, true, false)',
+                                (chat_id,))
+            await conn.commit()
+
+    msg = messages.setprem(chat_id)
+    await message.reply(msg)
+    msg = messages.premchat(uid, await getUserName(uid))
+    await sendMessage(2000000000 + chat_id, msg)
+
+
+@bl.chat_message(SearchCMD('delprem'))
+async def delprem(message: Message):
+    chat_id = await getIDFromMessage(message.text, message.reply_message)
+    if chat_id <= 0:
+        msg = messages.delprem_hint()
+        await message.reply(msg)
+        return
+
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            await c.execute('update publicchats set premium = false where chat_id=%s', (chat_id,))
+            await conn.commit()
+
+    msg = messages.delprem(chat_id)
+    await message.reply(msg)
+
+
+@bl.chat_message(SearchCMD('premlist'))
+async def permlist(message: Message):
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            prem = await (await c.execute('select chat_id from publicchats where premium=true')).fetchall()
+    msg = messages.premlist(prem)
+    await message.reply(msg)
+
+
 @bl.chat_message(SearchCMD('givexp'))
 async def givexp(message: Message):
     id = await getIDFromMessage(message.text, message.reply_message)
@@ -288,48 +378,6 @@ async def resetlvl(message: Message):
     except:
         msgsent += '\n❗ Пользователю не удалось отправить сообщение'
     await message.reply(msgsent)
-
-
-@bl.chat_message(SearchCMD('delstatus'))
-async def delstatus(message: Message):
-    chat_id = message.peer_id - 2000000000
-    uid = message.from_id
-    id = await getIDFromMessage(message.text, message.reply_message)
-    data = message.text.split()
-    if id == 0:
-        msg = messages.delstatus_hint()
-        await message.reply(msg)
-        return
-    if id < 0:
-        msg = messages.id_group()
-        await message.reply(msg)
-        return
-    dev_name = await getUserName(uid)
-    u_nickname = await getUserNickname(uid, chat_id)
-    u_name = await getUserName(id)
-    nick = await getUserNickname(id, chat_id)
-
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            await c.execute('delete from premium where uid=%s', (id,))
-            await conn.commit()
-
-    msg = messages.setstatus(uid, dev_name, u_nickname, id, u_name, nick)
-    await message.reply(msg)
-    msg = messages.ugiveStatus(data[2], uid, dev_name)
-    await sendMessage(id, msg)
-
-
-@bl.chat_message(SearchCMD('statuslist'))
-async def statuslist(message: Message):
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            prem = await (await c.execute('select uid, time from premium').fetchall())
-    premium_uids = [i[0] for i in prem]
-    names = await API.users.get(user_ids=','.join([f'{i}' for i in premium_uids]))
-    msg = messages.statuslist(names, prem)
-    kb = keyboard.statuslist(message.from_id, 0, len(names))
-    await message.reply(msg, keyboard=kb)
 
 
 @bl.chat_message(SearchCMD('infban'))

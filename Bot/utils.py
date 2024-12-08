@@ -3,6 +3,8 @@ import os
 import tempfile
 import time
 import traceback
+from cache.async_ttl import AsyncTTL
+from cache.async_lru import AsyncLRU
 from ast import literal_eval
 from datetime import date, datetime
 from typing import Iterable, Any
@@ -25,6 +27,7 @@ from config.config import (API, VK_API_SESSION, VK_TOKEN_GROUP, GROUP_ID, TASKS_
 from db import pool
 
 
+@AsyncTTL(time_to_live=300, maxsize=0)
 async def getUserName(uid: int) -> str:
     if uid < 0:
         return await getGroupName(uid)
@@ -136,6 +139,7 @@ async def editMessage(msg: str, peer_id: int, cmid: int, kb=None) -> bool:
         return False
 
 
+@AsyncTTL(time_to_live=15, maxsize=0)
 async def getChatName(chat_id: int = None) -> str:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
@@ -152,6 +156,7 @@ async def getChatName(chat_id: int = None) -> str:
             return chatname
 
 
+@AsyncTTL(time_to_live=600, maxsize=0)
 async def getGroupName(group_id: int) -> str:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
@@ -226,6 +231,7 @@ async def uploadImage(file: str, c: int = 0) -> str | None:
         raise Exception('Uploading failed after 6 retries') from e
 
 
+@AsyncLRU(maxsize=0)
 async def getRegDate(id: int, format: str = '%d %B %Y', none: Any = 'Не удалось определить') -> str | Any:
     try:
         urlmanager = urllib3.PoolManager()
@@ -349,6 +355,7 @@ async def getUserXP(uid, none=0) -> int:
             return none
 
 
+@AsyncLRU(maxsize=0)
 async def getUserLVL(xp):
     if xp > 100:
         return (xp - 100) // 200 + 2
@@ -356,6 +363,7 @@ async def getUserLVL(xp):
         return 1
 
 
+@AsyncLRU(maxsize=0)
 async def getUserNeededXP(xp):
     if xp >= 100:
         xp -= 100
@@ -364,6 +372,7 @@ async def getUserNeededXP(xp):
         return 100
 
 
+@AsyncTTL(time_to_live=120, maxsize=0)
 async def getXPTop(returnval='count', limit=0, chat: list = None) -> dict:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
@@ -384,6 +393,7 @@ async def getXPTop(returnval='count', limit=0, chat: list = None) -> dict:
         raise Exception('returnval must be "count", "xp" or "lvl"')
 
 
+@AsyncTTL(time_to_live=16, maxsize=0)
 async def getUserPremium(uid, none=0) -> int:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
@@ -467,6 +477,7 @@ async def getUserDuelWins(uid, none=0):
             return none
 
 
+@AsyncTTL(time_to_live=5, maxsize=0)
 async def getChatSettings(chat_id):
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
@@ -481,6 +492,7 @@ async def getChatSettings(chat_id):
     return chatsettings
 
 
+@AsyncTTL(time_to_live=5, maxsize=0)
 async def getChatAltSettings(chat_id):
     chatsettings = SETTINGS_ALT()
     async with (await pool()).connection() as conn:
@@ -501,9 +513,10 @@ async def turnChatSetting(chat_id, category, setting, alt=False):
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             if not (await c.execute('update settings set ' +
-                                    ('pos2=not pos2' if alt else 'pos=not pos') + ' where chat_id=%s and setting=%s',
+                                    ('pos2=not pos2' if alt else 'pos=not pos') + ' where chat_id=%s and setting=%s;',
                                     (chat_id, setting))).rowcount:
-                await c.execute('insert into settings (chat_id, setting, pos) values (%s, %s, %s)',
+                await c.execute('insert into settings (chat_id, setting, ' +
+                                ('pos2' if alt else 'pos') + ') values (%s, %s, %s)',
                                 (chat_id, setting, not defaults['pos']))
             await conn.commit()
 
@@ -719,6 +732,7 @@ def chunks(li, n):
         yield li[i:i + n]
 
 
+@AsyncTTL(time_to_live=120, maxsize=0)
 async def getULvlBanned(uid) -> bool:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
@@ -727,6 +741,7 @@ async def getULvlBanned(uid) -> bool:
             return False
 
 
+@AsyncTTL(time_to_live=600, maxsize=0)
 async def generateCaptcha(uid, chat_id, exp):
     gen = CaptchaGenerator()
     image = gen.gen_math_captcha_image(difficult_level=2, multicolor=True)
@@ -861,7 +876,24 @@ async def getSilenceAllowed(chat_id):
     return []
 
 
+@AsyncLRU(maxsize=0)
 def hex_to_rgb(value):
     value = value.lstrip('#')
     lv = len(value)
     return tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
+
+
+async def chatPremium(chat_id, none=False):
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if pr := await (await c.execute('select premium from publicchats where chat_id=%s', (chat_id,))).fetchone():
+                return pr[0]
+            return none
+
+
+async def ischatPubic(chat_id, none=False):
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if pr := await (await c.execute('select isopen from publicchats where chat_id=%s', (chat_id,))).fetchone():
+                return pr[0]
+            return none
