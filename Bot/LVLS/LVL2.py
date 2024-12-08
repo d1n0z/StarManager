@@ -160,7 +160,7 @@ async def setaccess(message: Message):
     ch_acc = await getUserAccessLevel(id, chat_id)
     u_name = await getUserName(uid)
     name = await getUserName(id)
-    if not (0 < acc < 7):
+    if not (0 < acc < 7) and uid not in MAIN_DEVS:
         msg = messages.setacc_hint()
         await message.reply(disable_mentions=1, message=msg)
         return
