@@ -278,8 +278,12 @@ async def gmute(message: Message):
             mute_time = int(data[2]) * 60
         else:
             mute_time = int(data[1]) * 60
+        if mute_time <= 0:
+            raise
     except:
-        mute_time = 0
+        msg = messages.gmute_hint()
+        await message.reply(disable_mentions=1, message=msg)
+        return
 
     if message.reply_message is None:
         mute_cause = ' '.join(data[3:])

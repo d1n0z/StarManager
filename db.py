@@ -1,6 +1,7 @@
 from psycopg_pool import AsyncConnectionPool, ConnectionPool
 
-from config.config import DATABASE, USER, PASSWORD, DATABASE_HOST, DATABASE_PORT
+from config.config import DATABASE_STR
+
 
 _pool = None
 _syncpool = None
@@ -9,8 +10,7 @@ _syncpool = None
 async def pool():
     global _pool
     if _pool is None:
-        _pool = AsyncConnectionPool(f'postgresql://{USER}:{PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE}',
-                                    max_size=200, open=False)
+        _pool = AsyncConnectionPool(DATABASE_STR, min_size=100, max_size=900, open=False)
         await _pool.open()
     return _pool
 
@@ -18,7 +18,6 @@ async def pool():
 def syncpool() -> ConnectionPool:
     global _syncpool
     if _syncpool is None:
-        _syncpool = ConnectionPool(f'postgresql://{USER}:{PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE}',
-                                   open=False)
+        _syncpool = ConnectionPool(DATABASE_STR, max_size=100, open=False)
         _syncpool.open()
     return _syncpool

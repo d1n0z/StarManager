@@ -612,6 +612,11 @@ async def NSFWDetector(pic_path):
     return False
 
 
+@cached()
+def whoiscached(text):
+    return whois.whois(text)
+
+
 async def antispamChecker(chat_id, uid, message: MessagesMessage, settings):
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
@@ -633,7 +638,7 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings):
                 for i in data:
                     for y in i.split('/'):
                         try:
-                            if whois.whois(y)['domain_name'] is None or y in ['vk.com', 'vk.ru']:
+                            if whoiscached(y)['domain_name'] is None or y in ['vk.com', 'vk.ru']:
                                 continue
                         except:
                             continue

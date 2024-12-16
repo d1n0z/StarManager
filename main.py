@@ -1,4 +1,3 @@
-import asyncio
 import sys
 import time
 import traceback
@@ -59,4 +58,3 @@ def main(retry=0, vkbot=VkBot()):
 
 if __name__ == '__main__':
     main()
-

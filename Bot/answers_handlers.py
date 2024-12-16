@@ -5,14 +5,13 @@ import traceback
 from ast import literal_eval
 
 import requests
-import whois
 from vkbottle_types.events.bot_events import MessageNew
 from vkbottle_types.objects import MessagesMessageAttachmentType
 
 import keyboard
 import messages
 from Bot.utils import getUserName, getChatName, sendMessage, editMessage, uploadImage, deleteMessages, getUserNickname, \
-    hex_to_rgb
+    hex_to_rgb, whoiscached
 from config.config import REPORT_TO, SETTINGS_COUNTABLE_MULTIPLE_ARGUMENTS, PATH, SETTINGS_COUNTABLE_SPECIAL_LIMITS
 from db import pool
 
@@ -260,7 +259,7 @@ async def queue_handler(event: MessageNew):
                     await sendMessage(chat_id + 2000000000, msg)
                     return
                 try:
-                    if whois.whois(text[-1])['domain_name'] is None:
+                    if whoiscached(text[-1])['domain_name'] is None:
                         raise
                 except:
                     msg = messages.get(queue[3] + '_no_url')
@@ -284,7 +283,7 @@ async def queue_handler(event: MessageNew):
                 if action == 'add':
                     url = event.object.message.text.replace(' ', '').replace('https://', '').replace('/', '')
                     try:
-                        if whois.whois(url)['domain_name'] is None:
+                        if whoiscached(url)['domain_name'] is None:
                             raise
                     except:
                         msg = messages.settings_change_countable_format_error()

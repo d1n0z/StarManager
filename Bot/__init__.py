@@ -8,6 +8,7 @@ from pydantic import v1
 from vkbottle import Bot, GroupEventType, GroupTypes, VKAPIError, LoopWrapper
 from vkbottle.framework.labeler import BotLabeler
 
+from Bot import scheduler
 from Bot.exception_handler import exception_handle
 from Bot.labelers import LABELERS
 from Bot.comment_handlers import comment_handle
@@ -31,6 +32,8 @@ class VkBot:
     def run(self):
 
         labeler = BotLabeler()
+
+        # self.bot.loop_wrapper.add_task(scheduler.run())
 
         @labeler.raw_event(GroupEventType.MESSAGE_REACTION_EVENT, dataclass=GroupTypes.MessageReactionEvent)
         async def start(event: GroupTypes.MessageReactionEvent):

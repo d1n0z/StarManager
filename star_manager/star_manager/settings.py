@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 import sys
 sys.path.append('/root/StarManager/')
-sys.path.append('../')
+# sys.path.append('../')
 from config import config
 import db as sdb
 

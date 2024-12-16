@@ -1,5 +1,4 @@
 import traceback
-from ast import literal_eval
 from datetime import datetime
 
 import messages
@@ -116,7 +115,7 @@ async def checkCMD(message, chat_id, fixing=False, accesstoalldevs=False, return
         msg = messages.inprogress()
         await message.reply(disable_mentions=1, message=msg)
         return False
-    
+
     if sgw := await isSGW(uid, message.date):
         await message.reply(messages.lock(sgw - message.date))
         return False
@@ -152,7 +151,7 @@ async def checkCMD(message, chat_id, fixing=False, accesstoalldevs=False, return
                 if await (await c.execute('select id from typequeue where chat_id=%s and uid=%s and type=\'captcha\'',
                                           (chat_id, uid))).fetchone():
                     return False
-    
+
     if returncmd:
         return cmd
     return True

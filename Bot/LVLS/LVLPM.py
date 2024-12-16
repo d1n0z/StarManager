@@ -1,7 +1,6 @@
 import time
 from datetime import datetime
 
-import whois
 from vkbottle.framework.labeler import BotLabeler
 from vkbottle_types import GroupTypes
 from vkbottle_types.events import GroupEventType
@@ -9,7 +8,7 @@ from vkbottle_types.events import GroupEventType
 import messages
 from Bot.rules import SearchPMCMD
 from Bot.utils import getUserName, getUserNickname, getUserPremium, getChatName, sendMessage, isChatMember, \
-    getChatSettings
+    getChatSettings, whoiscached
 from config.config import API, GROUP_ID
 from db import pool
 
@@ -41,7 +40,7 @@ async def anon(message: GroupTypes.MessageNew):
     for i in data:
         for y in i.split('/'):
             try:
-                if whois.whois(y)['domain_name'] is None:
+                if whoiscached(y)['domain_name'] is None:
                     continue
             except:
                 continue
