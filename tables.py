@@ -1,7 +1,7 @@
 from peewee import PostgresqlDatabase, Model, IntegerField, BigIntegerField, TextField, BooleanField, DateTimeField
-from config.config import USER, PASSWORD, DATABASE, DATABASE_PORT
+from config.config import USER, PASSWORD, DATABASE, DATABASE_PORT, DATABASE_HOST
 
-dbhandle = PostgresqlDatabase(DATABASE, user=USER, password=PASSWORD, host='localhost', port=DATABASE_PORT)
+dbhandle = PostgresqlDatabase(DATABASE, user=USER, password=PASSWORD, host=DATABASE_HOST, port=DATABASE_PORT)
 
 
 class AccessLevel(Model):
