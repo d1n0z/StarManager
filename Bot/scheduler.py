@@ -156,8 +156,8 @@ async def updateInfo():
                     except:
                         traceback.print_exc()
 
-                for i in await c.execute('select chat_id from publicchatssettings where last_update>%s',
-                                         (int(time.time()) - 43200,)):
+                for i in await (await c.execute('select chat_id from publicchatssettings where last_update>%s',
+                                               (int(time.time()) - 43200,))).fetchall():
                     try:
                         link = (await API.messages.get_invite_link(peer_id=2000000000 + i[0])).link
                         preview = await IMPLICIT_API.messages.get_chat_preview(link=link)
