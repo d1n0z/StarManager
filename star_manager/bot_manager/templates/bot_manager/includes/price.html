@@ -1,4 +1,5 @@
 {% load static %}
+{% load tag_library %}
 <h1 id="buy" class="price-h1">Прайс-лист</h1>
 <p class="price-p">
     *Покупая Premium, вы автоматически соглашаетесь с
@@ -16,37 +17,37 @@
             <div class="price-col-container">
                 <div class="price-col">
                     <ul class="price-ul">
-                        <li class="price-li"><a>99 ₽ <s>120 ₽</s></a></li>
+                        <li class="price-li"><a>{{ low }} ₽ <s>{{ low|multiplystr:"1.25" }} ₽</s></a></li>
                         <li class="price-li"><a>30 Дней</a></li>
                     </ul>
                     <input class="btn btn-white btn-animate input-btn price-btn"
-                           type="submit" value="Купить" name="99"/>
+                           type="submit" value="Купить" name="{{ low }}"/>
                 </div>
             </div>
             <div class="price-col-container">
                 <div class="price-col">
                     <ul class="price-ul">
-                        <li class="price-li"><a>499 ₽ <s>720 ₽</s></a></li>
+                        <li class="price-li"><a>{{ high }} ₽ <s>{{ high|multiplystr:"1.25" }} ₽</s></a></li>
                         <li class="price-li"><a>180 Дней</a></li>
                     </ul>
                     <input class="btn btn-white btn-animate input-btn price-btn"
-                           type="submit" value="Купить" name="499"/>
+                           type="submit" value="Купить" name="{{ high }}"/>
                 </div>
             </div>
             <div class="price-col-container">
                 <div class="price-col" onclick="">
                     <ul class="price-ul">
-                        <li class="price-li"><a>249 ₽ <s>360 ₽</s></a></li>
+                        <li class="price-li"><a>{{ medium }} ₽ <s>{{ medium|multiplystr:"1.25" }} ₽</s></a></li>
                         <li class="price-li"><a>90 Дней</a></li>
                     </ul>
                     <input class="btn btn-white btn-animate input-btn price-btn"
-                           type="submit" value="Купить" name="249"/>
+                           type="submit" value="Купить" name="{{ medium }}"/>
                 </div>
             </div>
             <div class="price-col-container">
                 <div class="price-col" onclick="">
                     <ul class="price-ul">
-                        <li class="price-li"><a>199 ₽ <s>300 ₽</s></a></li>
+                        <li class="price-li"><a>{{ premiumchat }} ₽ <s>{{ premiumchat|multiplystr:"1.25" }} ₽</s></a></li>
                         <li class="price-li"><a>Premium-чат</a></li>
                     </ul>
                     {% if error %}
@@ -67,7 +68,7 @@
                                name="chatid" minlength="1" maxlength="9" placeholder="Введите ID чата..."/>
                     </label>
                     <input class="btn btn-multiform btn-white btn-animate input-btn price-btn" type="submit"
-                           value="Купить" name="199"/>
+                           value="Купить" name="{{ premiumchat }}"/>
                 </div>
             </div>
         </div>

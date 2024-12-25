@@ -360,8 +360,6 @@ API = VKAPI(VK_TOKEN_GROUP)
 VK_API_SESSION = vk_api.VkApi(token=VK_TOKEN_GROUP, api_version='5.199')
 VK_API_IMPLICIT_SESSION = vk_api.VkApi(token=VK_TOKEN_IMPLICIT_FLOW, api_version='5.199')
 
-PREMIUM_COST = {30: 99, 90: 249, 180: 499}
-
 USER = config['DATABASE']['USER']
 PASSWORD = config['DATABASE']['PASSWORD']
 DATABASE = config['DATABASE']['DATABASE']
@@ -385,9 +383,14 @@ YOOKASSA_TOKEN = config['YOOKASSA']['YOOKASSA_TOKEN']
 MEGA_LOGIN = config['MEGA']['MEGA_LOGIN']
 MEGA_PASSWORD = config['MEGA']['MEGA_PASSWORD']
 
+PREMIUM_COST = {30: 149, 90: 349, 180: 599}
 data = {
     'email': config['SOCIALS']['email'],
     'vk': config['SOCIALS']['vk'],
     'vk_preminfo': config['SOCIALS']['vk_preminfo'],
     'tg': config['SOCIALS']['tg'],
+    'high': f'{PREMIUM_COST[180]}',
+    'medium': f'{PREMIUM_COST[90]}',
+    'low': f'{PREMIUM_COST[30]}',
+    'premiumchat': '199'
 }

@@ -107,14 +107,14 @@ def buy(request: HttpRequest):
         chatform = PremiumChatForm(request.POST)
         if form.is_valid() or chatform.is_valid():
             usersocial = UserSocialAuth.objects.select_related("user").filter(user_id=request.user.id)[0]
-            if '99' in request.POST:
-                cost = '99.00'
-            elif '249' in request.POST:
-                cost = '249.00'
-            elif '499' in request.POST:
-                cost = '499.00'
-            elif '199' in request.POST:
-                cost = '199.00'
+            if config.data['low'] in request.POST:
+                cost = config.data['low']
+            elif config.data['medium'] in request.POST:
+                cost = config.data['medium']
+            elif config.data['high'] in request.POST:
+                cost = config.data['high']
+            elif config.data['premiumchat'] in request.POST:
+                cost = config.data['premiumchat']
                 if not chatform.is_valid():
                     return render(request, "bot_manager/index.html", config.data | {'error': 'chatnone'})
                 with sdb.syncpool().connection() as conn:
@@ -146,7 +146,7 @@ def buy(request: HttpRequest):
 
             payment = {
                 'amount': {
-                    'value': cost,
+                    'value': cost + '.00',
                     'currency': 'RUB'
                 },
                 'receipt': {
@@ -155,9 +155,9 @@ def buy(request: HttpRequest):
                         'email': config.data['email']
                     },
                     'items': [{
-                        'description': 'Premium-статус' if cost != '199.00' else 'Premium-беседа',
+                        'description': 'Premium-статус' if cost != config.data['premiumchat'] else 'Premium-беседа',
                         'amount': {
-                            'value': cost,
+                            'value': cost + '.00',
                             'currency': 'RUB'
                         },
                         'vat_code': 1,
@@ -166,7 +166,7 @@ def buy(request: HttpRequest):
                 },
                 'metadata': {
                     'pid': oid + 1,
-                    'chat_id': 0 if cost != '199.00' else chatform.cleaned_data['chatid']
+                    'chat_id': 0 if cost != config.data['premiumchat'] else chatform.cleaned_data['chatid']
                 },
                 'merchant_customer_id': user.id,
                 'confirmation': {
