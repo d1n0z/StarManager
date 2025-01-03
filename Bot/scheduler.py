@@ -146,7 +146,7 @@ async def updateInfo():
                             'update chatnames set name = %s where chat_id=%s',
                             [(chat.chat_settings.title, chat.peer.id - 2000000000) for chat in chatnames.items])
                     except:
-                        traceback.print_exc()
+                        pass
 
                 for i in groups:
                     try:
@@ -157,7 +157,7 @@ async def updateInfo():
                         traceback.print_exc()
 
                 for i in await (await c.execute('select chat_id from publicchatssettings where last_update>%s',
-                                               (int(time.time()) - 43200,))).fetchall():
+                                                (int(time.time()) - 43200,))).fetchall():
                     try:
                         link = (await API.messages.get_invite_link(peer_id=2000000000 + i[0])).link
                         preview = await IMPLICIT_API.messages.get_chat_preview(link=link)
