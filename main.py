@@ -32,15 +32,17 @@ def main(retry=0, vkbot=VkBot()):
     os.system(f"tmux new -s botscheduler -d && tmux send-keys -t botscheduler 'cd {PATH}' ENTER "
               f"'. {PATH + 'venv/bin/activate'}' ENTER 'python3.11 runscheduler.py' ENTER")
 
-    logger.info('Starting the bot...')
+    logger.info('Loading...')
     try:
         try:
             vkbot.run()
+            raise KeyboardInterrupt
         except KeyboardInterrupt:
             raise
-        except:
+        except Exception as e:
+            print(e)
             os.system("tmux kill-session -t botscheduler")
-        logger.info('Retarting the bot in 15 seconds...')
+        logger.info('ERROR! Retarting the bot in 15 seconds...')
         time.sleep(15)
         main(retry + 1, vkbot)
     except KeyboardInterrupt:

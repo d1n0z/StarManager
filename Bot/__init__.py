@@ -4,6 +4,7 @@ import traceback
 import pydantic
 import vk_api.exceptions
 import vkbottle.api.response_validator
+from loguru import logger
 from pydantic import v1
 from vkbottle import Bot, GroupEventType, GroupTypes, VKAPIError, LoopWrapper
 from vkbottle.framework.labeler import BotLabeler
@@ -86,5 +87,5 @@ class VkBot:
                     c.execute('update reboots set sended=true where id=%s', (i[0],))
                 conn.commit()
 
-        print('Started!')
+        logger.info('Loaded. Starting the bot...')
         self.bot.run_forever()
