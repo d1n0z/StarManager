@@ -23,7 +23,7 @@ LVL_NAMES = ["Обычный Пользователь", "Смотрящий", "�
 COMMANDS = {
     "start": 0, "help": 0, "id": 0, "stats": 0, "report": 0, "mtop": 0, "q": 0, "premium": 0, "bonus": 0, "transfer": 0,
     "duel": 0, "cmd": 0, "premmenu": 0, "test": 0, "task": 0, "getdev": 0, "anon": 0, "chatid": 0, "prefix": 0,
-    "deanon": 0, "chats": 0, "catalog": 0,
+    "deanon": 0, "chats": 0, "catalog": 0, "new2025": 0,
 
     "kick": 1, "mute": 1, "warn": 1, "clear": 1, "staff": 1, "olist": 1, "getnick": 1, "snick": 1, "rnick": 1,
     "nlist": 1, "check": 1, "mkick": 1,
@@ -383,7 +383,7 @@ YOOKASSA_TOKEN = config['YOOKASSA']['YOOKASSA_TOKEN']
 MEGA_LOGIN = config['MEGA']['MEGA_LOGIN']
 MEGA_PASSWORD = config['MEGA']['MEGA_PASSWORD']
 
-PREMIUM_COST = {30: 149, 90: 349, 180: 599}
+PREMIUM_COST = {30: 99, 90: 249, 180: 499}
 data = {
     'email': config['SOCIALS']['email'],
     'vk': config['SOCIALS']['vk'],

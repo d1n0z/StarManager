@@ -165,7 +165,7 @@ async def stats(message: Message):
         userlvl, invites[0], await getUserName(id), top, mute, ban, lvl_name, neededxp,
         await getUserPremmenuSetting(id, 'border_color', False))
     await deleteMessages(reply.conversation_message_id, chat_id)
-    await message.reply(disable_mentions=1, attachment=await uploadImage(statsimg))
+    await message.reply(disable_mentions=1, attachment=await uploadImage(statsimg, message.peer_id))
 
 
 @bl.chat_message(SearchCMD('report'))
@@ -559,7 +559,26 @@ async def deanon(message: Message):
 
 
 @bl.chat_message(SearchCMD('chats'))
-async def deanon(message: Message):
+async def chats(message: Message):
     msg = messages.chats()
     kb = keyboard.chats()
     await message.reply(msg, keyboard=kb, disable_mentions=1)
+
+
+@bl.chat_message(SearchCMD('new2025'))
+async def new2025(message: Message):
+    if message.date > datetime.strptime('03.01.2025 00:00', '%d.%m.%Y %H:%M').timestamp():
+        return
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if await (await c.execute('select id from newactivated where uid=%s', (message.from_id,))).fetchone():
+                await message.reply('❗️ Вы уже ранее активировали данную команду.')
+                return
+            await c.execute('insert into newactivated (uid) values (%s)', (message.from_id,))
+            if not (await c.execute('update premium set time = time + %s where uid=%s',
+                                    (6 * 86400, message.from_id))).rowcount:
+                await c.execute('insert into premium (uid, time) values (%s, %s)',
+                                (message.from_id, int(time.time() + 6 * 86400)))
+            await conn.commit()
+    await message.reply('☃️ Вы успешно получили подарок в виде Premium подписки на 6 дней. С новым 2025 годом.',
+                        disable_mentions=1)

@@ -215,18 +215,18 @@ async def setChatMute(uid: int | Iterable[int], chat_id: int, mute_time: int | f
         return
 
 
-async def uploadImage(file: str, c: int = 0) -> str | None:
+async def uploadImage(file: str, peer_id: int, c: int = 0) -> str | None:
     bot = Bot(VK_TOKEN_GROUP)
     photo_uploader = PhotoMessageUploader(bot.api)
     try:
-        photo = await photo_uploader.upload(file_source=file)
+        photo = await photo_uploader.upload(file_source=file, peer_id=peer_id)
         if photo is None:
             raise ValueError
         if c == 6:
             raise Exception
         return photo
     except ValueError:
-        return await uploadImage(file, c + 1)
+        return await uploadImage(file, peer_id, c + 1)
     except Exception as e:
         raise Exception('Uploading failed after 6 retries') from e
 

@@ -228,7 +228,7 @@ async def queue_handler(event: MessageNew):
                     f.write(r.content)
                     f.close()
                 r.close()
-                photo = await uploadImage(f'{PATH}media/temp/{uid}welcome.jpg')
+                photo = await uploadImage(f'{PATH}media/temp/{uid}welcome.jpg', event.object.message.peer_id)
                 async with (await pool()).connection() as conn:
                     async with conn.cursor() as c:
                         if not (await c.execute('update welcome set photo = %s where chat_id=%s',

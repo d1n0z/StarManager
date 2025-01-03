@@ -671,5 +671,13 @@ class PublicChatsSettings(Model):
         table_name = f'publicchatssettings'
 
 
+class NewActivated(Model):
+    uid = IntegerField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'newactivated'
+
+
 if __name__ == '__main__':
     dbhandle.create_tables(Model.__subclasses__())
