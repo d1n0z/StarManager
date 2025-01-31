@@ -6,7 +6,7 @@ from datetime import datetime
 
 from memoization import cached
 
-from Bot.utils import getUserNickname, pointMinutes, pointDays, pointHours, pointWords, getUserName, getUserLVL, \
+from Bot.utils import getUserNickname, pointMinutes, pointDays, pointHours, pointWords, getUserName, getLVLFromXP, \
     getChatAccessName
 from config.config import COMMANDS, LVL_NAMES, COMMANDS_DESC, SETTINGS_POSITIONS, \
     SETTINGS_COUNTABLE_CHANGEPUNISHMENTMESSAGE, SETTINGS_COUNTABLE_NO_PUNISHMENT
@@ -42,7 +42,7 @@ def id(uid, data, name, url):
 
 async def top(top):
     return get('top') + ''.join(
-        f"[{k + 1}]. [id{i[0]}|{await getUserName(i[0])}] - {i[1]} сообщений\n" for k, i in enumerate(top))
+        [f"[{k + 1}]. [id{i[0]}|{await getUserName(i[0])}] - {i[1]} сообщений\n" for k, i in enumerate(top)])
 
 
 def help(page=0, cmds=COMMANDS):
@@ -55,7 +55,7 @@ def help(page=0, cmds=COMMANDS):
             descs[int(i)].append(COMMANDS_DESC[k])
         except:
             pass
-    return get(f'help_page{page}') + ''.join(f'{i}\n' for i in descs[page]) + get('help_last')
+    return get(f'help_page{page}') + ''.join([f'{i}\n' for i in descs[page]]) + get('help_last')
 
 
 def helpdev():
@@ -290,7 +290,7 @@ async def staff(res, names, chat_id):
     emoji = {'1': '☀', '2': '🔥', '3': '🔥', '4': '🔥', '5': '✨', '6': '⚡', '7': '⭐'}
     for k in sorted(users.keys()):
         msg += f'[{emoji[k]}] {await getChatAccessName(chat_id, int(k))}\n' + ''.join(
-            f"➖ [id{item['uid']}|{item['nickname'] if item['nickname'] else item['name']}]\n" for item in users[k])
+            [f"➖ [id{item['uid']}|{item['nickname'] if item['nickname'] else item['name']}]\n" for item in users[k]])
     return msg
 
 
@@ -1259,12 +1259,15 @@ async def top_duels(duels, category='общее'):
 
 def premmenu(settings, prem):
     msg = get('premmenu')
+    c = 0
     for e, i in settings.items():
         if e == 'clear_by_fire':
-            msg += f'\n[{e + 1}]. Удаление сообщения с помощью реакции(🔥) | {"✔" if i == 1 else "❌"}'
+            c += 1
+            msg += f'\n[{c}]. Удаление сообщения с помощью реакции(🔥) | {"✔" if i == 1 else "❌"}'
         elif e == 'border_color':
             if prem:
-                msg += f'\n[{e + 1}]. Смена цвета рамки в /stats | {i if i else "Выкл."}'
+                c += 1
+                msg += f'\n[{c}]. Смена цвета рамки в /stats | {i if i else "Выкл."}'
     return msg
 
 
@@ -1305,7 +1308,7 @@ def listprefix(uid, name, nick, prefixes):
         return (get('listprefix', uid=uid, n=nick if nick else name) +
                 'Префиксов не обнаружено. Используйте кнопку "Добавить префикс"')
     return (get('listprefix', uid=uid, n=nick if nick else name) +
-            ''.join(f'➖ "{i[0]}"\n' for i in prefixes))
+            ''.join([f'➖ "{i[0]}"\n' for i in prefixes]))
 
 
 def levelname_hint():
@@ -1366,7 +1369,7 @@ def unignore(id, name, nick):
 
 
 def ignorelist(res, names):
-    return get('ignorelist', lres=len(res)) + ''.join(f'➖ [id{i}|{names[k]}]\n' for k, i in enumerate(res))
+    return get('ignorelist', lres=len(res)) + ''.join([f'➖ [id{i}|{names[k]}]\n' for k, i in enumerate(res)])
 
 
 def chatlimit_hint():
@@ -2016,7 +2019,7 @@ def premchat(uid, name):
 
 
 def premlist(prem):
-    return get('premlist') + '\n' + '\n'.join(str(i[0]) for i in prem)
+    return get('premlist') + '\n' + '\n'.join([str(i[0]) for i in prem])
 
 
 def transfer_limit(u_prem):

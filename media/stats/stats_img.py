@@ -130,7 +130,7 @@ async def createStatsImage(warns, messages, uid, access_level, nickname, reg_dat
     height = 169
     width = 169
     fg = (67, 64, 238)
-    progress = (xp - fullxp) / ((xp - fullxp) + neededxp)
+    progress = xp / (xp + neededxp)
 
     draw.arc((x, y, x + width, y + height), start=0 - 90, end=progress * 360 - 90, fill=fg, width=10)
     draw.ellipse((x + 10, y + 10, x + width - 10, y + height - 10), fill=(36, 36, 36))

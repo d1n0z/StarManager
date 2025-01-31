@@ -366,8 +366,16 @@ async def getUserLeague(uid, none=1) -> int:
             return none
 
 
+async def getUserLVL(uid, none=0) -> int:
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if lvl := await (await c.execute('select lvl from xp where uid=%s', (uid,))).fetchone():
+                return lvl[0]
+            return none
+
+
 @AsyncLRU(maxsize=0)
-async def getUserLVL(xp):
+async def getLVLFromXP(xp):
     if not xp:
         return 1
     lvl, incr, xp = 0, 0, xp + 1
@@ -395,7 +403,7 @@ async def getXPFromLVL(lvl):
 
 @AsyncLRU(maxsize=0)
 async def getUserNeededXP(xp):
-    return await getXPFromLVL(await getUserLVL(xp) + 1) - xp
+    return await getXPFromLVL(await getLVLFromXP(xp) + 1) - xp
 
 
 @AsyncTTL(time_to_live=120, maxsize=0)
@@ -404,20 +412,18 @@ async def getXPTop(returnval='count', limit: int = 10, league: int = 1, users: l
         async with conn.cursor() as c:
             if users is not None:
                 top = await (await c.execute(
-                    'select uid, xp from xp where uid>0 and league=%s and uid=ANY(%s) order by xp desc limit %s',
+                    'select uid, lvl from xp where uid>0 and league=%s and uid=ANY(%s) order by lvl desc limit %s',
                     (league, users, limit))).fetchall()
             else:
                 top = await (await c.execute(
-                    'select uid, xp from xp where uid>0 and league=%s order by xp desc limit %s',
+                    'select uid, lvl from xp where uid>0 and league=%s order by lvl desc limit %s',
                     (league, limit))).fetchall()
     if returnval == 'count':
         return {i[0]: k + 1 for k, i in enumerate(top)}
-    elif returnval == 'xp':
-        return {i[0]: i[1] for k, i in enumerate(top)}
     elif returnval == 'lvl':
-        return {i[0]: await getUserLVL(i[1]) for k, i in enumerate(top)}
+        return {i[0]: i[1] for k, i in enumerate(top)}
     else:
-        raise Exception('returnval must be "count", "xp" or "lvl"')
+        raise Exception('returnval must be "count" or "lvl"')
 
 
 @AsyncTTL(time_to_live=16, maxsize=0)
@@ -485,15 +491,19 @@ async def addUserXP(uid, addxp, checklvlbanned=True):
             return
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
-            if u := await (await c.execute('select id, xp, league from xp where uid=%s', (uid,))).fetchone():
-                uxp, ulg = u[1], u[2]
-                if ulg != len(LEAGUE_LVL) and await getUserLVL(uxp + addxp) > LEAGUE_LVL[ulg]:
-                    return await c.execute('update xp set xp = 0, league = %s where id=%s', (ulg + 1, u[0]))
-                await c.execute('update xp set xp = %s where id=%s', (uxp + addxp, u[0]))
+            if u := await (await c.execute('select id, xp, lvl, league from xp where uid=%s', (uid,))).fetchone():
+                uxp, ulvl, ulg = u[1] + addxp, u[2], u[3]
+                while uxp >= await getXPFromLVL(ulvl + 1):
+                    ulvl += 1
+                    uxp -= await getXPFromLVL(ulvl)
+                if ulg != len(LEAGUE_LVL) and await getLVLFromXP(uxp) > LEAGUE_LVL[ulg]:
+                    return await c.execute('update xp set xp = 0, league = %s, lvl = %s where id=%s',
+                                           (ulg + 1, u[0], ulvl))
+                await c.execute('update xp set xp = %s, lvl = %s where id=%s', (uxp, ulvl, u[0]))
             else:
                 await c.execute(
-                    'insert into xp (uid, xp, lm, lvm, lsm, league) values (%(i)s, %(x)s, %(t)s, %(t)s, %(t)s, 1)',
-                    {'i': uid, 'x': addxp, 't': int(time.time())})
+                    'insert into xp (uid, xp, lm, lvm, lsm, league, lvl) values (%(i)s, %(x)s, %(t)s, %(t)s, %(t)s, 1, '
+                    '1)', {'i': uid, 'x': addxp, 't': int(time.time())})
             await conn.commit()
 
 

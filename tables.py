@@ -219,7 +219,8 @@ class UserJoinedDate(Model):
 class XP(Model):
     uid = IntegerField(default=0, unique=True, index=True)
     xp = FloatField(default=0)
-    league = IntegerField(default=0)
+    lvl = IntegerField(default=1)
+    league = IntegerField(default=1)
     lm = BigIntegerField(default=0)
     lvm = BigIntegerField(default=0)
     lsm = BigIntegerField(default=0)

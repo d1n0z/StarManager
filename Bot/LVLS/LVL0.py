@@ -12,11 +12,11 @@ import messages
 from Bot.rules import SearchCMD
 from Bot.tgbot import tgbot
 from Bot.utils import (getIDFromMessage, getUserName, getRegDate, kickUser, getUserNickname, getUserAccessLevel,
-                       getUserLastMessage, getUserMute, getUserBan, getUserXP, getUserLVL, getUserNeededXP,
+                       getUserLastMessage, getUserMute, getUserBan, getUserXP, getLVLFromXP, getUserNeededXP,
                        getUserPremium, uploadImage, addUserXP, isChatAdmin, getUserWarns, getUserMessages,
                        setUserAccessLevel, getChatName, getULvlBanned, getChatSettings, deleteMessages,
                        speccommandscheck, getUserPremmenuSettings, getUserPremmenuSetting, chatPremium, getURepBanned,
-                       getUserLeague, getXPFromLVL)
+                       getUserLeague, getXPFromLVL, getUserLVL)
 from config.config import (API, LVL_NAMES, PATH, REPORT_CD, REPORT_TO, COMMANDS, TG_CHAT_ID, TG_TRANSFER_THREAD_ID,
                            CMDLEAGUES)
 from db import pool
@@ -73,7 +73,7 @@ async def top(message: Message):
                 'select uid, messages from messages where uid>0 and messages>0 and chat_id=%s and '
                 'uid=ANY(%s) order by messages desc limit 10', (chat_id, [i.member_id for i in (
                     await API.messages.get_conversation_members(peer_id=message.peer_id)).items]))).fetchall()
-    await message.reply(disable_mentions=1, message=messages.top(msgs), keyboard=keyboard.top(chat_id, message.from_id))
+    await message.reply(disable_mentions=1, message=await messages.top(msgs), keyboard=keyboard.top(chat_id, message.from_id))
 
 
 @bl.chat_message(SearchCMD('stats'))
@@ -111,13 +111,14 @@ async def stats(message: Message):
                 'select count(*) as c from refferal where from_id=%s and chat_id=%s',
                 (id, chat_id))).fetchone()
     xp = int(await getUserXP(id))
-    lvl = await getUserLVL(xp)
+    lvl = await getUserLVL(id)
     await message.reply(disable_mentions=1, attachment=await uploadImage(await createStatsImage(
         await getUserWarns(id, chat_id), await getUserMessages(id, chat_id), id, await getUserAccessLevel(id, chat_id),
         await getUserNickname(id, chat_id), await getRegDate(id, '%d.%m.%Y', 'Неизвестно'), last_message,
         await getUserPremium(id), min(xp, 99999999), min(lvl, 999), await getXPFromLVL(lvl), invites[0],
         await getUserName(id), await getUserMute(id, chat_id), await getUserBan(id, chat_id),
-        lvl_name[0] if lvl_name else LVL_NAMES[acc], await getUserNeededXP(xp) if lvl < 999 else 0,
+        lvl_name[0] if lvl_name else LVL_NAMES[acc],
+        await getUserNeededXP(await getXPFromLVL(lvl) + xp) if lvl < 999 else 0,
         await getUserPremmenuSetting(id, 'border_color', False), await getUserLeague(id)), message.peer_id))
     await deleteMessages(reply.conversation_message_id, chat_id)
 

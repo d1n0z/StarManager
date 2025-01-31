@@ -304,7 +304,7 @@ async def resetlvl(message: Message):
         return await message.reply('🔶 Пользователь не найден')
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
-            await c.execute('update xp set xp=0 where uid=%s', (id,))
+            await c.execute('update xp set xp=0, lvl=0, league=1 where uid=%s', (id,))
             await conn.commit()
     u_name = await getUserName(id)
     msgsent = messages.resetlvlcomplete(id, u_name)

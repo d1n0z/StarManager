@@ -19,7 +19,7 @@ from Bot.utils import (sendMessageEventAnswer, editMessage, getUserAccessLevel, 
                        getChatAltSettings, getChatMembers, getChatOwner, getUserPremmenuSettings, getSilenceAllowed,
                        sendMessage, getSilence, setUserAccessLevel, getGroupName)
 from config.config import API, COMMANDS, SETTINGS_COUNTABLE, \
-    TG_CHAT_ID, TG_NEWCHAT_THREAD_ID, SETTINGS_PREMIUM, LEAGUE
+    TG_CHAT_ID, TG_NEWCHAT_THREAD_ID, SETTINGS_PREMIUM, LEAGUE, PREMMENU_DEFAULT
 from db import pool
 
 bl = BotLabeler()
@@ -179,8 +179,10 @@ async def premmenu_turn(message: MessageEvent):
     payload = message.payload
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
-            await c.execute('update premmenu set pos = %s where uid=%s and setting=%s',
-                            (int(not bool(payload['pos'])), uid, payload['setting']))
+            if not (await c.execute('update premmenu set pos = %s where uid=%s and setting=%s',
+                                   (int(not bool(payload['pos'])), uid, payload['setting']))).rowcount:
+                await c.execute('insert into premmenu (uid, setting, pos) values (%s, %s, %s)',
+                                (uid, payload['setting'], int(not PREMMENU_DEFAULT[payload['setting']])))
     prem = await getUserPremium(uid)
     settings = await getUserPremmenuSettings(uid)
     await editMessage(messages.premmenu(settings, prem), message.peer_id, message.conversation_message_id,

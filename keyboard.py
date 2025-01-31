@@ -359,7 +359,7 @@ def premmenu(uid, settings, prem):
 
     k = 0
     for e, i in settings.items():
-        if i != 'clear_by_fire' and not prem:
+        if e != 'clear_by_fire' and not prem:
             continue
         k += 1
         if i:

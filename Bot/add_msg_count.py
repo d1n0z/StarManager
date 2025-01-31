@@ -34,7 +34,7 @@ async def add_msg_counter(chat_id, uid, audio=False, sticker=False) -> bool:
                 await c.execute(f'update xp set {md[0]} = %s where uid=%s', (int(time.time()), uid))
             else:
                 await c.execute(
-                    f'insert into xp (uid, xp, lm, lvm, lsm, league) values (%(i)s, 0, %(t)s, %(t)s, %(t)s, 1)',
+                    f'insert into xp (uid, xp, lm, lvm, lsm, league, lvl) values (%(i)s, 0, %(t)s, %(t)s, %(t)s, 1, 1)',
                     {'i': uid, 't': int(time.time())})
             await conn.commit()
 
