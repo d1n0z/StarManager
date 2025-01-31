@@ -73,8 +73,7 @@ async def top(message: Message):
                 'select uid, messages from messages where uid>0 and messages>0 and chat_id=%s and '
                 'uid=ANY(%s) order by messages desc limit 10', (chat_id, [i.member_id for i in (
                     await API.messages.get_conversation_members(peer_id=message.peer_id)).items]))).fetchall()
-    await message.reply(disable_mentions=1, message=messages.top(
-        msgs, await API.users.get(user_ids=[i[0] for i in msgs])), keyboard=keyboard.top(chat_id, message.from_id))
+    await message.reply(disable_mentions=1, message=messages.top(msgs), keyboard=keyboard.top(chat_id, message.from_id))
 
 
 @bl.chat_message(SearchCMD('stats'))
@@ -264,7 +263,7 @@ async def cmd(message: Message):
 @bl.chat_message(SearchCMD('premmenu'))
 async def premmenu(message: Message):
     uid = message.from_id
-    if not (prem := await getUserPremium(uid)) and not await getUserLeague(uid):
+    if not (prem := await getUserPremium(uid)) and await getUserLeague(uid) <= 1:
         return await message.reply(disable_mentions=1, message=messages.no_prem())
     settings = await getUserPremmenuSettings(uid)
     await message.reply(disable_mentions=1, message=messages.premmenu(settings, prem),

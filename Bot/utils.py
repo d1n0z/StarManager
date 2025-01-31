@@ -358,7 +358,7 @@ async def getUserXP(uid, none=0) -> int:
             return none
 
 
-async def getUserLeague(uid, none=0) -> int:
+async def getUserLeague(uid, none=1) -> int:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             if lg := await (await c.execute('select league from xp where uid=%s', (uid,))).fetchone():
@@ -491,8 +491,9 @@ async def addUserXP(uid, addxp, checklvlbanned=True):
                     return await c.execute('update xp set xp = 0, league = %s where id=%s', (ulg + 1, u[0]))
                 await c.execute('update xp set xp = %s where id=%s', (uxp + addxp, u[0]))
             else:
-                await c.execute('insert into xp (uid, xp, lm, league) values (%s, %s, %s, 0)',
-                                (uid, addxp, int(time.time())))
+                await c.execute(
+                    'insert into xp (uid, xp, lm, lvm, lsm, league) values (%(i)s, %(x)s, %(t)s, %(t)s, %(t)s, 1)',
+                    {'i': uid, 'x': addxp, 't': int(time.time())})
             await conn.commit()
 
 

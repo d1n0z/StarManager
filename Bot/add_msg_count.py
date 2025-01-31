@@ -24,15 +24,18 @@ async def add_msg_counter(chat_id, uid, audio=False, sticker=False) -> bool:
     if await getUInfBanned(uid, chat_id) or await getULvlBanned(uid):
         return False
 
+    md = ("lm", 5) if not audio and not sticker else (("lvm", 20) if audio else ("lsm", 10))
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
-            lmt = await (await c.execute('select id, lm from xp where uid=%s', (uid,))).fetchone()
-            if lmt and time.time() - lmt[1] < (5 if not audio and not sticker else (20 if audio else 10)):
+            lmt = await (await c.execute(f'select id, {md[0]} from xp where uid=%s', (uid,))).fetchone()
+            if lmt and time.time() - lmt[1] < md[1]:
                 return False
             elif lmt:
-                await c.execute('update xp set lm = %s where uid=%s', (int(time.time()), uid))
+                await c.execute(f'update xp set {md[0]} = %s where uid=%s', (int(time.time()), uid))
             else:
-                await c.execute('insert into xp (uid, xp, lm, league) values (%s, 0, %s, 0)', (uid, int(time.time())))
+                await c.execute(
+                    f'insert into xp (uid, xp, lm, lvm, lsm, league) values (%(i)s, 0, %(t)s, %(t)s, %(t)s, 1)',
+                    {'i': uid, 't': int(time.time())})
             await conn.commit()
 
     if audio:
