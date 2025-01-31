@@ -3,6 +3,8 @@
 .__pycache__
 .config
 /config/config.ini
+/config/config2.ini
+/config/config2.py
 /vkminiapp
 migrations/
 temp/
@@ -14,3 +16,4 @@ venv
 test.py
 requirements.txt
 site
+.gitignore

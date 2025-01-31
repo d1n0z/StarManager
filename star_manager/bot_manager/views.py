@@ -128,8 +128,7 @@ def buy(request: HttpRequest):
                 except vk_api.exceptions.ApiError:
                     return render(request, "bot_manager/index.html",
                                   config.data | {'error': 'chatnoacc'})
-                if 'items' not in chat or not [i for i in chat['items'] if i['member_id'] == int(usersocial.uid) and
-                                               'is_admin' in i and i['is_admin']]:
+                if 'items' not in chat or not [i for i in chat['items'] if i['member_id'] == int(usersocial.uid)]:
                     return render(request, "bot_manager/index.html",
                                   config.data | {'error': 'chatid'})
             else:

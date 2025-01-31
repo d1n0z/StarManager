@@ -6,9 +6,9 @@ from datetime import datetime
 
 from memoization import cached
 
-from Bot.utils import getUserNickname, pointMinutes, pointDays, pointHours, pointWords, getUserName, getUserLVL
-from config.config import COMMANDS, LVL_NAMES, COMMANDS_DESC, TASKS_LOTS, TASKS_DAILY, PREMIUM_TASKS_DAILY, \
-    PREMIUM_TASKS_DAILY_TIERS, TASKS_WEEKLY, PREMIUM_TASKS_WEEKLY, SETTINGS_POSITIONS, \
+from Bot.utils import getUserNickname, pointMinutes, pointDays, pointHours, pointWords, getUserName, getUserLVL, \
+    getChatAccessName
+from config.config import COMMANDS, LVL_NAMES, COMMANDS_DESC, SETTINGS_POSITIONS, \
     SETTINGS_COUNTABLE_CHANGEPUNISHMENTMESSAGE, SETTINGS_COUNTABLE_NO_PUNISHMENT
 from db import syncpool
 
@@ -40,17 +40,9 @@ def id(uid, data, name, url):
     return get('id', uid=uid, data=data, name=name, url=url)
 
 
-def mtop(res, names):
-    msg = get('mtop')
-    for index, item in enumerate(res):
-        try:
-            name = f"{names[index].first_name} {names[index].last_name}"
-            addmsg = f"[{index + 1}]. [id{names[index].id}|{name}] - {item[1]} сообщений\n"
-            if addmsg not in msg:
-                msg += addmsg
-        except:
-            pass
-    return msg
+async def top(top):
+    return get('top') + ''.join(
+        f"[{k + 1}]. [id{i[0]}|{await getUserName(i[0])}] - {i[1]} сообщений\n" for k, i in enumerate(top))
 
 
 def help(page=0, cmds=COMMANDS):
@@ -58,36 +50,12 @@ def help(page=0, cmds=COMMANDS):
         return get('help_page8')
 
     descs = {0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [], 8: []}
-    # print(cmds)
     for k, i in cmds.items():
         try:
             descs[int(i)].append(COMMANDS_DESC[k])
         except:
-            pass  # traceback.print_exc()
-    # print(descs)
-    msg = None
-    if page == 0:
-        msg = get('help_page0')
-    if page == 1:
-        msg = get('help_page1')
-    if page == 2:
-        msg = get('help_page2')
-    if page == 3:
-        msg = get('help_page3')
-    if page == 4:
-        msg = get('help_page4')
-    if page == 5:
-        msg = get('help_page5')
-    if page == 6:
-        msg = get('help_page6')
-    if page == 7:
-        msg = get('help_page7')
-    # print(page)
-    for i in descs[page]:
-        msg += f'{i}\n'
-    # print(descs[page])
-    msg += get('help_last')
-    return msg
+            pass
+    return get(f'help_page{page}') + ''.join(f'{i}\n' for i in descs[page]) + get('help_last')
 
 
 def helpdev():
@@ -99,15 +67,11 @@ def help_closed():
 
 
 def help_sent(id, name, nick):
-    if nick is not None:
-        n = nick
-    else:
-        n = name
-    return get('help_sent', id=id, n=n)
+    return get('help_sent', id=id, n=nick if nick else name)
 
 
 def query_error():
-    return get(query_error())
+    return get('query_error')
 
 
 def report(uid, name, report, repid, chatid, chatname):
@@ -145,18 +109,12 @@ def kick_hint():
 
 
 def kick(u_name, u_nick, uid, ch_name, ch_nick, id, cause):
-    if id < 0:
-        i = 'club'
-        id = abs(id)
-    else:
-        i = 'id'
-    u_name = u_nick if u_nick is not None else u_name
-    ch_name = ch_nick if ch_nick is not None else ch_name
-    return get('kick', uid=uid, u_name=u_name, i=i, id=id, ch_name=ch_name, cause=cause)
+    return get('kick', uid=uid, u_name=u_nick if u_nick else u_name, i='club' if id < 0 else 'id',
+               id=abs(id), ch_name=ch_nick if ch_nick else ch_name, cause=cause)
 
 
 def kicked(uid, name, nickname):
-    return get('kicked', uid=uid, un=nickname if nickname is not None else name)
+    return get('kicked', uid=uid, un=nickname if nickname else name)
 
 
 def kick_error():
@@ -164,13 +122,8 @@ def kick_error():
 
 
 def kick_access(id, name, nick):
-    if id < 0:
-        i = 'club'
-        id = abs(id)
-    else:
-        i = 'id'
-    n = nick if nick is not None and len(nick) > 0 else name
-    return get('kick_access', i=i, id=id, n=n)
+    return get('kick_access', i='club' if id < 0 else 'id', id=abs(id),
+               n=nick if nick else name)
 
 
 def kick_myself():
@@ -186,11 +139,9 @@ def mute_hint():
 
 
 def mute(name, nick, id, mutingname, mutingnick, mutingid, cause, time):
-    if cause != '':
-        cause = ' по причине: ' + cause
-    n = nick if nick is not None else name
-    mn = mutingnick if mutingnick is not None else mutingname
-    return get('mute', id=id, n=n, mutingid=mutingid, mn=mn, time=time, cause=cause)
+    return get('mute', id=id, n=nick if nick else name, mutingid=mutingid,
+               mn=mutingnick if mutingnick else mutingname, time=time,
+               cause=' по причине: ' + cause if cause else '')
 
 
 def mute_error():
@@ -214,9 +165,7 @@ def access_dont_match():
 
 
 def already_muted(name, nick, id, mute):
-    time_left = int((mute - time.time()) / 60)
-    n = nick if nick is not None else name
-    return get('already_muted', id=id, n=n, time_left=time_left)
+    return get('already_muted', id=id, n=nick if nick else name, time_left=int((mute - time.time()) / 60))
 
 
 def usermute_hint():
@@ -232,19 +181,13 @@ def warn_hint():
 
 
 def warn(name, nick, uid, ch_name, ch_nick, id, cause):
-    if cause != '':
-        cause = ' по причине: ' + cause
-    n = nick if nick is not None else name
-    cn = ch_nick if ch_nick is not None else ch_name
-    return get('warn', uid=uid, n=n, cause=cause, cn=cn, id=id)
+    return get('warn', uid=uid, n=nick if nick else name, cause=' по причине: ' + cause if cause else '',
+               cn=ch_nick if ch_nick else ch_name, id=id)
 
 
 def warn_kick(name, nick, uid, ch_name, ch_nick, id, cause):
-    if cause != '':
-        cause = ' по причине: ' + cause
-    n = nick if nick is not None else name
-    cn = ch_nick if ch_nick is not None else ch_name
-    return get('warn_kick', uid=uid, n=n, id=id, cn=cn, cause=cause)
+    return get('warn_kick', uid=uid, n=nick if nick else name, id=id, cn=ch_nick if ch_nick else ch_name,
+               cause=' по причине: ' + cause if cause else '')
 
 
 def warn_higher():
@@ -260,13 +203,8 @@ def unwarn_myself():
 
 
 def clear(names, u_name, uid):
-    users = []
-    for uid, name in names.items():
-        user = f"[{'id' if int(uid) > 0 else 'club'}{uid}|{name}]"
-        if user not in users:
-            users.append(user)
-    users = ", ".join(users)
-    return get('clear', uid=uid, u_name=u_name, users=users)
+    return get('clear', uid=uid, u_name=u_name, users=", ".join(
+        set([f"[{'id' if int(id) > 0 else 'club'}{id}|{name}]" for id, name in names.items()])))
 
 
 def clear_hint():
@@ -298,9 +236,8 @@ def snick_higher():
 
 
 def snick(uid, u_name, u_nickname, id, ch_name, nickname, newnickname):
-    un = u_nickname if u_nickname is not None else u_name
-    n = nickname if nickname is not None else ch_name
-    return get('snick', uid=uid, un=un, id=id, newnickname=newnickname, n=n)
+    return get('snick', uid=uid, un=u_nickname if u_nickname else u_name, id=id,
+               newnickname=newnickname, n=nickname if nickname else ch_name)
 
 
 def rnick_hint():
@@ -316,181 +253,53 @@ def rnick_higher():
 
 
 def rnick(uid, u_name, u_nick, id, name, nick):
-    un = u_nick if u_nick is not None else u_name
-    return get('rnick', uid=uid, un=un, id=id, nick=nick, name=name)
+    return get('rnick', uid=uid, un=u_nick if u_nick else u_name, id=id, nick=nick, name=name)
 
 
 def nlist(res, members, page=0):
-    msg = get('nlist')
-    cnt = 0
+    msg, cnt, res = get('nlist'), 0, {item[0]: item for item in res}
     for it in members:
-        if it.id < 0 or it.first_name == 'DELETED' or it.last_name == 'DELETED':
+        if it.id < 0 or 'DELETED' in (it.first_name, it.last_name) or not (item := res.get(it.id)):
             continue
-        for item in res:
-            if it.id != item[0]:
-                continue
-            cnt += 1
-            addmsg = f"{cnt + 30 * page}. {item[1]} - [id{item[0]}|{it.first_name} {it.last_name}]\n"
-            if addmsg not in msg:
-                msg += addmsg
+        cnt += 1
+        msg += f"{cnt + 30 * page}. {item[1]} - [id{item[0]}|{it.first_name} {it.last_name}]\n"
     return msg
 
 
 def nnlist(members, page=0):
-    msg = get('nnlist')
-    k = page * 30
+    msg, k = get('nnlist'), page * 30
     for i in members:
         try:
-            if i.first_name != 'DELETED' and i.last_name != 'DELETED' and i.id > 0:
-                addmsg = f"{k + 1}. [id{i.id}|{i.first_name} {i.last_name}]\n"
-                if addmsg not in msg:
-                    msg += addmsg
-                    k += 1
-        except:
-            traceback.print_exc()
-    return msg
-
-
-async def staff(res, names, chat_id):
-    msg = get('staff')
-    admins = {}
-    included = []
-    users = {'1': [], '2': [], '3': [], '4': [], '5': [], '6': [], '7': [], '8': []}
-    for ind, item in enumerate(res):
-        x = {"uid": item[0], "name": [f"{i.first_name} {i.last_name}" for i in names if i.id == item[0]][0],
-             "nickname": await getUserNickname(item[0], chat_id), "access_level": item[1]}
-        users[f'{item[1]}'].append(x)
-        admins[f'{item[1]}'] = x
-    for k, i in admins.items():
-        try:
-            with syncpool().connection() as conn:
-                with conn.cursor() as c:
-                    if k == '1':
-                        try:
-                            lvl_name = c.execute('select name from accessnames where chat_id=%s and lvl=1',
-                                                 (chat_id,)).fetchone()[0]
-                        except:
-                            lvl_name = LVL_NAMES[1]
-                        msg += f'[☀] {lvl_name}\n'
-                        for item in users['1']:
-                            if item['access_level'] == 1:
-                                if item['uid'] > 0:
-                                    if item['uid'] not in included:
-                                        if item['nickname'] is not None and item['nickname'] != '':
-                                            msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
-                                        else:
-                                            msg += f"➖ [id{item['uid']}|{item['name']}]\n"
-                                        included.append(item['uid'])
-                    if k == '2':
-                        try:
-                            lvl_name = c.execute('select name from accessnames where chat_id=%s and lvl=2',
-                                                 (chat_id,)).fetchone()[0]
-                        except:
-                            lvl_name = LVL_NAMES[2]
-                        msg += f'[🔥] {lvl_name}\n'
-                        for item in users['2']:
-                            if item['access_level'] == 2:
-                                if item['uid'] > 0:
-                                    if item['uid'] not in included:
-                                        if item['nickname'] is not None and item['nickname'] != '':
-                                            msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
-                                        else:
-                                            msg += f"➖ [id{item['uid']}|{item['name']}]\n"
-                                        included.append(item['uid'])
-                    if k == '3':
-                        try:
-                            lvl_name = c.execute('select name from accessnames where chat_id=%s and lvl=3',
-                                                 (chat_id,)).fetchone()[0]
-                        except:
-                            lvl_name = LVL_NAMES[3]
-                        msg += f'[🔥] {lvl_name}\n'
-                        for item in users['3']:
-                            if item['access_level'] == 3:
-                                if item['uid'] > 0:
-                                    if item['uid'] not in included:
-                                        if item['nickname'] is not None and item['nickname'] != '':
-                                            msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
-                                        else:
-                                            msg += f"➖ [id{item['uid']}|{item['name']}]\n"
-                                        included.append(item['uid'])
-                    if k == '4':
-                        try:
-                            lvl_name = c.execute('select name from accessnames where chat_id=%s and lvl=4',
-                                                 (chat_id,)).fetchone()[0]
-                        except:
-                            lvl_name = LVL_NAMES[4]
-                        msg += f'[🔥] {lvl_name}\n'
-                        for item in users['4']:
-                            if item['access_level'] == 4:
-                                if item['uid'] > 0:
-                                    if item['uid'] not in included:
-                                        if item['nickname'] is not None and item['nickname'] != '':
-                                            msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
-                                        else:
-                                            msg += f"➖ [id{item['uid']}|{item['name']}]\n"
-                                        included.append(item['uid'])
-                    if k == '5':
-                        try:
-                            lvl_name = c.execute('select name from accessnames where chat_id=%s and lvl=5',
-                                                 (chat_id,)).fetchone()[0]
-                        except:
-                            lvl_name = LVL_NAMES[5]
-                        msg += f'[✨] {lvl_name}\n'
-                        for item in users['5']:
-                            if item['access_level'] == 5:
-                                if item['uid'] > 0:
-                                    if item['uid'] not in included:
-                                        if item['nickname'] is not None and item['nickname'] != '':
-                                            msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
-                                        else:
-                                            msg += f"➖ [id{item['uid']}|{item['name']}]\n"
-                                        included.append(item['uid'])
-                    if k == '6':
-                        try:
-                            lvl_name = c.execute('select name from accessnames where chat_id=%s and lvl=6',
-                                                 (chat_id,)).fetchone()[0]
-                        except:
-                            lvl_name = LVL_NAMES[6]
-                        msg += f'[⚡] {lvl_name}\n'
-                        for item in users['6']:
-                            if item['access_level'] == 6:
-                                if item['uid'] > 0:
-                                    if item['uid'] not in included:
-                                        if item['nickname'] is not None and item['nickname'] != '':
-                                            msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
-                                        else:
-                                            msg += f"➖ [id{item['uid']}|{item['name']}]\n"
-                                        included.append(item['uid'])
-                    if k == '7':
-                        try:
-                            lvl_name = c.execute('select name from accessnames where chat_id=%s and lvl=7',
-                                                 (chat_id,)).fetchone()[0]
-                        except:
-                            lvl_name = LVL_NAMES[7]
-                        msg += f'[⭐] {lvl_name}\n'
-                        for item in users['7']:
-                            if item['access_level'] == 7:
-                                if item['uid'] > 0:
-                                    if item['uid'] not in included:
-                                        if item['nickname'] is not None and item['nickname'] != '':
-                                            msg += f"➖ [id{item['uid']}|{item['nickname']}]\n"
-                                        else:
-                                            msg += f"➖ [id{item['uid']}|{item['name']}]\n"
-                                        included.append(item['uid'])
+            if i.first_name == 'DELETED' or i.last_name == 'DELETED' or i.id <= 0:
+                continue
+            msg += f"{k + 1}. [id{i.id}|{i.first_name} {i.last_name}]\n"
+            k += 1
         except:
             pass
     return msg
 
 
+async def staff(res, names, chat_id):
+    msg, admins, users = get('staff'), set(), {}
+    for ind, item in enumerate(res):
+        if f'{item[1]}' not in users:
+            users[f'{item[1]}'] = []
+        users[f'{item[1]}'].append({
+            "uid": item[0], "name": [f"{i.first_name} {i.last_name}" for i in names if i.id == item[0]][0],
+            "nickname": await getUserNickname(item[0], chat_id), "access_level": item[1]})
+    emoji = {'1': '☀', '2': '🔥', '3': '🔥', '4': '🔥', '5': '✨', '6': '⚡', '7': '⭐'}
+    for k in sorted(users.keys()):
+        msg += f'[{emoji[k]}] {await getChatAccessName(chat_id, int(k))}\n' + ''.join(
+            f"➖ [id{item['uid']}|{item['nickname'] if item['nickname'] else item['name']}]\n" for item in users[k])
+    return msg
+
+
 def unmute(uname, unickname, uid, name, nickname, id):
-    un = unickname if unickname is not None else uname
-    n = nickname if nickname is not None else name
-    return get('unmute', uid=uid, un=un, id=id, n=n)
+    return get('unmute', uid=uid, un=unickname if unickname else uname, id=id, n=nickname if nickname else name)
 
 
 def unmute_no_mute(id, name, nickname):
-    n = nickname if nickname is not None else name
-    return get('unmute_no_mute', id=id, n=n)
+    return get('unmute_no_mute', id=id, n=nickname if nickname else name)
 
 
 def unmute_higher():
@@ -502,14 +311,11 @@ def unmute_hint():
 
 
 def unwarn(uname, unick, uid, name, nick, id):
-    un = unick if unick is not None else uname
-    n = nick if nick is not None else name
-    return get('unwarn', uid=uid, un=un, id=id, n=n)
+    return get('unwarn', uid=uid, un=unick if unick else uname, id=id, n=nick if nick else name)
 
 
 def unwarn_no_warns(id, name, nick):
-    n = nick if nick is not None else name
-    return get('unwarn_no_warns', id=id, n=n)
+    return get('unwarn_no_warns', id=id, n=nick if nick else name)
 
 
 def unwarn_higher():
@@ -520,53 +326,27 @@ def unwarn_hint():
     return get('unwarn_hint')
 
 
-async def mutelist(res, names, mutedcount):
+async def mutelist(res, mutedcount):
     msg = get('mutelist', mutedcount=mutedcount)
-
     for ind, item in enumerate(res):
-        try:
-            if names[ind].first_name != 'DELETED' and names[ind].last_name != 'DELETED':
-                nickname = await getUserNickname(item[0], item[1])
-                if nickname is not None:
-                    name = nickname
-                else:
-                    name = f"{names[ind].first_name} {names[ind].last_name}"
-                if not item[2] or not literal_eval(item[2])[-1]:
-                    cause = "Без указания причины"
-                else:
-                    cause = literal_eval(item[2])[-1]
-                addmsg = f"[{ind + 1}]. [id{item[0]}|{name}] | " \
-                         f"{int((item[3] - time.time()) / 60)} минут | {cause} | Выдал: " \
-                         f"{literal_eval(item[4])[-1]}\n"
-                if addmsg not in msg:
-                    msg += addmsg
-        except:
-            pass
+        nickname = await getUserNickname(item[0], item[1])
+        msg += (
+            f"[{ind + 1}]. [id{item[0]}|{nickname if nickname else await getUserName(item[0])}] | "
+            f"{int((item[3] - time.time()) / 60)} минут | "
+            f"{literal_eval(item[2])[-1] if item[2] and literal_eval(item[2])[-1] else 'Без указания причины'} "
+            f"| Выдал: {literal_eval(item[4])[-1]}\n")
     return msg
 
 
-async def warnlist(res, names, warnedcount):
+async def warnlist(res, warnedcount):
     msg = get('warnlist', warnedcount=warnedcount)
-
     for ind, item in enumerate(res):
-        try:
-            if names[ind].first_name != 'DELETED' and names[ind].last_name != 'DELETED':
-                nickname = await getUserNickname(item[0], item[1])
-                if nickname is not None:
-                    name = nickname
-                else:
-                    name = f"{names[ind].first_name} {names[ind].last_name}"
-                if not item[2] or not literal_eval(item[2])[-1]:
-                    cause = "Без указания причины"
-                else:
-                    cause = literal_eval(item[2])[-1]
-                addmsg = f"[{ind + 1}]. [id{item[0]}|{name}] | " \
-                         f"кол-во: {item[3]}/3 | {cause} | Выдал: " \
-                         f"{literal_eval(item[4])[-1]}\n"
-                if addmsg not in msg:
-                    msg += addmsg
-        except:
-            pass
+        nickname = await getUserNickname(item[0], item[1])
+        msg += (
+            f"[{ind + 1}]. [id{item[0]}|{nickname if nickname else await getUserName(item[0])}] | "
+            f"кол-во: {item[3]}/3 | "
+            f"{'Без указания причины' if not item[2] or not literal_eval(item[2])[-1] else literal_eval(item[2])[-1]} |"
+            f" Выдал: {literal_eval(item[4])[-1]}\n")
     return msg
 
 
@@ -583,29 +363,17 @@ def setacc_higher():
 
 
 def setacc(uid, u_name, u_nick, acc, id, name, nick, lvlname=None):
-    if u_nick is not None:
-        u_n = f'[id{uid}|{u_nick}]'
-    else:
-        u_n = f'[id{uid}|{u_name}]'
-    if nick is not None:
-        n = f'[id{id}|{nick}]'
-    else:
-        n = f'[id{id}|{name}]'
-    acc = LVL_NAMES[acc] if lvlname is None else lvlname
-    return get('setacc', u_n=u_n, acc=acc, n=n)
+    return get('setacc', u_n=f'[id{uid}|{u_nick}]' if u_nick else f'[id{uid}|{u_name}]',
+               acc=LVL_NAMES[acc] if lvlname is None else lvlname,
+               n=f'[id{id}|{nick}]' if nick is not None else f'[id{id}|{name}]')
 
 
 def setacc_already_have_acc(id, name, nick):
-    if nick is not None:
-        n = nick
-    else:
-        n = name
-    return get('setacc_already_have_acc', id=id, n=n)
+    return get('setacc_already_have_acc', id=id, n=nick if nick else name)
 
 
 def setacc_low_acc(acc):
-    acc = LVL_NAMES[acc]
-    return get('setacc_low_acc', acc=acc)
+    return get('setacc_low_acc', acc=LVL_NAMES[acc])
 
 
 def delaccess_hint():
@@ -617,11 +385,7 @@ def delaccess_myself():
 
 
 def delaccess_noacc(id, name, nick):
-    if nick is not None:
-        n = nick
-    else:
-        n = name
-    return get('delaccess_noacc', id=id, n=n)
+    return get('delaccess_noacc', id=id, n=nick if nick else name)
 
 
 def delaccess_higher():
@@ -629,15 +393,7 @@ def delaccess_higher():
 
 
 def delaccess(uid, uname, unick, id, name, nick):
-    if unick is not None:
-        un = unick
-    else:
-        un = uname
-    if nick is not None:
-        n = nick
-    else:
-        n = name
-    return get('delaccess', uid=uid, un=un, id=id, n=n)
+    return get('delaccess', uid=uid, un=unick if unick else uname, id=id, n=nick if nick else name)
 
 
 def timeout_hint():
@@ -645,19 +401,11 @@ def timeout_hint():
 
 
 def timeouton(id, name, nickname):
-    if nickname is not None:
-        n = nickname
-    else:
-        n = name
-    return get('timeouton', id=id, n=n)
+    return get('timeouton', id=id, n=nickname if nickname else name)
 
 
 def timeoutoff(id, name, nickname):
-    if nickname is not None:
-        n = nickname
-    else:
-        n = name
-    return get('timeoutoff', id=id, n=n)
+    return get('timeoutoff', id=id, n=nickname if nickname else name)
 
 
 def inactive_hint():
@@ -669,14 +417,8 @@ def inactive_no_results():
 
 
 def inactive(uid, name, nick, count):
-    if int(count) > 0:
-        if nick is not None:
-            n = nick
-        else:
-            n = name
-        return get('inactive', uid=uid, n=n, count=count)
-    else:
-        return get('inactive_no_active')
+    return get('inactive_no_active') if int(count) <= 0 else get(
+        'inactive', uid=uid, n=nick if nick else name, count=count)
 
 
 def ban_hint():
@@ -684,14 +426,9 @@ def ban_hint():
 
 
 def ban(uid, u_name, u_nickname, id, name, nickname, cause, time):
-    cause = f' по причине: "{cause}"' if cause is not None else ''
-    n = u_nickname if u_nickname is not None else u_name
-    bn = nickname if nickname is not None else name
-    if time < 3650:
-        time = f' {time} дней'
-    else:
-        time = f'всегда'
-    return get('ban', uid=uid, n=n, id=id, bn=bn, time=time, cause=cause)
+    return get('ban', uid=uid, n=u_nickname if u_nickname else u_name, id=id,
+               bn=nickname if nickname else name, time=f' {time} дней' if time < 3650 else 'всегда',
+               cause=f' по причине: "{cause}"' if cause is not None else '')
 
 
 def ban_error():
@@ -711,20 +448,15 @@ def ban_higher():
 
 
 def already_banned(name, nick, id, ban):
-    time_left = int((ban - time.time()) / 86400 + 1)
-    n = nick if nick is not None else name
-    return get('already_banned', id=id, n=n, time_left=time_left)
+    return get('already_banned', id=id, n=nick if nick else name, time_left=int((ban - time.time()) / 86400 + 1))
 
 
 def unban(uname, unick, uid, name, nick, id):
-    un = unick if unick is not None else uname
-    n = nick if nick is not None else name
-    return get('unban', uid=uid, un=un, id=id, n=n)
+    return get('unban', uid=uid, un=unick if unick else uname, id=id, n=nick if nick else name)
 
 
 def unban_no_ban(id, name, nick):
-    n = nick if nick is not None else name
-    return get('unban_no_ban', id=id, n=n)
+    return get('unban_no_ban', id=id, n=nick if nick else name)
 
 
 def unban_higher():
@@ -740,11 +472,7 @@ def async_already_bound():
 
 
 def async_done(uid, u_name, u_nickname):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('async_done', uid=uid, n=n)
+    return get('async_done', uid=uid, n=u_nickname if u_nickname else u_name)
 
 
 def async_limit():
@@ -760,52 +488,31 @@ def delasync_not_owner():
 
 
 def delasync_done(uid, u_name, u_nickname, chname=''):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    if chname != '':
-        chname = f' "{chname}"'
-    return get('delasync_done', uid=uid, n=n, chname=chname)
+    return get('delasync_done', uid=uid, n=u_nickname if u_nickname else u_name,
+               chname=f' "{chname}"' if chname else '')
 
 
 def gkick(uid, u_name, u_nickname, chats, success):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('gkick', uid=uid, n=n, success=success, chats=chats)
+    return get('gkick', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
 
 
 def gkick_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    un = u_nickname if u_nickname is not None else u_name
-    n = nickname if nickname is not None else name
-    return get('gkick_start', uid=uid, un=un, chats=chats, id=id, n=n)
+    return get('gkick_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
+               n=nickname if nickname else name)
 
 
 def gkick_hint():
     return get('gkick_hint')
 
 
-async def banlist(res, names, bancount):
+async def banlist(res, bancount):
     msg = get('banlist', bancount=bancount)
-
-    for ind, item in enumerate(res):
-        if names[ind].first_name != 'DELETED' and names[ind].last_name != 'DELETED':
-            nickname = await getUserNickname(item[0], item[1])
-            if nickname is not None:
-                name = nickname
-            else:
-                name = f"{names[ind].first_name} {names[ind].last_name}"
-            if literal_eval(item[2])[-1] is None or literal_eval(item[2])[-1] == '':
-                cause = "Без указания причины"
-            else:
-                cause = literal_eval(item[2])[-1]
-            addmsg = f"[{ind + 1}]. [id{item[0]}|{name}] | " \
-                     f"{int((item[3] - time.time()) / 86400) + 1} дней | {cause} | Выдал: " \
-                     f"{literal_eval(item[4])[-1]}\n"
-            if addmsg not in msg:
-                msg += addmsg
+    for k, i in enumerate(res):
+        nickname = await getUserNickname(i[0], i[1])
+        cause = literal_eval(i[2])[-1]
+        msg += (f"[{k + 1}]. [id{i[0]}|{nickname if nickname else await getUserName(i[0])}] | "
+                f"{int((i[3] - time.time()) / 86400) + 1} дней | "
+                f"{cause if cause else 'Без указания причины'} | Выдал: {literal_eval(i[4])[-1]}\n")
     return msg
 
 
@@ -814,17 +521,12 @@ def userban_hint():
 
 
 def gban(uid, u_name, u_nickname, chats, success):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('gban', uid=uid, n=n, success=success, chats=chats)
+    return get('gban', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
 
 
 def gban_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    un = u_nickname if u_nickname is not None else u_name
-    n = nickname if nickname is not None else name
-    return get('gban_start', uid=uid, un=un, chats=chats, id=id, n=n)
+    return get('gban_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
+               n=nickname if nickname else name)
 
 
 def gban_hint():
@@ -832,30 +534,17 @@ def gban_hint():
 
 
 def kick_banned(id, name, nick, btime, cause):
-    if nick is not None:
-        n = nick
-    else:
-        n = name
-    if cause is None:
-        cause = ''
-    else:
-        cause = f' по причине {cause}'
-    t = int((btime - time.time()) / 86400)
-    return get('kick_banned', id=id, n=n, t=t, cause=cause)
+    return get('kick_banned', id=id, n=nick if nick else name, t=int((btime - time.time()) / 86400),
+               cause=f' по причине {cause}' if cause else '')
 
 
 def gunban(uid, u_name, u_nickname, chats, success):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('gunban', uid=uid, n=n, success=success, chats=chats)
+    return get('gunban', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
 
 
 def gunban_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    un = u_nickname if u_nickname is not None else u_name
-    n = nickname if nickname is not None else name
-    return get('gunban_start', uid=uid, un=un, chats=chats, id=id, n=n)
+    return get('gunban_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
+               n=nickname if nickname else name)
 
 
 def gunban_hint():
@@ -863,14 +552,12 @@ def gunban_hint():
 
 
 def gmute(uid, u_name, u_nickname, chats, success):
-    n = u_name if u_nickname is None else u_nickname
-    return get('gmute', uid=uid, n=n, success=success, chats=chats)
+    return get('gmute', uid=uid, n=u_name if u_nickname is None else u_nickname, success=success, chats=chats)
 
 
 def gmute_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    un = u_nickname if u_nickname is not None else u_name
-    n = nickname if nickname is not None else name
-    return get('gmute_start', uid=uid, un=un, chats=chats, id=id, n=n)
+    return get('gmute_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
+               n=nickname if nickname else name)
 
 
 def gmute_hint():
@@ -878,17 +565,12 @@ def gmute_hint():
 
 
 def gunmute(uid, u_name, u_nickname, chats, success):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('gunmute', uid=uid, n=n, success=success, chats=chats)
+    return get('gunmute', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
 
 
 def gunmute_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    un = u_nickname if u_nickname is not None else u_name
-    n = nickname if nickname is not None else name
-    return get('gunmute_start', uid=uid, un=un, chats=chats, id=id, n=n)
+    return get('gunmute_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
+               n=nickname if nickname else name)
 
 
 def gunmute_hint():
@@ -896,14 +578,12 @@ def gunmute_hint():
 
 
 def gwarn(uid, u_name, u_nick, chats, success):
-    un = u_nick if u_nick is not None else u_name
-    return get('gwarn', uid=uid, un=un, success=success, chats=chats)
+    return get('gwarn', uid=uid, un=u_nick if u_nick is not None else u_name, success=success, chats=chats)
 
 
 def gwarn_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    un = u_nickname if u_nickname is not None else u_name
-    n = nickname if nickname is not None else name
-    return get('gwarn_start', uid=uid, un=un, chats=chats, id=id, n=n)
+    return get('gwarn_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
+               n=nickname if nickname else name)
 
 
 def gwarn_hint():
@@ -911,17 +591,12 @@ def gwarn_hint():
 
 
 def gunwarn(uid, u_name, u_nickname, chats, success):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('gunwarn', uid=uid, n=n, success=success, chats=chats)
+    return get('gunwarn', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
 
 
 def gunwarn_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    un = u_nickname if u_nickname is not None else u_name
-    n = nickname if nickname is not None else name
-    return get('gunwarn_start', uid=uid, un=un, chats=chats, id=id, n=n)
+    return get('gunwarn_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
+               n=nickname if nickname else name)
 
 
 def gunwarn_hint():
@@ -929,17 +604,12 @@ def gunwarn_hint():
 
 
 def gsnick(uid, u_name, u_nickname, chats, success):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('gsnick', uid=uid, n=n, success=success, chats=chats)
+    return get('gsnick', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
 
 
 def gsnick_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    un = u_nickname if u_nickname is not None else u_name
-    n = nickname if nickname is not None else name
-    return get('gkick_start', uid=uid, un=un, chats=chats, id=id, n=n)
+    return get('gkick_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
+               n=nickname if nickname else name)
 
 
 def gsnick_hint():
@@ -947,17 +617,12 @@ def gsnick_hint():
 
 
 def grnick(uid, u_name, u_nickname, chats, success):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('grnick', uid=uid, n=n, success=success, chats=chats)
+    return get('grnick', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
 
 
 def grnick_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    un = u_nickname if u_nickname is not None else u_name
-    n = nickname if nickname is not None else name
-    return get('grnick_start', uid=uid, un=un, chats=chats, id=id, n=n)
+    return get('grnick_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
+               n=nickname if nickname else name)
 
 
 def grnick_hint():
@@ -965,17 +630,12 @@ def grnick_hint():
 
 
 def gdelaccess(uid, u_name, u_nickname, chats, success):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('gdelaccess', uid=uid, n=n, success=success, chats=chats)
+    return get('gdelaccess', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
 
 
 def gdelaccess_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    un = u_nickname if u_nickname is not None else u_name
-    n = nickname if nickname is not None else name
-    return get('gdelaccess_start', uid=uid, un=un, chats=chats, id=id, n=n)
+    return get('gdelaccess_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
+               n=nickname if nickname else name)
 
 
 def gdelaccess_hint():
@@ -987,11 +647,7 @@ def gdelaccess_admin_unknown():
 
 
 def gdelaccess_admin(uid, u_name, u_nickname):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('gdelaccess_admin', uid=uid, n=n)
+    return get('gdelaccess_admin', uid=uid, n=u_nickname if u_nickname else u_name)
 
 
 def setaccess_myself():
@@ -999,17 +655,12 @@ def setaccess_myself():
 
 
 def gsetaccess(uid, u_name, u_nickname, chats, success):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('gsetaccess', uid=uid, n=n, success=success, chats=chats)
+    return get('gsetaccess', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
 
 
 def gsetaccess_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    un = u_nickname if u_nickname is not None else u_name
-    n = nickname if nickname is not None else name
-    return get('gsetaccess_start', uid=uid, un=un, chats=chats, id=id, n=n)
+    return get('gsetaccess_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
+               n=nickname if nickname else name)
 
 
 def gsetaccess_hint():
@@ -1017,15 +668,9 @@ def gsetaccess_hint():
 
 
 def zov(uid, name, nickname, cause, members):
-    if nickname is not None:
-        n = nickname
-    else:
-        n = name
     call = [f"[id{i.member_id}|\u200b\u206c]" for i in members if i.member_id > 0]
-    lc = len(call)
-    lm = len(members)
-    jc = ''.join(call)
-    return get('zov', uid=uid, n=n, lc=lc, lm=lm, cause=cause, jc=jc)
+    return get('zov', uid=uid, n=nickname if nickname else name, lc=len(call), lm=len(members), cause=cause,
+               jc=''.join(call))
 
 
 def zov_hint():
@@ -1033,11 +678,7 @@ def zov_hint():
 
 
 def welcome(id, name, nickname):
-    if nickname is not None:
-        n = nickname
-    else:
-        n = name
-    return get('welcome', id=id, n=n)
+    return get('welcome', id=id, n=nickname if nickname else name)
 
 
 def welcome_hint():
@@ -1045,11 +686,7 @@ def welcome_hint():
 
 
 def delwelcome(id, name, nickname):
-    if nickname is not None:
-        n = nickname
-    else:
-        n = name
-    return get('delwelcome', id=id, n=n)
+    return get('delwelcome', id=id, n=nickname if nickname else name)
 
 
 def delwelcome_hint():
@@ -1061,19 +698,11 @@ def chat_unbound():
 
 
 def gzov_start(uid, u_name, u_nickname, chats):
-    if u_nickname is not None:
-        un = u_nickname
-    else:
-        un = u_name
-    return get('gzov_start', uid=uid, un=un, chats=chats)
+    return get('gzov_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats)
 
 
 def gzov(uid, u_name, u_nickname, chats, success):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('gzov', uid=uid, n=n, success=success, chats=chats)
+    return get('gzov', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
 
 
 def gzov_hint():
@@ -1085,11 +714,7 @@ def creategroup_already_created(group):
 
 
 def creategroup_done(uid, u_name, u_nickname, group):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('creategroup_done', uid=uid, n=n, group=group)
+    return get('creategroup_done', uid=uid, n=u_nickname if u_nickname else u_name, group=group)
 
 
 def creategroup_incorrect_name():
@@ -1117,11 +742,7 @@ def bind_hint():
 
 
 def bind(uid, u_name, u_nickname, group):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('bind', uid=uid, n=n, group=group)
+    return get('bind', uid=uid, n=u_nickname if u_nickname else u_name, group=group)
 
 
 def unbind_group_not_found(group):
@@ -1141,7 +762,7 @@ def unbind(uid, u_name, u_nickname, group):
         n = u_nickname
     else:
         n = u_name
-    return get('unbind', uid=uid, n=n, group=group)
+    return get('unbind', uid=uid, n=u_nickname if u_nickname else u_name, group=group)
 
 
 def delgroup_not_found(group):
@@ -1149,11 +770,7 @@ def delgroup_not_found(group):
 
 
 def delgroup(uid, u_name, u_nickname, group):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('delgroup', group=group, uid=uid, n=n)
+    return get('delgroup', group=group, uid=uid, n=u_nickname if u_nickname else u_name)
 
 
 def delgroup_hint():
@@ -1169,17 +786,12 @@ def skick_hint():
 
 
 def skick(uid, u_name, u_nickname, chats, success):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('skick', uid=uid, n=n, success=success, chats=chats)
+    return get('skick', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
 
 
 def skick_start(uid, u_name, u_nickname, id, name, nickname, chats, group):
-    un = u_nickname if u_nickname is not None else u_name
-    n = nickname if nickname is not None else name
-    return get('skick_start', uid=uid, un=un, group=group, chats=chats, id=id, n=n)
+    return get('skick_start', uid=uid, un=u_nickname if u_nickname else u_name, group=group, chats=chats, id=id,
+               n=nickname if nickname else name)
 
 
 def sban_hint():
@@ -1187,17 +799,12 @@ def sban_hint():
 
 
 def sban(uid, u_name, u_nickname, chats, success):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('sban', uid=uid, n=n, success=success, chats=chats)
+    return get('sban', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
 
 
 def sban_start(uid, u_name, u_nickname, id, name, nickname, chats, group):
-    un = u_nickname if u_nickname is not None else u_name
-    n = nickname if nickname is not None else name
-    return get('sban_start', uid=uid, un=un, group=group, chats=chats, id=id, n=n)
+    return get('sban_start', uid=uid, un=u_nickname if u_nickname else u_name, group=group, chats=chats, id=id,
+               n=nickname if nickname else name)
 
 
 def sunban_hint():
@@ -1205,17 +812,12 @@ def sunban_hint():
 
 
 def sunban(uid, u_name, u_nickname, chats, success):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('sunban', uid=uid, n=n, success=success, chats=chats)
+    return get('sunban', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
 
 
 def sunban_start(uid, u_name, u_nickname, id, name, nickname, chats, group):
-    un = u_nickname if u_nickname is not None else u_name
-    n = nickname if nickname is not None else name
-    return get('sunban_start', uid=uid, un=un, group=group, chats=chats, id=id, n=n)
+    return get('sunban_start', uid=uid, un=u_nickname if u_nickname else u_name, group=group, chats=chats, id=id,
+               n=nickname if nickname else name)
 
 
 def ssnick_hint():
@@ -1223,17 +825,12 @@ def ssnick_hint():
 
 
 def ssnick(uid, u_name, u_nickname, chats, success):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('ssnick', uid=uid, n=n, success=success, chats=chats)
+    return get('ssnick', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
 
 
 def ssnick_start(uid, u_name, u_nickname, id, name, nickname, chats, group):
-    un = u_nickname if u_nickname is not None else u_name
-    n = nickname if nickname is not None else name
-    return get('ssnick_start', uid=uid, un=un, group=group, chats=chats, id=id, n=n)
+    return get('ssnick_start', uid=uid, un=u_nickname if u_nickname else u_name, group=group, chats=chats, id=id,
+               n=nickname if nickname else name)
 
 
 def srnick_hint():
@@ -1245,9 +842,8 @@ def srnick(uid, u_name, chats, success):
 
 
 def srnick_start(uid, u_name, u_nickname, id, name, nickname, chats, group):
-    un = u_nickname if u_nickname is not None else u_name
-    n = nickname if nickname is not None else name
-    return get('srnick_start', uid=uid, un=un, group=group, chats=chats, id=id, n=n)
+    return get('srnick_start', uid=uid, un=u_nickname if u_nickname else u_name, group=group, chats=chats, id=id,
+               n=nickname if nickname else name)
 
 
 def szov_hint():
@@ -1255,19 +851,11 @@ def szov_hint():
 
 
 def szov_start(uid, u_name, u_nickname, chats, group):
-    if u_nickname is not None:
-        un = u_nickname
-    else:
-        un = u_name
-    return get('szov_start', uid=uid, un=un, group=group, chats=chats)
+    return get('szov_start', uid=uid, un=u_nickname if u_nickname else u_name, group=group, chats=chats)
 
 
 def szov(uid, u_name, u_nickname, group, pool, success):
-    if u_nickname is not None:
-        un = u_nickname
-    else:
-        un = u_name
-    return get('szov', uid=uid, un=un, success=success, pool=pool, group=group)
+    return get('szov', uid=uid, un=u_nickname if u_nickname else u_name, success=success, pool=pool, group=group)
 
 
 def ssetaccess_hint():
@@ -1275,17 +863,12 @@ def ssetaccess_hint():
 
 
 def ssetaccess(uid, u_name, u_nickname, chats, success):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('ssetaccess', uid=uid, n=n, success=success, chats=chats)
+    return get('ssetaccess', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
 
 
 def ssetaccess_start(uid, u_name, u_nickname, id, name, nickname, chats, group):
-    un = u_nickname if u_nickname is not None else u_name
-    n = nickname if nickname is not None else name
-    return get('ssetaccess_start', uid=uid, un=un, group=group, chats=chats, id=id, n=n)
+    return get('ssetaccess_start', uid=uid, un=u_nickname if u_nickname else u_name, group=group, chats=chats, id=id,
+               n=nickname if nickname else name)
 
 
 def sdelaccess_hint():
@@ -1293,17 +876,12 @@ def sdelaccess_hint():
 
 
 def sdelaccess(uid, u_name, u_nickname, chats, success):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('sdelaccess', uid=uid, n=n, success=success, chats=chats)
+    return get('sdelaccess', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
 
 
 def sdelaccess_start(uid, u_name, u_nickname, id, name, nickname, group, chats):
-    un = u_nickname if u_nickname is not None else u_name
-    n = nickname if nickname is not None else name
-    return get('ssetaccess_start', uid=uid, un=un, group=group, chats=chats, id=id, n=n)
+    return get('ssetaccess_start', uid=uid, un=u_nickname if u_nickname else u_name, group=group, chats=chats, id=id,
+               n=nickname if nickname else name)
 
 
 def demote_choose():
@@ -1319,8 +897,7 @@ def demote_disaccept():
 
 
 def demote_accept(id, name, nick):
-    n = nick if nick is not None and len(nick) > 0 else name
-    return get('demote_accept', id=id, n=n)
+    return get('demote_accept', id=id, n=nick if nick else name)
 
 
 def mygroups_no_groups():
@@ -1328,11 +905,7 @@ def mygroups_no_groups():
 
 
 def addfilter(id, name, nickname):
-    if nickname is not None:
-        n = nickname
-    else:
-        n = name
-    return get('addfilter', id=id, n=n)
+    return get('addfilter', id=id, n=nickname if nickname else name)
 
 
 def addfilter_hint():
@@ -1340,11 +913,7 @@ def addfilter_hint():
 
 
 def delfilter(id, name, nickname):
-    if nickname is not None:
-        n = nickname
-    else:
-        n = name
-    return get('delfilter', id=id, n=n)
+    return get('delfilter', id=id, n=nickname if nickname else name)
 
 
 def delfilter_hint():
@@ -1356,11 +925,7 @@ def delfilter_no_filter():
 
 
 def gaddfilter_start(uid, u_name, u_nickname, chats):
-    if u_nickname is not None:
-        un = u_nickname
-    else:
-        un = u_name
-    return get('gaddfilter_start', uid=uid, un=un, chats=chats)
+    return get('gaddfilter_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats)
 
 
 def gaddfilter(uid, name, chats, success):
@@ -1372,11 +937,7 @@ def gaddfilter_hint():
 
 
 def gdelfilter_start(uid, u_name, u_nickname, chats):
-    if u_nickname is not None:
-        un = u_nickname
-    else:
-        un = u_name
-    return get('gdelfilter_start', uid=uid, un=un, chats=chats)
+    return get('gdelfilter_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats)
 
 
 def gdelfilter(uid, name, chats, success):
@@ -1392,11 +953,7 @@ def editlvl_hint():
 
 
 def editlvl(id, name, nickname, cmd, beforelvl, lvl):
-    if nickname is not None:
-        n = nickname
-    else:
-        n = name
-    return get('editlvl', id=id, n=n, cmd=cmd, beforelvl=beforelvl, lvl=lvl)
+    return get('editlvl', id=id, n=nickname if nickname else name, cmd=cmd, beforelvl=beforelvl, lvl=lvl)
 
 
 def editlvl_command_not_found():
@@ -1428,23 +985,11 @@ def unban_myself():
 
 
 def addblack(uid, uname, unick, id, name, nick):
-    if unick is not None:
-        un = unick
-    else:
-        un = uname
-    if nick is not None:
-        n = nick
-    else:
-        n = name
-    return get('addblack', uid=uid, un=un, id=id, n=n)
+    return get('addblack', uid=uid, un=unick if unick else uname, id=id, n=nick if nick else name)
 
 
 def blacked(id, name, nick):
-    if nick is not None:
-        n = nick
-    else:
-        n = name
-    return get('blacked', id=id, n=n)
+    return get('blacked', id=id, n=nick if nick else name)
 
 
 def delblack_hint():
@@ -1456,31 +1001,15 @@ def delblack_myself():
 
 
 def delblack(uid, uname, unick, id, name, nick):
-    if unick is not None:
-        un = unick
-    else:
-        un = uname
-    if nick is not None:
-        n = nick
-    else:
-        n = name
-    return get('delblack', uid=uid, un=un, id=id, n=n)
+    return get('delblack', uid=uid, un=unick if unick else uname, id=id, n=nick if nick else name)
 
 
 def delblacked(id, name, nick):
-    if nick is not None:
-        n = nick
-    else:
-        n = name
-    return get('delblacked', id=id, n=n)
+    return get('delblacked', id=id, n=nick if nick else name)
 
 
-def delblack_no_user(id, u_name, nick):
-    if nick is not None:
-        n = nick
-    else:
-        n = u_name
-    return get('delblack_no_user', id=id, n=n)
+def delblack_no_user(id, name, nick):
+    return get('delblack_no_user', id=id, n=nick if nick else name)
 
 
 def setstatus_hint():
@@ -1488,15 +1017,7 @@ def setstatus_hint():
 
 
 def setstatus(uid, uname, unick, id, name, nick):
-    if unick is not None:
-        un = unick
-    else:
-        un = uname
-    if nick is not None:
-        n = nick
-    else:
-        n = name
-    return get('setstatus', uid=uid, un=un, id=id, n=n)
+    return get('setstatus', uid=uid, un=unick if unick else uname, id=id, n=nick if nick else name)
 
 
 def delstatus_hint():
@@ -1504,80 +1025,54 @@ def delstatus_hint():
 
 
 def delstatus(uid, uname, unick, id, name, nick):
-    if unick is not None:
-        un = unick
-    else:
-        un = uname
-    if nick is not None:
-        n = nick
-    else:
-        n = name
-    return get('delstatus', uid=uid, un=un, id=id, n=n)
+    return get('delstatus', uid=uid, un=unick if unick else uname, id=id, n=nick if nick else name)
 
 
 def sgroup_unbound(group):
     return get('sgroup_unbound', group=group)
 
 
-def statuslist(names, pp):
+async def statuslist(pp):
     msg = ''
-
-    ind = 0
-    for _ in names:
-        if names[ind].first_name != 'DELETED' and names[ind].last_name != 'DELETED':
-            name = f"{names[ind].first_name} {names[ind].last_name}"
-            for i in pp:
-                if i[0] != int(names[ind].id):
-                    continue
-                addmsg = f"[{ind + 1}]. [id{names[ind].id}|{name}] | " \
-                         f"Осталось: {int((i[1] - time.time()) / 86400) + 1} дней\n"
-                if addmsg not in msg:
-                    msg += addmsg
-                break
-        ind += 1
-    return get('statuslist', premium_status=ind) + msg
+    k = 0
+    for k, i in enumerate(pp):
+        msg += (f"[{k + 1}]. [id{i[0]}|{await getUserName(i[0])}] | "
+                f"Осталось: {int((i[1] - time.time()) / 86400) + 1} дней\n")
+    return get('statuslist', premium_status=k) + msg
 
 
 def settings():
-    msg = get('settings')
-    return msg
+    return get('settings')
 
 
 def settings_category(category, settings):
-    settings = [SETTINGS_POSITIONS[category][k][i] for k, i in settings.items()]
-
-    return get(f'settings_{category}', settings=settings)
+    return get(f'settings_{category}', settings=[SETTINGS_POSITIONS[category][k][i] for k, i in settings.items()])
 
 
 def settings_change_countable(chat_id, setting, pos, value, value2, pos2, punishment=None):
-    status = "Включено" if pos else "Выключено"
-    value = 0 if value is None else value
     if setting not in SETTINGS_COUNTABLE_NO_PUNISHMENT:
         if punishment == 'deletemessage':
             punishment = 'удаление сообщения'
         elif punishment == 'kick':
             punishment = f'исключение'
-        elif punishment is not None and punishment.startswith('mute'):
+        elif punishment and punishment.startswith('mute'):
             punishment = f'мут на {punishment.split("|")[-1]} минут'
-        elif punishment is not None and punishment.startswith('ban'):
+        elif punishment and punishment.startswith('ban'):
             punishment = f'блокировку на {punishment.split("|")[-1]} дней'
         else:
             punishment = 'без наказания'
-        return get(f'settings_change_countable_{setting}', status=status, count=value, punishment=punishment)
+        return get(f'settings_change_countable_{setting}', status="Включено" if pos else "Выключено",
+                   count=0 if not value else value, punishment=punishment)
     elif setting == 'nightmode':
-        if not pos or value2 is None:
-            value2 = '❌'
-        return get(f'settings_change_countable_{setting}', status=status, time=value2)
+        return get(f'settings_change_countable_{setting}', status="Включено" if pos else "Выключено",
+                   time='❌' if not pos or value2 is None else value2)
     elif setting == 'welcome':
-        status2 = "Да" if pos2 else "Нет"
         with syncpool().connection() as conn:
             with conn.cursor() as c:
                 w = c.execute('select msg, photo from welcome where chat_id=%s', (chat_id,)).fetchone()
-        if not pos or w is None or (not w[0] and not w[1]):
-            value = '❌'
-        else:
-            value = 'Установлено'
-        return get(f'settings_change_countable_{setting}', status=status, status2=status2, value=value)
+        return get(f'settings_change_countable_{setting}', status="Включено" if pos else "Выключено",
+                   status2="Да" if pos2 else "Нет",
+                   value='Установлено' if pos and w is not None and (w[0] or w[1]) else '❌')
 
 
 def settings_change_countable_digit_error():
@@ -1594,12 +1089,9 @@ def settings_choose_punishment():
 
 def settings_countable_action(action, setting, text=None, image=None, url=None):
     if setting == 'welcome':
-        text = 'Не установлено' if not text else text
-        url = 'Не установлено' if not url else url
-        image = 'Не установлено' if not image else 'Установлено'
-        return get(f'settings_{action}_{setting}', text=text, image=image, url=url)
-    else:
-        return get(f'settings_{action}_{setting}')
+        return get(f'settings_{action}_{setting}', text='Не установлено' if not text else text,
+                   url='Не установлено' if not url else url, image='Не установлено' if not image else 'Установлено')
+    return get(f'settings_{action}_{setting}')
 
 
 def settings_set_punishment(punishment, time=None):
@@ -1663,13 +1155,11 @@ def uexpStatus():
 
 
 def q(uid, name, nick):
-    n = nick if nick is not None and len(nick) > 0 else name
-    return get('q', uid=uid, n=n)
+    return get('q', uid=uid, n=nick if nick else name)
 
 
 def q_fail(uid, name, nick):
-    n = nick if nick is not None and len(nick) > 0 else name
-    return get('q_fail', uid=uid, n=n)
+    return get('q_fail', uid=uid, n=nick if nick else name)
 
 
 def premium():
@@ -1677,11 +1167,7 @@ def premium():
 
 
 def premium_sent(uid, name, nickname):
-    if nickname is not None and len(nickname) >= 0:
-        n = nickname
-    else:
-        n = name
-    return get('premium_sent', uid=uid, n=n)
+    return get('premium_sent', uid=uid, n=nickname if nickname else name)
 
 
 def chat(uid, uname, chat_id, bind, gbind, public, muted, banned, users, time, prefix, chat_name):
@@ -1689,26 +1175,12 @@ def chat(uid, uname, chat_id, bind, gbind, public, muted, banned, users, time, p
                gbind=gbind, public=public, banned=banned, muted=muted, users=users, time=time)
 
 
-def getnick(res, names, members, query):
+async def getnick(res, query):
     msg = ''
-    cnt = 0
-    for it in members:
-        if it.member_id < 0:
-            members.remove(it)
-    for ind, item in enumerate(res):
-        for i in members:
-            if i.member_id == item[0] and i.member_id > 0:
-                try:
-                    if names[ind].first_name != 'DELETED' and names[ind].last_name != 'DELETED':
-                        cnt += 1
-                        addmsg = f"{cnt}. {item[1]} - [id{item[0]}|{names[ind].first_name} " \
-                                 f"{names[ind].last_name}]\n"
-                        if addmsg not in msg:
-                            msg += addmsg
-                except:
-                    pass
-    msg = get('getnick', query=query, cnt=cnt) + msg
-    return msg
+    k = 0
+    for k, item in enumerate(res):
+        msg += f"{k + 1}. {item[1]} - [id{item[0]}|{await getUserName(item[[0]])}]\n"
+    return get('getnick', query=query, cnt=k + 1) + msg
 
 
 def getnick_no_result(query):
@@ -1756,66 +1228,43 @@ def giveowner_no():
 
 
 def giveowner(uid, unick, uname, id, nick, name):
-    if unick is not None and len(unick) > 0:
-        un = unick
-    else:
-        un = uname
-    n = nick if nick is not None and len(nick) > 0 else name
-    return get('giveowner', uid=uid, un=un, id=id, n=n)
+    return get('giveowner', uid=uid, un=unick if unick else uname, id=id, n=nick if nick else name)
 
 
 def bonus(id, nick, name, xp):
-    n = nick if nick is not None and len(nick) > 0 else name
-    return get('bonus', id=id, n=n, xp=xp)
+    return get('bonus', id=id, n=nick if nick else name, xp=xp)
 
 
 def bonus_time(id, nick, name, timeleft):
-    n = nick if nick is not None and len(nick) > 0 else name
-    hours = pointHours((timeleft // 3600) * 3600)
-    minutes = pointMinutes(timeleft - (timeleft // 3600) * 3600)
-    return get('bonus_time', id=id, n=n, hours=hours, minutes=minutes)
+    return get('bonus_time', id=id, n=nick if nick else name, hours=pointHours((timeleft // 3600) * 3600),
+               minutes=pointMinutes(timeleft - (timeleft // 3600) * 3600))
 
 
-def top_lvls(names, lvls, category='общее'):
-    dl = calendar.monthrange(datetime.now().year, datetime.now().month)[1] - datetime.now().day + 1
-    msg = get('top_lvls', category=category, dl=dl)
-    for index, item in enumerate(list(lvls.values())):
-        try:
-            name = f"{names[index].first_name} {names[index].last_name}"
-            addmsg = f"[{index + 1}]. [id{names[index].id}|{name}] - {item} уровень\n"
-            if addmsg not in msg:
-                msg += addmsg
-        except:
-            pass
+async def top_lvls(top, chattop):
+    msg = get('top_lvls')
+    for k, i in enumerate(top.items()):
+        msg += f"[{k + 1}]. [id{i[0]}|{await getUserName(i[0])}] - {i[1]} уровень\n"
+    msg += f'\n🥨 В беседе:\n'
+    for k, i in enumerate(chattop.items()):
+        msg += f"[{k + 1}]. [id{i[0]}|{await getUserName(i[0])}] - {i[1]} уровень\n"
     return msg
 
 
-def top_duels(names, duels, category='общее'):
+async def top_duels(duels, category='общее'):
     msg = get('top_duels', category=category)
-    for index, item in enumerate(list(duels.values())):
-        try:
-            name = f"{names[index].first_name} {names[index].last_name}"
-            addmsg = f"[{index + 1}]. [id{names[index].id}|{name}] - {item} побед\n"
-            if addmsg not in msg:
-                msg += addmsg
-        except:
-            pass
+    for k, item in enumerate(duels.items()):
+        msg += f"[{k + 1}]. [id{item[0]}|{await getUserName(item[0])}] - {item[1]} побед\n"
     return msg
 
 
-def premmenu(settings):
+def premmenu(settings, prem):
     msg = get('premmenu')
-    k = 0
     for e, i in settings.items():
-        k += 1
         if e == 'clear_by_fire':
-            msg += f'\n[{k}]. Удаление сообщения с помощью реакции(🔥) '
-            if i == 1:
-                msg += '| ✔'
-            else:
-                msg += '| ❌'
+            msg += f'\n[{e + 1}]. Удаление сообщения с помощью реакции(🔥) | {"✔" if i == 1 else "❌"}'
         elif e == 'border_color':
-            msg += f'\n[{k}]. Смена цвета рамки в /stats | {i if i else "Выкл."}'
+            if prem:
+                msg += f'\n[{e + 1}]. Смена цвета рамки в /stats | {i if i else "Выкл."}'
     return msg
 
 
@@ -1840,13 +1289,11 @@ def addprefix_too_long():
 
 
 def addprefix(uid, name, nick, prefix):
-    n = nick if nick is not None and len(nick) > 0 else name
-    return get('addprefix', uid=uid, n=n, prefix=prefix)
+    return get('addprefix', uid=uid, n=nick if nick else name, prefix=prefix)
 
 
 def delprefix(uid, name, nick, prefix):
-    n = nick if nick is not None and len(nick) > 0 else name
-    return get('delprefix', uid=uid, n=n, prefix=prefix)
+    return get('delprefix', uid=uid, n=nick if nick else name, prefix=prefix)
 
 
 def delprefix_not_found(prefix):
@@ -1854,13 +1301,11 @@ def delprefix_not_found(prefix):
 
 
 def listprefix(uid, name, nick, prefixes):
-    n = nick if nick is not None and len(nick) > 0 else name
-    msg = get('listprefix', uid=uid, n=n)
-    if len(prefixes) == 0:
-        msg += 'Префиксов не обнаружено. Используйте кнопку "Добавить префикс"'
-    for i in prefixes:
-        msg += f'➖ "{i[0]}"\n'
-    return msg
+    if not prefixes:
+        return (get('listprefix', uid=uid, n=nick if nick else name) +
+                'Префиксов не обнаружено. Используйте кнопку "Добавить префикс"')
+    return (get('listprefix', uid=uid, n=nick if nick else name) +
+            ''.join(f'➖ "{i[0]}"\n' for i in prefixes))
 
 
 def levelname_hint():
@@ -1868,8 +1313,7 @@ def levelname_hint():
 
 
 def levelname(uid, name, nick, lvl, lvlname):
-    n = nick if nick is not None and len(nick) > 0 else name
-    return get('levelname', uid=uid, n=n, lvlname=lvlname, lvl=lvl)
+    return get('levelname', uid=uid, n=nick if nick else name, lvlname=lvlname, lvl=lvl)
 
 
 def resetlevel_hint():
@@ -1877,9 +1321,7 @@ def resetlevel_hint():
 
 
 def cmdcount(cmdcounter):
-    summ = 0
-    for i in cmdcounter:
-        summ += i.count
+    summ = sum([i.count for i in cmdcounter])
     msg = get('cmdcount')
     for i in cmdcounter:
         if i.cmd not in msg:
@@ -1904,11 +1346,7 @@ def ignore_not_found():
 
 
 def ignore(id, name, nick):
-    if nick is not None:
-        n = nick
-    else:
-        n = name
-    return get('ignore', id=id, n=n)
+    return get('ignore', id=id, n=nick if nick else name)
 
 
 def unignore_hint():
@@ -1924,22 +1362,11 @@ def unignore_not_ignored():
 
 
 def unignore(id, name, nick):
-    if nick is not None:
-        n = nick
-    else:
-        n = name
-    return get('unignore', id=id, n=n)
+    return get('unignore', id=id, n=nick if nick else name)
 
 
 def ignorelist(res, names):
-    msg = get('ignorelist', lres=len(res))
-    k = 0
-    for i in res:
-        addmsg = f'➖ [id{i}|{names[k]}]'
-        if addmsg not in msg:
-            msg += addmsg
-        k += 1
-    return msg
+    return get('ignorelist', lres=len(res)) + ''.join(f'➖ [id{i}|{names[k]}]\n' for k, i in enumerate(res))
 
 
 def chatlimit_hint():
@@ -1947,7 +1374,6 @@ def chatlimit_hint():
 
 
 def chatlimit(id, name, nick, t, postfix, lpos):
-    n = nick if nick is not None and len(nick) > 0 else name
     if bool(t):
         if t == 1 or (t > 20 and int(str(t)[-1]) == 1):
             if postfix == 's':
@@ -1970,12 +1396,10 @@ def chatlimit(id, name, nick, t, postfix, lpos):
                 postfix = 'минут'
             else:
                 postfix = 'часов'
-        return get('chatlimit', id=id, n=n, t=t, postfix=postfix)
-    else:
-        if lpos == 0:
-            return get('chatlimit_already_on')
-        else:
-            return get('chatlimit_off', id=id, n=n)
+        return get('chatlimit', id=id, n=nick if nick else name, t=t, postfix=postfix)
+    elif lpos == 0:
+        return get('chatlimit_already_on')
+    return get('chatlimit_off', id=id, n=nick if nick else name)
 
 
 def pm():
@@ -2006,13 +1430,12 @@ def cmd_hint():
     return get('cmd_hint')
 
 
-def cmd_prem():
-    return get('cmd_prem')
+def cmd_prem(l):
+    return get('cmd_prem', l=l)
 
 
 def cmd_set(uid, name, nick, cmd, changed):
-    n = nick if nick is not None and len(nick) > 0 else name
-    return get('cmd_set', uid=uid, n=n, changed=changed, cmd=cmd)
+    return get('cmd_set', uid=uid, n=nick if nick else name, changed=changed, cmd=cmd)
 
 
 def resetcmd_hint():
@@ -2028,8 +1451,7 @@ def resetcmd_not_changed(cmd):
 
 
 def resetcmd(uid, name, nick, cmd, cmdname):
-    n = nick if nick is not None and len(nick) > 0 else name
-    return get('resetcmd', uid=uid, n=n, cmdname=cmdname, cmd=cmd)
+    return get('resetcmd', uid=uid, n=nick if nick else name, cmdname=cmdname, cmd=cmd)
 
 
 def cmd_char_limit():
@@ -2053,10 +1475,8 @@ def listasync(chats, total):
         else:
             total -= 1
     if total <= 0:
-        msg = get('listasync_not_found')
-    else:
-        msg = get('listasync', total=total) + msg
-    return msg
+        return get('listasync_not_found')
+    return get('listasync', total=total) + msg
 
 
 def duel_not_allowed():
@@ -2068,8 +1488,7 @@ def duel_hint():
 
 
 def duel_uxp_not_enough(uid, name, nick):
-    n = nick if nick is not None and len(nick) > 0 else name
-    return get('duel_uxp_not_enough', uid=uid, n=n)
+    return get('duel_uxp_not_enough', uid=uid, n=nick if nick else name)
 
 
 def duel_xp_minimum():
@@ -2077,18 +1496,12 @@ def duel_xp_minimum():
 
 
 def duel(uid, name, nick, xp):
-    n = nick if nick is not None and len(nick) > 0 else name
-    return get('duel', uid=uid, n=n, xp=xp)
+    return get('duel', uid=uid, n=nick if nick else name, xp=xp)
 
 
-def duel_res(uid, uname, unick, id, name, nick, xp, prem):
-    if unick is not None and len(unick) > 0:
-        un = unick
-    else:
-        un = uname
-    n = nick if nick is not None and len(nick) > 0 else name
-    com = '' if prem else ' с учётом комиссии 10%'
-    return get('duel_res', uid=uid, un=un, id=id, n=n, xp=xp, com=com)
+def duel_res(uid, uname, unick, id, name, nick, xp, prem, com=10):
+    return get('duel_res', uid=uid, un=unick if unick else uname, id=id, n=nick if nick else name, xp=xp,
+               com='' if prem else f' с учётом комиссии {com}%')
 
 
 def dueling():
@@ -2149,33 +1562,15 @@ def kickmenu():
 
 
 def kickmenu_kick_nonick(uid, name, nick, kicked):
-    n = nick if nick is not None and len(nick) > 0 else name
-    return get('kickmenu_kick_nonick', uid=uid, n=n, kicked=kicked)
+    return get('kickmenu_kick_nonick', uid=uid, n=nick if nick else name, kicked=kicked)
 
 
 def kickmenu_kick_nick(uid, name, nick, kicked):
-    n = nick if nick is not None and len(nick) > 0 else name
-    return get('kickmenu_kick_nick', uid=uid, n=n, kicked=kicked)
+    return get('kickmenu_kick_nick', uid=uid, n=nick if nick else name, kicked=kicked)
 
 
 def kickmenu_kick_banned(uid, name, nick, kicked):
-    n = nick if nick is not None and len(nick) > 0 else name
-    return get('kickmenu_kick_banned', uid=uid, n=n, kicked=kicked)
-
-
-def rewards(sub, wd):
-    subs = wds = ''
-    if sub >= 1:
-        sub = 1
-        subs = '✅'
-    if wd >= 10:
-        wd = 10
-        wds = '✅'
-    return get('rewards', sub=sub, subs=subs, wd=wd, wds=wds)
-
-
-def lock(time):
-    return get('lock', time=time)
+    return get('kickmenu_kick_banned', uid=uid, n=nick if nick else name, kicked=kicked)
 
 
 def send_notification(text, tagging):
@@ -2211,12 +1606,7 @@ def notification(name, text, time, every, tag, status):
     elif tag == 4:
         msg += 'Без прав'
 
-    msg += '\n\n🟣 Статус: '
-
-    if status == 0:
-        msg += 'Выключено'
-    elif status == 1:
-        msg += 'Включено'
+    msg += f'\n\n🟣 Статус: {"Выключено" if not status else "Включено"}'
 
     return msg
 
@@ -2272,8 +1662,7 @@ def notification_too_long_text(name):
 def notifs(notifs):
     msg = get('notifs')
     for k, i in enumerate(notifs):
-        status = 'Включено' if i[0] == 1 else 'Выключено'
-        msg += f'[{k + 1}]. {i[1]} | {status}\n'
+        msg += f'[{k + 1}]. {i[1]} | {"Включено" if i[0] == 1 else "Выключено"}\n'
     return msg
 
 
@@ -2286,8 +1675,7 @@ def transfer_wrong_number():
 
 
 def transfer_not_enough(uid, name, nickname):
-    n = name if nickname is None else nickname
-    return get('transfer_not_enough', uid=uid, n=n)
+    return get('transfer_not_enough', uid=uid, n=name if nickname is None else nickname)
 
 
 def transfer_myself():
@@ -2299,8 +1687,8 @@ def transfer_community():
 
 
 def transfer(uid, uname, id, name, xp, com):
-    com = '' if com == 0 else f' с учётом комиссии {com}%'
-    return get('transfer', uid=uid, uname=uname, xp=xp, id=id, name=name, com=com)
+    return get('transfer', uid=uid, uname=uname, xp=xp, id=id, name=name,
+               com='' if com == 0 else f' с учётом комиссии {com}%')
 
 
 def transfer_not_allowed():
@@ -2319,40 +1707,6 @@ def bot_info(chats, total_users, users, premium_users, all_groups, biggest_gpool
                max_pool=max_pool, max_group_name=max_group_name, max_group_count=max_group_count,
                biggest_chat_id=biggest_chat_id, biggest_chat_users=biggest_chat_users,
                biggest_chat_owner_id=biggest_chat_owner_id, biggest_chat_owner_name=biggest_chat_owner_name)
-
-
-def warn_report(uid, name, uwarns, from_id, from_name):
-    if uwarns <= 0:
-        h = '💙'
-    elif uwarns == 1:
-        h = '💚'
-    else:
-        h = '💛'
-    return get('warn_report', h=h, uid=uid, name=name, from_id=from_id, from_name=from_name, uwarns=uwarns)
-
-
-def unwarn_report(uid, name, uwarns, from_id, from_name):
-    if uwarns <= 0:
-        h = '💙'
-    elif uwarns == 1:
-        h = '💚'
-    else:
-        h = '💛'
-    return get('unwarn_report', h=h, uid=uid, name=name, from_id=from_id, from_name=from_name, uwarns=uwarns)
-
-
-def reportwarn(uid, name, uwarns):
-    if uwarns <= 0:
-        h = '💙'
-    elif uwarns == 1:
-        h = '💚'
-    else:
-        h = '💛'
-    return get('reportwarn', h=h, uid=uid, name=name, uwarns=uwarns)
-
-
-def warn_report_ban(uid, name, from_id, from_name):
-    return get('warn_report_ban', uid=uid, name=name, from_id=from_id, from_name=from_name)
 
 
 def reboot():
@@ -2399,126 +1753,6 @@ def infban():
     return get('infban')
 
 
-def newseason_top(top, reward):
-    return get('newseason_top', top=top, reward=reward)
-
-
-async def newseason_post(top, season_start, season_end):
-    msg = get('newseason_post_f')
-    for i in top:
-        msg += f'[id{i[0]}|{await getUserName(i[0])}] - {await getUserLVL(i[1])} уровень\n'
-    msg += get('newseason_post_s', season_start=season_start, season_end=season_end)
-    return msg
-
-
-def task(tasks, coins, streak):
-    return get('task', tasks=tasks, coins=coins, streak=streak)
-
-
-def task_not_allowed():
-    return get('task_not_allowed')
-
-
-def task_trade(c):
-    return get('task_trade', c=c)
-
-
-def task_trade_not_enough(c):
-    return get('task_trade_not_enough', c=c)
-
-
-def task_trade_lot(lot):
-    buy = f'{TASKS_LOTS[list(TASKS_LOTS.keys())[lot - 1]]} '
-    if lot < 4:
-        buy += 'уровня'
-    else:
-        buy += 'дня Premium подписки'
-    return get('task_trade_lot', buy=buy)
-
-
-def task_trade_lot_log(lot, id, name):
-    buy = f'{TASKS_LOTS[list(TASKS_LOTS.keys())[lot - 1]]} '
-    if lot < 4:
-        buy += 'уровня'
-    else:
-        buy += 'дня Premium подписки'
-    return get('task_trade_lot_log', id=id, name=name, buy=buy)
-
-
-def task_weekly(prem, tasks):
-    def point(num, maxv):
-        return num if num < maxv else maxv
-    count = [point(tasks[0], TASKS_WEEKLY["bonus"]) == TASKS_WEEKLY["bonus"],
-             point(tasks[1], TASKS_WEEKLY["dailytask"]) == TASKS_WEEKLY["dailytask"],
-             point(tasks[2], TASKS_WEEKLY["sendmsgs"]) == TASKS_WEEKLY["sendmsgs"]].count(True)
-    if prem:
-        count += [point(tasks[3], PREMIUM_TASKS_WEEKLY["lvlup"]) == PREMIUM_TASKS_WEEKLY["lvlup"],
-                  point(tasks[4], PREMIUM_TASKS_WEEKLY["duelwin"]) == PREMIUM_TASKS_WEEKLY["duelwin"]].count(True)
-    tl = datetime.now()
-    tl = 24 * (7 - tl.weekday()) - tl.hour - 1
-    hours = pointHours((tl % 24) * 3600)
-    days = pointDays((tl // 24) * 86400)
-    msg = f'''🟣 Выполнено заданий — {count} / {5 if prem else 3}
-🟣 До сброса заданий — {days} {hours}\n
-[1]. Забрать приз /bonus 6 раз | {point(tasks[0], TASKS_WEEKLY["bonus"])} / 6
-[2]. Выполнить ежедневные задания 7 раз | {point(tasks[1], TASKS_WEEKLY["dailytask"])} / 7
-[3]. Отправить 10.000 сообщений | {point(tasks[2], TASKS_WEEKLY["sendmsgs"])} / 10.000'''
-    if prem:
-        msg += f'''\n[4]. Повысить 10 уровней профиля | {point(tasks[3], PREMIUM_TASKS_WEEKLY["lvlup"])} / 10
-[5]. Победить 60 раз в дуэлях | {point(tasks[4], PREMIUM_TASKS_WEEKLY["duelwin"])} / 60'''
-    return msg + '''\n\n🪙 За каждое задание вы получаете +10 монет Star.'''
-
-
-def task_daily(prem, tasks):
-    def point(num, maxv):
-        return num if num < maxv else maxv
-    count = [point(tasks[0], TASKS_DAILY["sendmsgs"]) == TASKS_DAILY["sendmsgs"],
-             point(tasks[1], TASKS_DAILY["sendvoice"]) == TASKS_DAILY["sendvoice"],
-             point(tasks[2], TASKS_DAILY["duelwin"]) == TASKS_DAILY["duelwin"]].count(True)
-    if prem:
-        count += [point(tasks[3], PREMIUM_TASKS_DAILY["cmds"]) == PREMIUM_TASKS_DAILY["cmds"],
-                  point(tasks[4], PREMIUM_TASKS_DAILY["stickers"]) == PREMIUM_TASKS_DAILY["stickers"]].count(True)
-    tl = datetime.now()
-    tl = 1440 - tl.hour * 60 - tl.minute
-    hours = pointHours((tl // 60) * 3600)
-    minutes = pointMinutes((tl % 60) * 60)
-
-    msg = (f'🟣 Выполнено заданий — {count} / {5 if prem else 3}\n'
-           f'🟣 До сброса заданий — {hours} {minutes}\n\n')
-    if prem:
-        if point(tasks[0], TASKS_DAILY["sendmsgs"]) == TASKS_DAILY["sendmsgs"]:
-            msg += (f'[1.1]. Отправить 600 сообщений | '
-                    f'{point(tasks[0], PREMIUM_TASKS_DAILY_TIERS["sendmsgs"])} / 600\n')
-        else:
-            msg += f'[1]. Отправить 300 сообщений | {point(tasks[0], TASKS_DAILY["sendmsgs"])} / 300\n'
-        if point(tasks[1], TASKS_DAILY["sendvoice"]) == TASKS_DAILY["sendvoice"]:
-            msg += (f'[2.1]. Отправить 60 голосовых сообщений | '
-                    f'{point(tasks[1], PREMIUM_TASKS_DAILY_TIERS["sendvoice"])} / 60\n')
-        else:
-            msg += f'[2]. Отправить 30 голосовых сообщений | {point(tasks[1], TASKS_DAILY["sendvoice"])} / 30\n'
-        if point(tasks[2], TASKS_DAILY["duelwin"]) == TASKS_DAILY["duelwin"]:
-            msg += (f'[3.1]. Победить 25 раз в дуэлях | '
-                    f'{point(tasks[2], PREMIUM_TASKS_DAILY_TIERS["duelwin"])} / 25\n')
-        else:
-            msg += f'[3]. Победить 15 раз в дуэлях | {point(tasks[2], TASKS_DAILY["duelwin"])} / 15\n'
-        if point(tasks[3], PREMIUM_TASKS_DAILY["cmds"]) == PREMIUM_TASKS_DAILY["cmds"]:
-            msg += (f'[4.1]. Использовать команды бота 100 раз | '
-                    f'{point(tasks[3], PREMIUM_TASKS_DAILY_TIERS["cmds"])} / 100\n')
-        else:
-            msg += f'[4]. Использовать команды бота 50 раз | {point(tasks[3], PREMIUM_TASKS_DAILY["cmds"])} / 50\n'
-        if point(tasks[4], PREMIUM_TASKS_DAILY["stickers"]) == PREMIUM_TASKS_DAILY["stickers"]:
-            msg += (f'[5.1]. Отправить 200 стикеров | '
-                    f'{point(tasks[4], PREMIUM_TASKS_DAILY_TIERS["stickers"])} / 200\n')
-        else:
-            msg += f'[5]. Отправить 100 стикеров | {point(tasks[4], PREMIUM_TASKS_DAILY["stickers"])} / 100\n'
-    else:
-        msg += f'''[1]. Отправить 300 сообщений | {point(tasks[0], TASKS_DAILY["sendmsgs"])} / 300
-[2]. Отправить 30 голосовых сообщений | {point(tasks[1], TASKS_DAILY["sendvoice"])} / 30
-[3]. Победить 15 раз в дуэлях | {point(tasks[2], TASKS_DAILY["duelwin"])} / 15\n'''
-
-    return msg + '''\n🪙 За каждое задание вы получаете +5 монет Star.'''
-
-
 def resetlvl(id, u_name):
     return get('resetlvl', id=id, u_name=u_name)
 
@@ -2532,64 +1766,51 @@ def check_help():
 
 
 def check(id, name, nickname, ban, warn, mute):
-    n = nickname if nickname is not None else name
-    ban = pointDays(ban) if ban else "Отсутствуют"
-    warn = f"{warn} из 3" if warn else "Отсутствуют"
-    mute = pointMinutes(mute) if mute else "Отсутствует"
-    return get('check', id=id, n=n, ban=ban, warn=warn, mute=mute)
+    return get('check', id=id, n=nickname if nickname else name, ban=pointDays(ban) if ban else "Отсутствуют",
+               warn=f"{warn} из 3" if warn else "Отсутствуют", mute=pointMinutes(mute) if mute else "Отсутствует")
 
 
 def check_ban(id, name, nickname, ban, ban_history, ban_date, ban_from, ban_reason, ban_time):
-    n = nickname if nickname is not None else name
-    lbh = len(ban_history)
-    banm = pointDays(ban) if ban else "Отсутствует"
-    msg = get('check_ban', id=id, n=n, lbh=lbh, banm=banm)
+    msg = get('check_ban', id=id, n=nickname if nickname else name,
+              lbh=len(ban_history), banm=pointDays(ban) if ban else "Отсутствует")
     if ban:
         msg += f'★ {ban_date} | {ban_from} | {pointDays(ban_time)} | {ban_reason}'
     return msg
 
 
 def check_mute(id, name, nickname, mute, mute_history, mute_date, mute_from, mute_reason, mute_time):
-    n = nickname if nickname is not None else name
-    lmh = len(mute_history)
-    mutem = pointMinutes(mute) if mute else "Отсутствует"
-    msg = get('check_mute', id=id, n=n, lmh=lmh, mutem=mutem)
+    msg = get('check_mute', id=id, n=nickname if nickname else name, lmh=len(mute_history),
+              mutem=pointMinutes(mute) if mute else "Отсутствует")
     if mute:
         msg += f'★ {mute_date} | {mute_from} | {pointMinutes(mute_time)} | {mute_reason}'
     return msg
 
 
 def check_warn(id, name, nickname, warn, warn_history, warns_date, warns_from, warns_reason):
-    n = nickname if nickname is not None else name
-    lwh = len(warn_history)
-    warnm = f"{warn} из 3" if warn else "Отсутствуют"
-    msg = get('check_warn', id=id, n=n, lwh=lwh, warnm=warnm)
+    msg = get('check_warn', id=id, n=nickname if nickname else name, lwh=len(warn_history),
+              warnm=f"{warn} из 3" if warn else "Отсутствуют")
     if warn:
         for k, _ in enumerate(warn_history[:warn]):
             msg += f'★ {warns_date[k]} | {warns_from[k]} | {warn - k} из 3 | {warns_reason[k]}\n'
-
     return msg
 
 
 def check_history_ban(id, name, nickname, dates, names, times, causes):
-    n = nickname if nickname is not None else name
-    msg = get('check_history_ban', id=id, n=n)
+    msg = get('check_history_ban', id=id, n=nickname if nickname else name)
     for k in range(len(times)):
         msg += f'★ {dates[k]} | {names[k]} | {pointDays(times[k])} | {causes[k]}\n'
     return msg
 
 
 def check_history_mute(id, name, nickname, dates, names, times, causes):
-    n = nickname if nickname is not None else name
-    msg = get('check_history_mute', id=id, n=n)
+    msg = get('check_history_mute', id=id, n=nickname if nickname else name)
     for k in range(len(times)):
         msg += f'★ {dates[k]} | {names[k]} | {pointMinutes(times[k])} | {causes[k]}\n'
     return msg
 
 
 def check_history_warn(id, name, nickname, dates, names, times, causes):
-    n = nickname if nickname is not None else name
-    msg = get('check_history_warn', id=id, n=n)
+    msg = get('check_history_warn', id=id, n=nickname if nickname else name)
     for k in range(len(times)):
         msg += f'★ {dates[k]} | {names[k]} | {causes[k]}\n'
     return msg
@@ -2604,9 +1825,8 @@ def purge_empty():
 
 
 def purge(nicknames, levels):
-    nicknames = pointWords(nicknames, ("никнейм", "никнейма", "никнеймов"))
-    levels = pointWords(levels, ("уровень", "уровня", "уровней"))
-    return get('purge', nicknames=nicknames, levels=levels)
+    return get('purge', nicknames=pointWords(nicknames, ("никнейм", "никнейма", "никнеймов")),
+               levels=pointWords(levels, ("уровень", "уровня", "уровней")))
 
 
 def lvlbanned():
@@ -2635,6 +1855,30 @@ def lvlban():
 
 def user_lvlbanned():
     return get('user_lvlbanned')
+
+
+def repbanned():
+    return get('repbanned')
+
+
+def repunban_noban():
+    return get('repunban_noban')
+
+
+def repunban_hint():
+    return get('repunban_hint')
+
+
+def repunban():
+    return get('repunban')
+
+
+def repban_hint():
+    return get('repban_hint')
+
+
+def repban():
+    return get('repban')
 
 
 def anon_not_pm():
@@ -2686,14 +1930,12 @@ def deanon_target_not_found():
 
 
 def deanon(id, from_id, name, nickname, time):
-    n = nickname if nickname is not None else name
-    time = datetime.fromtimestamp(time).strftime('%d.%m.%Y - %H:%M')
-    return get('deanon', id=id, from_id=from_id, from_name=n, time=time)
+    return get('deanon', id=id, from_id=from_id, from_name=nickname if nickname else name,
+               time=datetime.fromtimestamp(time).strftime('%d.%m.%Y - %H:%M'))
 
 
 def antispam_punishment(uid, name, nick, setting, punishment, violation_count, time=None):
-    n = nick if nick is not None else name
-    return get(f'antispam_punishment_{setting}_{punishment}', uid=uid, n=n, time=time,
+    return get(f'antispam_punishment_{setting}_{punishment}', uid=uid, n=nick if nick else name, time=time,
                violation_count=violation_count)
 
 
@@ -2741,8 +1983,8 @@ def punishlist_delall_done(punish):
 
 
 def timeout(activated):
-    activated = 'Для активации нажмите "Включить"' if not activated else 'Для деактивации нажмите "Выключить"'
-    return get('timeout', activated=activated)
+    return get('timeout',
+               activated='Для активации нажмите "Включить"' if not activated else 'Для деактивации нажмите "Выключить"')
 
 
 def timeout_settings():
@@ -2775,3 +2017,7 @@ def premchat(uid, name):
 
 def premlist(prem):
     return get('premlist') + '\n' + '\n'.join(str(i[0]) for i in prem)
+
+
+def transfer_limit(u_prem):
+    return get('transfer_limit_prem' if u_prem else 'transfer_limit')

@@ -52,11 +52,11 @@
                     </ul>
                     {% if error %}
                         {% if error == "chatid" %}
-                            <p class="price-p" style="color: #ff0000;">Вы не являетесь владельцем этой беседы!</p>
+                            <p class="price-p" style="color: #ff0000;">Вы не являетесь участником этой беседы.</p>
                         {% elif error == "chatnone" %}
                             <p class="price-p" style="color: #ff0000;">Введите ID беседы!</p>
                         {% elif error == "chatnoacc" %}
-                            <p class="price-p" style="color: #ff0000;">Беседы с данным ID не существует!</p>
+                            <p class="price-p" style="color: #ff0000;">Беседы с данным ID не существует.</p>
                         {% elif error == "chatalready" %}
                             <p class="price-p" style="color: #ff0000;">Данная беседа уже имеет Premium-статус.</p>
                         {% else %}

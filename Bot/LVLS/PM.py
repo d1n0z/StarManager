@@ -23,20 +23,14 @@ async def anon(message: GroupTypes.MessageNew):
         return
     data = message.text.split()
     if len(data) < 3 or not data[1].isdigit():
-        msg = messages.anon_help()
-        await sendMessage(message.peer_id, msg)
-        return
+        return await sendMessage(message.peer_id, messages.anon_help())
     chatid = int(data[1])
     if not (await getChatSettings(chatid))['entertaining']['allowAnon']:
-        msg = messages.anon_not_allowed()
-        await sendMessage(message.peer_id, msg)
-        return
+        return await sendMessage(message.peer_id, messages.anon_not_allowed())
     try:
         await API.messages.get_conversations_by_id(peer_ids=chatid + 2000000000, group_id=GROUP_ID)
     except:
-        msg = messages.anon_chat_does_not_exist()
-        await sendMessage(message.peer_id, msg)
-        return
+        return await sendMessage(message.peer_id, messages.anon_chat_does_not_exist())
     for i in data:
         for y in i.split('/'):
             try:
@@ -44,35 +38,21 @@ async def anon(message: GroupTypes.MessageNew):
                     continue
             except:
                 continue
-            msg = messages.anon_link()
-            await sendMessage(message.peer_id, msg)
-            return
+            return await sendMessage(message.peer_id, messages.anon_link())
     if len(message.attachments) > 0:
-        msg = messages.anon_attachments()
-        await sendMessage(message.peer_id, msg)
-        return
+        return await sendMessage(message.peer_id, messages.anon_attachments())
     if not await isChatMember(uid, chatid):
-        msg = messages.anon_not_member()
-        await sendMessage(message.peer_id, msg)
-        return
-
+        return await sendMessage(message.peer_id, messages.anon_not_member())
     date = datetime.now().replace(hour=0, minute=0, second=0)
-
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             if (cnt := await (await c.execute('select count(*) as c from anonmessages where fromid=%s and time>%s',
                                               (uid, date.timestamp()))).fetchone()) and cnt[0] >= 25:
-                msg = messages.anon_limit()
-                await sendMessage(message.peer_id, msg)
-                return
+                return await sendMessage(message.peer_id, messages.anon_limit())
             mid = (await (await c.execute('insert into anonmessages (fromid, chat_id, time) values (%s, %s, %s) '
                                           'returning id', (uid, chatid, time.time()))).fetchone())[0]
-    text = ' '.join(data[2:])
-    msg = messages.anon_message(mid, text)
-    await sendMessage(chatid + 2000000000, msg)
-    msg = messages.anon_sent(mid, await getChatName(chatid))
-    await sendMessage(message.peer_id, msg)
-    return
+    await sendMessage(chatid + 2000000000, messages.anon_message(mid, ' '.join(data[2:])))
+    await sendMessage(message.peer_id, messages.anon_sent(mid, await getChatName(chatid)))
 
 
 @bl.raw_event(GroupEventType.MESSAGE_NEW, GroupTypes.MessageNew, SearchPMCMD('deanon'), blocking=False)
@@ -83,31 +63,18 @@ async def deanon(message: GroupTypes.MessageNew):
         return
     data = message.text.split()
     if len(data) < 2:
-        msg = messages.deanon_help()
-        await sendMessage(message.peer_id, msg)
-        return
+        return await sendMessage(message.peer_id, messages.deanon_help())
     id = data[1].replace('#', '').replace('A', '').replace('А', '')
     if not id.isdigit():
-        msg = messages.deanon_help()
-        await sendMessage(message.peer_id, msg)
-        return
-
+        return await sendMessage(message.peer_id, messages.deanon_help())
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             deanon_target = await (await c.execute(
                 'select chat_id, fromid, time from anonmessages where id=%s', (id,))).fetchone()
     if deanon_target is None:
-        msg = messages.deanon_target_not_found()
-        await sendMessage(message.peer_id, msg)
-        return
-    chatid = deanon_target[0]
-    fromid = deanon_target[1]
-    dttime = deanon_target[2]
+        return await sendMessage(message.peer_id, messages.deanon_target_not_found())
+    chatid, fromid = deanon_target[0], deanon_target[1]
     if not await isChatMember(uid, chatid):
-        msg = messages.anon_not_member()
-        await sendMessage(message.peer_id, msg)
-        return
-    msg = messages.deanon(id, fromid, await getUserName(fromid),
-                          await getUserNickname(fromid, chatid), dttime)
-    await sendMessage(message.peer_id, msg)
-    return
+        return await sendMessage(message.peer_id, messages.anon_not_member())
+    await sendMessage(message.peer_id, messages.deanon(id, fromid, await getUserName(fromid),
+                                                       await getUserNickname(fromid, chatid), deanon_target[2]))

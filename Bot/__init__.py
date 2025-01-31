@@ -1,5 +1,5 @@
 import asyncio
-import traceback
+from datetime import datetime
 
 import pydantic
 import vk_api.exceptions
@@ -10,7 +10,6 @@ from vkbottle import Bot, GroupEventType, GroupTypes, VKAPIError, LoopWrapper
 from vkbottle.framework.labeler import BotLabeler
 
 from Bot import scheduler
-from Bot.exception_handler import exception_handle
 from Bot.labelers import LABELERS
 from Bot.comment_handlers import comment_handle
 from Bot.like_handlers import like_handle
@@ -18,7 +17,7 @@ from Bot.message_handlers import message_handle
 from Bot.middlewares import CommandMiddleware
 from Bot.reaction_handlers import reaction_handle
 from config.config import VK_TOKEN_GROUP, VK_API_SESSION
-from db import syncpool
+from db import syncpool, pool
 
 
 class VkBot:
@@ -34,7 +33,7 @@ class VkBot:
 
         labeler = BotLabeler()
 
-        # self.bot.loop_wrapper.add_task(scheduler.run())
+        # self.bot.loop_wrapper.add_task(scheduler.run())  # uses a lot of resources(somehow)
 
         @labeler.raw_event(GroupEventType.MESSAGE_REACTION_EVENT, dataclass=GroupTypes.MessageReactionEvent)
         async def start(event: GroupTypes.MessageReactionEvent):
@@ -42,7 +41,14 @@ class VkBot:
 
         @labeler.raw_event(GroupEventType.MESSAGE_NEW, dataclass=GroupTypes.MessageNew, blocking=False)
         async def new_message(event: GroupTypes.MessageNew):
+            timestart = datetime.now()
             await message_handle(event)
+            async with (await pool()).connection() as conn:
+                async with conn.cursor() as c:
+                    await c.execute(
+                        'insert into messagesstatistics (timestart, timeend) values (%s, %s)',
+                        (timestart, datetime.now()))
+                    await conn.commit()
 
         @labeler.raw_event(GroupEventType.WALL_REPLY_NEW, dataclass=GroupTypes.WallReplyNew)
         async def new_wall_reply(event: GroupTypes.WallReplyNew):
@@ -51,10 +57,6 @@ class VkBot:
         @labeler.raw_event(GroupEventType.LIKE_ADD, dataclass=GroupTypes.LikeAdd)
         async def like_add(event: GroupTypes.LikeAdd):
             await like_handle(event)
-
-        # @self.bot.error_handler.register_error_handler(VKAPIError[917])
-        # async def exception_handler(e: VKAPIError):
-        #     pass  # await exception_handle(e)
 
         @self.bot.error_handler.register_error_handler(VKAPIError[7])
         @self.bot.error_handler.register_error_handler(VKAPIError[917])
@@ -83,9 +85,10 @@ class VkBot:
                             'random_id': 0
                         })
                     except:
-                        traceback.print_exc()
+                        pass
                     c.execute('update reboots set sended=true where id=%s', (i[0],))
                 conn.commit()
 
         logger.info('Loaded. Starting the bot...')
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())  # temp
         self.bot.run_forever()

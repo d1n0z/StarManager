@@ -1,8 +1,8 @@
 from vkbottle import Keyboard, Callback, OpenLink, KeyboardButtonColor
 
-from config.config import (TASKS_LOTS, SETTINGS_POSITIONS, SETTINGS_COUNTABLE_CHANGEMENU, SETTINGS_COUNTABLE,
+from config.config import (SETTINGS_POSITIONS, SETTINGS_COUNTABLE_CHANGEMENU, SETTINGS_COUNTABLE,
                            SETTINGS_COUNTABLE_NO_CATEGORY, SETTINGS_COUNTABLE_PUNISHMENT_NO_DELETE_MESSAGE,
-                           PREMMENU_TURN)
+                           PREMMENU_TURN, LEAGUE)
 
 
 def join(chid):
@@ -309,30 +309,28 @@ def giveowner(chat_id, chid, uid):
     return kb.get_json()
 
 
-def mtop(chat_id, uid):
+def top(chat_id, uid):
     kb = Keyboard(inline=True)
 
-    kb.add(Callback('✨ Уровни', {"cmd": "top_lvls", "chat_id": chat_id, "uid": uid}))
+    kb.add(Callback('✨ Лиги', {"cmd": "top_leagues", "league": 1, "chat_id": chat_id, "uid": uid}))
     kb.add(Callback('⚔ Дуэли', {"cmd": "top_duels", "chat_id": chat_id, "uid": uid}))
 
     return kb.get_json()
 
 
-def top_lvls(chat_id, uid):
+def top_leagues(chat_id, uid, league, availableleagues):
     kb = Keyboard(inline=True)
 
-    kb.add(Callback('◀ Назад', {"cmd": "mtop", "chat_id": chat_id, "uid": uid}), KeyboardButtonColor.NEGATIVE)
-    kb.add(Callback('🥨 В беседе', {"cmd": "top_lvls_in_group", "chat_id": chat_id, "uid": uid}),
-           KeyboardButtonColor.SECONDARY)
-
-    return kb.get_json()
-
-
-def top_lvls_in_group(chat_id, uid):
-    kb = Keyboard(inline=True)
-
-    kb.add(Callback('◀ Назад', {"cmd": "mtop", "chat_id": chat_id, "uid": uid}), KeyboardButtonColor.NEGATIVE)
-    kb.add(Callback('🥯 Общее', {"cmd": "top_lvls", "chat_id": chat_id, "uid": uid}), KeyboardButtonColor.SECONDARY)
+    kb.add(Callback('◀ Назад', {"cmd": "top", "chat_id": chat_id, "uid": uid}))
+    c = 0
+    for k, i in enumerate(LEAGUE):
+        if k not in availableleagues:
+            continue
+        if c % 2 == 0:
+            kb.row()
+        kb.add(Callback(i, {"cmd": "top_leagues", "league": k + 1, "chat_id": chat_id, "uid": uid}),
+               KeyboardButtonColor.POSITIVE if k + 1 == league else KeyboardButtonColor.NEGATIVE)
+        c += 1
 
     return kb.get_json()
 
@@ -340,7 +338,7 @@ def top_lvls_in_group(chat_id, uid):
 def top_duels(chat_id, uid):
     kb = Keyboard(inline=True)
 
-    kb.add(Callback('◀ Назад', {"cmd": "mtop", "chat_id": chat_id, "uid": uid}), KeyboardButtonColor.NEGATIVE)
+    kb.add(Callback('◀ Назад', {"cmd": "top", "chat_id": chat_id, "uid": uid}))
     kb.add(Callback('🥨 В беседе', {"cmd": "top_duels_in_group", "chat_id": chat_id, "uid": uid}),
            KeyboardButtonColor.SECONDARY)
 
@@ -350,17 +348,19 @@ def top_duels(chat_id, uid):
 def top_duels_in_group(chat_id, uid):
     kb = Keyboard(inline=True)
 
-    kb.add(Callback('◀ Назад', {"cmd": "mtop", "chat_id": chat_id, "uid": uid}), KeyboardButtonColor.NEGATIVE)
-    kb.add(Callback('🥯 Общее', {"cmd": "top_duels", "chat_id": chat_id, "uid": uid}), KeyboardButtonColor.SECONDARY)
+    kb.add(Callback('◀ Назад', {"cmd": "top", "chat_id": chat_id, "uid": uid}))
+    kb.add(Callback('🥯 Общее', {"cmd": "top_duels", "chat_id": chat_id, "uid": uid}))
 
     return kb.get_json()
 
 
-def premmenu(uid, settings):
+def premmenu(uid, settings, prem):
     kb = Keyboard(inline=True)
 
     k = 0
     for e, i in settings.items():
+        if i != 'clear_by_fire' and not prem:
+            continue
         k += 1
         if i:
             color = KeyboardButtonColor.POSITIVE
@@ -635,43 +635,6 @@ def cmdlist(uid, page, cmdslen):
         kb.add(Callback('<<', {"cmd": "cmdlist", "uid": uid, "page": page - 1}))
     if cmdslen > (10 * page) + 10:
         kb.add(Callback('>>', {"cmd": "cmdlist", "uid": uid, "page": page + 1}))
-
-    return kb.get_json()
-
-
-def tasks(uid):
-    kb = Keyboard(inline=True)
-
-    kb.add(Callback('Обмен', {"cmd": "task_trade", "uid": uid}), KeyboardButtonColor.POSITIVE)
-    kb.row()
-    kb.add(Callback('Еженедельные', {"cmd": "task_weekly", "uid": uid}))
-    kb.add(Callback('Ежедневные', {"cmd": "task_daily", "uid": uid}))
-
-    return kb.get_json()
-
-
-def task_trade(uid, coins):
-    kb = Keyboard(inline=True)
-
-    kbdcolors = []
-    for i in TASKS_LOTS.keys():
-        kbdcolors.append(KeyboardButtonColor.NEGATIVE if coins < i else KeyboardButtonColor.POSITIVE)
-
-    kb.add(Callback('Назад', {"cmd": "task", "uid": uid}))
-    kb.row()
-    kb.add(Callback('1', {"cmd": "task_trade_lot", "uid": uid, "lot": 1}), kbdcolors[0])
-    kb.add(Callback('2', {"cmd": "task_trade_lot", "uid": uid, "lot": 2}), kbdcolors[1])
-    kb.row()
-    kb.add(Callback('3', {"cmd": "task_trade_lot", "uid": uid, "lot": 3}), kbdcolors[2])
-    kb.add(Callback('4', {"cmd": "task_trade_lot", "uid": uid, "lot": 4}), kbdcolors[3])
-
-    return kb.get_json()
-
-
-def task_back(uid):
-    kb = Keyboard(inline=True)
-
-    kb.add(Callback('Назад', {"cmd": "task", "uid": uid}))
 
     return kb.get_json()
 

@@ -21,9 +21,9 @@ from vkbottle.bot import Bot
 from vkbottle.tools.mini_types.bot.foreign_message import ForeignMessageMin
 from vkbottle_types.objects import MessagesMessage, MessagesMessageAttachmentType, MessagesSendUserIdsResponseItem
 
-from config.config import (API, VK_API_SESSION, VK_TOKEN_GROUP, GROUP_ID, TASKS_DAILY, PREMIUM_TASKS_DAILY,
-                           PREMIUM_TASKS_DAILY_TIERS, TASKS_WEEKLY, PREMIUM_TASKS_WEEKLY, SETTINGS, PATH,
-                           NSFW_CATEGORIES, SETTINGS_ALT, SETTINGS_DEFAULTS, MAIN_DEVS, PREMMENU_DEFAULT, PREMMENU_TURN)
+from config.config import (API, VK_API_SESSION, VK_TOKEN_GROUP, GROUP_ID, SETTINGS, PATH,
+                           NSFW_CATEGORIES, SETTINGS_ALT, SETTINGS_DEFAULTS, MAIN_DEVS, PREMMENU_DEFAULT, PREMMENU_TURN,
+                           LEAGUE_LVL)
 from db import pool
 
 
@@ -79,34 +79,32 @@ async def getIDFromMessage(message: str, reply: ForeignMessageMin | None, place:
     """
     data = message.split()
     try:
-        if len(data) >= place or reply:
-            if reply is None:
+        if len(data) < place and not reply:
+            return 0
+        if reply is not None:
+            return reply.from_id
+        try:
+            if data[place - 1].count('[id') != 0:
+                id = data[place - 1][data[place - 1].find('[id') + 3:data[place - 1].find('|')]
+            elif data[place - 1].count('[club') != 0:
+                id = '-' + data[place - 1][data[place - 1].find('[club') + 5:data[place - 1].find('|')]
+            elif data[place - 1].count('vk.') != 0:
+                id = data[place - 1][data[place - 1].find('vk.'):]
+                id = id[id.find('/') + 1:]
                 try:
-                    if data[place - 1].count('[id') != 0:
-                        id = data[place - 1][data[place - 1].find('[id') + 3:data[place - 1].find('|')]
-                    elif data[place - 1].count('[club') != 0:
-                        id = '-' + data[place - 1][data[place - 1].find('[club') + 5:data[place - 1].find('|')]
-                    elif data[place - 1].count('vk.') != 0:
-                        id = data[place - 1][data[place - 1].find('vk.'):]
-                        id = id[id.find('/') + 1:]
-                        try:
-                            id = await API.users.get(user_ids=id)
-                            id = id[0].id
-                        except:
-                            traceback.print_exc()
-                            id = int(id)
-                    elif data[place - 1].isdigit():
-                        id = data[place - 1]
-                    elif data[place - 1].count('@id') != 0:
-                        id = data[place - 1][data[place - 1].find('@id') + 3:]
-                    else:
-                        id = False
-                except IndexError:
-                    id = False
+                    id = await API.users.get(user_ids=id)
+                    id = id[0].id
+                except:
+                    traceback.print_exc()
+                    id = int(id)
+            elif data[place - 1].isdigit():
+                id = data[place - 1]
+            elif data[place - 1].count('@id') != 0:
+                id = data[place - 1][data[place - 1].find('@id') + 3:]
             else:
-                id = reply.from_id
-        else:
-            id = False
+                return 0
+        except IndexError:
+            return 0
 
         return int(id)
     except:
@@ -139,7 +137,7 @@ async def editMessage(msg: str, peer_id: int, cmid: int, kb=None) -> bool:
         return False
 
 
-@AsyncTTL(time_to_live=15, maxsize=0)
+@AsyncTTL(time_to_live=300, maxsize=0)
 async def getChatName(chat_id: int = None) -> str:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
@@ -156,7 +154,7 @@ async def getChatName(chat_id: int = None) -> str:
             return chatname
 
 
-@AsyncTTL(time_to_live=600, maxsize=0)
+@AsyncTTL(time_to_live=300, maxsize=0)
 async def getGroupName(group_id: int) -> str:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
@@ -170,6 +168,7 @@ async def getGroupName(group_id: int) -> str:
             return name
 
 
+@AsyncTTL(maxsize=0)
 async def isChatAdmin(id: int, chat_id: int) -> bool:
     try:
         status = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
@@ -181,6 +180,7 @@ async def isChatAdmin(id: int, chat_id: int) -> bool:
     return False
 
 
+@AsyncTTL(maxsize=0)
 async def getChatOwner(chat_id: int) -> int | bool:
     try:
         status = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
@@ -192,6 +192,7 @@ async def getChatOwner(chat_id: int) -> int | bool:
     return False
 
 
+@AsyncTTL(maxsize=0)
 async def getChatMembers(chat_id: int) -> int | bool:
     try:
         status = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
@@ -252,6 +253,7 @@ async def getRegDate(id: int, format: str = '%d %B %Y', none: Any = 'Не уда
         return none
 
 
+@AsyncTTL(time_to_live=2, maxsize=0)
 async def getUserAccessLevel(uid: int, chat_id: int, none: Any = 0) -> int | Any:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
@@ -261,6 +263,7 @@ async def getUserAccessLevel(uid: int, chat_id: int, none: Any = 0) -> int | Any
             return none
 
 
+@AsyncTTL(maxsize=0)
 async def getUserLastMessage(uid: int, chat_id: int, none: Any = 'Неизвестно') -> int | Any:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
@@ -355,34 +358,58 @@ async def getUserXP(uid, none=0) -> int:
             return none
 
 
+async def getUserLeague(uid, none=0) -> int:
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if lg := await (await c.execute('select league from xp where uid=%s', (uid,))).fetchone():
+                return lg[0]
+            return none
+
+
 @AsyncLRU(maxsize=0)
 async def getUserLVL(xp):
-    if xp > 100:
-        return (xp - 100) // 200 + 2
-    else:
+    if not xp:
         return 1
+    lvl, incr, xp = 0, 0, xp + 1
+    while xp > 0:
+        xp -= 200 + incr
+        lvl += 1
+        incr += 20
+        if incr > 100:
+            incr = 20
+    return lvl
+
+
+@AsyncLRU(maxsize=0)
+async def getXPFromLVL(lvl):
+    if lvl == 1:
+        return 0
+    xp, incr = 0, 0
+    for _ in range(lvl - 1):
+        xp += 200 + incr
+        incr += 20
+        if incr > 100:
+            incr = 20
+    return xp
 
 
 @AsyncLRU(maxsize=0)
 async def getUserNeededXP(xp):
-    if xp >= 100:
-        xp -= 100
-        return 200 - (xp - (xp // 200) * 200)
-    else:
-        return 100
+    return await getXPFromLVL(await getUserLVL(xp) + 1) - xp
 
 
 @AsyncTTL(time_to_live=120, maxsize=0)
-async def getXPTop(returnval='count', limit=0, chat: list = None) -> dict:
+async def getXPTop(returnval='count', limit: int = 10, league: int = 1, users: list = None) -> dict:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
-            if chat is not None:
-                top = await (await c.execute('select uid, xp from xp where uid>0 and uid=ANY(%s) order by xp desc',
-                                             (chat,))).fetchall()
+            if users is not None:
+                top = await (await c.execute(
+                    'select uid, xp from xp where uid>0 and league=%s and uid=ANY(%s) order by xp desc limit %s',
+                    (league, users, limit))).fetchall()
             else:
-                top = await (await c.execute('select uid, xp from xp where uid>0 order by xp desc')).fetchall()
-    if limit > 0:
-        top = top[:limit]
+                top = await (await c.execute(
+                    'select uid, xp from xp where uid>0 and league=%s order by xp desc limit %s',
+                    (league, limit))).fetchall()
     if returnval == 'count':
         return {i[0]: k + 1 for k, i in enumerate(top)}
     elif returnval == 'xp':
@@ -458,17 +485,18 @@ async def addUserXP(uid, addxp, checklvlbanned=True):
             return
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
-            if u := await (await c.execute('select id, xp from xp where uid=%s', (uid,))).fetchone():
-                uxp = u[1]
-                await c.execute('update xp set xp=xp+%s where id=%s', (addxp, u[0]))
+            if u := await (await c.execute('select id, xp, league from xp where uid=%s', (uid,))).fetchone():
+                uxp, ulg = u[1], u[2]
+                if ulg != len(LEAGUE_LVL) and await getUserLVL(uxp + addxp) > LEAGUE_LVL[ulg]:
+                    return await c.execute('update xp set xp = 0, league = %s where id=%s', (ulg + 1, u[0]))
+                await c.execute('update xp set xp = %s where id=%s', (uxp + addxp, u[0]))
             else:
-                uxp = 0
-                await c.execute('insert into xp (uid, xp) values (%s, %s)', (uid, addxp))
+                await c.execute('insert into xp (uid, xp, lm, league) values (%s, %s, %s, 0)',
+                                (uid, addxp, int(time.time())))
             await conn.commit()
-    if await getUserLVL(uxp + addxp) > await getUserLVL(uxp):
-        await addWeeklyTask(uid, 'lvlup')
 
 
+@AsyncTTL(time_to_live=120, maxsize=0)
 async def getUserDuelWins(uid, none=0):
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
@@ -546,47 +574,7 @@ async def getSilence(chat_id) -> bool:
                                                (chat_id,))).fetchone())
 
 
-async def addDailyTask(uid, task, count=1, checklvlbanned=True):
-    if checklvlbanned:
-        if await getULvlBanned(uid):
-            return
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            t = await (await c.execute('select count from tasksdaily where uid=%s and task=%s', (uid, task))).fetchone()
-            if t:
-                await c.execute('update tasksdaily set count=count+%s where uid=%s and task=%s', (count, uid, task))
-            else:
-                await c.execute('insert into tasksdaily (uid, task, count) values (%s, %s, %s)', (uid, task, count))
-            t = t[0] if t else 0
-            if t + count == (TASKS_DAILY | PREMIUM_TASKS_DAILY)[task] or t + count == PREMIUM_TASKS_DAILY_TIERS:
-                if (task in PREMIUM_TASKS_DAILY or task in PREMIUM_TASKS_DAILY_TIERS) and await getUserPremium(uid):
-                    if not (await c.execute('update coins set coins=coins+10 where uid=%s', (uid,))).rowcount:
-                        await c.execute('insert into coins (uid, coins) values (%s, 10)', (uid,))
-                elif task in TASKS_DAILY:
-                    if not (await c.execute('update coins set coins=coins+5 where uid=%s', (uid,))).rowcount:
-                        await c.execute('insert into coins (uid, coins) values (%s, 5)', (uid,))
-            await conn.commit()
-
-
-async def addWeeklyTask(uid, task, count=1, checklvlbanned=True):
-    if checklvlbanned:
-        if await getULvlBanned(uid):
-            return
-
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            if not (await c.execute('update tasksweekly set count=count+%s where uid=%s and task=%s',
-                                    (count, uid, task))).rowcount:
-                await c.execute('insert into tasksweekly (uid, task, count) values (%s, %s, %s)', (uid, task, count))
-            if ((await (await c.execute(
-                    'select count from tasksweekly where uid=%s and task=%s', (uid, task))).fetchone()
-                 )[0] == (TASKS_WEEKLY | PREMIUM_TASKS_WEEKLY)[task] and
-                    (task in TASKS_WEEKLY or (task in PREMIUM_TASKS_WEEKLY and await getUserPremium(uid)))):
-                if not (await c.execute('update coins set coins=coins+10 where uid=%s', (uid,))).rowcount:
-                    await c.execute('insert into coins (uid, coins) values (%s, 10)', (uid,))
-            await conn.commit()
-
-
+@AsyncTTL(time_to_live=120, maxsize=0)
 async def isChatMember(uid, chat_id):
     try:
         return uid in [i.member_id for i in
@@ -612,7 +600,7 @@ async def NSFWDetector(pic_path):
     return False
 
 
-@cached()
+@cached
 def whoiscached(text):
     return whois.whois(text)
 
@@ -742,6 +730,14 @@ async def getULvlBanned(uid) -> bool:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             if await (await c.execute('select id from lvlbanned where uid=%s', (uid,))).fetchone():
+                return True
+            return False
+
+
+async def getURepBanned(uid) -> bool:
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if await (await c.execute('select id from reportban where uid=%s', (uid,))).fetchone():
                 return True
             return False
 
@@ -881,7 +877,7 @@ async def getSilenceAllowed(chat_id):
     return []
 
 
-@AsyncLRU(maxsize=0)
+@cached
 def hex_to_rgb(value):
     value = value.lstrip('#')
     lv = len(value)

@@ -1,11 +1,9 @@
-from typing import Iterable
-
 from vkbottle import ABCRule
 from vkbottle.bot import Message, MessageEvent
 from vkbottle_types.events.bot_events import MessageNew
 
 from Bot.checkers import getUserPrefixes
-from Bot.utils import addDailyTask, getUserPremium, sendMessageEventAnswer
+from Bot.utils import getUserPremium, sendMessageEventAnswer
 from config.config import PM_COMMANDS
 
 
@@ -15,8 +13,6 @@ class SearchCMD(ABCRule[Message]):
 
     async def check(self, event: Message) -> bool:
         if event.out == self.cmd:
-            if event.from_id > 0:
-                await addDailyTask(event.from_id, 'cmds')
             return True
         return False
 
@@ -27,7 +23,7 @@ class SearchPMCMD(ABCRule[Message]):
 
     async def check(self, event: MessageNew) -> bool:
         message = event.object.message
-        if message.peer_id > 2000000000:
+        if message.peer_id > 2000000000 or not message.text:
             return False
         text = message.text.lower().split()[0]
         for i in await getUserPrefixes(await getUserPremium(message.from_id), message.from_id):

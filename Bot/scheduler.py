@@ -8,88 +8,20 @@ from datetime import datetime
 from zipfile import ZipFile
 
 import aiocron
+import yadisk
 from loguru import logger
 
 import messages
-from Bot.megadrive import mega_drive
 from Bot.tgbot import tgbot
 from Bot.utils import sendMessage, chunks, punish, getUserName
-from config.config import DATABASE, PASSWORD, USER, TG_CHAT_ID, NEWSEASON_REWARDS, TASKS_DAILY, \
-    PREMIUM_TASKS_DAILY, DAILY_TO, API, IMPLICIT_API, GROUP_ID, TG_BACKUP_THREAD_ID, PHOTO_NOT_FOUND
+from config.config import DATABASE, PASSWORD, USER, TG_CHAT_ID, NEWSEASON_REWARDS, DAILY_TO, API, IMPLICIT_API, \
+    GROUP_ID, TG_BACKUP_THREAD_ID, PHOTO_NOT_FOUND, YANDEX_TOKEN
 from db import pool
-
-
-async def deleteTempdataDB():
-    try:
-        async with (await pool()).connection() as conn:
-            async with conn.cursor() as c:
-                await c.execute('delete from antispammessages where time<%s', (int(time.time() - 60),))
-                await c.execute('delete from speccommandscooldown where time<%s', (int(time.time() - 10),))
-                await c.execute('update xp set xp=0 where xp<0')
-                await conn.commit()
-    except Exception as e:
-        traceback.print_exc()
-        await sendMessage(DAILY_TO + 2000000000, f'e from schedule resetAntispamMessages:\n{e}')
-
-
-async def dailyTasks():
-    try:
-        async with (await pool()).connection() as conn:
-            async with conn.cursor() as c:
-                for i in await (await c.execute('select distinct uid from tasksdaily')).fetchall():
-                    prem = await (await c.execute('select time from premium where uid=%s', (i[0],))).fetchone()
-                    prem = prem[0] if prem else 0
-                    tasks = [await (await c.execute(
-                        'select count from tasksdaily where uid=%s and task=\'sendmsgs\'', (i[0],))).fetchone()]
-                    tasks[0] = tasks[0][0] if tasks[0] is not None else 0
-                    tasks.append(await (await c.execute(
-                        'select count from tasksdaily where uid=%s and task=\'sendvoice\'', (i[0],))).fetchone())
-                    tasks[1] = tasks[1][0] if tasks[1] is not None else 0
-                    tasks.append(await (await c.execute(
-                        'select count from tasksdaily where uid=%s and task=\'duelwin\'', (i[0],))).fetchone())
-                    tasks[2] = tasks[2][0] if tasks[2] is not None else 0
-                    tasks.append(await (await c.execute(
-                        'select count from tasksdaily where uid=%s and task=\'cmds\'', (i[0],))).fetchone())
-                    tasks[3] = tasks[3][0] if tasks[3] is not None else 0
-                    tasks.append(await (await c.execute(
-                        'select count from tasksdaily where uid=%s and task=\'stickers\'', (i[0],))).fetchone())
-                    tasks[4] = tasks[4][0] if tasks[4] is not None else 0
-                    count = [tasks[0] >= TASKS_DAILY["sendmsgs"], tasks[1] >= TASKS_DAILY["sendvoice"],
-                             tasks[2] >= TASKS_DAILY["duelwin"]].count(True)
-                    countrange = 3
-                    if prem:
-                        countrange += 2
-                        count += [tasks[3] >= PREMIUM_TASKS_DAILY["cmds"],
-                                  tasks[4] >= PREMIUM_TASKS_DAILY["stickers"]].count(True)
-                    if count >= countrange:
-                        if not (await c.execute(
-                                'update tasksweekly set count=count+1 where uid=%s and task=\'dailytask\'',
-                                (i[0],))).rowcount:
-                            await c.execute('insert into tasksweekly (uid, task, count) values (%s, \'dailytask\', 1)',
-                                            (i[0],))
-                await c.execute('delete from tasksdaily')
-                await conn.commit()
-        await sendMessage(DAILY_TO + 2000000000, 'daily tasks reset: 100%')
-    except Exception as e:
-        traceback.print_exc()
-        await sendMessage(DAILY_TO + 2000000000, f'e from schedule dailyTasks:\n{e}')
-
-
-async def weeklyTasks():
-    try:
-        async with (await pool()).connection() as conn:
-            async with conn.cursor() as c:
-                await c.execute('delete from tasksweekly')
-                await conn.commit()
-        await sendMessage(DAILY_TO + 2000000000, 'weekly tasks reset: 100%')
-    except Exception as e:
-        traceback.print_exc()
-        await sendMessage(DAILY_TO + 2000000000, f'e from schedule everyday:\n{e}')
 
 
 async def backup() -> None:
     try:
-        os.system('rm backup*.zip *.sql')
+        os.system('rm backup*.zip *.sql > /dev/null 2>&1')
         name = f"backup{datetime.now().strftime('%d-%m-%Y:%H:%M:%S')}.zip"
         db = f"{DATABASE}.sql"
         subprocess.run(f'PGPASSWORD="{PASSWORD}" pg_dump -h localhost -U {USER} -f {DATABASE}.sql {DATABASE}',
@@ -97,12 +29,15 @@ async def backup() -> None:
         with ZipFile(name, "a") as myzip:
             myzip.write(f"{db}")
 
-        drive = mega_drive()
-        file = drive.upload(name)
+        drive = yadisk.AsyncClient(token=YANDEX_TOKEN)
+        async with drive:
+            (await drive.upload(name, f'/StarManager/backups/{name}',
+                                timeout=int(os.stat(name).st_size / 1000 / 128) * 1.5))
+            file = await drive.get_download_link(f'/StarManager/backups/{name}')
 
         try:
             await tgbot.send_message(chat_id=TG_CHAT_ID, message_thread_id=TG_BACKUP_THREAD_ID,
-                                     text=f"<a href='{drive.get_upload_link(file)}'>{name}</a>", parse_mode='HTML')
+                                     text=f"<a href='{file}'>{name}</a>", parse_mode='HTML')
         except:
             traceback.print_exc()
 
@@ -137,7 +72,7 @@ async def updateInfo():
                         await c.executemany('update usernames set name = %s where uid=%s',
                                             [(f"{name.first_name} {name.last_name}", name.id) for name in names])
                     except:
-                        traceback.print_exc()
+                        pass
 
                 for i in chats:
                     try:
@@ -154,7 +89,7 @@ async def updateInfo():
                         await c.executemany('update groupnames set name = %s where group_id=%s',
                                             [(name.name, -abs(name.id)) for name in names.groups])
                     except:
-                        traceback.print_exc()
+                        pass
 
                 for i in await (await c.execute('select chat_id from publicchatssettings where last_update>%s',
                                                 (int(time.time()) - 43200,))).fetchall():
@@ -202,54 +137,13 @@ async def reboot():
         await sendMessage(DAILY_TO + 2000000000, f'e from schedule reboot:\n{e}')
 
 
-async def new_season():
-    try:
-        await sendMessage(DAILY_TO + 2000000000, '@all new_season: 0%')
-        season_start = datetime.now().strftime('%d.%m.%Y')
-        now = datetime.now()
-        ld = calendar.monthrange(datetime.now().year, now.month)[1]
-        season_end = now.replace(day=ld).strftime('%d.%m.%Y')
-        async with (await pool()).connection() as conn:
-            async with conn.cursor() as c:
-                top = await (await c.execute('select uid, xp from xp where uid>1 order by xp desc limit 10')).fetchall()
-                for k, i in enumerate(top):
-                    if not (await c.execute('update premium set time=time+%s where uid=%s',
-                                            (NEWSEASON_REWARDS[k] * 86400, i[0]))).rowcount:
-                        await c.execute('insert into premium (uid, time) values (%s, %s)',
-                                        (i[0], int(time.time() + NEWSEASON_REWARDS[k] * 86400)))
-                    try:
-                        await sendMessage(i[0], messages.newseason_top(k + 1, NEWSEASON_REWARDS[k]))
-                    except:
-                        await sendMessage(DAILY_TO + 2000000000,
-                                          f'FAILED TO SEND MESSAGE TO [id{i[0]}|USER]!\n'
-                                          f'REWARD STILL RECEIVED!\n ERROR:\n' + traceback.format_exc())
-                try:
-                    msg = await messages.newseason_post(top, season_start, season_end)
-                except:
-                    await sendMessage(DAILY_TO + 2000000000, f'@all POST MESSAGE CREATING FAILURE!\nERROR:\n' +
-                                      traceback.format_exc())
-                    await conn.rollback()
-                    raise
-                try:
-                    await IMPLICIT_API.wall.post(owner_id=-GROUP_ID, from_group=1, guid=1, message=msg)
-                except:
-                    await sendMessage(DAILY_TO + 2000000000, f'@all POST FAILURE!\nPOST MESSAGE: {msg}\nERROR:\n' +
-                                      traceback.format_exc())
-                    await conn.rollback()
-                    raise
-                await c.execute('delete from coins')
-                await c.execute('update xp set xp=0')
-                await conn.commit()
-        await sendMessage(DAILY_TO + 2000000000, '@all new_season: 100%')
-    except:
-        traceback.print_exc()
-        await sendMessage(DAILY_TO + 2000000000, f'e from scheduler:\n' + traceback.format_exc())
-
-
 async def everyminute():
     try:
         async with (await pool()).connection() as conn:
             async with conn.cursor() as c:
+                await c.execute('delete from antispammessages where time<%s', (int(time.time() - 60),))
+                await c.execute('delete from speccommandscooldown where time<%s', (int(time.time() - 10),))
+                await c.execute('update xp set xp=0 where xp<0')
                 await c.execute('delete from premium where time<%s', (int(time.time()),))
                 unique = []
                 for cp in await (await c.execute(
@@ -339,13 +233,9 @@ async def run():
     loop = asyncio.get_event_loop()
     asyncio.set_event_loop(loop)
     logger.info('loading tasks')
-    aiocron.crontab('* * * * * */5', func=deleteTempdataDB, loop=loop)
-    aiocron.crontab('* * * * * */10', func=run_notifications, loop=loop)
-    aiocron.crontab('* * * * * 0', func=run_nightmode_notifications, loop=loop)
+    aiocron.crontab('* * * * * 5', func=run_notifications, loop=loop)
+    aiocron.crontab('* * * * * 5', func=run_nightmode_notifications, loop=loop)
     aiocron.crontab('*/1 * * * *', func=everyminute, loop=loop)
-    aiocron.crontab('0 0 * * *', func=dailyTasks, loop=loop)
-    aiocron.crontab('0 0 * * 1', func=weeklyTasks, loop=loop)
-    aiocron.crontab('0 3/6 * * *', func=backup, loop=loop)
+    aiocron.crontab('0 6/12 * * *', func=backup, loop=loop)
     aiocron.crontab('0 1/3 * * *', func=updateInfo, loop=loop)
     aiocron.crontab('50 23 * * *', func=reboot, loop=loop)
-    aiocron.crontab('0 0 1 * *', func=new_season, loop=loop)

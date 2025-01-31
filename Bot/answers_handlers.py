@@ -10,19 +10,18 @@ from vkbottle_types.objects import MessagesMessageAttachmentType
 
 import keyboard
 import messages
-from Bot.utils import getUserName, getChatName, sendMessage, editMessage, uploadImage, deleteMessages, getUserNickname, \
-    hex_to_rgb, whoiscached
+from Bot.utils import (getUserName, getChatName, sendMessage, editMessage, uploadImage, deleteMessages,
+                       getUserNickname, hex_to_rgb, whoiscached)
 from config.config import REPORT_TO, SETTINGS_COUNTABLE_MULTIPLE_ARGUMENTS, PATH, SETTINGS_COUNTABLE_SPECIAL_LIMITS
 from db import pool
 
 
 async def report_handler(event: MessageNew):
-    uid = event.object.message.from_id
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             repansi = await (await c.execute(
                 'select id, answering_id, uid, chat_id, repid, report_text, cmid from reportanswers '
-                'where answering_id=%s', (uid,))).fetchone()
+                'where answering_id=%s', (event.object.message.from_id,))).fetchone()
             if repansi is None:
                 return False
             await c.execute('delete from reportanswers where id=%s', (repansi[0],))
@@ -65,31 +64,21 @@ async def queue_handler(event: MessageNew):
                         'tag, status', (event.object.message.text, name, chat_id))).fetchone()
                     await conn.commit()
 
-            msg = messages.notification_changed_text(name)
-            await editMessage(msg, event.object.message.peer_id, cmid)
-
-            msg = messages.notification(notif[0], event.object.message.text, notif[1], notif[2], notif[3],
-                                        notif[4])
-            kb = keyboard.notification(uid, notif[4], notif[0])
-            await sendMessage(chat_id + 2000000000, msg, kb)
-            return
+            await editMessage(messages.notification_changed_text(name), event.object.message.peer_id, cmid)
+            return await sendMessage(chat_id + 2000000000, messages.notification(
+                notif[0], event.object.message.text, notif[1], notif[2], notif[3], notif[4]),
+                                     keyboard.notification(uid, notif[4], notif[0]))
         elif queue[3] == 'notification_time_change':
             ctime = event.object.message.text
-            name = additional['name']
-            cmid = int(additional['cmid'])
             ctype = additional['type']
 
             if ctype == 'single':
                 try:
                     if (int(ctime.split(':')[0]) > 23 or int(ctime.split(':')[0]) < 0) or (
                             int(ctime.split(':')[1]) > 59 or int(ctime.split(':')[1]) < 0):
-                        msg = messages.notification_changing_time_error()
-                        await sendMessage(chat_id + 2000000000, msg)
-                        return
+                        return await sendMessage(chat_id + 2000000000, messages.notification_changing_time_error())
                 except:
-                    msg = messages.notification_changing_time_error()
-                    await sendMessage(chat_id + 2000000000, msg)
-                    return
+                    return await sendMessage(chat_id + 2000000000, messages.notification_changing_time_error())
                 ctime = datetime.datetime.strptime(ctime, '%H:%M')
                 nctime = datetime.datetime.now().replace(hour=ctime.hour, minute=ctime.minute)
                 if nctime.timestamp() < time.time():
@@ -99,13 +88,9 @@ async def queue_handler(event: MessageNew):
                 try:
                     if (int(ctime.split(':')[0]) > 23 or int(ctime.split(':')[0]) < 0) or (
                             int(ctime.split(':')[1]) > 59 or int(ctime.split(':')[1]) < 0):
-                        msg = messages.notification_changing_time_error()
-                        await sendMessage(chat_id + 2000000000, msg)
-                        return
+                        return await sendMessage(chat_id + 2000000000, messages.notification_changing_time_error())
                 except:
-                    msg = messages.notification_changing_time_error()
-                    await sendMessage(chat_id + 2000000000, msg)
-                    return
+                    return await sendMessage(chat_id + 2000000000, messages.notification_changing_time_error())
                 ctime = datetime.datetime.strptime(ctime, '%H:%M')
                 nctime = datetime.datetime.now().replace(hour=ctime.hour, minute=ctime.minute)
                 if nctime.timestamp() < time.time():
@@ -114,16 +99,13 @@ async def queue_handler(event: MessageNew):
             else:
                 try:
                     if int(ctime.split()[0]) < 0:
-                        msg = messages.notification_changing_time_error()
-                        await sendMessage(chat_id + 2000000000, msg)
-                        return
+                        return await sendMessage(chat_id + 2000000000, messages.notification_changing_time_error())
                 except:
-                    msg = messages.notification_changing_time_error()
-                    await sendMessage(chat_id + 2000000000, msg)
-                    return
+                    return await sendMessage(chat_id + 2000000000, messages.notification_changing_time_error())
                 nctime = datetime.datetime.now() + datetime.timedelta(minutes=int(ctime))
                 every = ctime
 
+            name = additional['name']
             async with (await pool()).connection() as conn:
                 async with conn.cursor() as c:
                     notif = await (await c.execute(
@@ -132,12 +114,11 @@ async def queue_handler(event: MessageNew):
                         (nctime.timestamp(), every, name, chat_id))).fetchone()
                     await conn.commit()
 
-            msg = messages.notification_changed_time(name)
-            await editMessage(msg, event.object.message.peer_id, cmid)
-
-            msg = messages.notification(notif[0], notif[1], notif[2], notif[3], notif[4], notif[5])
-            kb = keyboard.notification(uid, notif[5], notif[0])
-            await sendMessage(chat_id + 2000000000, msg, kb)
+            cmid = int(additional['cmid'])
+            await editMessage(messages.notification_changed_time(name), event.object.message.peer_id, cmid)
+            await sendMessage(chat_id + 2000000000, messages.notification(
+                notif[0], notif[1], notif[2], notif[3], notif[4], notif[5]), keyboard.notification(
+                uid, notif[5], notif[0]))
     elif queue[3].startswith('settings_'):
         if queue[3] == 'settings_change_countable':
             setting = additional['setting']
@@ -188,15 +169,15 @@ async def queue_handler(event: MessageNew):
                               event.object.message.peer_id, cmid, kb)
         elif queue[3] == 'settings_set_punishment':
             setting = additional['setting']
-            category = additional['category']
-            action = additional['action']
             cmid = additional['cmid']
             text = event.object.message.text
+            category = additional['category']
             kb = keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True)
             if not text.isdigit() or int(text) <= 0 or int(text) >= 10000:
                 await editMessage(messages.settings_change_countable_digit_error(), event.object.message.peer_id, cmid,
                                   kb)
                 return
+            action = additional['action']
             async with (await pool()).connection() as conn:
                 async with conn.cursor() as c:
                     await c.execute('update settings set punishment = %s where chat_id=%s and setting=%s',
@@ -207,9 +188,7 @@ async def queue_handler(event: MessageNew):
         elif queue[3].startswith('settings_set_welcome_'):
             if queue[3] == 'settings_set_welcome_text':
                 if not event.object.message.text:
-                    msg = messages.get(queue[3] + '_no_text')
-                    await sendMessage(chat_id + 2000000000, msg)
-                    return
+                    return await sendMessage(chat_id + 2000000000, messages.get(queue[3] + '_no_text'))
                 async with (await pool()).connection() as conn:
                     async with conn.cursor() as c:
                         if not (await c.execute('update welcome set msg = %s where chat_id=%s',
@@ -220,14 +199,10 @@ async def queue_handler(event: MessageNew):
             elif queue[3] == 'settings_set_welcome_photo':
                 if (len(event.object.message.attachments) == 0 or
                         event.object.message.attachments[0].type != MessagesMessageAttachmentType.PHOTO):
-                    msg = messages.get(queue[3] + '_not_photo')
-                    await sendMessage(chat_id + 2000000000, msg)
-                    return
+                    return await sendMessage(chat_id + 2000000000, messages.get(queue[3] + '_not_photo'))
                 r = requests.get(event.object.message.attachments[0].photo.sizes[-1].url)
                 with open(f'{PATH}media/temp/{uid}welcome.jpg', "wb") as f:
                     f.write(r.content)
-                    f.close()
-                r.close()
                 photo = await uploadImage(f'{PATH}media/temp/{uid}welcome.jpg', event.object.message.peer_id)
                 async with (await pool()).connection() as conn:
                     async with conn.cursor() as c:
@@ -241,30 +216,20 @@ async def queue_handler(event: MessageNew):
                         welcome = await (await c.execute(
                             'select msg, url from welcome where chat_id=%s', (chat_id,))).fetchone()
                 if welcome and not welcome[0] and not welcome[1]:
-                    msg = messages.get(queue[3] + '_empty_text_url')
-                    await sendMessage(chat_id + 2000000000, msg)
-                    return
+                    return await sendMessage(chat_id + 2000000000, messages.get(queue[3] + '_empty_text_url'))
                 if len(' '.join(event.object.message.text.split()[1:])) > 40:
-                    msg = messages.get(queue[3] + '_limit_text')
-                    await sendMessage(chat_id + 2000000000, msg)
-                    return
+                    return await sendMessage(chat_id + 2000000000, messages.get(queue[3] + '_limit_text'))
                 if (len(' '.join(event.object.message.text.split()[1:])) == 0 or
                         event.object.message.text.count('\n') > 0):
-                    msg = messages.settings_change_countable_format_error()
-                    await sendMessage(chat_id + 2000000000, msg)
-                    return
+                    return await sendMessage(chat_id + 2000000000, messages.settings_change_countable_format_error())
                 text = event.object.message.text.split()
                 if len(text) < 2:
-                    msg = messages.settings_change_countable_format_error()
-                    await sendMessage(chat_id + 2000000000, msg)
-                    return
+                    return await sendMessage(chat_id + 2000000000, messages.settings_change_countable_format_error())
                 try:
                     if whoiscached(text[-1])['domain_name'] is None:
                         raise
                 except:
-                    msg = messages.get(queue[3] + '_no_url')
-                    await sendMessage(chat_id + 2000000000, msg)
-                    return
+                    return await sendMessage(chat_id + 2000000000, messages.get(queue[3] + '_no_url'))
                 async with (await pool()).connection() as conn:
                     async with conn.cursor() as c:
                         if not (await c.execute('update welcome set url = %s, button_label = %s where chat_id=%s',
@@ -272,23 +237,21 @@ async def queue_handler(event: MessageNew):
                             await c.execute('insert into welcome (chat_id, url, button_label) values (%s, %s, %s)',
                                             (chat_id, text[-1], ' '.join(text[0:-1])))
                         await conn.commit()
-            msg = messages.get(f'{queue[3]}_done')
-            kb = keyboard.settings_change_countable(uid, "main", "welcome", onlybackbutton=True)
-            await sendMessage(chat_id + 2000000000, msg, kb)
+            await sendMessage(chat_id + 2000000000, messages.get(f'{queue[3]}_done'),
+                              keyboard.settings_change_countable(uid, "main", "welcome", onlybackbutton=True))
         elif queue[3] == 'settings_listaction':
             setting = additional['setting']
-            action = additional['action']
             # type = additional['type']
             if setting == 'disallowLinks':
+                action = additional['action']
                 if action == 'add':
                     url = event.object.message.text.replace(' ', '').replace('https://', '').replace('/', '')
                     try:
                         if whoiscached(url)['domain_name'] is None:
                             raise
                     except:
-                        msg = messages.settings_change_countable_format_error()
-                        await sendMessage(chat_id + 2000000000, msg)
-                        return
+                        return await sendMessage(chat_id + 2000000000,
+                                                 messages.settings_change_countable_format_error())
                     async with (await pool()).connection() as conn:
                         async with conn.cursor() as c:
                             if await (await c.execute(
@@ -304,15 +267,13 @@ async def queue_handler(event: MessageNew):
                             if not await (await c.execute(
                                     'delete from antispammurlexceptions where chat_id=%s and url=%s',
                                     (chat_id, url))).fetchone():
-                                msg = messages.settings_change_countable_format_error()
-                                await sendMessage(chat_id + 2000000000, msg)
-                                return
+                                return await sendMessage(chat_id + 2000000000,
+                                                         messages.settings_change_countable_format_error())
                             await conn.commit()
                 else:
                     raise
-                msg = messages.settings_listaction_done(setting, action, url)
-                kb = keyboard.settings_change_countable(uid, 'antispam', onlybackbutton=True)
-                await sendMessage(chat_id + 2000000000, msg, kb)
+                await sendMessage(chat_id + 2000000000, messages.settings_listaction_done(setting, action, url),
+                                  keyboard.settings_change_countable(uid, 'antispam', onlybackbutton=True))
     elif queue[3].startswith('premmenu_action_'):
         if queue[3] == 'premmenu_action_border_color':
             data = event.object.message.text
@@ -322,9 +283,7 @@ async def queue_handler(event: MessageNew):
             elif re.search(r'^#[0-9a-fA-F]{6}$', data):
                 color = f'({",".join(str(i) for i in hex_to_rgb(data))})'
             else:
-                msg = messages.settings_change_countable_format_error()
-                await sendMessage(chat_id + 2000000000, msg)
-                return
+                return await sendMessage(chat_id + 2000000000, messages.settings_change_countable_format_error())
             async with (await pool()).connection() as conn:
                 async with conn.cursor() as c:
                     if not (await c.execute('update premmenu set value = %s where uid=%s and setting=%s',
@@ -332,9 +291,8 @@ async def queue_handler(event: MessageNew):
                         await c.execute('insert into premmenu (uid, setting, value) values (%s, %s, %s)',
                                         (uid, 'border_color', color))
                     await conn.commit()
-            msg = messages.premmenu_action_complete('border_color', color.replace('(', '').replace(')', ''))
-            kb = keyboard.premmenu_back(uid)
-            await sendMessage(chat_id + 2000000000, msg, kb)
+            await sendMessage(chat_id + 2000000000, messages.premmenu_action_complete(
+                'border_color', color.replace('(', '').replace(')', '')), keyboard.premmenu_back(uid))
     elif queue[3] == 'captcha':
         async with (await pool()).connection() as conn:
             async with conn.cursor() as c:
@@ -402,7 +360,6 @@ async def queue_handler(event: MessageNew):
 
 
 async def answer_handler(event: MessageNew):
-    chat_id = event.object.message.peer_id - 2000000000
-    if chat_id == REPORT_TO:
+    if event.object.message.peer_id - 2000000000 == REPORT_TO:
         return await report_handler(event)
     return await queue_handler(event)

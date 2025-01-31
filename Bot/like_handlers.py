@@ -34,5 +34,4 @@ async def like_handle(event) -> None:
                                     (uid, int(time.time() + PREMIUM_BONUS_DAYS * 86400)))
                 await conn.commit()
 
-        msg = messages.like_premium_bonus(PREMIUM_BONUS_DAYS)
-        await API.messages.send(user_id=uid, message=msg, random_id=0)
+        await API.messages.send(user_id=uid, message=messages.like_premium_bonus(PREMIUM_BONUS_DAYS), random_id=0)

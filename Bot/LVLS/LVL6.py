@@ -21,31 +21,18 @@ async def gdelaccess(message: Message):
     uid = message.from_id
     id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
-        msg = messages.gdelaccess_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.gdelaccess_hint())
     if id < 0:
-        msg = messages.id_group()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.id_group())
     if uid == id:
-        msg = messages.delaccess_myself()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
+        return await message.reply(disable_mentions=1, message=messages.delaccess_myself())
     if not (chats := await getgpool(chat_id)):
-        msg = messages.chat_unbound()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.chat_unbound())
 
     name = await getUserName(id)
-    u_name = await getUserName(uid)
-    ch_nickname = await getUserNickname(id, chat_id)
-    u_nickname = await getUserNickname(uid, chat_id)
-
-    msg = messages.gdelaccess_start(uid, u_name, u_nickname, id, name, ch_nickname, len(chats))
-    edit = await message.reply(disable_mentions=1, message=msg)
-
+    edit = await message.reply(disable_mentions=1, message=messages.gdelaccess_start(
+        uid, await getUserName(uid), await getUserNickname(uid, chat_id), id, name, await getUserNickname(id, chat_id),
+        len(chats)))
     success = 0
     for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
@@ -53,10 +40,9 @@ async def gdelaccess(message: Message):
             continue
         await setUserAccessLevel(id, chat_id, 0)
         success += 1
-
-    nick = await getUserNickname(id, edit.peer_id - 2000000000)
-    msg = messages.gdelaccess(id, name, nick, len(chats), success)
-    await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id, message=msg)
+    await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
+                            message=messages.gdelaccess(
+                                id, name, await getUserNickname(id, edit.peer_id - 2000000000), len(chats), success))
 
 
 @bl.chat_message(SearchCMD('gsetaccess'))
@@ -66,67 +52,44 @@ async def gsetaccess(message: Message):
     data = message.text.split()
     if ((len(data) <= 2 and message.reply_message is None) or
             (len(data) <= 1 and message.reply_message is not None)):
-        msg = messages.gsetaccess_hint()
-        await message.reply(message=msg, disable_mentions=1)
-        return
+        return await message.reply(message=messages.gsetaccess_hint(), disable_mentions=1)
     id = await getIDFromMessage(message.text, message.reply_message)
-    if not id:
-        msg = messages.gsetaccess_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
     if id < 0:
-        msg = messages.id_group()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.id_group())
     if uid == id:
-        msg = messages.setaccess_myself()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.setaccess_myself())
 
     try:
         acc = int(data[-1])
-        if acc <= 0 or acc >= 7:
+        if acc <= 0 or acc >= 7 or not id:
             raise
     except:
-        msg = messages.setacc_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
+        return await message.reply(disable_mentions=1, message=messages.gsetaccess_hint())
     if not (chats := await getgpool(chat_id)):
-        msg = messages.chat_unbound()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.chat_unbound())
 
-    u_name = await getUserName(uid)
     name = await getUserName(id)
-    u_nickname = await getUserNickname(uid, chat_id)
-    ch_nickname = await getUserNickname(id, chat_id)
-
-    msg = messages.gsetaccess_start(uid, u_name, u_nickname, id, name, ch_nickname, len(chats))
-    edit = await message.reply(disable_mentions=1, message=msg)
+    edit = await message.reply(disable_mentions=1, message=messages.gsetaccess_start(
+        uid, await getUserName(uid), await getUserNickname(uid, chat_id), id, name, await getUserNickname(id, chat_id),
+        len(chats)))
     success = 0
     for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
         ch_acc = await getUserAccessLevel(id, chat_id)
         if acc >= u_acc or ch_acc >= u_acc or ch_acc >= acc or not await haveAccess('gsetaccess', chat_id, u_acc):
             continue
-
         await setUserAccessLevel(id, chat_id, acc)
         success += 1
-
-    nick = await getUserNickname(id, edit.peer_id - 2000000000)
-    msg = messages.gsetaccess(id, name, nick, len(chats), success)
-    await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
-                            message=msg)
+    await API.messages.edit(
+        peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
+        message=messages.gsetaccess(id, name, await getUserNickname(id, edit.peer_id - 2000000000), len(chats), success)
+    )
 
 
 @bl.chat_message(SearchCMD('demote'))
 async def demote(message: Message):
-    chat_id = message.peer_id - 2000000000
-    uid = message.from_id
-    msg = messages.demote_choose()
-    kb = keyboard.demote_choose(uid, chat_id)
-    await message.reply(disable_mentions=1, message=msg, keyboard=kb)
+    await message.reply(disable_mentions=1, message=messages.demote_choose(),
+                        keyboard=keyboard.demote_choose(message.from_id, message.peer_id - 2000000000))
 
 
 @bl.chat_message(SearchCMD('ssetaccess'))
@@ -136,58 +99,39 @@ async def ssetaccess(message: Message):
     data = message.text.split()
     if ((len(data) <= 3 and message.reply_message is None) or
             (len(data) <= 2 and message.reply_message is not None)):
-        msg = messages.ssetaccess_hint()
-        await message.reply(message=msg, disable_mentions=1)
-        return
+        return await message.reply(message=messages.ssetaccess_hint(), disable_mentions=1)
     id = await getIDFromMessage(message.text, message.reply_message, 3)
-    if not id:
-        msg = messages.ssetaccess_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
     if id < 0:
-        msg = messages.id_group()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.id_group())
     if uid == id:
-        msg = messages.setaccess_myself()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.setaccess_myself())
 
     try:
         acc = int(data[-1])
-        if acc <= 0 or acc >= 7:
+        if acc <= 0 or acc >= 7 or not id:
             raise
     except:
-        msg = messages.setacc_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.setacc_hint())
 
     if not (chats := await getpool(chat_id, data[1])):
-        msg = messages.s_invalid_group(data[1])
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.s_invalid_group(data[1]))
 
-    u_name = await getUserName(uid)
     name = await getUserName(id)
-    u_nickname = await getUserNickname(uid, chat_id)
-    ch_nickname = await getUserNickname(id, chat_id)
-
-    msg = messages.ssetaccess_start(uid, u_name, u_nickname, id, name, ch_nickname, len(chats), data[1])
-    edit = await message.reply(disable_mentions=1, message=msg)
+    edit = await message.reply(disable_mentions=1, message=messages.ssetaccess_start(
+        uid, await getUserName(uid), await getUserNickname(uid, chat_id), id, name,
+        await getUserNickname(id, chat_id), len(chats), data[1]))
     success = 0
     for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
         ch_acc = await getUserAccessLevel(id, chat_id)
         if acc >= u_acc or ch_acc >= u_acc or ch_acc >= acc or not await haveAccess('ssetaccess', chat_id, u_acc):
             continue
-
         await setUserAccessLevel(id, chat_id, acc)
         success += 1
 
-    ch_nick = await getUserNickname(id, edit.peer_id - 2000000000)
-    msg = messages.ssetaccess(id, name, ch_nick, len(chats), success)
     await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
-                            message=msg)
+                            message=messages.ssetaccess(
+                                id, name, await getUserNickname(id, edit.peer_id - 2000000000), len(chats), success))
 
 
 @bl.chat_message(SearchCMD('sdelaccess'))
@@ -197,35 +141,20 @@ async def sdelaccess(message: Message):
     data = message.text.split()
     if ((len(data) <= 2 and message.reply_message is None) or
             (len(data) <= 1 and message.reply_message is not None)):
-        msg = messages.sdelaccess_hint()
-        await message.reply(message=msg, disable_mentions=1)
-        return
+        return await message.reply(message=messages.sdelaccess_hint(), disable_mentions=1)
     id = await getIDFromMessage(message.text, message.reply_message, 3)
     if not id:
-        msg = messages.sdelaccess_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.sdelaccess_hint())
     if id < 0:
-        msg = messages.id_group()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.id_group())
     if uid == id:
-        msg = messages.delaccess_myself()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
+        return await message.reply(disable_mentions=1, message=messages.delaccess_myself())
     if not (chats := await getpool(chat_id, data[1])):
-        msg = messages.s_invalid_group(data[1])
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
+        return await message.reply(disable_mentions=1, message=messages.s_invalid_group(data[1]))
     name = await getUserName(id)
-    u_name = await getUserName(uid)
-    u_nickname = await getUserNickname(uid, chat_id)
-    ch_nickname = await getUserNickname(id, chat_id)
-
-    msg = messages.sdelaccess_start(uid, u_name, u_nickname, id, name, ch_nickname, data[1], len(chats))
-    edit = await message.reply(disable_mentions=1, message=msg)
+    edit = await message.reply(disable_mentions=1, message=messages.sdelaccess_start(
+        uid, await getUserName(uid), await getUserNickname(uid, chat_id), id, name,
+        await getUserNickname(id, chat_id), data[1], len(chats)))
     success = 0
     for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
@@ -233,11 +162,9 @@ async def sdelaccess(message: Message):
             continue
         await setUserAccessLevel(id, chat_id, 0)
         success += 1
-
-    nick = await getUserNickname(id, edit.peer_id - 2000000000)
-    msg = messages.sdelaccess(id, name, nick, len(chats), success)
-    await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
-                            message=msg)
+    await API.messages.edit(
+        peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id, message=messages.sdelaccess(
+            id, name, await getUserNickname(id, edit.peer_id - 2000000000), len(chats), success))
 
 
 @bl.chat_message(SearchCMD('ignore'))
@@ -246,118 +173,74 @@ async def ignore(message: Message):
     uid = message.from_id
     u_prem = await getUserPremium(uid)
     if not u_prem:
-        msg = messages.no_prem()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
+        return await message.reply(disable_mentions=1, message=messages.no_prem())
     id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
-        msg = messages.ignore_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.ignore_hint())
     if await getUserAccessLevel(uid, chat_id) <= await getUserAccessLevel(id, chat_id):
-        msg = messages.ignore_higher()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.ignore_higher())
     if id < 0:
-        msg = messages.id_group()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
-    name = await getUserName(id)
+        return await message.reply(disable_mentions=1, message=messages.id_group())
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             if await (await c.execute('select * from ignore where chat_id=%s and uid=%s',
                                       (chat_id, id))).fetchone() is None:
                 await c.execute('insert into ignore (chat_id, uid) values (%s, %s)', (chat_id, id))
                 await conn.commit()
-
-    nick = await getUserNickname(uid, chat_id)
-    msg = messages.ignore(id, name, nick)
-    await message.reply(disable_mentions=1, message=msg)
+    await message.reply(disable_mentions=1, message=messages.ignore(
+        id, await getUserName(id), await getUserNickname(uid, chat_id)))
 
 
 @bl.chat_message(SearchCMD('unignore'))
 async def unignore(message: Message):
-    chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    u_prem = await getUserPremium(uid)
-    if not u_prem:
-        msg = messages.no_prem()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
+    if not await getUserPremium(uid):
+        return await message.reply(disable_mentions=1, message=messages.no_prem())
     id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
-        msg = messages.ignore_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.ignore_hint())
     if id < 0:
-        msg = messages.id_group()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
+        return await message.reply(disable_mentions=1, message=messages.id_group())
+    chat_id = message.peer_id - 2000000000
     name = await getUserName(id)
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             if not (await c.execute('delete from ignore where chat_id=%s and uid=%s', (chat_id, id))).rowcount:
-                msg = messages.unignore_not_ignored()
-                await message.reply(disable_mentions=1, message=msg)
-                return
+                return await message.reply(disable_mentions=1, message=messages.unignore_not_ignored())
             await conn.commit()
-
-    nick = await getUserNickname(uid, chat_id)
-    msg = messages.unignore(id, name, nick)
-    await message.reply(disable_mentions=1, message=msg)
+    await message.reply(disable_mentions=1, message=messages.unignore(id, name, await getUserNickname(uid, chat_id)))
 
 
 @bl.chat_message(SearchCMD('ignorelist'))
 async def ignorelist(message: Message):
-    chat_id = message.peer_id - 2000000000
-    uid = message.from_id
-    u_prem = await getUserPremium(uid)
-    if int(u_prem) <= 0:
-        msg = messages.no_prem()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
+    if int(await getUserPremium(message.from_id)) <= 0:
+        return await message.reply(disable_mentions=1, message=messages.no_prem())
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             ids = [i[0] for i in await (
-                await c.execute('select uid from ignore where chat_id=%s', (chat_id,))).fetchall()]
+                await c.execute('select uid from ignore where chat_id=%s', (message.peer_id - 2000000000,))).fetchall()]
     raw_names = await API.users.get(user_ids=ids)
     names = []
     for i in raw_names:
         names.append(f'{i.first_name} {i.last_name}')
-
-    msg = messages.ignorelist(ids, names)
-    await message.reply(disable_mentions=1, message=msg)
+    await message.reply(disable_mentions=1, message=messages.ignorelist(ids, names))
 
 
 @bl.chat_message(SearchCMD('chatlimit'))
 async def chatlimit(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    u_prem = await getUserPremium(uid)
-    if not u_prem:
-        msg = messages.no_prem()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
+    if not await getUserPremium(uid):
+        return await message.reply(disable_mentions=1, message=messages.no_prem())
     data = message.text.split()
     if len(data) != 2:
-        msg = messages.chatlimit_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.chatlimit_hint())
 
     t = data[1]
     pfx = t[-1]
     if t != '0':
         if not t[:-1].isdigit() or pfx not in ['s', 'm', 'h']:
-            msg = messages.chatlimit_hint()
-            await message.reply(disable_mentions=1, message=msg)
-            return
-
+            return await message.reply(disable_mentions=1, message=messages.chatlimit_hint())
         st = int(t[:-1])
         tst = int(st)
         if pfx == 'm':
@@ -378,34 +261,23 @@ async def chatlimit(message: Message):
                 await c.execute('insert into chatlimit (chat_id, time) values (%s, %s)', (chat_id, st))
             await conn.commit()
 
-    name = await getUserName(uid)
-    nick = await getUserNickname(uid, chat_id)
-    msg = messages.chatlimit(uid, name, nick, tst, pfx, lpos)
-    await message.reply(disable_mentions=1, message=msg)
+    await message.reply(disable_mentions=1, message=messages.chatlimit(
+        uid, await getUserName(uid), await getUserNickname(uid, chat_id), tst, pfx, lpos))
 
 
 @bl.chat_message(SearchCMD('resetnick'))
 async def resetnick(message: Message):
-    chat_id = message.peer_id - 2000000000
-    uid = message.from_id
-    kb = keyboard.resetnick_accept(uid, chat_id)
-    msg = messages.resetnick_yon()
-    await message.reply(disable_mentions=1, message=msg, keyboard=kb)
+    await message.reply(disable_mentions=1, message=messages.resetnick_yon(),
+                        keyboard=keyboard.resetnick_accept(message.from_id, message.peer_id - 2000000000))
 
 
 @bl.chat_message(SearchCMD('resetaccess'))
 async def resetaccess(message: Message):
-    chat_id = message.peer_id - 2000000000
     data = message.text.split()
     if len(data) != 2 or not data[1].isdigit() or int(data[1]) < 1 or int(data[1]) > 6:
-        msg = messages.resetaccess_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-
-    uid = message.from_id
-    kb = keyboard.resetaccess_accept(uid, chat_id, data[1])
-    msg = messages.resetaccess_yon(data[1])
-    await message.reply(disable_mentions=1, message=msg, keyboard=kb)
+        return await message.reply(disable_mentions=1, message=messages.resetaccess_hint())
+    await message.reply(disable_mentions=1, message=messages.resetaccess_yon(data[1]),
+                        keyboard=keyboard.resetaccess_accept(message.from_id, message.peer_id - 2000000000, data[1]))
 
 
 @bl.chat_message(SearchCMD('notif'))
@@ -424,28 +296,22 @@ async def notif(message: Message):
                         "insert into notifications (chat_id, tag, every, status, time, name, description, text) "
                         "values (%s, 1, -1, 1, %s, %s, '', '')", (chat_id, int(time.time() - 5), name))
                     await conn.commit()
-                    msg = messages.notification(name, '', time.time(), -1, 1, 1)
-                    kb = keyboard.notification(uid, 1, name)
-                    await message.reply(disable_mentions=1, message=msg, keyboard=kb)
-                    return
-        msg = messages.notif_already_exist(notif.name)
-        await message.reply(disable_mentions=1, message=msg)
-        return
+                    return await message.reply(disable_mentions=1, message=messages.notification(
+                        name, '', time.time(), -1, 1, 1), keyboard=keyboard.notification(uid, 1, name))
+        return await message.reply(disable_mentions=1, message=messages.notif_already_exist(name))
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             activenotifs = (await (await c.execute(
                 'select count(*) as c from notifications where chat_id=%s and status=1', (chat_id,))).fetchone())[0]
             notifs = (await (await c.execute(
                 'select count(*) as c from notifications where chat_id=%s', (chat_id,))).fetchone())[0]
-    msg = messages.notif(notifs, activenotifs)
-    kb = keyboard.notif(uid)
-    await message.reply(disable_mentions=1, message=msg, keyboard=kb)
+    await message.reply(disable_mentions=1, message=messages.notif(notifs, activenotifs), keyboard=keyboard.notif(uid))
 
 
 @bl.chat_message(SearchCMD('purge'))
 async def purge(message: Message):
     chat_id = message.peer_id - 2000000000
-
+    edit = await message.reply(disable_mentions=1, message=messages.purge_start())
     users = [i.member_id for i in (await API.messages.get_conversation_members(peer_id=message.peer_id)).items]
     dtdnicknames = 0
     dtdaccesslevels = 0
@@ -461,11 +327,5 @@ async def purge(message: Message):
                     await setChatMute(x[0], chat_id, 0)
                     dtdaccesslevels += 1
             await conn.commit()
-
-    msg = messages.purge_start()
-    edit = await message.reply(disable_mentions=1, message=msg)
-    if dtdnicknames > 0 or dtdaccesslevels > 0:
-        msg = messages.purge(dtdnicknames, dtdaccesslevels)
-    else:
-        msg = messages.purge_empty()
-    await editMessage(msg, message.peer_id, edit.conversation_message_id)
+    await editMessage(messages.purge(dtdnicknames, dtdaccesslevels) if dtdnicknames > 0 or dtdaccesslevels > 0 else
+                      messages.purge_empty(), message.peer_id, edit.conversation_message_id)

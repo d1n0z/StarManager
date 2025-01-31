@@ -18,12 +18,9 @@ bl = BotLabeler()
 
 @bl.chat_message(SearchCMD('timeout'))
 async def timeout(message: Message):
-    chat_id = message.peer_id - 2000000000
-    uid = message.from_id
-    activated = await getSilence(chat_id)
-    msg = messages.timeout(activated)
-    kb = keyboard.timeout(uid, activated)
-    await message.reply(disable_mentions=1, message=msg, keyboard=kb)
+    activated = await getSilence(message.peer_id - 2000000000)
+    await message.reply(disable_mentions=1, message=messages.timeout(activated),
+                        keyboard=keyboard.timeout(message.from_id, activated))
 
 
 @bl.chat_message(SearchCMD('inactive'))
@@ -32,18 +29,10 @@ async def inactive(message: Message):
     uid = message.from_id
     data = message.text.split()
     if len(data) != 2:
-        msg = messages.inactive_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.inactive_hint())
     count = data[1]
-    if count.isdigit():
-        count = int(count)
-    else:
-        count = 0
-    if count is None or count <= 0:
-        msg = messages.inactive_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+    if not count.isdigit() or (count := int(count)) <= 0:
+        return await message.reply(disable_mentions=1, message=messages.inactive_hint())
     count = time.time() - count * 86400
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
@@ -52,9 +41,7 @@ async def inactive(message: Message):
                 (chat_id, count))).fetchall()
     kicked = 0
     if len(res) <= 0:
-        msg = messages.inactive_no_results()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.inactive_no_results())
     members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = [i.member_id for i in members.items if i.member_id > 0]
     for i in res:
@@ -64,10 +51,8 @@ async def inactive(message: Message):
                 kicked += x
             except:
                 pass
-    u_name = await getUserName(uid)
-    u_nickname = await getUserNickname(uid, chat_id)
-    msg = messages.inactive(uid, u_name, u_nickname, kicked)
-    await message.reply(disable_mentions=1, message=msg)
+    await message.reply(disable_mentions=1, message=messages.inactive(
+        uid, await getUserName(uid), await getUserNickname(uid, chat_id), kicked))
 
 
 @bl.chat_message(SearchCMD('ban'))
@@ -77,17 +62,11 @@ async def ban(message: Message):
     data = message.text.split()
     id = await getIDFromMessage(message.text, message.reply_message)
     if id == uid:
-        msg = messages.ban_myself()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.ban_myself())
     if (len(data) == 1 and message.reply_message is None) or not id:
-        msg = messages.ban_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.ban_hint())
     if id < 0:
-        msg = messages.id_group()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.id_group())
 
     if message.reply_message is None:
         if len(data) == 2:
@@ -120,22 +99,12 @@ async def ban(message: Message):
                 ban_time = 3650 * 86400
                 ban_cause = ' '.join(data[1:])
 
-    ch_acc = await getUserAccessLevel(id, chat_id)
-    u_acc = await getUserAccessLevel(uid, chat_id)
-    if ch_acc >= u_acc:
-        msg = messages.ban_higher()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+    if await getUserAccessLevel(id, chat_id) >= await getUserAccessLevel(uid, chat_id):
+        return await message.reply(disable_mentions=1, message=messages.ban_higher())
 
-    u_name = await getUserName(uid)
-    u_nickname = await getUserNickname(uid, chat_id)
-    ch_name = await getUserName(id)
-    ch_nickname = await getUserNickname(id, chat_id)
-    ch_ban = await getUserBan(id, chat_id)
-    if ch_ban >= time.time():
-        msg = messages.already_banned(ch_name, ch_nickname, id, ch_ban)
-        await message.reply(disable_mentions=1, message=msg)
-        return
+    if (ch_ban := await getUserBan(id, chat_id)) >= time.time():
+        return await message.reply(disable_mentions=1, message=messages.already_banned(
+            await getUserName(id), await getUserNickname(id, chat_id), id, ch_ban))
 
     ban_date = datetime.now().strftime('%Y.%m.%d %H:%M:%S')
     async with (await pool()).connection() as conn:
@@ -157,6 +126,7 @@ async def ban(message: Message):
         ban_date = 'Дата неизвестна'
     ban_times.append(ban_time)
     ban_causes.append(ban_cause)
+    u_name = await getUserName(uid)
     ban_names.append(f'[id{uid}|{u_name}]')
     ban_dates.append(ban_date)
 
@@ -174,12 +144,11 @@ async def ban(message: Message):
                      f"{ban_dates}"))
             await conn.commit()
 
-    msg = messages.ban(uid, u_name, u_nickname, id, ch_name, ch_nickname, ban_cause, ban_time // 86400)
-    kick = await kickUser(id, chat_id)
-    if not kick:
-        msg += '\n❗ Пользователя не удалось кикнуть'
-    kb = keyboard.punish_unpunish(uid, id, 'ban', message.conversation_message_id)
-    await message.reply(disable_mentions=1, message=msg, keyboard=kb)
+    await message.reply(disable_mentions=1, message=messages.ban(
+        uid, u_name, await getUserNickname(uid, chat_id), id, await getUserName(id), await getUserNickname(id, chat_id),
+        ban_cause, ban_time // 86400) + (
+        '\n❗ Пользователя не удалось кикнуть' if not await kickUser(id, chat_id) else ''),
+                        keyboard=keyboard.punish_unpunish(uid, id, 'ban', message.conversation_message_id))
     return
 
 
@@ -190,79 +159,51 @@ async def unban(message: Message):
     data = message.text.split()
     id = await getIDFromMessage(message.text, message.reply_message)
     if id == uid:
-        msg = messages.unban_myself()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.unban_myself())
     if (len(data) == 1 and message.reply_message is None) or not id:
-        msg = messages.unban_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.unban_hint())
     if id < 0:
-        msg = messages.id_group()
-        await message.reply(disable_mentions=1, message=msg)
-        return
+        return await message.reply(disable_mentions=1, message=messages.id_group())
 
-    ch_acc = await getUserAccessLevel(id, chat_id)
-    u_acc = await getUserAccessLevel(uid, chat_id)
-    if ch_acc >= u_acc:
-        msg = messages.unban_higher()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-    u_name = await getUserName(uid)
-    u_nickname = await getUserNickname(uid, chat_id)
-    name = await getUserName(id)
-    ch_nickname = await getUserNickname(id, chat_id)
-    ch_ban = await getUserBan(id, chat_id)
-    if ch_ban <= time.time():
-        msg = messages.unban_no_ban(id, name, ch_nickname)
-        await message.reply(disable_mentions=1, message=msg)
-        return
+    if await getUserAccessLevel(id, chat_id) >= await getUserAccessLevel(uid, chat_id):
+        return await message.reply(disable_mentions=1, message=messages.unban_higher())
+    if await getUserBan(id, chat_id) <= time.time():
+        return await message.reply(disable_mentions=1, message=messages.unban_no_ban(
+            id, await getUserName(id), await getUserNickname(id, chat_id)))
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             await c.execute('update ban set ban = 0 where chat_id=%s and uid=%s', (chat_id, id))
             await conn.commit()
-    msg = messages.unban(u_name, u_nickname, uid, name, ch_nickname, id)
-    await message.reply(disable_mentions=1, message=msg)
+    await message.reply(disable_mentions=1, message=messages.unban(
+        await getUserName(uid), await getUserNickname(uid, chat_id), uid, await getUserName(id),
+        await getUserNickname(id, chat_id), id))
 
 
 @bl.chat_message(SearchCMD('banlist'))
 async def banlist(message: Message):
-    chat_id = message.peer_id - 2000000000
-    uid = message.from_id
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             res = await (await c.execute(
                 'select uid, chat_id, last_bans_causes, ban, last_bans_names from ban where chat_id=%s and '
-                'ban>%s order by uid desc', (chat_id, int(time.time())))).fetchall()
+                'ban>%s order by uid desc', (message.peer_id - 2000000000, int(time.time())))).fetchall()
     count = len(res)
     res = res[:30]
-    names = await API.users.get(user_ids=[i[0] for i in res])
-    msg = await messages.banlist(res, names, count)
-    kb = keyboard.banlist(uid, 0, count)
-    await message.reply(disable_mentions=1, message=msg, keyboard=kb)
+    await message.reply(disable_mentions=1, message=await messages.banlist(
+        res, count), keyboard=keyboard.banlist(
+        message.from_id, 0, count))
 
 
 @bl.chat_message(SearchCMD('zov'))
 async def zov(message: Message):
-    chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    data = [s for s in message.text.split(' ') if s]
+    data = message.text.split()
     if len(data) <= 1:
-        msg = messages.zov_hint()
-        await message.reply(disable_mentions=1, message=msg)
-        return
-    cause = ' '.join(data[1:])
-    members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
-    members = members.items
-    u_name = await getUserName(uid)
-    u_nick = await getUserNickname(uid, chat_id)
-    msg = messages.zov(uid, u_name, u_nick, cause, members)
-    await message.reply(message=msg)
+        return await message.reply(disable_mentions=1, message=messages.zov_hint())
+    await message.reply(message=messages.zov(
+        uid, await getUserName(uid), await getUserNickname(uid, message.peer_id - 2000000000), ' '.join(data[1:]),
+        (await API.messages.get_conversation_members(peer_id=message.peer_id)).items))
 
 
 @bl.chat_message(SearchCMD('kickmenu'))
 async def kickmenu(message: Message):
-    uid = message.from_id
-    kb = keyboard.kickmenu(uid)
-    msg = messages.kickmenu()
-    await message.reply(disable_mentions=1, message=msg, keyboard=kb)
+    await message.reply(disable_mentions=1, message=messages.kickmenu(), keyboard=keyboard.kickmenu(message.from_id))

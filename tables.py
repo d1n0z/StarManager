@@ -1,4 +1,5 @@
-from peewee import PostgresqlDatabase, Model, IntegerField, BigIntegerField, TextField, BooleanField, DateTimeField
+from peewee import (PostgresqlDatabase, Model, IntegerField, BigIntegerField, TextField, BooleanField, DateTimeField,
+                    FloatField)
 from config.config import USER, PASSWORD, DATABASE, DATABASE_PORT, DATABASE_HOST
 
 dbhandle = PostgresqlDatabase(DATABASE, user=USER, password=PASSWORD, host=DATABASE_HOST, port=DATABASE_PORT)
@@ -217,7 +218,8 @@ class UserJoinedDate(Model):
 
 class XP(Model):
     uid = IntegerField(default=0, unique=True, index=True)
-    xp = IntegerField(default=0)
+    xp = FloatField(default=0)
+    league = IntegerField(default=0)
     lm = BigIntegerField()
 
     class Meta:
@@ -426,13 +428,12 @@ class TypeQueue(Model):
         table_name = f'typequeue'
 
 
-class ReportWarns(Model):
+class ReportBans(Model):
     uid = IntegerField(default=0, unique=True, index=True)
-    warns = IntegerField(default=0)
 
     class Meta:
         database = dbhandle
-        table_name = f'reportwarns'
+        table_name = f'reportban'
 
 
 class Reboot(Model):
@@ -486,44 +487,6 @@ class GroupNames(Model):
     class Meta:
         database = dbhandle
         table_name = f'groupnames'
-
-
-class TasksDaily(Model):
-    uid = IntegerField(default=0, index=True)
-    task = TextField()
-    count = IntegerField(default=0)
-
-    class Meta:
-        database = dbhandle
-        table_name = f'tasksdaily'
-
-
-class TasksWeekly(Model):
-    uid = IntegerField(default=0, index=True)
-    task = TextField()
-    count = IntegerField(default=0)
-
-    class Meta:
-        database = dbhandle
-        table_name = f'tasksweekly'
-
-
-class Coins(Model):
-    uid = IntegerField(default=0, index=True)
-    coins = IntegerField(default=0)
-
-    class Meta:
-        database = dbhandle
-        table_name = f'coins'
-
-
-class TasksStreak(Model):
-    uid = IntegerField(default=0, index=True)
-    streak = IntegerField(default=0)
-
-    class Meta:
-        database = dbhandle
-        table_name = f'tasksstreak'
 
 
 class TransferHistory(Model):
@@ -669,14 +632,6 @@ class PublicChatsSettings(Model):
     class Meta:
         database = dbhandle
         table_name = f'publicchatssettings'
-
-
-class NewActivated(Model):
-    uid = IntegerField()
-
-    class Meta:
-        database = dbhandle
-        table_name = f'newactivated'
 
 
 if __name__ == '__main__':

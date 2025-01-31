@@ -19,7 +19,7 @@ def main(retry=0, vkbot=VkBot()):
     logger.add(sys.stderr, level='INFO')
 
     logger.info('Starting...')
-    os.system(f'rm {DATABASE}.sql {PATH + "media/temp/*"}')
+    os.system(f'rm {DATABASE}.sql {PATH + "media/temp/*"} > /dev/null 2>&1')
 
     logger.info('Creating tables...')
     dbhandle.create_tables(Model.__subclasses__())

@@ -1,5 +1,6 @@
 import time
 from datetime import datetime
+from typing import Any
 
 from vkbottle_types.events.bot_events import MessageNew
 from vkbottle_types.objects import MessagesMessageAttachmentType
@@ -10,17 +11,15 @@ from Bot.action_handlers import action_handle
 from Bot.add_msg_count import add_msg_counter
 from Bot.answers_handlers import answer_handler
 from Bot.checkers import getUChatLimit
-from Bot.utils import getUserLastMessage, getUserAccessLevel, getUserMute, addDailyTask, sendMessage, deleteMessages, \
+from Bot.utils import getUserLastMessage, getUserAccessLevel, getUserMute, sendMessage, deleteMessages, \
     getChatSettings, kickUser, getUserName, getUserNickname, antispamChecker, punish, getUserBan, getUserBanInfo
 from config.config import ADMINS, PM_COMMANDS
 from db import pool
 
 
-async def message_handle(event: MessageNew) -> None:
-    timestart = datetime.now()
+async def message_handle(event: MessageNew) -> Any:
     if event.object.message.action:
-        await action_handle(event)
-        return
+        return await action_handle(event)
     msg = event.object.message.text
     if event.object.message.peer_id < 2000000000:
         chat_id = event.object.message.peer_id
@@ -28,13 +27,9 @@ async def message_handle(event: MessageNew) -> None:
             if i in msg:
                 return
         if len(event.object.message.attachments) == 0:
-            msg = messages.pm()
-            await sendMessage(chat_id, msg)
-            return
+            return await sendMessage(chat_id, messages.pm())
         elif event.object.message.attachments[0].market is not None:
-            msg = messages.pm_market()
-            await sendMessage(chat_id, msg, kbd=keyboard.pm_market())
-            return
+            return await sendMessage(chat_id, messages.pm_market(), kbd=keyboard.pm_market())
 
     if await answer_handler(event) is not False:
         return
@@ -53,21 +48,17 @@ async def message_handle(event: MessageNew) -> None:
             
             if await (await c.execute('select id from filters where chat_id=%s and filter=ANY(%s)',
                                       (chat_id, [i.lower() for i in msg.lower().split()]))).fetchone():
-                await deleteMessages(event.object.message.conversation_message_id, chat_id)
-                return
+                return await deleteMessages(event.object.message.conversation_message_id, chat_id)
 
-    ban = await getUserBan(uid, chat_id)
-    if ban >= time.time():
+    if (ban := await getUserBan(uid, chat_id)) >= time.time():
         await deleteMessages(event.object.message.conversation_message_id, chat_id)
         await sendMessage(event.object.message.peer_id, messages.kick_banned(
             uid, await getUserName(uid), await getUserNickname(uid, chat_id), ban,
             (await getUserBanInfo(uid, chat_id))['causes'][-1]))
-        await kickUser(uid, chat_id=chat_id)
-        return
-    uacc = await getUserAccessLevel(uid, chat_id)
-    if uacc == 0 and await getUChatLimit(msgtime, await getUserLastMessage(uid, chat_id, 0), uacc, chat_id):
-        await deleteMessages(event.object.message.conversation_message_id, chat_id)
-        return
+        return await kickUser(uid, chat_id=chat_id)
+    if (uacc := await getUserAccessLevel(uid, chat_id)) == 0 and await getUChatLimit(
+            msgtime, await getUserLastMessage(uid, chat_id, 0), uacc, chat_id):
+        return await deleteMessages(event.object.message.conversation_message_id, chat_id)
     settings = await getChatSettings(chat_id)
     if await getUserMute(uid, chat_id) > int(msgtime):
         await deleteMessages(event.object.message.conversation_message_id, chat_id)
@@ -89,8 +80,7 @@ async def message_handle(event: MessageNew) -> None:
             if not (now.hour < start.hour or now.hour > end.hour or (
                     now.hour == start.hour and now.minute < start.minute) or (
                             now.hour == end.hour and now.minute >= end.minute)):
-                await deleteMessages(event.object.message.conversation_message_id, chat_id)
-                return
+                return await deleteMessages(event.object.message.conversation_message_id, chat_id)
 
     try:
         if event.object.message.attachments[0].type == MessagesMessageAttachmentType.AUDIO_MESSAGE:
@@ -99,12 +89,13 @@ async def message_handle(event: MessageNew) -> None:
             audio = False
     except:
         audio = False
-
     try:
-        if event.object.message.attachments[0].sticker.sticker_id:
-            await addDailyTask(uid, 'stickers')
+        if event.object.message.attachments[0].type == MessagesMessageAttachmentType.STICKER:
+            sticker = True
+        else:
+            sticker = False
     except:
-        pass
+        sticker = False
 
     if settings['antispam']['messagesPerMinute']:
         async with (await pool()).connection() as conn:
@@ -128,18 +119,10 @@ async def message_handle(event: MessageNew) -> None:
                     'select id, setting, "value" from settings where chat_id=%s and setting=%s',
                     (chat_id, setting))).fetchone()
         if punishment := await punish(uid, chat_id, setting[0]):
-            name = await getUserName(uid)
-            nick = await getUserNickname(uid, chat_id)
             await deleteMessages(event.object.message.conversation_message_id, chat_id)
             if punishment != 'del':
                 await sendMessage(chat_id + 2000000000, messages.antispam_punishment(
-                    uid, name, nick, setting[1], punishment[0], setting[2],
-                    punishment[1] if len(punishment) > 1 else None))
+                    uid, await getUserName(uid), await getUserNickname(uid, chat_id), setting[1], punishment[0],
+                    setting[2], punishment[1] if len(punishment) > 1 else None))
 
-    await add_msg_counter(chat_id, uid, audio)
-
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            await c.execute(
-                'insert into messagesstatistics (timestart, timeend) values (%s, %s)', (timestart, datetime.now()))
-            await conn.commit()
+    await add_msg_counter(chat_id, uid, audio, sticker)

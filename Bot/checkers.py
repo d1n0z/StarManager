@@ -1,6 +1,8 @@
 import traceback
 from datetime import datetime
 
+from cache import AsyncTTL
+
 import messages
 from Bot.utils import getUserAccessLevel, getUserPremium, getUserLastMessage, getUserMute, getChatSettings, \
     deleteMessages
@@ -8,6 +10,7 @@ from config.config import COMMANDS, API, PREFIX, DEVS, MAIN_DEVS, LVL_BANNED_COM
 from db import pool
 
 
+@AsyncTTL(time_to_live=30, maxsize=0)
 async def isAdmin(chat_id) -> bool:
     try:
         await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
@@ -50,6 +53,7 @@ async def getUserPrefixes(u_prem, uid) -> list:
     return PREFIX
 
 
+@AsyncTTL(maxsize=0)
 async def getUserIgnore(uid, chat_id) -> bool:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
@@ -57,6 +61,7 @@ async def getUserIgnore(uid, chat_id) -> bool:
                                                (chat_id, uid))).fetchone())
 
 
+@AsyncTTL(maxsize=0)
 async def getUInfBanned(uid, chat_id) -> bool:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
@@ -64,6 +69,7 @@ async def getUInfBanned(uid, chat_id) -> bool:
                                                ([chat_id, uid],))).fetchone())
 
 
+@AsyncTTL(maxsize=0)
 async def getULvlBanned(uid) -> bool:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
@@ -110,14 +116,8 @@ async def checkCMD(message, chat_id, fixing=False, accesstoalldevs=False, return
         await message.reply(messages.lvlbanned())
         return False
 
-    accessed = DEVS if accesstoalldevs else MAIN_DEVS
-    if fixing and uid not in accessed:
-        msg = messages.inprogress()
-        await message.reply(disable_mentions=1, message=msg)
-        return False
-
-    if sgw := await isSGW(uid, message.date):
-        await message.reply(messages.lock(sgw - message.date))
+    if fixing and uid not in (DEVS if accesstoalldevs else MAIN_DEVS):
+        await message.reply(disable_mentions=1, message=messages.inprogress())
         return False
 
     u_acc = await getUserAccessLevel(uid, chat_id)

@@ -4,12 +4,12 @@ from math import ceil
 
 from Bot.checkers import getUInfBanned, getULvlBanned
 from Bot.tgbot import tgbot
-from Bot.utils import getUserPremium, addUserXP, addWeeklyTask, addDailyTask, getChatName, getUserName, chatPremium
+from Bot.utils import getUserPremium, addUserXP, getChatName, getUserName, chatPremium
 from config.config import TG_CHAT_ID, TG_AUDIO_THREAD_ID
 from db import pool
 
 
-async def add_msg_counter(chat_id, uid, audio=False) -> bool:
+async def add_msg_counter(chat_id, uid, audio=False, sticker=False) -> bool:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             if not (await c.execute('update messages set messages=messages+1 where chat_id=%s and uid=%s',
@@ -27,18 +27,16 @@ async def add_msg_counter(chat_id, uid, audio=False) -> bool:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             lmt = await (await c.execute('select id, lm from xp where uid=%s', (uid,))).fetchone()
-            if lmt and time.time() - lmt[1] < 15:
+            if lmt and time.time() - lmt[1] < (5 if not audio and not sticker else (20 if audio else 10)):
                 return False
             elif lmt:
                 await c.execute('update xp set lm = %s where uid=%s', (int(time.time()), uid))
             else:
-                await c.execute('insert into xp (uid, xp, lm) values (%s, 0, %s)', (uid, int(time.time())))
+                await c.execute('insert into xp (uid, xp, lm, league) values (%s, 0, %s, 0)', (uid, int(time.time())))
             await conn.commit()
 
-    u_prem = await getUserPremium(uid)
     if audio:
-        addxp = 5
-        await addDailyTask(uid, 'sendvoice', checklvlbanned=False)
+        addxp = 4
         try:
             await tgbot.send_message(chat_id=TG_CHAT_ID, message_thread_id=TG_AUDIO_THREAD_ID,
                                      text=f'{chat_id} | {await getChatName(chat_id)} | '
@@ -47,14 +45,14 @@ async def add_msg_counter(chat_id, uid, audio=False) -> bool:
                                      disable_web_page_preview=True, parse_mode='HTML')
         except:
             pass
+    elif sticker:
+        addxp = 0.5
     else:
-        addxp = 2
-        await addWeeklyTask(uid, 'sendmsgs', checklvlbanned=False)
-        await addDailyTask(uid, 'sendmsgs', checklvlbanned=False)
-    if u_prem:
-        addxp *= 2
+        addxp = 1
+    if await getUserPremium(uid):
+        addxp *= 1.5
     if await chatPremium(chat_id):
-        addxp = ceil(addxp * 1.5)
+        addxp *= 1.5
 
     await addUserXP(uid, addxp, checklvlbanned=False)
     return True

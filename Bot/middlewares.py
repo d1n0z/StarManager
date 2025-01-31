@@ -12,7 +12,7 @@ class CommandMiddleware(BaseMiddleware[Message]):
         timestart = datetime.now()
 
         cmd = await checkCMD(self.event, self.event.chat_id, returncmd=True)
-        self.event.out = cmd
+        self.event.out = cmd  # god forgive me
         if cmd:
             self.event.geo = datetime.now()
 
