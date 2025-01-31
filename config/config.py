@@ -21,9 +21,9 @@ LVL_NAMES = ["Обычный Пользователь", "Смотрящий", "�
              "Спец администратор", "Руководитель", "Владелец", "DEV"]
 
 COMMANDS = {
-    "start": 0, "help": 0, "id": 0, "stats": 0, "report": 0, "mtop": 0, "q": 0, "premium": 0, "bonus": 0, "transfer": 0,
-    "duel": 0, "cmd": 0, "premmenu": 0, "test": 0, "task": 0, "getdev": 0, "anon": 0, "chatid": 0, "prefix": 0,
-    "deanon": 0, "chats": 0, "catalog": 0, "new2025": 0,
+    "start": 0, "help": 0, "id": 0, "stats": 0, "report": 0, "top": 0, "q": 0, "premium": 0, "bonus": 0, "transfer": 0,
+    "duel": 0, "cmd": 0, "premmenu": 0, "test": 0, "getdev": 0, "anon": 0, "chatid": 0, "prefix": 0,
+    "deanon": 0, "chats": 0, "catalog": 0,
 
     "kick": 1, "mute": 1, "warn": 1, "clear": 1, "staff": 1, "olist": 1, "getnick": 1, "snick": 1, "rnick": 1,
     "nlist": 1, "check": 1, "mkick": 1,
@@ -49,13 +49,12 @@ COMMANDS = {
     "reportwarn": 8, "reboot": 8, "sudo": 8, "givexp": 8, "reimport": 8, "resetlvl": 8, "getuserchats": 8, "helpdev": 8,
     "getchats": 8, "gettransferhistory": 8, "gettransferhistoryto": 8, "gettransferhistoryfrom": 8, "lvlunban": 8,
     "getmessageshistory": 8, "lvlban": 8, "lvlbanlist": 8, "msgscount": 8, "msgsaverage": 8, "mwaverage": 8,
-    "chatsstats": 8, "setprem": 8, "delprem": 8, "premlist": 8,
+    "chatsstats": 8, "setprem": 8, "delprem": 8, "premlist": 8, "repban": 8, "repunban": 8, "repbanlist": 8,
 }
 PM_COMMANDS = [
     "anon", "deanon",
 ]
 COMMANDS_DESC = {
-    "task": "/task - Открыть меню заданий.",
     "kick": "/kick - Исключить пользователя.",
     "mute": "/mute - Заблокировать чат пользователю.",
     "warn": "/warn - Выдать предупреждение пользователю.",
@@ -129,7 +128,7 @@ COMMANDS_DESC = {
     "chatlimit": "/chatlimit - Установить медленный режим в чате.",
     "id": "/id - Краткая информация пользователя.",
     "stats": "/stats - Статистика пользователя.",
-    "mtop": "/mtop - Топ активных пользователей.",
+    "top": "/top - Топ активных пользователей.",
     "q": "/q - Выйти из беседы.",
     "report": "/report - Обратится в поддержку.",
     "bonus": "/bonus - Ежедневный бонус.",
@@ -146,42 +145,12 @@ COMMANDS_DESC = {
 
 # chat ids
 DAILY_TO = int(config['SERVICE']['DAILY_TO'])
-BACKUPS_TO = int(config['SERVICE']['BACKUPS_TO'])
 REPORT_TO = int(config['SERVICE']['REPORT_TO'])
-CHEATING_TO = int(config['SERVICE']['CHEATING_TO'])
 PHOTO_NOT_FOUND = config['SERVICE']['PHOTO_NOT_FOUND']
 
 REPORT_CD = 300  # cooldown in seconds
 
 NEWSEASON_REWARDS = [45, 40, 30, 20, 15, 7, 7, 7, 7, 7]
-
-TASKS_DAILY = {
-    'sendmsgs': 300,
-    'sendvoice': 30,
-    'duelwin': 15
-}
-PREMIUM_TASKS_DAILY = {
-    'cmds': 50,
-    'stickers': 100
-}
-PREMIUM_TASKS_DAILY_TIERS = {
-    'sendmsgs': 600,
-    'sendvoice': 60,
-    'duelwin': 25,
-    'cmds': 100,
-    'stickers': 200
-}
-TASKS_WEEKLY = {
-    'bonus': 6,
-    'dailytask': 7,
-    'sendmsgs': 10000
-}
-PREMIUM_TASKS_WEEKLY = {
-    'lvlup': 10,
-    'duelwin': 60
-}
-
-TASKS_LOTS = {5: 1, 20: 5, 40: 10, 80: 3}
 
 DEVS = literal_eval(config['SERVICE']['DEVS'])
 ADMINS = literal_eval(config['SERVICE']['ADMINS'])
@@ -193,7 +162,12 @@ GWARN_TIME_LIMIT = 10
 GWARN_PUNISHMENT = 10  # in seconds
 GWARN_PUNISHMENTS_NAMES = ["5 минут", "30 минут", "48 часов", "30 дней"]
 
-LVL_BANNED_COMMANDS = ['task', 'bonus', 'transfer', 'duel']
+LVL_BANNED_COMMANDS = ['bonus', 'transfer', 'duel']
+
+LEAGUE_LVL = [0, 200, 400, 600, 800, 999]
+LEAGUE = ['Бронза', 'Серебро', 'Золото', 'Платина', 'Алмаз', 'Легенда']
+CREATEGROUPLEAGUES = [6, 7, 8, 9, 9, 9]
+CMDLEAGUES = [10, 12, 15, 19]
 
 
 def SETTINGS():
@@ -210,7 +184,6 @@ def SETTINGS():
         "entertaining": {
             "allowDuel": 1,
             "allowTransfer": 1,
-            "allowTask": 1,
             "allowAnon": 1,
         },
         "antispam": {
@@ -252,7 +225,6 @@ SETTINGS_POSITIONS = {
     "entertaining": {
         "allowDuel": ["Выкл.", "Вкл."],
         "allowTransfer": ["Выкл.", "Вкл."],
-        "allowTask": ["Выкл.", "Вкл."],
         "allowAnon": ["Выкл.", "Вкл."],
     },
     "antispam": {
@@ -333,8 +305,6 @@ PREMMENU = ["clear_by_fire", "border_color"]
 PREMMENU_DEFAULT = {"clear_by_fire": True, "border_color": None}
 PREMMENU_TURN = ["clear_by_fire"]
 
-TASKS = []
-
 FARM_CD = 7200  # in seconds
 FARM_POST_ID = int(config['SERVICE']['FARM_POST_ID'])
 
@@ -382,6 +352,8 @@ YOOKASSA_TOKEN = config['YOOKASSA']['YOOKASSA_TOKEN']
 
 MEGA_LOGIN = config['MEGA']['MEGA_LOGIN']
 MEGA_PASSWORD = config['MEGA']['MEGA_PASSWORD']
+
+YANDEX_TOKEN = config['YANDEX']['TOKEN']
 
 PREMIUM_COST = {30: 99, 90: 249, 180: 499}
 data = {
