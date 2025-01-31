@@ -180,7 +180,7 @@ async def premmenu_turn(message: MessageEvent):
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             if not (await c.execute('update premmenu set pos = %s where uid=%s and setting=%s',
-                                   (int(not bool(payload['pos'])), uid, payload['setting']))).rowcount:
+                                    (int(not bool(payload['pos'])), uid, payload['setting']))).rowcount:
                 await c.execute('insert into premmenu (uid, setting, pos) values (%s, %s, %s)',
                                 (uid, payload['setting'], int(not PREMMENU_DEFAULT[payload['setting']])))
     prem = await getUserPremium(uid)
@@ -270,14 +270,18 @@ async def settings_change_countable(message: MessageEvent):
             await conn.commit()
 
     if action in ('turn', 'turnalt'):
+        settings = await getChatSettings(chat_id)
+        altsettings = await getChatAltSettings(chat_id)
+        if action == 'turn':
+            settings[category][setting] = not settings[category][setting]
+        else:
+            altsettings[category][setting] = not altsettings[category][setting]
         await turnChatSetting(chat_id, category, setting, alt=action == 'turnalt')
         async with (await pool()).connection() as conn:
             async with conn.cursor() as c:
                 chatsetting = await (await c.execute(
-                    'select "value", value2, punishment from settings where chat_id=%s and setting=%s',
+                    'select "value", value2, punishment, pos, pos2 from settings where chat_id=%s and setting=%s',
                     (chat_id, setting))).fetchone()
-        settings = await getChatSettings(chat_id)
-        altsettings = await getChatAltSettings(chat_id)
         return await editMessage(messages.settings_change_countable(
             chat_id, setting, settings[category][setting], None if chatsetting is None else chatsetting[0],
             None if chatsetting is None else chatsetting[1], altsettings[category][setting] if (

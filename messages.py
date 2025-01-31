@@ -289,7 +289,7 @@ async def staff(res, names, chat_id):
             "nickname": await getUserNickname(item[0], chat_id), "access_level": item[1]})
     emoji = {'1': '☀', '2': '🔥', '3': '🔥', '4': '🔥', '5': '✨', '6': '⚡', '7': '⭐'}
     for k in sorted(users.keys()):
-        msg += f'[{emoji[k]}] {await getChatAccessName(chat_id, int(k))}\n' + ''.join(
+        msg += f'[{emoji[k]}] {await getChatAccessName(chat_id, int(k), LVL_NAMES[int(k)])}\n' + ''.join(
             [f"➖ [id{item['uid']}|{item['nickname'] if item['nickname'] else item['name']}]\n" for item in users[k]])
     return msg
 
@@ -1179,7 +1179,7 @@ async def getnick(res, query):
     msg = ''
     k = 0
     for k, item in enumerate(res):
-        msg += f"{k + 1}. {item[1]} - [id{item[0]}|{await getUserName(item[[0]])}]\n"
+        msg += f"{k + 1}. {item[1]} - [id{item[0]}|{await getUserName(item[0])}]\n"
     return get('getnick', query=query, cnt=k + 1) + msg
 
 

@@ -223,13 +223,13 @@ async def uploadImage(file: str, peer_id: int, c: int = 0) -> str | None:
         photo = await photo_uploader.upload(file_source=file, peer_id=peer_id)
         if photo is None:
             raise ValueError
-        if c == 6:
-            raise Exception
+        # if c == 6:
+        #     raise Exception
         return photo
     except ValueError:
         return await uploadImage(file, peer_id, c + 1)
     except Exception as e:
-        raise Exception('Uploading failed after 6 retries') from e
+        pass  # raise Exception('Uploading failed after 6 retries') from e
 
 
 @AsyncLRU(maxsize=0)
@@ -548,7 +548,6 @@ async def getChatAltSettings(chat_id):
 
 async def turnChatSetting(chat_id, category, setting, alt=False):
     defaults = SETTINGS_DEFAULTS[setting] if setting in SETTINGS_DEFAULTS else {'pos': SETTINGS()[category][setting]}
-
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             if not (await c.execute('update settings set ' +

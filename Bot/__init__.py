@@ -90,5 +90,4 @@ class VkBot:
                 conn.commit()
 
         logger.info('Loaded. Starting the bot...')
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())  # temp
         self.bot.run_forever()

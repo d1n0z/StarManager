@@ -1,7 +1,7 @@
 import traceback
 from datetime import datetime
 
-from cache import AsyncTTL
+from cache.async_ttl import AsyncTTL
 
 import messages
 from Bot.utils import getUserAccessLevel, getUserPremium, getUserLastMessage, getUserMute, getChatSettings, \
@@ -40,7 +40,6 @@ async def haveAccess(cmd, chat_id, uacc, premium=0) -> int | bool:
     try:
         return COMMANDS[cmd] <= uacc
     except:
-        traceback.print_exc()
         return 7 <= uacc
 
 
