@@ -15,7 +15,7 @@ import messages
 from Bot.tgbot import tgbot
 from Bot.utils import sendMessage, chunks, punish, getUserName
 from config.config import DATABASE, PASSWORD, USER, TG_CHAT_ID, NEWSEASON_REWARDS, DAILY_TO, API, IMPLICIT_API, \
-    GROUP_ID, TG_BACKUP_THREAD_ID, PHOTO_NOT_FOUND, YANDEX_TOKEN
+    GROUP_ID, TG_BACKUP_THREAD_ID, PHOTO_NOT_FOUND, YANDEX_TOKEN, COMMANDS
 from db import pool
 
 
@@ -141,6 +141,7 @@ async def everyminute():
     try:
         async with (await pool()).connection() as conn:
             async with conn.cursor() as c:
+                await c.execute('delete from cmdnames where not cmd=ANY(%s)', (list(COMMANDS.keys()),))
                 await c.execute('delete from antispammessages where time<%s', (int(time.time() - 60),))
                 await c.execute('delete from speccommandscooldown where time<%s', (int(time.time() - 10),))
                 await c.execute('update xp set xp=0 where xp<0')
