@@ -98,6 +98,8 @@ async def ban(message: Message):
             else:
                 ban_time = 3650 * 86400
                 ban_cause = ' '.join(data[1:])
+    if ban_time <= 0:
+        return await message.reply(disable_mentions=1, message=messages.ban_hint())
 
     if await getUserAccessLevel(id, chat_id) >= await getUserAccessLevel(uid, chat_id):
         return await message.reply(disable_mentions=1, message=messages.ban_higher())

@@ -637,5 +637,31 @@ class PublicChatsSettings(Model):
         table_name = f'publicchatssettings'
 
 
+class TelegramLink(Model):
+    tgid = BigIntegerField(index=True, unique=True, null=True)
+    vkid = IntegerField()
+    code = TextField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'tglink'
+
+
+class TGGiveaways(Model):
+    mid = BigIntegerField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'tggiveaways'
+
+
+class TGGiveawayUsers(Model):
+    tgid = BigIntegerField(unique=True)
+
+    class Meta:
+        database = dbhandle
+        table_name = f'tggiveawayusers'
+
+
 if __name__ == '__main__':
     dbhandle.create_tables(Model.__subclasses__())

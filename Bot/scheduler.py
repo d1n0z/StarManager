@@ -1,5 +1,4 @@
 import asyncio
-import calendar
 import os
 import subprocess
 import time
@@ -14,8 +13,8 @@ from loguru import logger
 import messages
 from Bot.tgbot import tgbot
 from Bot.utils import sendMessage, chunks, punish, getUserName
-from config.config import DATABASE, PASSWORD, USER, TG_CHAT_ID, NEWSEASON_REWARDS, DAILY_TO, API, IMPLICIT_API, \
-    GROUP_ID, TG_BACKUP_THREAD_ID, PHOTO_NOT_FOUND, YANDEX_TOKEN, COMMANDS
+from config.config import DATABASE, PASSWORD, USER, TG_CHAT_ID, DAILY_TO, API, IMPLICIT_API, \
+    TG_BACKUP_THREAD_ID, PHOTO_NOT_FOUND, YANDEX_TOKEN, COMMANDS
 from db import pool
 
 
@@ -239,4 +238,4 @@ async def run():
     aiocron.crontab('*/1 * * * *', func=everyminute, loop=loop)
     aiocron.crontab('0 6/12 * * *', func=backup, loop=loop)
     aiocron.crontab('0 1/3 * * *', func=updateInfo, loop=loop)
-    aiocron.crontab('50 23 * * *', func=reboot, loop=loop)
+    # aiocron.crontab('50 23 * * *', func=reboot, loop=loop)

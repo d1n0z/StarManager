@@ -106,6 +106,8 @@ async def gban(message: Message):
             else:
                 ban_time = 365 * 86400
                 ban_cause = ' '.join(data[1:])
+    if ban_time <= 0:
+        return await message.reply(disable_mentions=1, message=messages.gban_hint())
 
     if not (chats := await getgpool(chat_id)):
         return await message.reply(disable_mentions=1, message=messages.chat_unbound())

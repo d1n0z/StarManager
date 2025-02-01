@@ -36,7 +36,7 @@ class VkBot:
         # self.bot.loop_wrapper.add_task(scheduler.run())  # uses a lot of resources(somehow)
 
         @labeler.raw_event(GroupEventType.MESSAGE_REACTION_EVENT, dataclass=GroupTypes.MessageReactionEvent)
-        async def start(event: GroupTypes.MessageReactionEvent):
+        async def reaction(event: GroupTypes.MessageReactionEvent):
             await reaction_handle(event)
 
         @labeler.raw_event(GroupEventType.MESSAGE_NEW, dataclass=GroupTypes.MessageNew, blocking=False)

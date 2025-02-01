@@ -1,3 +1,5 @@
+import random
+import string
 import time
 from datetime import datetime
 
@@ -78,3 +80,20 @@ async def deanon(message: GroupTypes.MessageNew):
         return await sendMessage(message.peer_id, messages.anon_not_member())
     await sendMessage(message.peer_id, messages.deanon(id, fromid, await getUserName(fromid),
                                                        await getUserNickname(fromid, chatid), deanon_target[2]))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_NEW, GroupTypes.MessageNew, SearchPMCMD('code'), blocking=False)
+async def code(message: GroupTypes.MessageNew):
+    message = message.object.message
+    uid = message.from_id
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            code = await (await c.execute('select code from tglink where vkid=%s', (uid,))).fetchone()
+            if code:
+                code = code[0]
+            else:
+                while not code or await (await c.execute('select id from tglink where code=%s', (code,))).fetchone():
+                    code = ''.join([random.choice(string.ascii_letters + string.digits) for _ in range(6)])
+                await c.execute('insert into tglink (tgid, vkid, code) values (null, %s, %s)', (uid, code))
+                await conn.commit()
+    await sendMessage(message.peer_id, messages.code(code))

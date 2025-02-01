@@ -2024,3 +2024,7 @@ def premlist(prem):
 
 def transfer_limit(u_prem):
     return get('transfer_limit_prem' if u_prem else 'transfer_limit')
+
+
+def code(code):
+    return get('code', code=code)

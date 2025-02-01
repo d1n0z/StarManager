@@ -160,7 +160,7 @@ async def mute(message: Message):
     await setChatMute(id, chat_id, mute_time)
     await message.reply(disable_mentions=1, message=messages.mute(
         u_name, await getUserNickname(uid, chat_id), uid, await getUserName(id), await getUserNickname(id, chat_id),
-        id, mute_cause, int(mute_time)), keyboard=keyboard.punish_unpunish(
+        id, mute_cause, mute_time // 60), keyboard=keyboard.punish_unpunish(
         uid, id, 'mute', message.conversation_message_id))
 
 

@@ -32,6 +32,11 @@ def main(retry=0, vkbot=VkBot()):
     os.system(f"tmux new -s botscheduler -d && tmux send-keys -t botscheduler 'cd {PATH}' ENTER "
               f"'. {PATH + 'venv/bin/activate'}' ENTER 'python3.11 runscheduler.py' ENTER")
 
+    logger.info('Starting Telegram bot...')
+    os.system("tmux kill-session -t bottg")
+    os.system(f"tmux new -s bottg -d && tmux send-keys -t bottg 'cd {PATH}' ENTER "
+              f"'. {PATH + 'venv/bin/activate'}' ENTER 'python3.11 runtg.py' ENTER")
+
     logger.info('Loading...')
     try:
         try:

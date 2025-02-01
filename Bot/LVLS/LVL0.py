@@ -149,7 +149,7 @@ async def report(message: Message):
 
     await API.messages.send(disable_mentions=1, chat_id=REPORT_TO, random_id=0, message=messages.report(
         uid, await getUserName(uid), ' '.join(data[1:]), repid, chat_id, await getChatName(chat_id)),
-                            keyboard=keyboard.report(uid, repid, chat_id, report))
+                            keyboard=keyboard.report(uid, repid, chat_id, ' '.join(data[1:])))
     await message.reply(disable_mentions=1, message=messages.report_sent(repid))
 
 

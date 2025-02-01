@@ -18,6 +18,8 @@ from db import pool
 
 
 async def message_handle(event: MessageNew) -> Any:
+    if event.object.message.from_id < 0:
+        return
     if event.object.message.action:
         return await action_handle(event)
     msg = event.object.message.text

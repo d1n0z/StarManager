@@ -233,15 +233,22 @@ async def settings(message: MessageEvent):
     if setting in SETTINGS_PREMIUM and not await getUserPremium(uid):
         return await editMessage(messages.no_prem(), peer_id, message.conversation_message_id,
                                  keyboard.settings_goto(uid))
+    settings = await getChatSettings(chat_id)
+    altsettings = await getChatAltSettings(chat_id)
     if setting not in SETTINGS_COUNTABLE:
-        return await turnChatSetting(chat_id, category, setting)
+        if setting in settings[category]:
+            settings[category][setting] = not settings[category][setting]
+        else:
+            altsettings[category][setting] = not altsettings[category][setting]
+        await turnChatSetting(chat_id, category, setting)
+        return await editMessage(
+            messages.settings_category(category, settings[category]), peer_id,
+            message.conversation_message_id, keyboard.settings_category(uid, category, settings[category]))
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             chatsetting = await (await c.execute(
                 'select "value", value2, punishment from settings where chat_id=%s and '
                 'setting=%s', (chat_id, setting))).fetchone()
-    settings = await getChatSettings(chat_id)
-    altsettings = await getChatAltSettings(chat_id)
     return await editMessage(messages.settings_change_countable(
         chat_id, setting, settings[category][setting], None if chatsetting is None else chatsetting[0],
         None if chatsetting is None else chatsetting[1], altsettings[category][setting] if (
@@ -433,7 +440,7 @@ async def settings_unset_welcome(message: MessageEvent):
                              None if cmd == 'settings_unset_welcome_url' else url, chat_id))
             await conn.commit()
     await editMessage(messages.settings_countable_action('set', 'welcome'), peer_id, message.conversation_message_id,
-                      keyboard.settings_set_welcome(message.user_id, welcome.msg, welcome.photo, welcome.url))
+                      keyboard.settings_set_welcome(message.user_id, text, img, url))
 
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['nicklist']))

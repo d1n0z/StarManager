@@ -263,7 +263,6 @@ async def getUserAccessLevel(uid: int, chat_id: int, none: Any = 0) -> int | Any
             return none
 
 
-@AsyncTTL(maxsize=0)
 async def getUserLastMessage(uid: int, chat_id: int, none: Any = 'Неизвестно') -> int | Any:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
@@ -412,11 +411,11 @@ async def getXPTop(returnval='count', limit: int = 10, league: int = 1, users: l
         async with conn.cursor() as c:
             if users is not None:
                 top = await (await c.execute(
-                    'select uid, lvl from xp where uid>0 and league=%s and uid=ANY(%s) order by lvl desc limit %s',
-                    (league, users, limit))).fetchall()
+                    'select uid, lvl, xp from xp where uid>0 and league=%s and uid=ANY(%s) order by lvl desc, xp desc '
+                    'limit %s', (league, users, limit))).fetchall()
             else:
                 top = await (await c.execute(
-                    'select uid, lvl from xp where uid>0 and league=%s order by lvl desc limit %s',
+                    'select uid, lvl, xp from xp where uid>0 and league=%s order by lvl desc, xp desc limit %s',
                     (league, limit))).fetchall()
     if returnval == 'count':
         return {i[0]: k + 1 for k, i in enumerate(top)}

@@ -101,7 +101,7 @@ async def setaccess(message: Message):
     uid = message.from_id
     data = message.text.split()
     id = await getIDFromMessage(message.text, message.reply_message)
-    if not id or (len(data) + (not message.reply_message) < 3) or not data[-1].isdigit():
+    if not id or (len(data) + bool(message.reply_message) < 3) or not data[-1].isdigit():
         return await message.reply(disable_mentions=1, message=messages.setacc_hint())
     if id < 0:
         return await message.reply(disable_mentions=1, message=messages.id_group())

@@ -22,7 +22,7 @@ async def comment_handle(event: GroupTypes.WallReplyNew) -> None:
             elif time.time() - com[1] < FARM_CD:
                 return await API.wall.create_comment(
                     owner_id=-GROUP_ID, post_id=FARM_POST_ID, from_group=GROUP_ID, message=messages.farm_cd(
-                        await getUserName(uid), uid, FARM_CD - (time.time() - com.time)),
+                        await getUserName(uid), uid, FARM_CD - (time.time() - com[1])),
                     reply_to_comment=event.object.id)
             else:
                 await c.execute('update comments set time = %s where uid=%s', (int(time.time()), uid))

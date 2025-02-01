@@ -16,8 +16,8 @@ from Bot.checkers import getUInfBanned
 from Bot.rules import SearchCMD
 from Bot.scheduler import backup
 from Bot.utils import getUserName, getIDFromMessage, getUserNickname, sendMessage, addUserXP, getChatName, \
-    setUserAccessLevel, pointWords, chunks, getURepBanned
-from config.config import API, GROUP_ID, DEVS
+    setUserAccessLevel, pointWords, chunks, getURepBanned, pointMinutes
+from config.config import API, GROUP_ID, DEVS, PATH
 from db import pool
 
 bl = BotLabeler()
@@ -455,13 +455,17 @@ async def getlink(message: Message):
 
 @bl.chat_message(SearchCMD('reboot'))
 async def reboot(message: Message):
+    if len(data := message.text.split()) == 2:
+        await message.reply(
+            f'⌛ Перезагрузка произойдет через {pointWords(int(data[1]), ("минуту", "минуты", "минут"))}.')
+        await asyncio.sleep(int(data[1]) * 60)
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             await c.execute('insert into reboots (chat_id, time, sended) values (%s, %s, false)',
                             (message.chat_id, int(time.time())))
             await conn.commit()
     await message.reply(messages.reboot())
-    os.system('reboot')
+    os.system(PATH + 'startup.sh')  # noqa
 
 
 @bl.chat_message(SearchCMD('sudo'))
@@ -643,3 +647,12 @@ async def chatsstats(message: Message):
     msg = (f'🌓 Ночной режим включен в: {pointWords(nm, ["беседе", "беседах", "беседах"])}\n'
            f'🔢 Капча включена в: {pointWords(c, ["беседе", "беседах", "беседах"])}')
     await message.reply(msg)
+
+
+@bl.chat_message(SearchCMD('linked'))
+async def linked(message: Message):
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            c = (await (await c.execute(
+                'select count(*) as c from tglink where tgid IS NOT NULL')).fetchone())[0]
+    await message.reply(f'Связано с Telegram : {pointWords(c, ("аккаунт", "аккаунта", "аккаунтов"))}.')

@@ -49,10 +49,10 @@ COMMANDS = {
     "reportwarn": 8, "reboot": 8, "sudo": 8, "givexp": 8, "reimport": 8, "resetlvl": 8, "getuserchats": 8, "helpdev": 8,
     "getchats": 8, "gettransferhistory": 8, "gettransferhistoryto": 8, "gettransferhistoryfrom": 8, "lvlunban": 8,
     "getmessageshistory": 8, "lvlban": 8, "lvlbanlist": 8, "msgscount": 8, "msgsaverage": 8, "mwaverage": 8,
-    "chatsstats": 8, "setprem": 8, "delprem": 8, "premlist": 8, "repban": 8, "repunban": 8, "repbanlist": 8,
+    "chatsstats": 8, "setprem": 8, "delprem": 8, "premlist": 8, "repban": 8, "repunban": 8, "repbanlist": 8, "linked": 8
 }
 PM_COMMANDS = [
-    "anon", "deanon",
+    "anon", "deanon", "code"
 ]
 COMMANDS_DESC = {
     "kick": "/kick - Исключить пользователя.",
@@ -150,17 +150,11 @@ PHOTO_NOT_FOUND = config['SERVICE']['PHOTO_NOT_FOUND']
 
 REPORT_CD = 300  # cooldown in seconds
 
-NEWSEASON_REWARDS = [45, 40, 30, 20, 15, 7, 7, 7, 7, 7]
-
 DEVS = literal_eval(config['SERVICE']['DEVS'])
 ADMINS = literal_eval(config['SERVICE']['ADMINS'])
 MAIN_DEVS = literal_eval(config['SERVICE']['MAIN_DEVS'])
 
 PREFIX = ["/", "!", ".", "+"]
-
-GWARN_TIME_LIMIT = 10
-GWARN_PUNISHMENT = 10  # in seconds
-GWARN_PUNISHMENTS_NAMES = ["5 минут", "30 минут", "48 часов", "30 дней"]
 
 LVL_BANNED_COMMANDS = ['bonus', 'transfer', 'duel']
 
@@ -301,7 +295,6 @@ SETTINGS_COUNTABLE_CHANGEPUNISHMENTMESSAGE = {
     "ban": "бан на {count} дней",
 }
 
-PREMMENU = ["clear_by_fire", "border_color"]
 PREMMENU_DEFAULT = {"clear_by_fire": True, "border_color": None}
 PREMMENU_TURN = ["clear_by_fire"]
 
@@ -338,20 +331,20 @@ DATABASE_PORT = config['DATABASE']['DATABASE_PORT']
 DATABASE_STR = f'postgresql://{USER}:{PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE}'
 
 TG_TOKEN = config['TELEGRAM']['TG_TOKEN']
+TG_BOT_USERNAME = config['TELEGRAM']['TG_BOT_USERNAME']
 TG_CHAT_ID = config['TELEGRAM']['TG_CHAT_ID']
 TG_BACKUP_THREAD_ID = config['TELEGRAM']['TG_BACKUP_THREAD_ID']
 TG_PREMIUM_THREAD_ID = config['TELEGRAM']['TG_PREMIUM_THREAD_ID']
 TG_NEWCHAT_THREAD_ID = config['TELEGRAM']['TG_NEWCHAT_THREAD_ID']
 TG_TRANSFER_THREAD_ID = config['TELEGRAM']['TG_TRANSFER_THREAD_ID']
 TG_AUDIO_THREAD_ID = config['TELEGRAM']['TG_AUDIO_THREAD_ID']
+TG_PUBLIC_CHAT_ID = config['TELEGRAM']['TG_PUBLIC_CHAT_ID']
+TG_PUBLIC_GIVEAWAY_THREAD_ID = config['TELEGRAM']['TG_PUBLIC_GIVEAWAY_THREAD_ID']
 TG_API_HASH = config['TELEGRAM']['TG_API_HASH']
 TG_API_ID = config['TELEGRAM']['TG_API_ID']
 
 YOOKASSA_MERCHANT_ID = int(config['YOOKASSA']['YOOKASSA_MERCHANT_ID'])
 YOOKASSA_TOKEN = config['YOOKASSA']['YOOKASSA_TOKEN']
-
-MEGA_LOGIN = config['MEGA']['MEGA_LOGIN']
-MEGA_PASSWORD = config['MEGA']['MEGA_PASSWORD']
 
 YANDEX_TOKEN = config['YANDEX']['TOKEN']
 
