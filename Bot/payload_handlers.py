@@ -118,7 +118,7 @@ async def duel(message: MessageEvent):
     uxp = await getUserXP(uid)
     if xp < duelxp:
         return await message.show_snackbar("У вас недостаточно XP")
-    elif uxp < duelxp:
+    if uxp < duelxp:
         return await message.show_snackbar("У вашего соперника недостаточно XP")
 
     rid = (id, uid)[int.from_bytes(os.urandom(1)) % 2]

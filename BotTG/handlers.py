@@ -33,7 +33,10 @@ async def joingiveaway(query: CallbackQuery, state: FSMContext):
                             (query.from_user.id,))
             await conn.commit()
             count = await (await c.execute('select count(*) as c from tggiveawayusers')).fetchone()
-    await query.message.edit_reply_markup(reply_markup=keyboard.joingiveaway(count[0]))
+    try:
+        await query.message.edit_reply_markup(reply_markup=keyboard.joingiveaway(count[0]))
+    except:
+        pass
     await query.answer(text='Вы успешно участвуете в конкурсе.', show_alert=True)
 
 
