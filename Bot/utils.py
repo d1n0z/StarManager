@@ -212,7 +212,7 @@ async def setChatMute(uid: int | Iterable[int], chat_id: int, mute_time: int | f
             return VK_API_SESSION.method('messages.changeConversationMemberRestrictions',
                                          {'peer_id': chat_id + 2000000000, 'member_ids': uid, 'action': 'rw'})
     except:
-        traceback.print_exc()
+        # traceback.print_exc()
         return
 
 
@@ -223,13 +223,16 @@ async def uploadImage(file: str, peer_id: int, c: int = 0) -> str | None:
         photo = await photo_uploader.upload(file_source=file, peer_id=peer_id)
         if photo is None:
             raise ValueError
-        # if c == 6:
-        #     raise Exception
+        if c == 6:
+            raise Exception
+        os.system('rm ' + file)  # noqa
         return photo
     except ValueError:
         return await uploadImage(file, peer_id, c + 1)
     except Exception as e:
-        pass  # raise Exception('Uploading failed after 6 retries') from e
+        # print('Uploading failed after 6 retries')
+        # raise Exception('Uploading failed after 6 retries') from e
+        pass
 
 
 @AsyncLRU(maxsize=0)
@@ -401,8 +404,8 @@ async def getXPFromLVL(lvl):
 
 
 @AsyncLRU(maxsize=0)
-async def getUserNeededXP(xp):
-    return await getXPFromLVL(await getLVLFromXP(xp) + 1) - xp
+async def getUserNeededXP(xp, lvl):
+    return await getXPFromLVL(lvl + 1) - xp
 
 
 @AsyncTTL(time_to_live=120, maxsize=0)
@@ -561,7 +564,7 @@ async def turnChatSetting(chat_id, category, setting, alt=False):
 async def setUserAccessLevel(uid, chat_id, access_level):
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
-            if access_level == 0:
+            if not access_level:
                 await c.execute('delete from accesslvl where chat_id=%s and uid=%s', (chat_id, uid))
             else:
                 if not (await c.execute('update accesslvl set access_level = %s where chat_id=%s and uid=%s',

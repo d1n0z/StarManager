@@ -42,14 +42,15 @@ async def message_handle(event: MessageNew) -> Any:
     if uid in ADMINS:
         print(f'{uid}({chat_id}): {msg}')
 
-    async with (await pool()).connection() as conn:
+    async with ((await pool()).connection() as conn):
         async with conn.cursor() as c:
             await c.execute('insert into allusers (uid) values (%s) on conflict (uid) do nothing', (uid,))
             await c.execute('insert into allchats (chat_id) values (%s) on conflict (chat_id) do nothing', (chat_id,))
             await conn.commit()
             
-            if await (await c.execute('select id from filters where chat_id=%s and filter=ANY(%s)',
-                                      (chat_id, [i.lower() for i in msg.lower().split()]))).fetchone():
+            if (await (await c.execute('select id from filters where chat_id=%s and filter=ANY(%s)',
+                                       (chat_id, [i.lower() for i in msg.lower().split()]))).fetchone() and
+                    not await getUserAccessLevel(uid, chat_id)):
                 return await deleteMessages(event.object.message.conversation_message_id, chat_id)
 
     if (ban := await getUserBan(uid, chat_id)) >= time.time():

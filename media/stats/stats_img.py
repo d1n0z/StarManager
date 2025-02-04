@@ -6,7 +6,7 @@ from config.config import PATH, LEAGUE
 
 
 async def createStatsImage(warns, messages, uid, access_level, nickname, reg_date, last_activity, prem, xp, userlvl,
-                           fullxp, invites, name, mute, ban, lvl_name, neededxp, color, league):
+                           invites, name, mute, ban, lvl_name, neededxp, color, league):
     pss = list('xxx')
     if warns > 0:
         pss[2] = 'w'

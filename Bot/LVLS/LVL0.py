@@ -112,13 +112,15 @@ async def stats(message: Message):
                 (id, chat_id))).fetchone()
     xp = int(await getUserXP(id))
     lvl = await getUserLVL(id)
+    if not lvl:
+        lvl = 1
     await message.reply(disable_mentions=1, attachment=await uploadImage(await createStatsImage(
         await getUserWarns(id, chat_id), await getUserMessages(id, chat_id), id, await getUserAccessLevel(id, chat_id),
         await getUserNickname(id, chat_id), await getRegDate(id, '%d.%m.%Y', 'Неизвестно'), last_message,
-        await getUserPremium(id), min(xp, 99999999), min(lvl, 999), await getXPFromLVL(lvl), invites[0],
+        await getUserPremium(id), min(xp, 99999999), min(lvl, 999), invites[0],
         await getUserName(id), await getUserMute(id, chat_id), await getUserBan(id, chat_id),
         lvl_name[0] if lvl_name else LVL_NAMES[acc],
-        await getUserNeededXP(await getXPFromLVL(lvl) + xp) if lvl < 999 else 0,
+        await getUserNeededXP(xp, lvl) if lvl < 999 else 0,
         await getUserPremmenuSetting(id, 'border_color', False), await getUserLeague(id)), message.peer_id))
     await deleteMessages(reply.conversation_message_id, chat_id)
 
@@ -187,7 +189,7 @@ async def bonus(message: Message):
                 await c.execute('insert into bonus (uid, time) values (%s, %s)', (uid, int(time.time())))
             await conn.commit()
 
-    addxp = random.randint(50, 100) if await getUserPremium(uid) else random.randint(10, 50)
+    addxp = random.randint(100, 180) if await getUserPremium(uid) else random.randint(20, 100)
     await addUserXP(uid, addxp)
     await message.reply(disable_mentions=1, message=messages.bonus(
         uid, await getUserNickname(uid, chat_id), name, addxp))

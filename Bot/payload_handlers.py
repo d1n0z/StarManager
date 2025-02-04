@@ -33,7 +33,7 @@ async def join(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
 
-    if cmd == 'join' or (cmd == 'rejoin' and payload['activate'] == 0):
+    if cmd == 'join' or (cmd == 'rejoin' and not payload['activate']):
         if int(chat_id) != int(payload['chat_id']):
             return
 
@@ -43,9 +43,8 @@ async def join(message: MessageEvent):
         except:
             return await API.messages.send(random_id=0, message=messages.notadmin(), chat_id=chat_id)
 
-        omembers = [i.member_id for i in members if i.is_admin or i.is_owner]
         bp = message.user_id
-        if bp not in omembers:
+        if bp not in [i.member_id for i in members if i.is_admin]:
             return
         async with (await pool()).connection() as conn:
             async with conn.cursor() as c:
@@ -58,6 +57,7 @@ async def join(message: MessageEvent):
                     await setChatMute(i[0], chat_id, 0)
                 x = await (await c.execute('delete from accesslvl where chat_id=%s returning uid',
                                            (chat_id,))).fetchall()
+                await setUserAccessLevel(bp, chat_id, 7)
                 for id in x:
                     await setChatMute(id[0], chat_id, 0)
                 await c.execute('delete from nickname where chat_id=%s', (chat_id,))
@@ -80,7 +80,6 @@ async def join(message: MessageEvent):
                 await c.execute('delete from antispamurlexceptions where chat_id=%s', (chat_id,))
                 await c.execute('delete from botjoineddate where chat_id=%s', (chat_id,))
                 await c.execute('delete from captcha where chat_id=%s', (chat_id,))
-                await c.execute('insert into accesslvl (uid, chat_id, access_level) values (%s, %s, 7)', (bp, chat_id))
                 await c.execute('insert into botjoineddate (chat_id, time) values (%s, %s)',
                                 (chat_id, int(time.time())))
                 await conn.commit()
@@ -95,11 +94,11 @@ async def join(message: MessageEvent):
             pass
 
         return await editMessage(messages.start(), peer_id, message.conversation_message_id)
-    elif cmd == 'rejoin' and payload['activate'] == 1:
+    elif cmd == 'rejoin' and payload['activate']:
         if (await getUserAccessLevel(uid, chat_id) >= 7 or
                 uid in [i.member_id for i in (await API.messages.get_conversation_members(
                     peer_id=peer_id)).items if i.is_admin or i.is_owner]):
-            await editMessage(messages.rejoin_activate(), peer_id, message.conversation_message_id)
+            return await editMessage(messages.rejoin_activate(), peer_id, message.conversation_message_id)
 
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['duel'], answer=False, checksender=False))

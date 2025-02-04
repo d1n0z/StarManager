@@ -541,12 +541,15 @@ async def grnick(message: Message):
         if (u_acc <= await getUserAccessLevel(id, chat_id) or not await haveAccess('grnick', chat_id, u_acc) or
                 ch_nickname is None):
             continue
-        async with (await pool()).connection() as conn:
-            async with conn.cursor() as c:
-                await c.execute('delete from nickname where chat_id=%s and uid=%s', (chat_id, id))
-                await conn.commit()
-        await API.messages.send(disable_mentions=1, random_id=0, chat_id=chat_id, message=messages.rnick(
-            uid, u_name, await getUserNickname(uid, chat_id), id, ch_name, ch_nickname))
+        try:
+            await API.messages.send(disable_mentions=1, random_id=0, chat_id=chat_id, message=messages.rnick(
+                uid, u_name, await getUserNickname(uid, chat_id), id, ch_name, ch_nickname))
+            async with (await pool()).connection() as conn:
+                async with conn.cursor() as c:
+                    await c.execute('delete from nickname where chat_id=%s and uid=%s', (chat_id, id))
+                    await conn.commit()
+        except:
+            pass
         success += 1
 
     await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
