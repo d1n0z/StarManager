@@ -10,7 +10,6 @@ from django.contrib.auth.models import User
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render, redirect
 from django.urls import Resolver404
-from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 from social_django.models import UserSocialAuth
 from yookassa import Payment, Configuration
@@ -206,7 +205,7 @@ def chats(request: HttpRequest):
                     'messages.getInviteLink', {'peer_id': 2000000000 + chat[0], 'group_id': config.GROUP_ID})['link']
                 vkchat = config.VK_API_SESSION.method('messages.getConversationsById',
                                                       {'peer_ids': 2000000000 + chat[0]})
-                photo = config.VK_API_SESSION
+                photo = config.PHOTO_NOT_FOUND
                 if ('items' in vkchat and len(vkchat['items']) and 'chat_settings' in vkchat['items'][0] and
                         'photo' in vkchat['items'][0]['chat_settings']):
                     if 'photo_200' in vkchat['items'][0]['chat_settings']['photo']:

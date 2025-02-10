@@ -284,6 +284,7 @@ async def snick(message: Message):
     if await getUserAccessLevel(id, chat_id) > await getUserAccessLevel(uid, chat_id):
         return await message.reply(disable_mentions=1, message=messages.snick_higher())
 
+    oldnickname = await getUserNickname(id, chat_id)
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             if not (await c.execute('update nickname set nickname = %s where chat_id=%s and uid=%s',
@@ -293,8 +294,8 @@ async def snick(message: Message):
             await conn.commit()
 
     await message.reply(disable_mentions=1, message=messages.snick(
-        uid, await getUserName(id), await getUserNickname(uid, chat_id), id, await getUserName(id),
-        await getUserNickname(id, chat_id), nickname))
+        uid, await getUserName(uid), await getUserNickname(uid, chat_id), id, await getUserName(id),
+        oldnickname, nickname))
 
 
 @bl.chat_message(SearchCMD('rnick'))
@@ -345,12 +346,11 @@ async def getnick(message: Message):
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             res = await (await c.execute(
-                "select uid, nickname from nickname where chat_id=%s and uid>0 and nickname like %s order by nickname "
-                "limit 30", (chat_id, '%%' + query + '%%'))).fetchall()
-    if len(res) > 0:
-        await message.reply(disable_mentions=1, message=await messages.getnick(res, query))
-    else:
-        await message.reply(disable_mentions=1, message=messages.getnick_no_result(query))
+                "select uid, nickname from nickname where chat_id=%s and uid>0 and lower(nickname) like %s order by "
+                "nickname limit 30", (chat_id, '%%' + query.lower() + '%%'))).fetchall()
+    if not res:
+        return await message.reply(disable_mentions=1, message=messages.getnick_no_result(query))
+    await message.reply(disable_mentions=1, message=await messages.getnick(res, query))
 
 
 @bl.chat_message(SearchCMD('staff'))

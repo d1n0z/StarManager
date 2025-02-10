@@ -1,3 +1,4 @@
+import asyncio
 import locale
 import os
 import tempfile
@@ -216,23 +217,20 @@ async def setChatMute(uid: int | Iterable[int], chat_id: int, mute_time: int | f
         return
 
 
-async def uploadImage(file: str, peer_id: int, c: int = 0) -> str | None:
+async def uploadImage(file: str, c: int = 0, delay: float = 0.5) -> str | None:
     bot = Bot(VK_TOKEN_GROUP)
     photo_uploader = PhotoMessageUploader(bot.api)
     try:
-        photo = await photo_uploader.upload(file_source=file, peer_id=peer_id)
-        if photo is None:
-            raise ValueError
-        if c == 6:
+        photo = await photo_uploader.upload(file_source=file, peer_id=0)
+        if not photo:
             raise Exception
         os.system('rm ' + file)  # noqa
         return photo
-    except ValueError:
-        return await uploadImage(file, peer_id, c + 1)
     except Exception as e:
-        # print('Uploading failed after 6 retries')
-        # raise Exception('Uploading failed after 6 retries') from e
-        pass
+        if c != 5:
+            await asyncio.sleep(delay)
+            return await uploadImage(file, c + 1, delay + 0.5)
+        raise Exception from e
 
 
 @AsyncLRU(maxsize=0)

@@ -8,7 +8,7 @@ import messages
 from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserAccessLevel, getUserNickname, getUserMute, getUserName, setChatMute, \
     getChatAccessName, setUserAccessLevel
-from config.config import API, MAIN_DEVS, DEVS
+from config.config import MAIN_DEVS, DEVS
 from db import pool
 
 bl = BotLabeler()
@@ -141,11 +141,11 @@ async def delaccess(message: Message):
         return await message.reply(disable_mentions=1, message=messages.delaccess_myself())
 
     ch_acc = await getUserAccessLevel(id, chat_id)
-    if ch_acc >= await getUserAccessLevel(uid, chat_id) and uid not in DEVS:
-        return await message.reply(disable_mentions=1, message=messages.delaccess_higher())
     if ch_acc <= 0:
         return await message.reply(disable_mentions=1, message=messages.delaccess_noacc(
             id, await getUserName(id), await getUserNickname(id, chat_id)))
+    if ch_acc >= await getUserAccessLevel(uid, chat_id) and uid not in DEVS:
+        return await message.reply(disable_mentions=1, message=messages.delaccess_higher())
     await setUserAccessLevel(id, chat_id, 0)
     await message.reply(disable_mentions=1, message=messages.delaccess(
         uid, await getUserName(uid), await getUserNickname(uid, chat_id), id, await getUserName(id),

@@ -88,7 +88,7 @@ async def action_handle(event: MessageNew) -> None:
                 if s[0] and s[1] and s[2]:
                     captcha = await generateCaptcha(uid, chat_id, s[1])
                     m = await sendMessage(event.peer_id, messages.captcha(uid, await getUserName(uid), s[1], s[2]),
-                                          photo=await uploadImage(captcha[0], event.peer_id))
+                                          photo=await uploadImage(captcha[0]))
                     await c.execute('update captcha set cmid = %s where id=%s',
                                     (m[0].conversation_message_id, captcha[1]))
                     await c.execute('insert into typequeue (chat_id, uid, "type", additional) '

@@ -44,7 +44,7 @@ async def join(message: MessageEvent):
             return await API.messages.send(random_id=0, message=messages.notadmin(), chat_id=chat_id)
 
         bp = message.user_id
-        if bp not in [i.member_id for i in members if i.is_admin]:
+        if bp not in [i.member_id for i in members if i.is_admin or i.is_owner]:
             return
         async with (await pool()).connection() as conn:
             async with conn.cursor() as c:
@@ -54,12 +54,19 @@ async def join(message: MessageEvent):
                         return
                 for i in await (await c.execute(
                         'select uid from mute where chat_id=%s and mute>%s', (chat_id, time.time()))).fetchall():
-                    await setChatMute(i[0], chat_id, 0)
+                    try:
+                        await setChatMute(i[0], chat_id, 0)
+                    except:
+                        pass
                 x = await (await c.execute('delete from accesslvl where chat_id=%s returning uid',
                                            (chat_id,))).fetchall()
-                await setUserAccessLevel(bp, chat_id, 7)
+                await c.execute('insert into accesslvl (uid, chat_id, access_level) values (%s, %s, %s)',
+                                (bp, chat_id, 7))
                 for id in x:
-                    await setChatMute(id[0], chat_id, 0)
+                    try:
+                        await setChatMute(id[0], chat_id, 0)
+                    except:
+                        pass
                 await c.execute('delete from nickname where chat_id=%s', (chat_id,))
                 await c.execute('delete from settings where chat_id=%s', (chat_id,))
                 await c.execute('delete from welcome where chat_id=%s', (chat_id,))
@@ -504,7 +511,8 @@ async def page_nnlist(message: MessageEvent):
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             res = [i[0] for i in await (await c.execute(
-                'select uid from nickname where chat_id=%s and uid>0 and nickname is not null')).fetchall()]
+                'select uid from nickname where chat_id=%s and uid>0 and nickname is not null',
+                (peer_id - 2000000000,))).fetchall()]
     members = await API.messages.get_conversation_members(peer_id=peer_id)
     members_count = len(members.items[page * 30:])
     members = [i for i in members.items if i.member_id not in res][page * 30: page * 30 + 30]
@@ -566,7 +574,6 @@ async def page_banlist(message: MessageEvent):
         return
     banned_count = len(res)
     res = res[page * 30:page * 30 + 30]
-    names = await API.users.get(user_ids=[i[0] for i in res])
     await editMessage(await messages.banlist(res, banned_count), peer_id, message.conversation_message_id,
                       keyboard.banlist(message.user_id, page, banned_count))
 
@@ -732,8 +739,9 @@ async def top_duels(message: MessageEvent):
             lvln = await (await c.execute(
                 'select uid, wins from duelwins where uid>0 order by wins desc limit 10')).fetchall()
     lvln = {i[0]: i[1] for i in lvln}
-    await editMessage(await messages.top_duels(lvln),
-        peer_id, message.conversation_message_id, keyboard.top_duels(peer_id - 2000000000, message.user_id))
+    await editMessage(
+        await messages.top_duels(lvln), peer_id, message.conversation_message_id,
+        keyboard.top_duels(peer_id - 2000000000, message.user_id))
 
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['top_duels_in_group']))

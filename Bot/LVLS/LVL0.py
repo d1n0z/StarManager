@@ -121,7 +121,7 @@ async def stats(message: Message):
         await getUserName(id), await getUserMute(id, chat_id), await getUserBan(id, chat_id),
         lvl_name[0] if lvl_name else LVL_NAMES[acc],
         await getUserNeededXP(xp, lvl) if lvl < 999 else 0,
-        await getUserPremmenuSetting(id, 'border_color', False), await getUserLeague(id)), message.peer_id))
+        await getUserPremmenuSetting(id, 'border_color', False), await getUserLeague(id))))
     await deleteMessages(reply.conversation_message_id, chat_id)
 
 
