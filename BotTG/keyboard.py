@@ -28,5 +28,22 @@ def unlink() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
 
     builder.row(InlineKeyboardButton(text='🔗 Удалить привязку', callback_data=Callback(type='unlink').pack()))
+    builder.row(InlineKeyboardButton(text='👤 Пригласить друзей', callback_data=Callback(type='ref').pack()))
+
+    return builder.as_markup()
+
+
+def back():
+    builder = InlineKeyboardBuilder()
+
+    builder.row(InlineKeyboardButton(text='Назад', callback_data=Callback(type='start').pack()))
+
+    return builder.as_markup()
+
+
+def check(ref):
+    builder = InlineKeyboardBuilder()
+
+    builder.row(InlineKeyboardButton(text='Проверить подписку', callback_data=Callback(type=f'checksub_{ref}').pack()))
 
     return builder.as_markup()

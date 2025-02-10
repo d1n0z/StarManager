@@ -663,5 +663,22 @@ class TGGiveawayUsers(Model):
         table_name = f'tggiveawayusers'
 
 
+class TGReferrals(Model):
+    fromtgid = BigIntegerField(index=True)
+    tgid = BigIntegerField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'tgreferrals'
+
+
+class TGWaitingForSubscription(Model):
+    tgid = BigIntegerField(index=True, unique=True)
+
+    class Meta:
+        database = dbhandle
+        table_name = f'tgwaitingforsubscription'
+
+
 if __name__ == '__main__':
     dbhandle.create_tables(Model.__subclasses__())
