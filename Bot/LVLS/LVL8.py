@@ -656,3 +656,16 @@ async def linked(message: Message):
             c = (await (await c.execute(
                 'select count(*) as c from tglink where tgid IS NOT NULL')).fetchone())[0]
     await message.reply(f'Связано с Telegram : {pointWords(c, ("аккаунт", "аккаунта", "аккаунтов"))}.')
+
+
+@bl.chat_message(SearchCMD('cmdstats'))
+async def cmdstats(message: Message):
+    data = message.text.split()
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if len(data) == 2:
+                c = (await (await c.execute('select uid from cmdsusage where cmd=%s', (data[1],))).fetchall())
+            else:
+                c = (await (await c.execute('select uid from cmdsusage')).fetchall())
+    await message.reply(f'Использований: {pointWords(len(c), ("раз", "раза", "раз"))}.\n'
+                        f'Уникальных использований: {pointWords(len(set(c)), ("раз", "раза", "раз"))}.')

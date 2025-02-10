@@ -2028,3 +2028,27 @@ def transfer_limit(u_prem):
 
 def code(code):
     return get('code', code=code)
+
+
+def guess_hint():
+    return get('guess_hint')
+
+
+def guess_notenoughxp():
+    return get('guess_notenoughxp')
+
+
+def guess_not_allowed():
+    return get('guess_not_allowed')
+
+
+def guess_xp_minimum():
+    return get('guess_xp_minimum')
+
+
+def guess_win(bet, num, prem):
+    return get('guess_win', bet=bet, num=num, com='' if prem else ' с учётом комиссии в 10%')
+
+
+def guess_lose(bet, num):
+    return get('guess_lose', bet=bet, num=num)

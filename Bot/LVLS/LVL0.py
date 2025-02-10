@@ -12,11 +12,11 @@ import messages
 from Bot.rules import SearchCMD
 from Bot.tgbot import tgbot
 from Bot.utils import (getIDFromMessage, getUserName, getRegDate, kickUser, getUserNickname, getUserAccessLevel,
-                       getUserLastMessage, getUserMute, getUserBan, getUserXP, getLVLFromXP, getUserNeededXP,
+                       getUserLastMessage, getUserMute, getUserBan, getUserXP, getUserNeededXP,
                        getUserPremium, uploadImage, addUserXP, isChatAdmin, getUserWarns, getUserMessages,
                        setUserAccessLevel, getChatName, getULvlBanned, getChatSettings, deleteMessages,
                        speccommandscheck, getUserPremmenuSettings, getUserPremmenuSetting, chatPremium, getURepBanned,
-                       getUserLeague, getXPFromLVL, getUserLVL)
+                       getUserLeague, getUserLVL)
 from config.config import (API, LVL_NAMES, PATH, REPORT_CD, REPORT_TO, COMMANDS, TG_CHAT_ID, TG_TRANSFER_THREAD_ID,
                            CMDLEAGUES)
 from db import pool
@@ -179,7 +179,7 @@ async def bonus(message: Message):
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             bonus = await (await c.execute('select time from bonus where uid=%s', (uid,))).fetchone()
-    if time.time() - (lasttime := bonus[0] if bonus is not None else 0) < (
+    if time.time() - (lasttime := bonus[0] if bonus else 0) < (
             reqtime := 28800 if await chatPremium(chat_id) else 86400):
         return await message.reply(disable_mentions=1, message=messages.bonus_time(
             uid, None, name, lasttime + reqtime - time.time()))
@@ -401,3 +401,27 @@ async def deanon(message: Message):
 @bl.chat_message(SearchCMD('chats'))
 async def chats(message: Message):
     await message.reply(messages.chats(), keyboard=keyboard.chats(), disable_mentions=1)
+
+
+@bl.chat_message(SearchCMD('guess'))
+async def chats(message: Message):
+    if st := await speccommandscheck(message.from_id, 'guess', 10):
+        return await message.reply(
+            disable_mentions=1, message=messages.speccommandscooldown(int(10 - (time.time() - st) + 1)))
+    if not (await getChatSettings(message.chat_id))['entertaining']['allowGuess']:
+        return await message.reply(disable_mentions=1, message=messages.guess_not_allowed())
+    data = message.text.split()
+    if len(data) != 3 or not data[1].isdigit() or not data[2].isdigit() or int(data[2]) < 1 or int(data[2]) > 5:
+        return await message.reply(disable_mentions=1, message=messages.guess_hint())
+    if int(data[1]) < 10 or int(data[1]) > 500:
+        return await message.reply(disable_mentions=1, message=messages.guess_xp_minimum())
+    if await getUserXP(message.from_id) < int(data[1]):
+        return await message.reply(disable_mentions=1, message=messages.guess_notenoughxp())
+    if int(data[2]) != (num := random.randint(1, 5)):
+        await addUserXP(message.from_id, -int(data[1]))
+        return await message.reply(disable_mentions=1, message=messages.guess_lose(data[1], num))
+    bet = int(data[1]) * 2.5
+    if not (prem := await getUserPremium(message.from_id)):
+        bet = bet / 100 * 90
+    await addUserXP(message.from_id, bet)
+    await message.reply(disable_mentions=1, message=messages.guess_win(int(bet), data[2], prem))

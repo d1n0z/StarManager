@@ -23,7 +23,7 @@ LVL_NAMES = ["Обычный Пользователь", "Смотрящий", "�
 COMMANDS = {
     "start": 0, "help": 0, "id": 0, "stats": 0, "report": 0, "top": 0, "q": 0, "premium": 0, "bonus": 0, "transfer": 0,
     "duel": 0, "cmd": 0, "premmenu": 0, "test": 0, "getdev": 0, "anon": 0, "chatid": 0, "prefix": 0,
-    "deanon": 0, "chats": 0, "catalog": 0,
+    "deanon": 0, "chats": 0, "catalog": 0, "guess": 0,
 
     "kick": 1, "mute": 1, "warn": 1, "clear": 1, "staff": 1, "olist": 1, "getnick": 1, "snick": 1, "rnick": 1,
     "nlist": 1, "check": 1, "mkick": 1,
@@ -49,7 +49,8 @@ COMMANDS = {
     "reportwarn": 8, "reboot": 8, "sudo": 8, "givexp": 8, "reimport": 8, "resetlvl": 8, "getuserchats": 8, "helpdev": 8,
     "getchats": 8, "gettransferhistory": 8, "gettransferhistoryto": 8, "gettransferhistoryfrom": 8, "lvlunban": 8,
     "getmessageshistory": 8, "lvlban": 8, "lvlbanlist": 8, "msgscount": 8, "msgsaverage": 8, "mwaverage": 8,
-    "chatsstats": 8, "setprem": 8, "delprem": 8, "premlist": 8, "repban": 8, "repunban": 8, "repbanlist": 8, "linked": 8
+    "chatsstats": 8, "setprem": 8, "delprem": 8, "premlist": 8, "repban": 8, "repunban": 8, "repbanlist": 8,
+    "linked": 8, "cmdstats": 8,
 }
 PM_COMMANDS = [
     "anon", "deanon", "code"
@@ -141,6 +142,7 @@ COMMANDS_DESC = {
     "resetnick": "/resetnick - удалить ники всех пользователей беседы.",
     "purge": "/purge - очищает беседу от ненужной информации.",
     "chatsstats": "/chatsstats - информация по беседам.",
+    "guess": "/guess - Угадать число.",
 }
 
 # chat ids
@@ -156,7 +158,7 @@ MAIN_DEVS = literal_eval(config['SERVICE']['MAIN_DEVS'])
 
 PREFIX = ["/", "!", ".", "+"]
 
-LVL_BANNED_COMMANDS = ['bonus', 'transfer', 'duel']
+LVL_BANNED_COMMANDS = ['bonus', 'transfer', 'duel', 'guess']
 
 LEAGUE_LVL = [0, 200, 400, 600, 800, 999]
 LEAGUE = ['Бронза', 'Серебро', 'Золото', 'Платина', 'Алмаз', 'Легенда']
@@ -177,6 +179,7 @@ def SETTINGS():
         },
         "entertaining": {
             "allowDuel": 1,
+            "allowGuess": 1,
             "allowTransfer": 1,
             "allowAnon": 1,
         },
@@ -218,6 +221,7 @@ SETTINGS_POSITIONS = {
     },
     "entertaining": {
         "allowDuel": ["Выкл.", "Вкл."],
+        "allowGuess": ["Выкл.", "Вкл."],
         "allowTransfer": ["Выкл.", "Вкл."],
         "allowAnon": ["Выкл.", "Вкл."],
     },

@@ -18,6 +18,7 @@ class CommandMiddleware(BaseMiddleware[Message]):
 
         async with (await pool()).connection() as conn:
             async with conn.cursor() as c:
+                await c.execute('insert into cmdsusage (uid, cmd) values (%s, %s)', (self.event.from_id, cmd))
                 await c.execute('insert into middlewaresstatistics (timestart, timeend) values (%s, %s)',
                                 (timestart, datetime.now()))
                 await conn.commit()

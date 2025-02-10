@@ -680,5 +680,14 @@ class TGWaitingForSubscription(Model):
         table_name = f'tgwaitingforsubscription'
 
 
+class CommandsUsage(Model):
+    uid = IntegerField()
+    cmd = TextField(index=True)
+
+    class Meta:
+        database = dbhandle
+        table_name = f'cmdsusage'
+
+
 if __name__ == '__main__':
     dbhandle.create_tables(Model.__subclasses__())

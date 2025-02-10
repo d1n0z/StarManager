@@ -4,8 +4,6 @@ import os
 import tempfile
 import time
 import traceback
-from cache.async_ttl import AsyncTTL
-from cache.async_lru import AsyncLRU
 from ast import literal_eval
 from datetime import date, datetime
 from typing import Iterable, Any
@@ -14,6 +12,8 @@ import requests
 import urllib3
 import whois
 import xmltodict
+from cache.async_lru import AsyncLRU
+from cache.async_ttl import AsyncTTL
 from memoization import cached
 from multicolorcaptcha import CaptchaGenerator
 from nudenet import NudeDetector
@@ -23,8 +23,8 @@ from vkbottle.tools.mini_types.bot.foreign_message import ForeignMessageMin
 from vkbottle_types.objects import MessagesMessage, MessagesMessageAttachmentType, MessagesSendUserIdsResponseItem
 
 from config.config import (API, VK_API_SESSION, VK_TOKEN_GROUP, GROUP_ID, SETTINGS, PATH,
-                           NSFW_CATEGORIES, SETTINGS_ALT, SETTINGS_DEFAULTS, MAIN_DEVS, PREMMENU_DEFAULT, PREMMENU_TURN,
-                           LEAGUE_LVL)
+                           NSFW_CATEGORIES, SETTINGS_ALT, SETTINGS_DEFAULTS, PREMMENU_DEFAULT, PREMMENU_TURN,
+                           LEAGUE_LVL, DEVS)
 from db import pool
 
 
@@ -665,7 +665,7 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings):
 
 
 async def speccommandscheck(uid: int, cmd: str, cd: int) -> int | bool:
-    if uid in MAIN_DEVS:
+    if uid in DEVS:
         return False
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
