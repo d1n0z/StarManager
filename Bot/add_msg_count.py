@@ -39,7 +39,7 @@ async def add_msg_counter(chat_id, uid, audio=False, sticker=False) -> bool:
             await conn.commit()
 
     if audio:
-        addxp = 4
+        addxp = 6
         try:
             await tgbot.send_message(chat_id=TG_CHAT_ID, message_thread_id=TG_AUDIO_THREAD_ID,
                                      text=f'{chat_id} | {await getChatName(chat_id)} | '
@@ -49,9 +49,9 @@ async def add_msg_counter(chat_id, uid, audio=False, sticker=False) -> bool:
         except:
             pass
     elif sticker:
-        addxp = 0.5
+        addxp = 2
     else:
-        addxp = 1
+        addxp = 4
     if await getUserPremium(uid):
         addxp *= 1.5
     if await chatPremium(chat_id):

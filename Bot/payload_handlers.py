@@ -34,9 +34,6 @@ async def join(message: MessageEvent):
     chat_id = peer_id - 2000000000
 
     if cmd == 'join' or (cmd == 'rejoin' and not payload['activate']):
-        if int(chat_id) != int(payload['chat_id']):
-            return
-
         try:
             members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
             members = members.items
@@ -44,14 +41,11 @@ async def join(message: MessageEvent):
             return await API.messages.send(random_id=0, message=messages.notadmin(), chat_id=chat_id)
 
         bp = message.user_id
-        if bp not in [i.member_id for i in members if i.is_admin or i.is_owner]:
+        if (bp not in [i.member_id for i in members if i.is_admin or i.is_owner] and
+                await getUserAccessLevel(bp, chat_id) < 7):
             return
         async with (await pool()).connection() as conn:
             async with conn.cursor() as c:
-                if s := await (await c.execute(
-                        'select uid from accesslvl where chat_id=%s and access_level=7', (chat_id,))).fetchone():
-                    if s[0] != bp:
-                        return
                 for i in await (await c.execute(
                         'select uid from mute where chat_id=%s and mute>%s', (chat_id, time.time()))).fetchall():
                     try:
