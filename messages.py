@@ -2052,3 +2052,26 @@ def guess_win(bet, num, prem):
 
 def guess_lose(bet, num):
     return get('guess_lose', bet=bet, num=num)
+
+
+async def antitag_on(uid, nick, name):
+    return get('antitag_on', uid=uid, n=nick if nick else name)
+
+
+async def antitag():
+    return get('antitag')
+
+
+def antitag_add(id, name, nick):
+    return get('antitag_add', uid=id, n=nick if nick else name)
+
+
+def antitag_del(id, name, nick):
+    return get('antitag_del', uid=id, n=nick if nick else name)
+
+
+async def antitag_list(users, chat_id):
+    return get('antitag_list', userslen=pointWords(len(users), ('пользователь', 'пользователя', 'пользователей'))
+               ) + ''.join(
+        [f'[{k + 1}]. [id{i}|{await getUserNickname(i, chat_id) or await getUserName(i)}]\n' for k, i in enumerate(users
+                                                                                                                   )])

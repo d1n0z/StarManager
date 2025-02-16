@@ -354,3 +354,26 @@ async def chat(message: Message):
         await getChatName(chat_id)), keyboard=None if not await haveAccess(
         'settings', chat_id, await getUserAccessLevel(message.from_id, chat_id)) else (
         keyboard.chat(message.from_id, public == 'Открытый')))
+
+
+@bl.chat_message(SearchCMD('antitag'))
+async def antitag(message: Message):
+    data = message.text.split()
+    if len(data) != 3 or data[1] not in ('add', 'del') or not (
+            id := await getIDFromMessage(message.text, message.reply_message, 3)):
+        return await message.reply(disable_mentions=1, message=await messages.antitag(), keyboard=keyboard.antitag(
+            message.from_id))
+    chat_id = message.peer_id - 2000000000
+    if data[1] == 'add':
+        async with ((await pool()).connection() as conn):
+            async with conn.cursor() as c:
+                await c.execute('insert into antitag (uid, chat_id) values (%s, %s)', (id, chat_id))
+                await conn.commit()
+        return await message.reply(disable_mentions=1, message=messages.antitag_add(
+            id, await getUserName(id), await getUserNickname(id, chat_id)))
+    async with ((await pool()).connection() as conn):
+        async with conn.cursor() as c:
+            await c.execute('delete from antitag where uid=%s and chat_id=%s', (id, chat_id))
+            await conn.commit()
+    return await message.reply(disable_mentions=1, message=messages.antitag_del(
+            id, await getUserName(id), await getUserNickname(id, chat_id)))

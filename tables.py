@@ -689,5 +689,14 @@ class CommandsUsage(Model):
         table_name = f'cmdsusage'
 
 
+class Antitag(Model):
+    uid = IntegerField()
+    chat_id = IntegerField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'antitag'
+
+
 if __name__ == '__main__':
     dbhandle.create_tables(Model.__subclasses__())

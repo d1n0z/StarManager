@@ -1376,3 +1376,14 @@ async def turnpublic(message: MessageEvent):
         await getChatName(chat_id)
     ), peer_id, message.conversation_message_id, keyboard.chat(
         message.user_id, public == 'Открытый'))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['antitag_list']))
+async def antitag_list(message: MessageEvent):
+    peer_id = message.object.peer_id
+    chat_id = peer_id - 2000000000
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            users = set([i[0] for i in await (await c.execute('select uid from antitag where chat_id=%s',
+                                                              (chat_id,))).fetchall()])
+    await editMessage(await messages.antitag_list(users, chat_id), peer_id, message.conversation_message_id)

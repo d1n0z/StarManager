@@ -738,3 +738,11 @@ def chats():
     kb = Keyboard(inline=True)
     kb.add(OpenLink(label='Список бесед', link='https://star-manager.ru/chats/'))
     return kb.get_json()
+
+
+def antitag(uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('Посмотреть список', {"cmd": "antitag_list", "uid": uid}))
+
+    return kb.get_json()
