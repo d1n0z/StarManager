@@ -17,7 +17,7 @@ from Bot.utils import (sendMessageEventAnswer, editMessage, getUserAccessLevel, 
                        getUserName, getUserNickname, kickUser, getXPTop, getChatName, getUserBan, getUserWarns,
                        getUserMute, getULvlBanned, getChatSettings, turnChatSetting, deleteMessages, setChatMute,
                        getChatAltSettings, getChatMembers, getChatOwner, getUserPremmenuSettings, getSilenceAllowed,
-                       sendMessage, getSilence, setUserAccessLevel, getGroupName)
+                       sendMessage, getSilence, setUserAccessLevel, getGroupName, isMessagesFromGroupAllowed)
 from config.config import API, COMMANDS, SETTINGS_COUNTABLE, \
     TG_CHAT_ID, TG_NEWCHAT_THREAD_ID, SETTINGS_PREMIUM, LEAGUE, PREMMENU_DEFAULT
 from db import pool
@@ -177,6 +177,8 @@ async def premmenu(message: MessageEvent):
 async def premmenu_turn(message: MessageEvent):
     uid = message.user_id
     payload = message.payload
+    if payload['setting'] == 'tagnotif' and not (await isMessagesFromGroupAllowed(uid)):
+        return await editMessage(messages.tagnotiferror(), message.peer_id, message.conversation_message_id,)
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             if not (await c.execute('update premmenu set pos = %s where uid=%s and setting=%s',

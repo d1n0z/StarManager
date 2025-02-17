@@ -143,6 +143,7 @@ COMMANDS_DESC = {
     "purge": "/purge - очищает беседу от ненужной информации.",
     "chatsstats": "/chatsstats - информация по беседам.",
     "guess": "/guess - Угадать число.",
+    "antitag": "/antitag - Запретить упоминание пользователя.",
 }
 
 # chat ids
@@ -299,8 +300,8 @@ SETTINGS_COUNTABLE_CHANGEPUNISHMENTMESSAGE = {
     "ban": "бан на {count} дней",
 }
 
-PREMMENU_DEFAULT = {"clear_by_fire": True, "border_color": None}
-PREMMENU_TURN = ["clear_by_fire"]
+PREMMENU_DEFAULT = {"clear_by_fire": True, "border_color": None, "tagnotif": False}
+PREMMENU_TURN = ["clear_by_fire", "tagnotif"]
 
 FARM_CD = 7200  # in seconds
 FARM_POST_ID = int(config['SERVICE']['FARM_POST_ID'])

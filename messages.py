@@ -1264,10 +1264,14 @@ def premmenu(settings, prem):
         if e == 'clear_by_fire':
             c += 1
             msg += f'\n[{c}]. Удаление сообщения с помощью реакции(🔥) | {"✔" if i == 1 else "❌"}'
-        elif e == 'border_color':
-            if prem:
-                c += 1
-                msg += f'\n[{c}]. Смена цвета рамки в /stats | {i if i else "Выкл."}'
+        if not prem:
+            continue
+        if e == 'border_color':
+            c += 1
+            msg += f'\n[{c}]. Смена цвета рамки в /stats | {i if i else "Выкл."}'
+        if e == 'tagnotif':
+            c += 1
+            msg += f'\n[{c}]. Оповещение об упоминаниях в беседах | {"✔" if i == 1 else "❌"}'
     return msg
 
 
@@ -2075,3 +2079,7 @@ async def antitag_list(users, chat_id):
                ) + ''.join(
         [f'[{k + 1}]. [id{i}|{await getUserNickname(i, chat_id) or await getUserName(i)}]\n' for k, i in enumerate(users
                                                                                                                    )])
+
+
+def tagnotiferror():
+    return get('tagnotiferror')

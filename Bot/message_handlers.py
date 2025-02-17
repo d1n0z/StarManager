@@ -13,7 +13,7 @@ from Bot.answers_handlers import answer_handler
 from Bot.checkers import getUChatLimit, getUserPrefixes
 from Bot.utils import getUserLastMessage, getUserAccessLevel, getUserMute, sendMessage, deleteMessages, \
     getChatSettings, kickUser, getUserName, getUserNickname, antispamChecker, punish, getUserBan, getUserBanInfo, \
-    getUserPremium, getIDFromMessage
+    getUserPremium, getIDFromMessage, getUserPremmenuSetting, getChatName
 from config.config import ADMINS, PM_COMMANDS
 from db import pool
 
@@ -47,24 +47,32 @@ async def message_handle(event: MessageNew) -> Any:
         async with conn.cursor() as c:
             await c.execute('insert into allusers (uid) values (%s) on conflict (uid) do nothing', (uid,))
             await c.execute('insert into allchats (chat_id) values (%s) on conflict (chat_id) do nothing', (chat_id,))
-            await conn.commit()
 
             if (await (await c.execute('select id from filters where chat_id=%s and filter=ANY(%s)',
                                        (chat_id, [i.lower() for i in msg.lower().split()]))).fetchone() and
                     not await getUserAccessLevel(uid, chat_id)):
                 return await deleteMessages(event.object.message.conversation_message_id, chat_id)
 
-            if (await (await c.execute('select id from antitag where chat_id=%s', (chat_id,))).fetchone() and
-                    not any(event.object.message.text.startswith(i) for i in await getUserPrefixes(
-                        await getUserPremium(uid), uid)
-                    ) and (pinged := [i for i in [await getIDFromMessage(
-                        event.object.message.text, None, place=k) for k in range(
-                        1, len(event.object.message.text.split()) + 1)] if i]
-                    ) and (await (await c.execute('select id from antitag where chat_id=%s and uid=ANY(%s)',
-                                                  (chat_id, pinged))).fetchone())):
-                if await deleteMessages(event.object.message.conversation_message_id, chat_id):
+            if not any(event.object.message.text.startswith(i) for i in await getUserPrefixes(
+                    await getUserPremium(uid), uid)) and (
+                    pinged := [i for i in [
+                        await getIDFromMessage(event.object.message.text, None, place=k) for k in range(
+                            1, len(event.object.message.text.split()) + 1)] if i]):
+                if (await (await c.execute('select id from antitag where chat_id=%s', (chat_id,))).fetchone() and
+                        (await (await c.execute('select id from antitag where chat_id=%s and uid=ANY(%s)',
+                                                (chat_id, pinged))).fetchone()) and
+                        await deleteMessages(event.object.message.conversation_message_id, chat_id)):
                     return await sendMessage(event.object.message.peer_id, await messages.antitag_on(
                         uid, await getUserNickname(uid, chat_id), await getUserName(uid)))
+                if tonotif := [i for i in pinged if await getUserPremmenuSetting(i, 'tagnotif', False)]:
+                    for i in tonotif:
+                        if not await sendMessage(
+                                i, f'💥 [id{i}|{await getUserNickname(i, chat_id) or await getUserName(i)}], вас тегнул'
+                                   f' [id{uid}|{await getUserNickname(uid, chat_id) or await getUserName(uid)}] '
+                                   f'в чате ({await getChatName(chat_id)}) с текстом: "{event.object.message.text}"'):
+                            await c.execute(
+                                'update premmenu set pos = %s where uid=%s and setting=%s', (0, uid, 'tagnotif'))
+            await conn.commit()
 
     if (ban := await getUserBan(uid, chat_id)) >= time.time():
         await deleteMessages(event.object.message.conversation_message_id, chat_id)

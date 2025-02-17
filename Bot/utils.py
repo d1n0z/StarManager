@@ -464,6 +464,10 @@ async def getUserPremmenuSettings(uid):
                 'select "value" from premmenu where uid=%s and setting=%s', (uid, 'border_color'))).fetchone()
             if border_color is not None:
                 settings['border_color'] = border_color[0]
+            tagnotif = await (await c.execute(
+                'select pos from premmenu where uid=%s and setting=%s', (uid, 'tagnotif'))).fetchone()
+            if tagnotif is not None:
+                settings['tagnotif'] = tagnotif[0]
     return settings
 
 
@@ -908,3 +912,8 @@ async def ischatPubic(chat_id, none=False):
             if pr := await (await c.execute('select isopen from publicchats where chat_id=%s', (chat_id,))).fetchone():
                 return pr[0]
             return none
+
+
+# @AsyncTTL(time_to_live=300, maxsize=0)
+async def isMessagesFromGroupAllowed(uid):
+    return (await API.messages.is_messages_from_group_allowed(group_id=GROUP_ID, user_id=uid)).is_allowed
