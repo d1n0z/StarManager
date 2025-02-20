@@ -426,6 +426,7 @@ def report(uid, repid, chat_id, text, photos):
                                  "photos": photos}), KeyboardButtonColor.POSITIVE)
     kb.add(Callback('Удалить', {"cmd": "report_delete", "uid": uid, "chat_id": chat_id, "repid": repid}),
            KeyboardButtonColor.PRIMARY)
+    kb.row()
     kb.add(Callback('Заблокировать', {"cmd": "report_ban", "uid": uid, "chat_id": chat_id, "repid": repid, "text": text}
                     ), KeyboardButtonColor.NEGATIVE)
 

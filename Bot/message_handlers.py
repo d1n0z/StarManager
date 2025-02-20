@@ -63,7 +63,7 @@ async def message_handle(event: MessageNew) -> Any:
                         (await (await c.execute('select id from antitag where chat_id=%s and uid=ANY(%s)',
                                                 (chat_id, pinged))).fetchone()) and
                         await deleteMessages(event.object.message.conversation_message_id, chat_id)):
-                    return await sendMessage(event.object.message.peer_id, await messages.antitag_on(
+                    return await sendMessage(event.object.message.peer_id, messages.antitag_on(
                         uid, await getUserNickname(uid, chat_id), await getUserName(uid)))
                 if tonotif := [i for i in pinged if await getUserPremmenuSetting(i, 'tagnotif', False)]:
                     for i in tonotif:

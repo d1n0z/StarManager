@@ -2063,11 +2063,11 @@ def guess_lose(bet, num):
     return get('guess_lose', bet=bet, num=num)
 
 
-async def antitag_on(uid, nick, name):
+def antitag_on(uid, nick, name):
     return get('antitag_on', uid=uid, n=nick or name)
 
 
-async def antitag():
+def antitag():
     return get('antitag')
 
 
@@ -2134,3 +2134,11 @@ def promo(uid, nick, name, code, xp):
 
 def pmcmd():
     return get('pmcmd')
+
+
+def pin_hint():
+    return get('pin_hint')
+
+
+def pin_cannot():
+    return get('pin_cannot')

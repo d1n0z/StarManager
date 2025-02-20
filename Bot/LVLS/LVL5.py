@@ -10,7 +10,7 @@ import messages
 from Bot.checkers import haveAccess
 from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserAccessLevel, getUserName, getUserNickname, kickUser, \
-    getUserBan, getChatName, getGroupName, getpool, sendMessage, ischatPubic
+    getUserBan, getChatName, getGroupName, getpool, sendMessage, ischatPubic, deleteMessages
 from config.config import api
 from db import pool
 
@@ -361,7 +361,7 @@ async def antitag(message: Message):
     data = message.text.split()
     if len(data) != 3 or data[1] not in ('add', 'del') or not (
             id := await getIDFromMessage(message.text, message.reply_message, 3)):
-        return await message.reply(disable_mentions=1, message=await messages.antitag(), keyboard=keyboard.antitag(
+        return await message.reply(disable_mentions=1, message=messages.antitag(), keyboard=keyboard.antitag(
             message.from_id))
     chat_id = message.peer_id - 2000000000
     if data[1] == 'add':
@@ -377,3 +377,16 @@ async def antitag(message: Message):
             await conn.commit()
     return await message.reply(disable_mentions=1, message=messages.antitag_del(
             id, await getUserName(id), await getUserNickname(id, chat_id)))
+
+
+@bl.chat_message(SearchCMD('pin'))
+async def pin(message: Message):
+    if not message.reply_message:
+        return await message.reply(disable_mentions=1, message=messages.pin_hint())
+    try:
+        if not await api.messages.pin(message.peer_id, message.conversation_message_id):
+            raise Exception
+    except:
+        return await message.reply(disable_mentions=1, message=messages.pin_cannot())
+    else:
+        await deleteMessages(message.conversation_message_id, message.chat_id)
