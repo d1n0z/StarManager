@@ -234,6 +234,8 @@ async def uploadImage(file: str, uid: int | None = None, count: int = 0, delay: 
             global _hiddenalbumuid
             _hiddenalbumuid = None
             uid = await getHiddenAlbumUser()
+        if 'too many' in str(e).lower():
+            await asyncio.sleep(1)
         if count != 5:
             await asyncio.sleep(delay)
             return await uploadImage(file, uid, count + 1, delay + 0.5)
