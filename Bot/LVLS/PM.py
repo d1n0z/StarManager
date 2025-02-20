@@ -6,12 +6,14 @@ from datetime import datetime
 from vkbottle.framework.labeler import BotLabeler
 from vkbottle_types import GroupTypes
 from vkbottle_types.events import GroupEventType
+from vkbottle_types.objects import MessagesMessageAttachmentType
 
+import keyboard
 import messages
 from Bot.rules import SearchPMCMD
 from Bot.utils import getUserName, getUserNickname, getUserPremium, getChatName, sendMessage, isChatMember, \
-    getChatSettings, whoiscached
-from config.config import API, GROUP_ID
+    getChatSettings, whoiscached, getURepBanned, uploadImage
+from config.config import api, GROUP_ID, REPORT_CD, REPORT_TO, DEVS, PATH
 from db import pool
 
 bl = BotLabeler()
@@ -25,14 +27,17 @@ async def anon(message: GroupTypes.MessageNew):
         return
     data = message.text.split()
     if len(data) < 3 or not data[1].isdigit():
-        return await sendMessage(message.peer_id, messages.anon_help())
+        await sendMessage(message.peer_id, messages.anon_help())
+        return
     chatid = int(data[1])
     if not (await getChatSettings(chatid))['entertaining']['allowAnon']:
-        return await sendMessage(message.peer_id, messages.anon_not_allowed())
+        await sendMessage(message.peer_id, messages.anon_not_allowed())
+        return
     try:
-        await API.messages.get_conversations_by_id(peer_ids=chatid + 2000000000, group_id=GROUP_ID)
+        await api.messages.get_conversations_by_id(peer_ids=chatid + 2000000000, group_id=GROUP_ID)
     except:
-        return await sendMessage(message.peer_id, messages.anon_chat_does_not_exist())
+        await sendMessage(message.peer_id, messages.anon_chat_does_not_exist())
+        return
     for i in data:
         for y in i.split('/'):
             try:
@@ -40,17 +45,21 @@ async def anon(message: GroupTypes.MessageNew):
                     continue
             except:
                 continue
-            return await sendMessage(message.peer_id, messages.anon_link())
+            await sendMessage(message.peer_id, messages.anon_link())
+            return
     if len(message.attachments) > 0:
-        return await sendMessage(message.peer_id, messages.anon_attachments())
+        await sendMessage(message.peer_id, messages.anon_attachments())
+        return
     if not await isChatMember(uid, chatid):
-        return await sendMessage(message.peer_id, messages.anon_not_member())
+        await sendMessage(message.peer_id, messages.anon_not_member())
+        return
     date = datetime.now().replace(hour=0, minute=0, second=0)
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             if (cnt := await (await c.execute('select count(*) as c from anonmessages where fromid=%s and time>%s',
                                               (uid, date.timestamp()))).fetchone()) and cnt[0] >= 25:
-                return await sendMessage(message.peer_id, messages.anon_limit())
+                await sendMessage(message.peer_id, messages.anon_limit())
+                return
             mid = (await (await c.execute('insert into anonmessages (fromid, chat_id, time) values (%s, %s, %s) '
                                           'returning id', (uid, chatid, time.time()))).fetchone())[0]
     await sendMessage(chatid + 2000000000, messages.anon_message(mid, ' '.join(data[2:])))
@@ -65,19 +74,23 @@ async def deanon(message: GroupTypes.MessageNew):
         return
     data = message.text.split()
     if len(data) < 2:
-        return await sendMessage(message.peer_id, messages.deanon_help())
+        await sendMessage(message.peer_id, messages.deanon_help())
+        return
     id = data[1].replace('#', '').replace('A', '').replace('А', '')
     if not id.isdigit():
-        return await sendMessage(message.peer_id, messages.deanon_help())
+        await sendMessage(message.peer_id, messages.deanon_help())
+        return
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             deanon_target = await (await c.execute(
                 'select chat_id, fromid, time from anonmessages where id=%s', (id,))).fetchone()
     if deanon_target is None:
-        return await sendMessage(message.peer_id, messages.deanon_target_not_found())
+        await sendMessage(message.peer_id, messages.deanon_target_not_found())
+        return
     chatid, fromid = deanon_target[0], deanon_target[1]
     if not await isChatMember(uid, chatid):
-        return await sendMessage(message.peer_id, messages.anon_not_member())
+        await sendMessage(message.peer_id, messages.anon_not_member())
+        return
     await sendMessage(message.peer_id, messages.deanon(id, fromid, await getUserName(fromid),
                                                        await getUserNickname(fromid, chatid), deanon_target[2]))
 
@@ -97,3 +110,43 @@ async def code(message: GroupTypes.MessageNew):
                 await c.execute('insert into tglink (tgid, vkid, code) values (null, %s, %s)', (uid, code))
                 await conn.commit()
     await sendMessage(message.peer_id, messages.code(code))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_NEW, GroupTypes.MessageNew, SearchPMCMD('report'), blocking=False)
+async def report(message: GroupTypes.MessageNew):
+    message = message.object.message
+    uid = message.from_id
+    if await getURepBanned(uid) and uid not in DEVS:
+        await sendMessage(message.peer_id, messages.repbanned())
+        return
+    chat_id, data, photos = message.peer_id - 2000000000, message.text.split(), []
+    for i in message.attachments:
+        r = await api.http_client.request_content(i.photo.orig_photo.url)
+        with open(PATH + f'media/temp/{i.photo.owner_id}{i.photo.id}.jpg', "wb") as f:
+            f.write(r)
+        photos.append(await uploadImage(PATH + f'media/temp/{i.photo.owner_id}{i.photo.id}.jpg'))
+    if len(data) <= 1 and not photos:
+        await sendMessage(message.peer_id, messages.report_empty())
+        return
+
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            repu = await (await c.execute(
+                'select time from reports where uid=%s order by time desc limit 1', (uid,))).fetchone()
+    if repu and time.time() - repu[0] < REPORT_CD and uid not in DEVS:
+        await sendMessage(message.peer_id, messages.report_cd())
+        return
+
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            repid = await (await c.execute('select id from reports order by id desc limit 1')).fetchone()
+            repid = (repid[0] + 1) if repid else 1
+            await c.execute('insert into reports (uid, id, time) VALUES (%s, %s, %s)', (uid, repid, int(time.time())))
+            await conn.commit()
+
+    photos = ','.join(photos) or None
+    await api.messages.send(disable_mentions=1, chat_id=REPORT_TO, random_id=0, message=messages.report(
+        uid, await getUserName(uid), ' '.join(data[1:]), repid, chat_id, await getChatName(chat_id)),
+                            keyboard=keyboard.report(uid, repid, chat_id, ' '.join(data[1:]), photos),
+                            attachment=photos)
+    await sendMessage(message.peer_id, messages.report_sent(repid))

@@ -3,7 +3,6 @@ import locale
 import os
 import tempfile
 import time
-import traceback
 from ast import literal_eval
 from datetime import date, datetime
 from typing import Iterable, Any
@@ -22,10 +21,12 @@ from vkbottle.bot import Bot
 from vkbottle.tools.mini_types.bot.foreign_message import ForeignMessageMin
 from vkbottle_types.objects import MessagesMessage, MessagesMessageAttachmentType, MessagesSendUserIdsResponseItem
 
-from config.config import (API, VK_API_SESSION, VK_TOKEN_GROUP, GROUP_ID, SETTINGS, PATH,
+from config.config import (api, vk_api_session, VK_TOKEN_GROUP, GROUP_ID, SETTINGS, PATH,
                            NSFW_CATEGORIES, SETTINGS_ALT, SETTINGS_DEFAULTS, PREMMENU_DEFAULT, PREMMENU_TURN,
                            LEAGUE_LVL, DEVS)
 from db import pool
+
+_hiddenalbumuid = None
 
 
 @AsyncTTL(time_to_live=300, maxsize=0)
@@ -37,7 +38,7 @@ async def getUserName(uid: int) -> str:
             name = await c.execute('select name from usernames where uid=%s', (uid,))
             if name := await name.fetchone():
                 return name[0]
-            name = await API.users.get(user_ids=uid)
+            name = await api.users.get(user_ids=uid)
             if not name:
                 return 'UNKNOWN'
             await c.execute('insert into usernames (uid, name) values (%s, %s)',
@@ -48,7 +49,7 @@ async def getUserName(uid: int) -> str:
 
 async def kickUser(uid: int, chat_id: int) -> bool:
     try:
-        await API.messages.remove_chat_user(chat_id=chat_id, member_id=uid)
+        await api.messages.remove_chat_user(chat_id=chat_id, member_id=uid)
         if (await getChatSettings(chat_id))['main']['deleteAccessAndNicknameOnLeave']:
             async with (await pool()).connection() as conn:
                 async with conn.cursor() as c:
@@ -63,7 +64,7 @@ async def kickUser(uid: int, chat_id: int) -> bool:
 
 async def deleteMessages(cmids: int | Iterable[int], chat_id: int) -> bool:
     try:
-        await API.messages.delete(group_id=GROUP_ID, delete_for_all=True, peer_id=chat_id + 2000000000, cmids=cmids)
+        await api.messages.delete(group_id=GROUP_ID, delete_for_all=True, peer_id=chat_id + 2000000000, cmids=cmids)
     except:
         return False
     return True
@@ -93,10 +94,9 @@ async def getIDFromMessage(message: str, reply: ForeignMessageMin | None, place:
                 id = data[place - 1][data[place - 1].find('vk.'):]
                 id = id[id.find('/') + 1:]
                 try:
-                    id = await API.users.get(user_ids=id)
+                    id = await api.users.get(user_ids=id)
                     id = id[0].id
                 except:
-                    traceback.print_exc()
                     id = int(id)
             elif data[place - 1].isdigit():
                 id = data[place - 1]
@@ -114,7 +114,7 @@ async def getIDFromMessage(message: str, reply: ForeignMessageMin | None, place:
 
 async def sendMessageEventAnswer(event_id: Any, user_id: int, peer_id: int, event_data: str | None = None) -> bool:
     try:
-        await API.messages.send_message_event_answer(event_id=event_id, user_id=user_id,
+        await api.messages.send_message_event_answer(event_id=event_id, user_id=user_id,
                                                      peer_id=peer_id, event_data=event_data)
     except:
         return False
@@ -124,16 +124,16 @@ async def sendMessageEventAnswer(event_id: Any, user_id: int, peer_id: int, even
 async def sendMessage(peer_ids: int | Iterable[int], msg: str | None = None, kbd: str | None = None,
                       photo: str | None = None) -> list[MessagesSendUserIdsResponseItem] | int | bool:
     try:
-        return await API.messages.send(random_id=0, peer_ids=peer_ids, message=msg,
+        return await api.messages.send(random_id=0, peer_ids=peer_ids, message=msg,
                                        keyboard=kbd, attachment=photo, disable_mentions=1)
     except:
         return False
 
 
-async def editMessage(msg: str, peer_id: int, cmid: int, kb=None) -> bool:
+async def editMessage(msg: str, peer_id: int, cmid: int, kb=None, attachment=None) -> bool:
     try:
-        return await API.messages.edit(peer_id=peer_id, message=msg, disable_mentions=1,
-                                       conversation_message_id=cmid, keyboard=kb)
+        return await api.messages.edit(peer_id=peer_id, message=msg, disable_mentions=1,
+                                       conversation_message_id=cmid, keyboard=kb, attachment=attachment)
     except:
         return False
 
@@ -146,7 +146,7 @@ async def getChatName(chat_id: int = None) -> str:
             if name := await name.fetchone():
                 return name[0]
             try:
-                chatname = await API.messages.get_conversations_by_id(peer_ids=chat_id + 2000000000, group_id=GROUP_ID)
+                chatname = await api.messages.get_conversations_by_id(peer_ids=chat_id + 2000000000, group_id=GROUP_ID)
                 chatname = chatname.items[0].chat_settings.title
             except:
                 chatname = 'UNKNOWN'
@@ -162,7 +162,7 @@ async def getGroupName(group_id: int) -> str:
             name = await c.execute('select name from groupnames where group_id=%s', (-abs(group_id),))
             if name := await name.fetchone():
                 return name[0]
-            name = await API.groups.get_by_id(group_ids=abs(group_id))
+            name = await api.groups.get_by_id(group_ids=abs(group_id))
             name = name.groups[0].name
             await c.execute('insert into groupnames (group_id, name) values (%s, %s)', (-abs(group_id), name))
             await conn.commit()
@@ -172,7 +172,7 @@ async def getGroupName(group_id: int) -> str:
 @AsyncTTL(maxsize=0)
 async def isChatAdmin(id: int, chat_id: int) -> bool:
     try:
-        status = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
+        status = await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)
         for i in status.items:
             if i.member_id == id and (i.is_admin or i.is_owner):
                 return True
@@ -184,7 +184,7 @@ async def isChatAdmin(id: int, chat_id: int) -> bool:
 @AsyncTTL(maxsize=0)
 async def getChatOwner(chat_id: int) -> int | bool:
     try:
-        status = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
+        status = await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)
         for i in status.items:
             if i.is_owner:
                 return i.member_id
@@ -196,7 +196,7 @@ async def getChatOwner(chat_id: int) -> int | bool:
 @AsyncTTL(maxsize=0)
 async def getChatMembers(chat_id: int) -> int | bool:
     try:
-        status = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
+        status = await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)
         return len(status.items)
     except:
         return False
@@ -208,29 +208,36 @@ async def setChatMute(uid: int | Iterable[int], chat_id: int, mute_time: int | f
             payload = {'peer_id': chat_id + 2000000000, 'member_ids': uid, 'action': 'ro'}
             if mute_time is not None:
                 payload['for'] = int(mute_time)
-            return VK_API_SESSION.method('messages.changeConversationMemberRestrictions', payload)
+            return vk_api_session.method('messages.changeConversationMemberRestrictions', payload)
         else:
-            return VK_API_SESSION.method('messages.changeConversationMemberRestrictions',
+            return vk_api_session.method('messages.changeConversationMemberRestrictions',
                                          {'peer_id': chat_id + 2000000000, 'member_ids': uid, 'action': 'rw'})
     except:
-        # traceback.print_exc()
         return
 
 
-async def uploadImage(file: str, c: int = 0, delay: float = 0.5) -> str | None:
-    bot = Bot(VK_TOKEN_GROUP)
-    photo_uploader = PhotoMessageUploader(bot.api)
+async def uploadImage(file: str, uid: int | None = None, count: int = 0, delay: float = 0.5) -> str | None:
+    if not uid:
+        uid = await getHiddenAlbumUser()
     try:
-        photo = await photo_uploader.upload(file_source=file, peer_id=0)
+        photo = await PhotoMessageUploader(api).upload(file_source=file, peer_id=uid)
         if not photo:
             raise Exception
         os.system('rm ' + file)  # noqa
         return photo
     except Exception as e:
-        if c != 5:
+        if 'internal' in str(e).lower() or 'access' in str(e).lower():
+            async with (await pool()).connection() as conn:
+                async with conn.cursor() as c:
+                    await c.execute('insert into hiddenalbumserverinternalerror (uid) values (%s)', (uid,))
+                    await conn.commit()
+            global _hiddenalbumuid
+            _hiddenalbumuid = None
+            uid = await getHiddenAlbumUser()
+        if count != 5:
             await asyncio.sleep(delay)
-            return await uploadImage(file, c + 1, delay + 0.5)
-        raise Exception from e
+            return await uploadImage(file, uid, count + 1, delay + 0.5)
+        raise e
 
 
 @AsyncLRU(maxsize=0)
@@ -592,7 +599,7 @@ async def getSilence(chat_id) -> bool:
 async def isChatMember(uid, chat_id):
     try:
         return uid in [i.member_id for i in
-                       (await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)).items]
+                       (await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)).items]
     except:
         return False
 
@@ -751,7 +758,8 @@ async def getULvlBanned(uid) -> bool:
 async def getURepBanned(uid) -> bool:
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
-            if await (await c.execute('select id from reportban where uid=%s', (uid,))).fetchone():
+            if (t := await (await c.execute('select time from reportban where uid=%s', (uid,))).fetchone()) and (
+                    not t[0] or time.time() < t[0]):
                 return True
             return False
 
@@ -914,6 +922,21 @@ async def ischatPubic(chat_id, none=False):
             return none
 
 
-# @AsyncTTL(time_to_live=300, maxsize=0)
+@AsyncTTL(time_to_live=300, maxsize=0)
 async def isMessagesFromGroupAllowed(uid):
-    return (await API.messages.is_messages_from_group_allowed(group_id=GROUP_ID, user_id=uid)).is_allowed
+    return (await api.messages.is_messages_from_group_allowed(group_id=GROUP_ID, user_id=uid)).is_allowed
+
+
+async def getHiddenAlbumUser():
+    global _hiddenalbumuid
+    if _hiddenalbumuid:
+        return _hiddenalbumuid
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            for i in await (await c.execute('select uid from allusers where not uid=ANY(%s) and uid>0',
+                                            ([i[0] for i in await (await c.execute(
+                                                'select uid from hiddenalbumserverinternalerror')).fetchall()],)
+                                            )).fetchall():
+                if (await api.messages.is_messages_from_group_allowed(group_id=GROUP_ID, user_id=i[0])).is_allowed:
+                    _hiddenalbumuid = i[0]
+                    return _hiddenalbumuid

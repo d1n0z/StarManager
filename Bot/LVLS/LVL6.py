@@ -9,7 +9,7 @@ from Bot.checkers import haveAccess
 from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserName, getUserNickname, getUserAccessLevel, getUserPremium, editMessage, \
     getgpool, getpool, setUserAccessLevel, setChatMute
-from config.config import API
+from config.config import api
 from db import pool
 
 bl = BotLabeler()
@@ -40,7 +40,7 @@ async def gdelaccess(message: Message):
             continue
         await setUserAccessLevel(id, chat_id, 0)
         success += 1
-    await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
+    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
                             message=messages.gdelaccess(
                                 id, name, await getUserNickname(id, edit.peer_id - 2000000000), len(chats), success))
 
@@ -80,7 +80,7 @@ async def gsetaccess(message: Message):
             continue
         await setUserAccessLevel(id, chat_id, acc)
         success += 1
-    await API.messages.edit(
+    await api.messages.edit(
         peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
         message=messages.gsetaccess(id, name, await getUserNickname(id, edit.peer_id - 2000000000), len(chats), success)
     )
@@ -129,7 +129,7 @@ async def ssetaccess(message: Message):
         await setUserAccessLevel(id, chat_id, acc)
         success += 1
 
-    await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
+    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
                             message=messages.ssetaccess(
                                 id, name, await getUserNickname(id, edit.peer_id - 2000000000), len(chats), success))
 
@@ -162,7 +162,7 @@ async def sdelaccess(message: Message):
             continue
         await setUserAccessLevel(id, chat_id, 0)
         success += 1
-    await API.messages.edit(
+    await api.messages.edit(
         peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id, message=messages.sdelaccess(
             id, name, await getUserNickname(id, edit.peer_id - 2000000000), len(chats), success))
 
@@ -219,7 +219,7 @@ async def ignorelist(message: Message):
         async with conn.cursor() as c:
             ids = [i[0] for i in await (
                 await c.execute('select uid from ignore where chat_id=%s', (message.peer_id - 2000000000,))).fetchall()]
-    raw_names = await API.users.get(user_ids=ids)
+    raw_names = await api.users.get(user_ids=ids)
     names = []
     for i in raw_names:
         names.append(f'{i.first_name} {i.last_name}')
@@ -312,7 +312,7 @@ async def notif(message: Message):
 async def purge(message: Message):
     chat_id = message.peer_id - 2000000000
     edit = await message.reply(disable_mentions=1, message=messages.purge_start())
-    users = [i.member_id for i in (await API.messages.get_conversation_members(peer_id=message.peer_id)).items]
+    users = [i.member_id for i in (await api.messages.get_conversation_members(peer_id=message.peer_id)).items]
     dtdnicknames = 0
     dtdaccesslevels = 0
     async with (await pool()).connection() as conn:

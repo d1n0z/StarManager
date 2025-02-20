@@ -354,6 +354,7 @@ class ReportAnswers(Model):
     repid = IntegerField(default=0, unique=True)
     report_text = TextField(null=True)
     cmid = IntegerField(null=True)
+    photos = TextField(null=True)
 
     class Meta:
         database = dbhandle
@@ -433,6 +434,7 @@ class TypeQueue(Model):
 
 class ReportBans(Model):
     uid = IntegerField(default=0, unique=True, index=True)
+    time = BigIntegerField(null=True)
 
     class Meta:
         database = dbhandle
@@ -696,6 +698,34 @@ class Antitag(Model):
     class Meta:
         database = dbhandle
         table_name = f'antitag'
+
+
+class HiddenAlbumServerInternalError(Model):
+    uid = IntegerField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'hiddenalbumserverinternalerror'
+
+
+class Promocodes(Model):
+    code = TextField(unique=True, index=True)
+    usage = IntegerField(null=True)
+    date = IntegerField(null=True)
+    xp = IntegerField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'promocodes'
+
+
+class PromocodeUses(Model):
+    code = TextField()
+    uid = IntegerField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'promocodeuses'
 
 
 if __name__ == '__main__':

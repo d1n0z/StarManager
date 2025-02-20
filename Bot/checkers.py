@@ -6,14 +6,14 @@ from cache.async_ttl import AsyncTTL
 import messages
 from Bot.utils import getUserAccessLevel, getUserPremium, getUserLastMessage, getUserMute, getChatSettings, \
     deleteMessages
-from config.config import COMMANDS, API, PREFIX, DEVS, MAIN_DEVS, LVL_BANNED_COMMANDS
+from config.config import COMMANDS, api, PREFIX, DEVS, MAIN_DEVS, LVL_BANNED_COMMANDS, PM_COMMANDS
 from db import pool
 
 
 @AsyncTTL(time_to_live=30, maxsize=0)
 async def isAdmin(chat_id) -> bool:
     try:
-        await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
+        await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)
         return True
     except:
         return False
@@ -109,6 +109,8 @@ async def checkCMD(message, chat_id, fixing=False, accesstoalldevs=False, return
                                                (uid, text.replace(prefix, '', 1)))).fetchone():
                 cmd = cmd[0]
             else:
+                if (cmd in PM_COMMANDS or text.replace(prefix, '', 1) in PM_COMMANDS) and message.peer_id >= 2000000000:
+                    await message.reply(messages.pmcmd())
                 return False
 
     if cmd in LVL_BANNED_COMMANDS and await getULvlBanned(uid):

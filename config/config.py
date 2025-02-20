@@ -1,7 +1,7 @@
 from ast import literal_eval
 
 from vk_api import vk_api
-from vkbottle import API as VKAPI
+from vkbottle import API, AiohttpClient
 from configparser import ConfigParser
 
 
@@ -12,7 +12,6 @@ PATH = config['SERVICE']['PATH']
 
 VK_TOKEN_GROUP = config['VK']['VK_TOKEN_GROUP']
 GROUP_ID = abs(int(config['VK']['GROUP_ID']))
-VK_TOKEN_IMPLICIT_FLOW = config['VK']['VK_TOKEN_IMPLICIT_FLOW']
 VK_APP_ID = config['VK']['VK_APP_ID']
 VK_APP_SECRET = config['VK']['VK_APP_SECRET']
 
@@ -21,9 +20,9 @@ LVL_NAMES = ["Обычный Пользователь", "Смотрящий", "�
              "Спец администратор", "Руководитель", "Владелец", "DEV"]
 
 COMMANDS = {
-    "start": 0, "help": 0, "id": 0, "stats": 0, "report": 0, "top": 0, "q": 0, "premium": 0, "bonus": 0, "transfer": 0,
+    "start": 0, "help": 0, "id": 0, "stats": 0, "top": 0, "q": 0, "premium": 0, "bonus": 0, "transfer": 0,
     "duel": 0, "cmd": 0, "premmenu": 0, "test": 0, "getdev": 0, "anon": 0, "chatid": 0, "prefix": 0,
-    "deanon": 0, "chats": 0, "catalog": 0, "guess": 0,
+    "deanon": 0, "chats": 0, "catalog": 0, "guess": 0, "promo": 0,
 
     "kick": 1, "mute": 1, "warn": 1, "clear": 1, "staff": 1, "olist": 1, "getnick": 1, "snick": 1, "rnick": 1,
     "nlist": 1, "check": 1, "mkick": 1,
@@ -50,10 +49,10 @@ COMMANDS = {
     "getchats": 8, "gettransferhistory": 8, "gettransferhistoryto": 8, "gettransferhistoryfrom": 8, "lvlunban": 8,
     "getmessageshistory": 8, "lvlban": 8, "lvlbanlist": 8, "msgscount": 8, "msgsaverage": 8, "mwaverage": 8,
     "chatsstats": 8, "setprem": 8, "delprem": 8, "premlist": 8, "repban": 8, "repunban": 8, "repbanlist": 8,
-    "linked": 8, "cmdstats": 8,
+    "linked": 8, "cmdstats": 8, "promocreate": 8, "promodel": 8, "promolist": 8,
 }
 PM_COMMANDS = [
-    "anon", "deanon", "code"
+    "anon", "deanon", "code", "report"
 ]
 COMMANDS_DESC = {
     "kick": "/kick - Исключить пользователя.",
@@ -159,7 +158,7 @@ MAIN_DEVS = literal_eval(config['SERVICE']['MAIN_DEVS'])
 
 PREFIX = ["/", "!", ".", "+"]
 
-LVL_BANNED_COMMANDS = ['bonus', 'transfer', 'duel', 'guess']
+LVL_BANNED_COMMANDS = ['bonus', 'transfer', 'duel', 'guess', 'promo']
 
 LEAGUE_LVL = [0, 200, 400, 600, 800, 999]
 LEAGUE = ['Бронза', 'Серебро', 'Золото', 'Платина', 'Алмаз', 'Легенда']
@@ -318,15 +317,8 @@ NSFW_CATEGORIES = [
 ]
 
 
-def PREMIUM_BONUS_POST_WORKS_TIL():
-    import datetime
-    return datetime.datetime(year=2024, month=2, day=17).timestamp()
-
-
-IMPLICIT_API = VKAPI(VK_TOKEN_IMPLICIT_FLOW)
-API = VKAPI(VK_TOKEN_GROUP)
-VK_API_SESSION = vk_api.VkApi(token=VK_TOKEN_GROUP, api_version='5.199')
-VK_API_IMPLICIT_SESSION = vk_api.VkApi(token=VK_TOKEN_IMPLICIT_FLOW, api_version='5.199')
+api = API(VK_TOKEN_GROUP)
+vk_api_session = vk_api.VkApi(token=VK_TOKEN_GROUP, api_version='5.199')
 
 USER = config['DATABASE']['USER']
 PASSWORD = config['DATABASE']['PASSWORD']

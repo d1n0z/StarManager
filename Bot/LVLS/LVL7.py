@@ -9,7 +9,7 @@ from Bot.checkers import haveAccess
 from Bot.rules import SearchCMD
 from Bot.utils import getUserPremium, getUserName, getUserNickname, getChatName, getUserAccessLevel, getIDFromMessage, \
     getgpool, getUserLeague
-from config.config import API, COMMANDS, LVL_NAMES, CREATEGROUPLEAGUES
+from config.config import api, COMMANDS, LVL_NAMES, CREATEGROUPLEAGUES
 from db import pool
 
 bl = BotLabeler()
@@ -241,7 +241,7 @@ async def gaddfilter(message: Message):
                     await c.execute('insert into filters (chat_id, filter) values (%s, %s)', (chat_id, addfilter))
                     await conn.commit()
         success += 1
-    await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.message_id, message=messages.gaddfilter(
+    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.message_id, message=messages.gaddfilter(
         uid, await getUserName(uid), len(chats), success))
 
 
@@ -270,7 +270,7 @@ async def gdelfilter(message: Message):
                 await c.execute('delete from filters where chat_id=%s and filter=%s', (chat_id, delfilter))
                 await conn.commit()
         success += 1
-    await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.message_id,
+    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.message_id,
                             message=messages.gdelfilter(uid, await getUserName(uid), len(chats), success))
 
 

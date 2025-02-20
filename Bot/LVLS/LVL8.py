@@ -17,7 +17,7 @@ from Bot.rules import SearchCMD
 from Bot.scheduler import backup
 from Bot.utils import getUserName, getIDFromMessage, getUserNickname, sendMessage, addUserXP, getChatName, \
     setUserAccessLevel, pointWords, chunks, getURepBanned, pointMinutes
-from config.config import API, GROUP_ID, DEVS, PATH
+from config.config import api, GROUP_ID, DEVS, PATH
 from db import pool
 
 bl = BotLabeler()
@@ -54,7 +54,7 @@ async def botinfo(message: Message):
     # biggest_chat_users = 0
     # biggest_chat_id = 0
     # for i in chats:
-    #     chat_users = await API.messages.get_conversation_members(i + 2000000000, group_id=GROUP_ID)
+    #     chat_users = await api.messages.get_conversation_members(i + 2000000000, group_id=GROUP_ID)
     #     chat_users = chat_users.items
     #     owner = None
     #     for u in chat_users:
@@ -100,7 +100,7 @@ async def botinfo(message: Message):
     # biggest_gpool = list(gplens.keys())[list(gplens.keys()).index(max(gplens.items(), key=operator.itemgetter(1))[0])]
     # max_pool = gplens[biggest_gpool]
     #
-    # u_name = await API.users.get(user_ids=746110579)
+    # u_name = await api.users.get(user_ids=746110579)
     # biggest_gpool_owner_name = f"{u_name[0].first_name} {u_name[0].last_name}"
     # msg = messages.bot_info(chats, total_users, users, premium_users, all_groups, biggest_gpool,
     #                         biggest_gpool_owner_name, max_pool, max_group_name, max_group_count, biggest_chat_id,
@@ -124,9 +124,9 @@ async def msg(message: Message):
             k += len(i)
             code = ''
             for y in chunks(i, 100):
-                code += ('API.messages.send({"random_id": 0, "peer_ids": [' + ','.join(str(o[0]) for o in y) +
+                code += ('api.messages.send({"random_id": 0, "peer_ids": [' + ','.join(str(o[0]) for o in y) +
                          '], "message": "' + f"{msg}" + '"});')
-            await API.execute(code=code)
+            await api.execute(code=code)
             print(f'sent {k}/{len(chats)}')
             await asyncio.sleep(1)
         except:
@@ -309,7 +309,7 @@ async def resetlvl(message: Message):
     u_name = await getUserName(id)
     msgsent = messages.resetlvlcomplete(id, u_name)
     try:
-        await API.messages.send(random_id=0, user_id=id, message=messages.resetlvl(id, u_name))
+        await api.messages.send(random_id=0, user_id=id, message=messages.resetlvl(id, u_name))
     except:
         msgsent += '\n❗ Пользователю не удалось отправить сообщение'
     await message.reply(msgsent)
@@ -448,7 +448,7 @@ async def getlink(message: Message):
         return await message.reply('/getlink chat_id')
     try:
         await message.reply(
-            (await API.messages.get_invite_link(peer_id=int(data[1]) + 2000000000, reset=0, group_id=GROUP_ID)).link)
+            (await api.messages.get_invite_link(peer_id=int(data[1]) + 2000000000, reset=0, group_id=GROUP_ID)).link)
     except:
         await message.reply('❌ Невозможно сгенерировать ссылку')
 
@@ -495,7 +495,7 @@ async def getuserchats(message: Message):
         if await getUInfBanned(id, i[0]):
             continue
         try:
-            chu = len((await API.messages.get_conversation_members(peer_id=2000000000 + i[0], group_id=GROUP_ID)).items)
+            chu = len((await api.messages.get_conversation_members(peer_id=2000000000 + i[0], group_id=GROUP_ID)).items)
         except:
             chu = 0
         msg += f'➖ {i[0]} | M: {i[1]} | C: {chu} | N: {await getChatName(i[0])} \n'
@@ -514,7 +514,7 @@ async def getchats(message: Message):
         if str(i[0]) in msg or await getUInfBanned(0, i[0]):
             continue
         try:
-            chu = len((await API.messages.get_conversation_members(peer_id=2000000000 + i[0], group_id=GROUP_ID)).items)
+            chu = len((await api.messages.get_conversation_members(peer_id=2000000000 + i[0], group_id=GROUP_ID)).items)
         except:
             chu = 0
         msg += f'➖ {i[0]} | M: {i[1]} | C: {chu} | N: {await getChatName(i[0])}\n'
@@ -604,7 +604,7 @@ async def repban(message: Message):
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             if not await getURepBanned(id):
-                await c.execute('insert into reportban (uid) values (%s)', (id,))
+                await c.execute('insert into reportban (uid, time) values (%s, %s)', (id, None))
             await conn.commit()
     await message.reply(messages.repban())
 
@@ -669,3 +669,51 @@ async def cmdstats(message: Message):
                 c = (await (await c.execute('select uid from cmdsusage')).fetchall())
     await message.reply(f'Использований: {pointWords(len(c), ("раз", "раза", "раз"))}.\n'
                         f'Уникальных использований: {pointWords(len(set(c)), ("раз", "раза", "раз"))}.')
+
+
+@bl.chat_message(SearchCMD('promocreate'))
+async def promocreate(message: Message):
+    data = message.text.split()
+    if len(data) not in (4, 5) or not data[2].isdigit():
+        return await message.reply(messages.promocreate_hint())
+    usage, date, xp = None, None, int(data[2])
+    try:
+        if data[3].isdigit():
+            usage = int(data[3])
+            date = datetime.strptime(data[4], '%d.%m.%Y') if len(data) > 4 else None
+        else:
+            date = datetime.strptime(data[3], '%d.%m.%Y')
+    except ValueError:
+        return await message.reply(messages.promocreate_hint())
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if await (await c.execute('select id from promocodes where code=%s', (data[1],))).fetchone():
+                return await message.reply(messages.promocreate_alreadyexists(data[1]))
+            await c.execute('insert into promocodes (code, usage, date, xp) values (%s, %s, %s, %s)',
+                            (data[1], usage, int(date.timestamp() + 86399) if date else None, xp))
+            await conn.commit()
+    await message.reply(messages.promocreate(data[1], xp, usage, date))
+
+
+@bl.chat_message(SearchCMD('promodel'))
+async def promodel(message: Message):
+    data = message.text.split()
+    if len(data) != 2:
+        return await message.reply(messages.promodel_hint())
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if not (await c.execute('delete from promocodes where code=%s', (data[1],))).rowcount:
+                return await message.reply(messages.promodel_notfound(data[1]))
+            await conn.commit()
+    await message.reply(messages.promodel(data[1]))
+
+
+@bl.chat_message(SearchCMD('promolist'))
+async def promolist(message: Message):
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            promos = await (await c.execute('select code from promocodeuses where code=ANY(%s)',
+                                            ([i[0] for i in await (await c.execute(
+                                                'select code from promocodes')).fetchall()],))).fetchall()
+    promos = [i[0] for i in promos]
+    await message.reply(messages.promolist({k: promos.count(k) for k in set(promos)}))

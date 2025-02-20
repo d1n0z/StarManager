@@ -122,7 +122,7 @@ def buy(request: HttpRequest):
                                             (chatform.cleaned_data['chatid'],)).fetchone()) and ch[0]:
                             return render(request, "bot_manager/index.html", config.data | {'error': 'chatalready'})
                 try:
-                    chat = config.VK_API_SESSION.method('messages.getConversationMembers',
+                    chat = config.vk_api_session.method('messages.getConversationMembers',
                                                         {'peer_id': 2000000000 + chatform.cleaned_data['chatid']})
                 except vk_api.exceptions.ApiError:
                     return render(request, "bot_manager/index.html",
@@ -201,9 +201,9 @@ def chats(request: HttpRequest):
                           'members': allsettings[chat[0]][3], 'messages': allmessages[chat[0]],
                           'url': allsettings[chat[0]][0]}
             else:
-                link = config.VK_API_SESSION.method(
+                link = config.vk_api_session.method(
                     'messages.getInviteLink', {'peer_id': 2000000000 + chat[0], 'group_id': config.GROUP_ID})['link']
-                vkchat = config.VK_API_SESSION.method('messages.getConversationsById',
+                vkchat = config.vk_api_session.method('messages.getConversationsById',
                                                       {'peer_ids': 2000000000 + chat[0]})
                 photo = config.PHOTO_NOT_FOUND
                 if ('items' in vkchat and len(vkchat['items']) and 'chat_settings' in vkchat['items'][0] and

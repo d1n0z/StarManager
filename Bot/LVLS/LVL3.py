@@ -10,7 +10,7 @@ import messages
 from Bot.utils import getSilence
 from Bot.rules import SearchCMD
 from Bot.utils import getUserName, kickUser, getUserNickname, getIDFromMessage, getUserAccessLevel, getUserBan
-from config.config import API
+from config.config import api
 from db import pool
 
 bl = BotLabeler()
@@ -42,7 +42,7 @@ async def inactive(message: Message):
     kicked = 0
     if len(res) <= 0:
         return await message.reply(disable_mentions=1, message=messages.inactive_no_results())
-    members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
+    members = await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     members = [i.member_id for i in members.items if i.member_id > 0]
     for i in res:
         if i[0] in members:
@@ -203,7 +203,7 @@ async def zov(message: Message):
         return await message.reply(disable_mentions=1, message=messages.zov_hint())
     await message.reply(message=messages.zov(
         uid, await getUserName(uid), await getUserNickname(uid, message.peer_id - 2000000000), ' '.join(data[1:]),
-        (await API.messages.get_conversation_members(peer_id=message.peer_id)).items))
+        (await api.messages.get_conversation_members(peer_id=message.peer_id)).items))
 
 
 @bl.chat_message(SearchCMD('kickmenu'))

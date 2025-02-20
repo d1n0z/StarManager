@@ -19,10 +19,9 @@ from db import pool
 async def report_handler(event: MessageNew):
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
-            repansi = await (await c.execute(
-                'select id, answering_id, uid, chat_id, repid, report_text, cmid from reportanswers '
-                'where answering_id=%s', (event.object.message.from_id,))).fetchone()
-            if repansi is None:
+            if not (repansi := await (await c.execute(
+                    'select id, answering_id, uid, chat_id, repid, report_text, cmid, photos from reportanswers '
+                    'where answering_id=%s', (event.object.message.from_id,))).fetchone()):
                 return False
             await c.execute('delete from reportanswers where id=%s', (repansi[0],))
             await conn.commit()
@@ -30,7 +29,7 @@ async def report_handler(event: MessageNew):
     name = await getUserName(repansi[2])
     await deleteMessages([repansi[6], event.object.message.conversation_message_id], REPORT_TO)
     await sendMessage(repansi[3] + 2000000000, messages.report_answer(
-        repansi[1], answering_name, repansi[4], event.object.message.text, repansi[2], name))
+        repansi[1], answering_name, repansi[4], event.object.message.text, repansi[2], name, repansi[5]))
     await sendMessage(REPORT_TO + 2000000000, messages.report_answered(
         repansi[1], answering_name, repansi[4], event.object.message.text, repansi[5],
         repansi[2], name, repansi[3], await getChatName(repansi[3])))

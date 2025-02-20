@@ -11,7 +11,7 @@ import messages
 from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserName, getUserNickname, isChatAdmin, \
     getUserAccessLevel, kickUser, getUserPremium, getUserMute, setChatMute, getUserBan, getUserWarns
-from config.config import API
+from config.config import api
 from db import pool
 
 bl = BotLabeler()
@@ -58,7 +58,7 @@ async def mkick(message: Message):
         elif i.find('vk.') != -1:
             id = i[i.find('vk.'):]
             id = id[id.find('/') + 1:]
-            id = await API.users.get(user_ids=id)
+            id = await api.users.get(user_ids=id)
             id = id[0].id
         elif i.isdigit():
             id = i
@@ -69,7 +69,7 @@ async def mkick(message: Message):
     if len(strids) <= 0:
         return await message.reply(disable_mentions=1, message=messages.mkick_error())
 
-    names = await API.users.get(user_ids=strids)
+    names = await api.users.get(user_ids=strids)
     u_acc = await getUserAccessLevel(uid, chat_id)
     kick_res_count = 0
     msg = ''
@@ -254,7 +254,7 @@ async def clear(message: Message):
 
     if len(cmids) > 0:
         try:
-            await API.messages.delete(peer_id=2000000000 + chat_id, cmids=cmids, delete_for_all=True)
+            await api.messages.delete(peer_id=2000000000 + chat_id, cmids=cmids, delete_for_all=True)
             await message.reply(disable_mentions=1, message=messages.clear(names, await getUserName(uid), uid))
         except VKAPIError[15]:
             await message.reply(disable_mentions=1, message=messages.clear_admin())
@@ -328,12 +328,12 @@ async def nlist(message: Message):
             res = await (await c.execute(
                 'select uid, nickname from nickname where chat_id=%s and uid>0 and uid=ANY(%s) and nickname is not null'
                 ' order by nickname', (
-                    message.peer_id - 2000000000, [i.member_id for i in (await API.messages.get_conversation_members(
+                    message.peer_id - 2000000000, [i.member_id for i in (await api.messages.get_conversation_members(
                         peer_id=message.peer_id)).items]))).fetchall()
     count = len(res)
     res = res[:30]
     await message.reply(disable_mentions=1, message=messages.nlist(
-        res, await API.users.get(user_ids=[i[0] for i in res])), keyboard=keyboard.nlist(message.from_id, 0, count))
+        res, await api.users.get(user_ids=[i[0] for i in res])), keyboard=keyboard.nlist(message.from_id, 0, count))
 
 
 @bl.chat_message(SearchCMD('getnick'))
@@ -362,13 +362,13 @@ async def staff(message: Message):
                 'select uid, access_level from accesslvl where chat_id=%s and uid>0 and access_level>0 and '
                 'access_level<8 order by access_level desc', (chat_id,))).fetchall()
     await message.reply(disable_mentions=1, message=await messages.staff(
-        res, await API.users.get(user_ids=[i[0] for i in res if i[0] > 0]), chat_id))
+        res, await api.users.get(user_ids=[i[0] for i in res if i[0] > 0]), chat_id))
 
 
 @bl.chat_message(SearchCMD('olist'))
 async def olist(message: Message):
-    members = await API.users.get(user_ids=[f'{i.member_id}' for i in (
-        await API.messages.get_conversation_members(peer_id=message.peer_id - 2000000000 + 2000000000)).items],
+    members = await api.users.get(user_ids=[f'{i.member_id}' for i in (
+        await api.messages.get_conversation_members(peer_id=message.peer_id - 2000000000 + 2000000000)).items],
                                   fields='online')
     members_online = {}
     for i in members:

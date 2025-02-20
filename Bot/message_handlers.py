@@ -53,11 +53,12 @@ async def message_handle(event: MessageNew) -> Any:
                     not await getUserAccessLevel(uid, chat_id)):
                 return await deleteMessages(event.object.message.conversation_message_id, chat_id)
 
+            data = event.object.message.text.split()
             if not any(event.object.message.text.startswith(i) for i in await getUserPrefixes(
                     await getUserPremium(uid), uid)) and (
                     pinged := [i for i in [
                         await getIDFromMessage(event.object.message.text, None, place=k) for k in range(
-                            1, len(event.object.message.text.split()) + 1)] if i]):
+                            1, len(data) + 1) if not data[k - 1].isdigit()] if i]):
                 if (await (await c.execute('select id from antitag where chat_id=%s', (chat_id,))).fetchone() and
                         (await (await c.execute('select id from antitag where chat_id=%s and uid=ANY(%s)',
                                                 (chat_id, pinged))).fetchone()) and
@@ -67,8 +68,7 @@ async def message_handle(event: MessageNew) -> Any:
                 if tonotif := [i for i in pinged if await getUserPremmenuSetting(i, 'tagnotif', False)]:
                     for i in tonotif:
                         if not await sendMessage(
-                                i, f'💥 [id{i}|{await getUserNickname(i, chat_id) or await getUserName(i)}], вас тегнул'
-                                   f' [id{uid}|{await getUserNickname(uid, chat_id) or await getUserName(uid)}] '
+                                i, f'💥 [id{i}|{await getUserName(i)}], вас тегнул [id{uid}|{await getUserName(uid)}] '
                                    f'в чате ({await getChatName(chat_id)}) с текстом: "{event.object.message.text}"'):
                             await c.execute(
                                 'update premmenu set pos = %s where uid=%s and setting=%s', (0, uid, 'tagnotif'))

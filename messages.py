@@ -1,13 +1,10 @@
-import calendar
 import time
-import traceback
 from ast import literal_eval
 from datetime import datetime
 
 from memoization import cached
 
-from Bot.utils import getUserNickname, pointMinutes, pointDays, pointHours, pointWords, getUserName, getLVLFromXP, \
-    getChatAccessName
+from Bot.utils import getUserNickname, pointMinutes, pointDays, pointHours, pointWords, getUserName, getChatAccessName
 from config.config import COMMANDS, LVL_NAMES, COMMANDS_DESC, SETTINGS_POSITIONS, \
     SETTINGS_COUNTABLE_CHANGEPUNISHMENTMESSAGE, SETTINGS_COUNTABLE_NO_PUNISHMENT
 from db import syncpool
@@ -67,7 +64,7 @@ def help_closed():
 
 
 def help_sent(id, name, nick):
-    return get('help_sent', id=id, n=nick if nick else name)
+    return get('help_sent', id=id, n=nick or name)
 
 
 def query_error():
@@ -94,9 +91,14 @@ def report_empty():
     return get('report_empty')
 
 
-def report_answer(ansing_id, ansing_name, repid, ans, qusing_id, quesing_name):
+def report_ban(ansing_id, ansing_name, repid, qusing_id, quesing_name, report):
+    return get('report_ban', repid=repid, qusing_id=qusing_id, quesing_name=quesing_name, ansing_id=ansing_id,
+               ansing_name=ansing_name, report=report)
+
+
+def report_answer(ansing_id, ansing_name, repid, ans, qusing_id, quesing_name, text):
     return get('report_answer', repid=repid, qusing_id=qusing_id, quesing_name=quesing_name, ansing_id=ansing_id,
-               ansing_name=ansing_name, ans=ans)
+               ansing_name=ansing_name, ans=ans, text=text)
 
 
 def report_answered(ansing_id, ansing_name, repid, ans, report, uid, name, chatid, chatname):
@@ -104,17 +106,25 @@ def report_answered(ansing_id, ansing_name, repid, ans, report, uid, name, chati
                chatid=chatid, chatname=chatname, report=report, ans=ans)
 
 
+def report_deleted(repid):
+    return get('report_deleted', repid=repid)
+
+
+def report_banned(id, name):
+    return get('report_banned', id=id, name=name)
+
+
 def kick_hint():
     return get('kick_hint')
 
 
 def kick(u_name, u_nick, uid, ch_name, ch_nick, id, cause):
-    return get('kick', uid=uid, u_name=u_nick if u_nick else u_name, i='club' if id < 0 else 'id',
-               id=abs(id), ch_name=ch_nick if ch_nick else ch_name, cause=cause)
+    return get('kick', uid=uid, u_name=u_nick or u_name, i='club' if id < 0 else 'id',
+               id=abs(id), ch_name=ch_nick or ch_name, cause=cause)
 
 
 def kicked(uid, name, nickname):
-    return get('kicked', uid=uid, un=nickname if nickname else name)
+    return get('kicked', uid=uid, un=nickname or name)
 
 
 def kick_error():
@@ -123,7 +133,7 @@ def kick_error():
 
 def kick_access(id, name, nick):
     return get('kick_access', i='club' if id < 0 else 'id', id=abs(id),
-               n=nick if nick else name)
+               n=nick or name)
 
 
 def kick_myself():
@@ -139,8 +149,8 @@ def mute_hint():
 
 
 def mute(name, nick, id, mutingname, mutingnick, mutingid, cause, time):
-    return get('mute', id=id, n=nick if nick else name, mutingid=mutingid,
-               mn=mutingnick if mutingnick else mutingname, time=time,
+    return get('mute', id=id, n=nick or name, mutingid=mutingid,
+               mn=mutingnick or mutingname, time=time,
                cause=' по причине: ' + cause if cause else '')
 
 
@@ -165,7 +175,7 @@ def access_dont_match():
 
 
 def already_muted(name, nick, id, mute):
-    return get('already_muted', id=id, n=nick if nick else name, time_left=int((mute - time.time()) / 60))
+    return get('already_muted', id=id, n=nick or name, time_left=int((mute - time.time()) / 60))
 
 
 def usermute_hint():
@@ -181,12 +191,12 @@ def warn_hint():
 
 
 def warn(name, nick, uid, ch_name, ch_nick, id, cause):
-    return get('warn', uid=uid, n=nick if nick else name, cause=' по причине: ' + cause if cause else '',
-               cn=ch_nick if ch_nick else ch_name, id=id)
+    return get('warn', uid=uid, n=nick or name, cause=' по причине: ' + cause if cause else '',
+               cn=ch_nick or ch_name, id=id)
 
 
 def warn_kick(name, nick, uid, ch_name, ch_nick, id, cause):
-    return get('warn_kick', uid=uid, n=nick if nick else name, id=id, cn=ch_nick if ch_nick else ch_name,
+    return get('warn_kick', uid=uid, n=nick or name, id=id, cn=ch_nick or ch_name,
                cause=' по причине: ' + cause if cause else '')
 
 
@@ -236,8 +246,8 @@ def snick_higher():
 
 
 def snick(uid, u_name, u_nickname, id, ch_name, nickname, newnickname):
-    return get('snick', uid=uid, un=u_nickname if u_nickname else u_name, id=id,
-               newnickname=newnickname, n=nickname if nickname else ch_name)
+    return get('snick', uid=uid, un=u_nickname or u_name, id=id,
+               newnickname=newnickname, n=nickname or ch_name)
 
 
 def rnick_hint():
@@ -253,7 +263,7 @@ def rnick_higher():
 
 
 def rnick(uid, u_name, u_nick, id, name, nick):
-    return get('rnick', uid=uid, un=u_nick if u_nick else u_name, id=id, nick=nick, name=name)
+    return get('rnick', uid=uid, un=u_nick or u_name, id=id, nick=nick, name=name)
 
 
 def nlist(res, members, page=0):
@@ -295,11 +305,11 @@ async def staff(res, names, chat_id):
 
 
 def unmute(uname, unickname, uid, name, nickname, id):
-    return get('unmute', uid=uid, un=unickname if unickname else uname, id=id, n=nickname if nickname else name)
+    return get('unmute', uid=uid, un=unickname or uname, id=id, n=nickname or name)
 
 
 def unmute_no_mute(id, name, nickname):
-    return get('unmute_no_mute', id=id, n=nickname if nickname else name)
+    return get('unmute_no_mute', id=id, n=nickname or name)
 
 
 def unmute_higher():
@@ -311,11 +321,11 @@ def unmute_hint():
 
 
 def unwarn(uname, unick, uid, name, nick, id):
-    return get('unwarn', uid=uid, un=unick if unick else uname, id=id, n=nick if nick else name)
+    return get('unwarn', uid=uid, un=unick or uname, id=id, n=nick or name)
 
 
 def unwarn_no_warns(id, name, nick):
-    return get('unwarn_no_warns', id=id, n=nick if nick else name)
+    return get('unwarn_no_warns', id=id, n=nick or name)
 
 
 def unwarn_higher():
@@ -331,7 +341,7 @@ async def mutelist(res, mutedcount):
     for ind, item in enumerate(res):
         nickname = await getUserNickname(item[0], item[1])
         msg += (
-            f"[{ind + 1}]. [id{item[0]}|{nickname if nickname else await getUserName(item[0])}] | "
+            f"[{ind + 1}]. [id{item[0]}|{nickname or await getUserName(item[0])}] | "
             f"{int((item[3] - time.time()) / 60)} минут | "
             f"{literal_eval(item[2])[-1] if item[2] and literal_eval(item[2])[-1] else 'Без указания причины'} "
             f"| Выдал: {literal_eval(item[4])[-1]}\n")
@@ -343,7 +353,7 @@ async def warnlist(res, warnedcount):
     for ind, item in enumerate(res):
         nickname = await getUserNickname(item[0], item[1])
         msg += (
-            f"[{ind + 1}]. [id{item[0]}|{nickname if nickname else await getUserName(item[0])}] | "
+            f"[{ind + 1}]. [id{item[0]}|{nickname or await getUserName(item[0])}] | "
             f"кол-во: {item[3]}/3 | "
             f"{'Без указания причины' if not item[2] or not literal_eval(item[2])[-1] else literal_eval(item[2])[-1]} |"
             f" Выдал: {literal_eval(item[4])[-1]}\n")
@@ -363,13 +373,12 @@ def setacc_higher():
 
 
 def setacc(uid, u_name, u_nick, acc, id, name, nick, lvlname=None):
-    return get('setacc', u_n=f'[id{uid}|{u_nick}]' if u_nick else f'[id{uid}|{u_name}]',
-               acc=LVL_NAMES[acc] if lvlname is None else lvlname,
-               n=f'[id{id}|{nick}]' if nick is not None else f'[id{id}|{name}]')
+    return get('setacc', u_n=f'[id{uid}|{u_nick or u_name}]', acc=lvlname if lvlname else LVL_NAMES[acc],
+               n=f'[id{id}|{nick or name}]')
 
 
 def setacc_already_have_acc(id, name, nick):
-    return get('setacc_already_have_acc', id=id, n=nick if nick else name)
+    return get('setacc_already_have_acc', id=id, n=nick or name)
 
 
 def setacc_low_acc(acc):
@@ -385,7 +394,7 @@ def delaccess_myself():
 
 
 def delaccess_noacc(id, name, nick):
-    return get('delaccess_noacc', id=id, n=nick if nick else name)
+    return get('delaccess_noacc', id=id, n=nick or name)
 
 
 def delaccess_higher():
@@ -393,7 +402,7 @@ def delaccess_higher():
 
 
 def delaccess(uid, uname, unick, id, name, nick):
-    return get('delaccess', uid=uid, un=unick if unick else uname, id=id, n=nick if nick else name)
+    return get('delaccess', uid=uid, un=unick or uname, id=id, n=nick or name)
 
 
 def timeout_hint():
@@ -401,11 +410,11 @@ def timeout_hint():
 
 
 def timeouton(id, name, nickname):
-    return get('timeouton', id=id, n=nickname if nickname else name)
+    return get('timeouton', id=id, n=nickname or name)
 
 
 def timeoutoff(id, name, nickname):
-    return get('timeoutoff', id=id, n=nickname if nickname else name)
+    return get('timeoutoff', id=id, n=nickname or name)
 
 
 def inactive_hint():
@@ -418,7 +427,7 @@ def inactive_no_results():
 
 def inactive(uid, name, nick, count):
     return get('inactive_no_active') if int(count) <= 0 else get(
-        'inactive', uid=uid, n=nick if nick else name, count=count)
+        'inactive', uid=uid, n=nick or name, count=count)
 
 
 def ban_hint():
@@ -426,8 +435,8 @@ def ban_hint():
 
 
 def ban(uid, u_name, u_nickname, id, name, nickname, cause, time):
-    return get('ban', uid=uid, n=u_nickname if u_nickname else u_name, id=id,
-               bn=nickname if nickname else name, time=f' {time} дней' if time < 3650 else 'всегда',
+    return get('ban', uid=uid, n=u_nickname or u_name, id=id,
+               bn=nickname or name, time=f' {time} дней' if time < 3650 else 'всегда',
                cause=f' по причине: "{cause}"' if cause is not None else '')
 
 
@@ -448,15 +457,15 @@ def ban_higher():
 
 
 def already_banned(name, nick, id, ban):
-    return get('already_banned', id=id, n=nick if nick else name, time_left=int((ban - time.time()) / 86400 + 1))
+    return get('already_banned', id=id, n=nick or name, time_left=int((ban - time.time()) / 86400 + 1))
 
 
 def unban(uname, unick, uid, name, nick, id):
-    return get('unban', uid=uid, un=unick if unick else uname, id=id, n=nick if nick else name)
+    return get('unban', uid=uid, un=unick or uname, id=id, n=nick or name)
 
 
 def unban_no_ban(id, name, nick):
-    return get('unban_no_ban', id=id, n=nick if nick else name)
+    return get('unban_no_ban', id=id, n=nick or name)
 
 
 def unban_higher():
@@ -472,7 +481,7 @@ def async_already_bound():
 
 
 def async_done(uid, u_name, u_nickname):
-    return get('async_done', uid=uid, n=u_nickname if u_nickname else u_name)
+    return get('async_done', uid=uid, n=u_nickname or u_name)
 
 
 def async_limit():
@@ -488,17 +497,17 @@ def delasync_not_owner():
 
 
 def delasync_done(uid, u_name, u_nickname, chname=''):
-    return get('delasync_done', uid=uid, n=u_nickname if u_nickname else u_name,
+    return get('delasync_done', uid=uid, n=u_nickname or u_name,
                chname=f' "{chname}"' if chname else '')
 
 
 def gkick(uid, u_name, u_nickname, chats, success):
-    return get('gkick', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
+    return get('gkick', uid=uid, n=u_nickname or u_name, success=success, chats=chats)
 
 
 def gkick_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    return get('gkick_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
-               n=nickname if nickname else name)
+    return get('gkick_start', uid=uid, un=u_nickname or u_name, chats=chats, id=id,
+               n=nickname or name)
 
 
 def gkick_hint():
@@ -510,7 +519,7 @@ async def banlist(res, bancount):
     for k, i in enumerate(res):
         nickname = await getUserNickname(i[0], i[1])
         cause = literal_eval(i[2])[-1]
-        msg += (f"[{k + 1}]. [id{i[0]}|{nickname if nickname else await getUserName(i[0])}] | "
+        msg += (f"[{k + 1}]. [id{i[0]}|{nickname or await getUserName(i[0])}] | "
                 f"{int((i[3] - time.time()) / 86400) + 1} дней | "
                 f"{cause if cause else 'Без указания причины'} | Выдал: {literal_eval(i[4])[-1]}\n")
     return msg
@@ -521,12 +530,12 @@ def userban_hint():
 
 
 def gban(uid, u_name, u_nickname, chats, success):
-    return get('gban', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
+    return get('gban', uid=uid, n=u_nickname or u_name, success=success, chats=chats)
 
 
 def gban_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    return get('gban_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
-               n=nickname if nickname else name)
+    return get('gban_start', uid=uid, un=u_nickname or u_name, chats=chats, id=id,
+               n=nickname or name)
 
 
 def gban_hint():
@@ -534,17 +543,17 @@ def gban_hint():
 
 
 def kick_banned(id, name, nick, btime, cause):
-    return get('kick_banned', id=id, n=nick if nick else name, t=int((btime - time.time()) / 86400),
+    return get('kick_banned', id=id, n=nick or name, t=int((btime - time.time()) / 86400),
                cause=f' по причине {cause}' if cause else '')
 
 
 def gunban(uid, u_name, u_nickname, chats, success):
-    return get('gunban', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
+    return get('gunban', uid=uid, n=u_nickname or u_name, success=success, chats=chats)
 
 
 def gunban_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    return get('gunban_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
-               n=nickname if nickname else name)
+    return get('gunban_start', uid=uid, un=u_nickname or u_name, chats=chats, id=id,
+               n=nickname or name)
 
 
 def gunban_hint():
@@ -552,12 +561,12 @@ def gunban_hint():
 
 
 def gmute(uid, u_name, u_nickname, chats, success):
-    return get('gmute', uid=uid, n=u_name if u_nickname is None else u_nickname, success=success, chats=chats)
+    return get('gmute', uid=uid, n=u_nickname or u_name, success=success, chats=chats)
 
 
 def gmute_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    return get('gmute_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
-               n=nickname if nickname else name)
+    return get('gmute_start', uid=uid, un=u_nickname or u_name, chats=chats, id=id,
+               n=nickname or name)
 
 
 def gmute_hint():
@@ -565,12 +574,12 @@ def gmute_hint():
 
 
 def gunmute(uid, u_name, u_nickname, chats, success):
-    return get('gunmute', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
+    return get('gunmute', uid=uid, n=u_nickname or u_name, success=success, chats=chats)
 
 
 def gunmute_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    return get('gunmute_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
-               n=nickname if nickname else name)
+    return get('gunmute_start', uid=uid, un=u_nickname or u_name, chats=chats, id=id,
+               n=nickname or name)
 
 
 def gunmute_hint():
@@ -578,12 +587,12 @@ def gunmute_hint():
 
 
 def gwarn(uid, u_name, u_nick, chats, success):
-    return get('gwarn', uid=uid, un=u_nick if u_nick is not None else u_name, success=success, chats=chats)
+    return get('gwarn', uid=uid, un=u_nick or u_name, success=success, chats=chats)
 
 
 def gwarn_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    return get('gwarn_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
-               n=nickname if nickname else name)
+    return get('gwarn_start', uid=uid, un=u_nickname or u_name, chats=chats, id=id,
+               n=nickname or name)
 
 
 def gwarn_hint():
@@ -591,12 +600,12 @@ def gwarn_hint():
 
 
 def gunwarn(uid, u_name, u_nickname, chats, success):
-    return get('gunwarn', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
+    return get('gunwarn', uid=uid, n=u_nickname or u_name, success=success, chats=chats)
 
 
 def gunwarn_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    return get('gunwarn_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
-               n=nickname if nickname else name)
+    return get('gunwarn_start', uid=uid, un=u_nickname or u_name, chats=chats, id=id,
+               n=nickname or name)
 
 
 def gunwarn_hint():
@@ -604,12 +613,12 @@ def gunwarn_hint():
 
 
 def gsnick(uid, u_name, u_nickname, chats, success):
-    return get('gsnick', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
+    return get('gsnick', uid=uid, n=u_nickname or u_name, success=success, chats=chats)
 
 
 def gsnick_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    return get('gkick_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
-               n=nickname if nickname else name)
+    return get('gkick_start', uid=uid, un=u_nickname or u_name, chats=chats, id=id,
+               n=nickname or name)
 
 
 def gsnick_hint():
@@ -617,12 +626,12 @@ def gsnick_hint():
 
 
 def grnick(uid, u_name, u_nickname, chats, success):
-    return get('grnick', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
+    return get('grnick', uid=uid, n=u_nickname or u_name, success=success, chats=chats)
 
 
 def grnick_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    return get('grnick_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
-               n=nickname if nickname else name)
+    return get('grnick_start', uid=uid, un=u_nickname or u_name, chats=chats, id=id,
+               n=nickname or name)
 
 
 def grnick_hint():
@@ -630,12 +639,12 @@ def grnick_hint():
 
 
 def gdelaccess(uid, u_name, u_nickname, chats, success):
-    return get('gdelaccess', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
+    return get('gdelaccess', uid=uid, n=u_nickname or u_name, success=success, chats=chats)
 
 
 def gdelaccess_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    return get('gdelaccess_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
-               n=nickname if nickname else name)
+    return get('gdelaccess_start', uid=uid, un=u_nickname or u_name, chats=chats, id=id,
+               n=nickname or name)
 
 
 def gdelaccess_hint():
@@ -647,7 +656,7 @@ def gdelaccess_admin_unknown():
 
 
 def gdelaccess_admin(uid, u_name, u_nickname):
-    return get('gdelaccess_admin', uid=uid, n=u_nickname if u_nickname else u_name)
+    return get('gdelaccess_admin', uid=uid, n=u_nickname or u_name)
 
 
 def setaccess_myself():
@@ -655,12 +664,12 @@ def setaccess_myself():
 
 
 def gsetaccess(uid, u_name, u_nickname, chats, success):
-    return get('gsetaccess', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
+    return get('gsetaccess', uid=uid, n=u_nickname or u_name, success=success, chats=chats)
 
 
 def gsetaccess_start(uid, u_name, u_nickname, id, name, nickname, chats):
-    return get('gsetaccess_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats, id=id,
-               n=nickname if nickname else name)
+    return get('gsetaccess_start', uid=uid, un=u_nickname or u_name, chats=chats, id=id,
+               n=nickname or name)
 
 
 def gsetaccess_hint():
@@ -669,7 +678,7 @@ def gsetaccess_hint():
 
 def zov(uid, name, nickname, cause, members):
     call = [f"[id{i.member_id}|\u200b\u206c]" for i in members if i.member_id > 0]
-    return get('zov', uid=uid, n=nickname if nickname else name, lc=len(call), lm=len(members), cause=cause,
+    return get('zov', uid=uid, n=nickname or name, lc=len(call), lm=len(members), cause=cause,
                jc=''.join(call))
 
 
@@ -678,7 +687,7 @@ def zov_hint():
 
 
 def welcome(id, name, nickname):
-    return get('welcome', id=id, n=nickname if nickname else name)
+    return get('welcome', id=id, n=nickname or name)
 
 
 def welcome_hint():
@@ -686,7 +695,7 @@ def welcome_hint():
 
 
 def delwelcome(id, name, nickname):
-    return get('delwelcome', id=id, n=nickname if nickname else name)
+    return get('delwelcome', id=id, n=nickname or name)
 
 
 def delwelcome_hint():
@@ -698,11 +707,11 @@ def chat_unbound():
 
 
 def gzov_start(uid, u_name, u_nickname, chats):
-    return get('gzov_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats)
+    return get('gzov_start', uid=uid, un=u_nickname or u_name, chats=chats)
 
 
 def gzov(uid, u_name, u_nickname, chats, success):
-    return get('gzov', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
+    return get('gzov', uid=uid, n=u_nickname or u_name, success=success, chats=chats)
 
 
 def gzov_hint():
@@ -714,7 +723,7 @@ def creategroup_already_created(group):
 
 
 def creategroup_done(uid, u_name, u_nickname, group):
-    return get('creategroup_done', uid=uid, n=u_nickname if u_nickname else u_name, group=group)
+    return get('creategroup_done', uid=uid, n=u_nickname or u_name, group=group)
 
 
 def creategroup_incorrect_name():
@@ -742,7 +751,7 @@ def bind_hint():
 
 
 def bind(uid, u_name, u_nickname, group):
-    return get('bind', uid=uid, n=u_nickname if u_nickname else u_name, group=group)
+    return get('bind', uid=uid, n=u_nickname or u_name, group=group)
 
 
 def unbind_group_not_found(group):
@@ -758,11 +767,7 @@ def unbind_hint():
 
 
 def unbind(uid, u_name, u_nickname, group):
-    if u_nickname is not None:
-        n = u_nickname
-    else:
-        n = u_name
-    return get('unbind', uid=uid, n=u_nickname if u_nickname else u_name, group=group)
+    return get('unbind', uid=uid, n=u_nickname or u_name, group=group)
 
 
 def delgroup_not_found(group):
@@ -770,7 +775,7 @@ def delgroup_not_found(group):
 
 
 def delgroup(uid, u_name, u_nickname, group):
-    return get('delgroup', group=group, uid=uid, n=u_nickname if u_nickname else u_name)
+    return get('delgroup', group=group, uid=uid, n=u_nickname or u_name)
 
 
 def delgroup_hint():
@@ -786,12 +791,12 @@ def skick_hint():
 
 
 def skick(uid, u_name, u_nickname, chats, success):
-    return get('skick', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
+    return get('skick', uid=uid, n=u_nickname or u_name, success=success, chats=chats)
 
 
 def skick_start(uid, u_name, u_nickname, id, name, nickname, chats, group):
-    return get('skick_start', uid=uid, un=u_nickname if u_nickname else u_name, group=group, chats=chats, id=id,
-               n=nickname if nickname else name)
+    return get('skick_start', uid=uid, un=u_nickname or u_name, group=group, chats=chats, id=id,
+               n=nickname or name)
 
 
 def sban_hint():
@@ -799,12 +804,12 @@ def sban_hint():
 
 
 def sban(uid, u_name, u_nickname, chats, success):
-    return get('sban', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
+    return get('sban', uid=uid, n=u_nickname or u_name, success=success, chats=chats)
 
 
 def sban_start(uid, u_name, u_nickname, id, name, nickname, chats, group):
-    return get('sban_start', uid=uid, un=u_nickname if u_nickname else u_name, group=group, chats=chats, id=id,
-               n=nickname if nickname else name)
+    return get('sban_start', uid=uid, un=u_nickname or u_name, group=group, chats=chats, id=id,
+               n=nickname or name)
 
 
 def sunban_hint():
@@ -812,12 +817,12 @@ def sunban_hint():
 
 
 def sunban(uid, u_name, u_nickname, chats, success):
-    return get('sunban', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
+    return get('sunban', uid=uid, n=u_nickname or u_name, success=success, chats=chats)
 
 
 def sunban_start(uid, u_name, u_nickname, id, name, nickname, chats, group):
-    return get('sunban_start', uid=uid, un=u_nickname if u_nickname else u_name, group=group, chats=chats, id=id,
-               n=nickname if nickname else name)
+    return get('sunban_start', uid=uid, un=u_nickname or u_name, group=group, chats=chats, id=id,
+               n=nickname or name)
 
 
 def ssnick_hint():
@@ -825,12 +830,12 @@ def ssnick_hint():
 
 
 def ssnick(uid, u_name, u_nickname, chats, success):
-    return get('ssnick', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
+    return get('ssnick', uid=uid, n=u_nickname or u_name, success=success, chats=chats)
 
 
 def ssnick_start(uid, u_name, u_nickname, id, name, nickname, chats, group):
-    return get('ssnick_start', uid=uid, un=u_nickname if u_nickname else u_name, group=group, chats=chats, id=id,
-               n=nickname if nickname else name)
+    return get('ssnick_start', uid=uid, un=u_nickname or u_name, group=group, chats=chats, id=id,
+               n=nickname or name)
 
 
 def srnick_hint():
@@ -842,8 +847,8 @@ def srnick(uid, u_name, chats, success):
 
 
 def srnick_start(uid, u_name, u_nickname, id, name, nickname, chats, group):
-    return get('srnick_start', uid=uid, un=u_nickname if u_nickname else u_name, group=group, chats=chats, id=id,
-               n=nickname if nickname else name)
+    return get('srnick_start', uid=uid, un=u_nickname or u_name, group=group, chats=chats, id=id,
+               n=nickname or name)
 
 
 def szov_hint():
@@ -851,11 +856,11 @@ def szov_hint():
 
 
 def szov_start(uid, u_name, u_nickname, chats, group):
-    return get('szov_start', uid=uid, un=u_nickname if u_nickname else u_name, group=group, chats=chats)
+    return get('szov_start', uid=uid, un=u_nickname or u_name, group=group, chats=chats)
 
 
 def szov(uid, u_name, u_nickname, group, pool, success):
-    return get('szov', uid=uid, un=u_nickname if u_nickname else u_name, success=success, pool=pool, group=group)
+    return get('szov', uid=uid, un=u_nickname or u_name, success=success, pool=pool, group=group)
 
 
 def ssetaccess_hint():
@@ -863,12 +868,12 @@ def ssetaccess_hint():
 
 
 def ssetaccess(uid, u_name, u_nickname, chats, success):
-    return get('ssetaccess', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
+    return get('ssetaccess', uid=uid, n=u_nickname or u_name, success=success, chats=chats)
 
 
 def ssetaccess_start(uid, u_name, u_nickname, id, name, nickname, chats, group):
-    return get('ssetaccess_start', uid=uid, un=u_nickname if u_nickname else u_name, group=group, chats=chats, id=id,
-               n=nickname if nickname else name)
+    return get('ssetaccess_start', uid=uid, un=u_nickname or u_name, group=group, chats=chats, id=id,
+               n=nickname or name)
 
 
 def sdelaccess_hint():
@@ -876,12 +881,12 @@ def sdelaccess_hint():
 
 
 def sdelaccess(uid, u_name, u_nickname, chats, success):
-    return get('sdelaccess', uid=uid, n=u_nickname if u_nickname else u_name, success=success, chats=chats)
+    return get('sdelaccess', uid=uid, n=u_nickname or u_name, success=success, chats=chats)
 
 
 def sdelaccess_start(uid, u_name, u_nickname, id, name, nickname, group, chats):
-    return get('ssetaccess_start', uid=uid, un=u_nickname if u_nickname else u_name, group=group, chats=chats, id=id,
-               n=nickname if nickname else name)
+    return get('ssetaccess_start', uid=uid, un=u_nickname or u_name, group=group, chats=chats, id=id,
+               n=nickname or name)
 
 
 def demote_choose():
@@ -897,7 +902,7 @@ def demote_disaccept():
 
 
 def demote_accept(id, name, nick):
-    return get('demote_accept', id=id, n=nick if nick else name)
+    return get('demote_accept', id=id, n=nick or name)
 
 
 def mygroups_no_groups():
@@ -905,7 +910,7 @@ def mygroups_no_groups():
 
 
 def addfilter(id, name, nickname):
-    return get('addfilter', id=id, n=nickname if nickname else name)
+    return get('addfilter', id=id, n=nickname or name)
 
 
 def addfilter_hint():
@@ -913,7 +918,7 @@ def addfilter_hint():
 
 
 def delfilter(id, name, nickname):
-    return get('delfilter', id=id, n=nickname if nickname else name)
+    return get('delfilter', id=id, n=nickname or name)
 
 
 def delfilter_hint():
@@ -925,7 +930,7 @@ def delfilter_no_filter():
 
 
 def gaddfilter_start(uid, u_name, u_nickname, chats):
-    return get('gaddfilter_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats)
+    return get('gaddfilter_start', uid=uid, un=u_nickname or u_name, chats=chats)
 
 
 def gaddfilter(uid, name, chats, success):
@@ -937,7 +942,7 @@ def gaddfilter_hint():
 
 
 def gdelfilter_start(uid, u_name, u_nickname, chats):
-    return get('gdelfilter_start', uid=uid, un=u_nickname if u_nickname else u_name, chats=chats)
+    return get('gdelfilter_start', uid=uid, un=u_nickname or u_name, chats=chats)
 
 
 def gdelfilter(uid, name, chats, success):
@@ -953,7 +958,7 @@ def editlvl_hint():
 
 
 def editlvl(id, name, nickname, cmd, beforelvl, lvl):
-    return get('editlvl', id=id, n=nickname if nickname else name, cmd=cmd, beforelvl=beforelvl, lvl=lvl)
+    return get('editlvl', id=id, n=nickname or name, cmd=cmd, beforelvl=beforelvl, lvl=lvl)
 
 
 def editlvl_command_not_found():
@@ -985,11 +990,11 @@ def unban_myself():
 
 
 def addblack(uid, uname, unick, id, name, nick):
-    return get('addblack', uid=uid, un=unick if unick else uname, id=id, n=nick if nick else name)
+    return get('addblack', uid=uid, un=unick or uname, id=id, n=nick or name)
 
 
 def blacked(id, name, nick):
-    return get('blacked', id=id, n=nick if nick else name)
+    return get('blacked', id=id, n=nick or name)
 
 
 def delblack_hint():
@@ -1001,15 +1006,15 @@ def delblack_myself():
 
 
 def delblack(uid, uname, unick, id, name, nick):
-    return get('delblack', uid=uid, un=unick if unick else uname, id=id, n=nick if nick else name)
+    return get('delblack', uid=uid, un=unick or uname, id=id, n=nick or name)
 
 
 def delblacked(id, name, nick):
-    return get('delblacked', id=id, n=nick if nick else name)
+    return get('delblacked', id=id, n=nick or name)
 
 
 def delblack_no_user(id, name, nick):
-    return get('delblack_no_user', id=id, n=nick if nick else name)
+    return get('delblack_no_user', id=id, n=nick or name)
 
 
 def setstatus_hint():
@@ -1017,7 +1022,7 @@ def setstatus_hint():
 
 
 def setstatus(uid, uname, unick, id, name, nick):
-    return get('setstatus', uid=uid, un=unick if unick else uname, id=id, n=nick if nick else name)
+    return get('setstatus', uid=uid, un=unick or uname, id=id, n=nick or name)
 
 
 def delstatus_hint():
@@ -1025,7 +1030,7 @@ def delstatus_hint():
 
 
 def delstatus(uid, uname, unick, id, name, nick):
-    return get('delstatus', uid=uid, un=unick if unick else uname, id=id, n=nick if nick else name)
+    return get('delstatus', uid=uid, un=unick or uname, id=id, n=nick or name)
 
 
 def sgroup_unbound(group):
@@ -1155,11 +1160,11 @@ def uexpStatus():
 
 
 def q(uid, name, nick):
-    return get('q', uid=uid, n=nick if nick else name)
+    return get('q', uid=uid, n=nick or name)
 
 
 def q_fail(uid, name, nick):
-    return get('q_fail', uid=uid, n=nick if nick else name)
+    return get('q_fail', uid=uid, n=nick or name)
 
 
 def premium():
@@ -1167,7 +1172,7 @@ def premium():
 
 
 def premium_sent(uid, name, nickname):
-    return get('premium_sent', uid=uid, n=nickname if nickname else name)
+    return get('premium_sent', uid=uid, n=nickname or name)
 
 
 def chat(uid, uname, chat_id, bind, gbind, public, muted, banned, users, time, prefix, chat_name):
@@ -1228,15 +1233,15 @@ def giveowner_no():
 
 
 def giveowner(uid, unick, uname, id, nick, name):
-    return get('giveowner', uid=uid, un=unick if unick else uname, id=id, n=nick if nick else name)
+    return get('giveowner', uid=uid, un=unick or uname, id=id, n=nick or name)
 
 
 def bonus(id, nick, name, xp):
-    return get('bonus', id=id, n=nick if nick else name, xp=xp)
+    return get('bonus', id=id, n=nick or name, xp=xp)
 
 
 def bonus_time(id, nick, name, timeleft):
-    return get('bonus_time', id=id, n=nick if nick else name, hours=pointHours((timeleft // 3600) * 3600),
+    return get('bonus_time', id=id, n=nick or name, hours=pointHours((timeleft // 3600) * 3600),
                minutes=pointMinutes(timeleft - (timeleft // 3600) * 3600))
 
 
@@ -1296,11 +1301,11 @@ def addprefix_too_long():
 
 
 def addprefix(uid, name, nick, prefix):
-    return get('addprefix', uid=uid, n=nick if nick else name, prefix=prefix)
+    return get('addprefix', uid=uid, n=nick or name, prefix=prefix)
 
 
 def delprefix(uid, name, nick, prefix):
-    return get('delprefix', uid=uid, n=nick if nick else name, prefix=prefix)
+    return get('delprefix', uid=uid, n=nick or name, prefix=prefix)
 
 
 def delprefix_not_found(prefix):
@@ -1309,9 +1314,9 @@ def delprefix_not_found(prefix):
 
 def listprefix(uid, name, nick, prefixes):
     if not prefixes:
-        return (get('listprefix', uid=uid, n=nick if nick else name) +
+        return (get('listprefix', uid=uid, n=nick or name) +
                 'Префиксов не обнаружено. Используйте кнопку "Добавить префикс"')
-    return (get('listprefix', uid=uid, n=nick if nick else name) +
+    return (get('listprefix', uid=uid, n=nick or name) +
             ''.join([f'➖ "{i[0]}"\n' for i in prefixes]))
 
 
@@ -1320,7 +1325,7 @@ def levelname_hint():
 
 
 def levelname(uid, name, nick, lvl, lvlname):
-    return get('levelname', uid=uid, n=nick if nick else name, lvlname=lvlname, lvl=lvl)
+    return get('levelname', uid=uid, n=nick or name, lvlname=lvlname, lvl=lvl)
 
 
 def resetlevel_hint():
@@ -1353,7 +1358,7 @@ def ignore_not_found():
 
 
 def ignore(id, name, nick):
-    return get('ignore', id=id, n=nick if nick else name)
+    return get('ignore', id=id, n=nick or name)
 
 
 def unignore_hint():
@@ -1369,7 +1374,7 @@ def unignore_not_ignored():
 
 
 def unignore(id, name, nick):
-    return get('unignore', id=id, n=nick if nick else name)
+    return get('unignore', id=id, n=nick or name)
 
 
 def ignorelist(res, names):
@@ -1403,10 +1408,10 @@ def chatlimit(id, name, nick, t, postfix, lpos):
                 postfix = 'минут'
             else:
                 postfix = 'часов'
-        return get('chatlimit', id=id, n=nick if nick else name, t=t, postfix=postfix)
+        return get('chatlimit', id=id, n=nick or name, t=t, postfix=postfix)
     elif lpos == 0:
         return get('chatlimit_already_on')
-    return get('chatlimit_off', id=id, n=nick if nick else name)
+    return get('chatlimit_off', id=id, n=nick or name)
 
 
 def pm():
@@ -1442,7 +1447,7 @@ def cmd_prem(l):
 
 
 def cmd_set(uid, name, nick, cmd, changed):
-    return get('cmd_set', uid=uid, n=nick if nick else name, changed=changed, cmd=cmd)
+    return get('cmd_set', uid=uid, n=nick or name, changed=changed, cmd=cmd)
 
 
 def resetcmd_hint():
@@ -1458,7 +1463,7 @@ def resetcmd_not_changed(cmd):
 
 
 def resetcmd(uid, name, nick, cmd, cmdname):
-    return get('resetcmd', uid=uid, n=nick if nick else name, cmdname=cmdname, cmd=cmd)
+    return get('resetcmd', uid=uid, n=nick or name, cmdname=cmdname, cmd=cmd)
 
 
 def cmd_char_limit():
@@ -1495,7 +1500,7 @@ def duel_hint():
 
 
 def duel_uxp_not_enough(uid, name, nick):
-    return get('duel_uxp_not_enough', uid=uid, n=nick if nick else name)
+    return get('duel_uxp_not_enough', uid=uid, n=nick or name)
 
 
 def duel_xp_minimum():
@@ -1503,11 +1508,11 @@ def duel_xp_minimum():
 
 
 def duel(uid, name, nick, xp):
-    return get('duel', uid=uid, n=nick if nick else name, xp=xp)
+    return get('duel', uid=uid, n=nick or name, xp=xp)
 
 
 def duel_res(uid, uname, unick, id, name, nick, xp, prem, com=10):
-    return get('duel_res', uid=uid, un=unick if unick else uname, id=id, n=nick if nick else name, xp=xp,
+    return get('duel_res', uid=uid, un=unick or uname, id=id, n=nick or name, xp=xp,
                com='' if prem else f' с учётом комиссии {com}%')
 
 
@@ -1569,15 +1574,15 @@ def kickmenu():
 
 
 def kickmenu_kick_nonick(uid, name, nick, kicked):
-    return get('kickmenu_kick_nonick', uid=uid, n=nick if nick else name, kicked=kicked)
+    return get('kickmenu_kick_nonick', uid=uid, n=nick or name, kicked=kicked)
 
 
 def kickmenu_kick_nick(uid, name, nick, kicked):
-    return get('kickmenu_kick_nick', uid=uid, n=nick if nick else name, kicked=kicked)
+    return get('kickmenu_kick_nick', uid=uid, n=nick or name, kicked=kicked)
 
 
 def kickmenu_kick_banned(uid, name, nick, kicked):
-    return get('kickmenu_kick_banned', uid=uid, n=nick if nick else name, kicked=kicked)
+    return get('kickmenu_kick_banned', uid=uid, n=nick or name, kicked=kicked)
 
 
 def send_notification(text, tagging):
@@ -1682,7 +1687,7 @@ def transfer_wrong_number():
 
 
 def transfer_not_enough(uid, name, nickname):
-    return get('transfer_not_enough', uid=uid, n=name if nickname is None else nickname)
+    return get('transfer_not_enough', uid=uid, n=nickname or name)
 
 
 def transfer_myself():
@@ -1773,12 +1778,12 @@ def check_help():
 
 
 def check(id, name, nickname, ban, warn, mute):
-    return get('check', id=id, n=nickname if nickname else name, ban=pointDays(ban) if ban else "Отсутствуют",
+    return get('check', id=id, n=nickname or name, ban=pointDays(ban) if ban else "Отсутствуют",
                warn=f"{warn} из 3" if warn else "Отсутствуют", mute=pointMinutes(mute) if mute else "Отсутствует")
 
 
 def check_ban(id, name, nickname, ban, ban_history, ban_date, ban_from, ban_reason, ban_time):
-    msg = get('check_ban', id=id, n=nickname if nickname else name,
+    msg = get('check_ban', id=id, n=nickname or name,
               lbh=len(ban_history), banm=pointDays(ban) if ban else "Отсутствует")
     if ban:
         msg += f'★ {ban_date} | {ban_from} | {pointDays(ban_time)} | {ban_reason}'
@@ -1786,7 +1791,7 @@ def check_ban(id, name, nickname, ban, ban_history, ban_date, ban_from, ban_reas
 
 
 def check_mute(id, name, nickname, mute, mute_history, mute_date, mute_from, mute_reason, mute_time):
-    msg = get('check_mute', id=id, n=nickname if nickname else name, lmh=len(mute_history),
+    msg = get('check_mute', id=id, n=nickname or name, lmh=len(mute_history),
               mutem=pointMinutes(mute) if mute else "Отсутствует")
     if mute:
         msg += f'★ {mute_date} | {mute_from} | {pointMinutes(mute_time)} | {mute_reason}'
@@ -1794,7 +1799,7 @@ def check_mute(id, name, nickname, mute, mute_history, mute_date, mute_from, mut
 
 
 def check_warn(id, name, nickname, warn, warn_history, warns_date, warns_from, warns_reason):
-    msg = get('check_warn', id=id, n=nickname if nickname else name, lwh=len(warn_history),
+    msg = get('check_warn', id=id, n=nickname or name, lwh=len(warn_history),
               warnm=f"{warn} из 3" if warn else "Отсутствуют")
     if warn:
         for k, _ in enumerate(warn_history[:warn]):
@@ -1803,21 +1808,21 @@ def check_warn(id, name, nickname, warn, warn_history, warns_date, warns_from, w
 
 
 def check_history_ban(id, name, nickname, dates, names, times, causes):
-    msg = get('check_history_ban', id=id, n=nickname if nickname else name)
+    msg = get('check_history_ban', id=id, n=nickname or name)
     for k in range(len(times)):
         msg += f'★ {dates[k]} | {names[k]} | {pointDays(times[k])} | {causes[k]}\n'
     return msg
 
 
 def check_history_mute(id, name, nickname, dates, names, times, causes):
-    msg = get('check_history_mute', id=id, n=nickname if nickname else name)
+    msg = get('check_history_mute', id=id, n=nickname or name)
     for k in range(len(times)):
         msg += f'★ {dates[k]} | {names[k]} | {pointMinutes(times[k])} | {causes[k]}\n'
     return msg
 
 
 def check_history_warn(id, name, nickname, dates, names, times, causes):
-    msg = get('check_history_warn', id=id, n=nickname if nickname else name)
+    msg = get('check_history_warn', id=id, n=nickname or name)
     for k in range(len(times)):
         msg += f'★ {dates[k]} | {names[k]} | {causes[k]}\n'
     return msg
@@ -1937,12 +1942,12 @@ def deanon_target_not_found():
 
 
 def deanon(id, from_id, name, nickname, time):
-    return get('deanon', id=id, from_id=from_id, from_name=nickname if nickname else name,
+    return get('deanon', id=id, from_id=from_id, from_name=nickname or name,
                time=datetime.fromtimestamp(time).strftime('%d.%m.%Y - %H:%M'))
 
 
 def antispam_punishment(uid, name, nick, setting, punishment, violation_count, time=None):
-    return get(f'antispam_punishment_{setting}_{punishment}', uid=uid, n=nick if nick else name, time=time,
+    return get(f'antispam_punishment_{setting}_{punishment}', uid=uid, n=nick or name, time=time,
                violation_count=violation_count)
 
 
@@ -2059,7 +2064,7 @@ def guess_lose(bet, num):
 
 
 async def antitag_on(uid, nick, name):
-    return get('antitag_on', uid=uid, n=nick if nick else name)
+    return get('antitag_on', uid=uid, n=nick or name)
 
 
 async def antitag():
@@ -2067,11 +2072,11 @@ async def antitag():
 
 
 def antitag_add(id, name, nick):
-    return get('antitag_add', uid=id, n=nick if nick else name)
+    return get('antitag_add', uid=id, n=nick or name)
 
 
 def antitag_del(id, name, nick):
-    return get('antitag_del', uid=id, n=nick if nick else name)
+    return get('antitag_del', uid=id, n=nick or name)
 
 
 async def antitag_list(users, chat_id):
@@ -2083,3 +2088,49 @@ async def antitag_list(users, chat_id):
 
 def tagnotiferror():
     return get('tagnotiferror')
+
+
+def promocreate_hint():
+    return get('promocreate_hint')
+
+
+def promocreate_alreadyexists(code):
+    return get('promocreate_alreadyexists', code=code)
+
+
+def promocreate(code, xp, usage, date):
+    return get('promocreate', code=code, xp=xp, usage=f'\n🔘 Доступно использований: {usage}.' if usage else '',
+               date=f'\n🕒 Доступен до {date.strftime("%d.%m.%Y")}.' if date else '')
+
+
+def promodel_hint():
+    return get('promodel_hint')
+
+
+def promodel_notfound(code):
+    return get('promodel_notfound', code=code)
+
+
+def promodel(code):
+    return get('promodel', code=code)
+
+
+def promolist(promos):
+    return get('promolist', promos=''.join([f'[{k + 1}]. {i[0]} - ({i[1]} исп.)\n' for k, i in enumerate(
+        promos.items())]))
+
+
+def promo_hint():
+    return get('promo_hint')
+
+
+def promo_alreadyusedornotexists(uid, nick, name):
+    return get('promo_alreadyusedornotexists', uid=uid, n=nick or name)
+
+
+def promo(uid, nick, name, code, xp):
+    return get('promo', uid=uid, n=nick or name, code=code, xp=xp)
+
+
+def pmcmd():
+    return get('pmcmd')

@@ -5,15 +5,15 @@ import traceback
 from loguru import logger
 from whois.whois import logger as whoislogger
 
-from Bot import VkBot
-from config.config import DATABASE, PATH, VK_API_SESSION, DAILY_TO
+from Bot import main as vkbot
+from config.config import DATABASE, PATH, vk_api_session, DAILY_TO
 import os
 
 from tables import dbhandle, Model
 from load_messages import load
 
 
-def main(retry=0, vkbot=VkBot()):
+def main(retry=0):
     whoislogger.disabled = True
     logger.remove()
     logger.add(sys.stderr, level='INFO')
@@ -49,12 +49,12 @@ def main(retry=0, vkbot=VkBot()):
             os.system("tmux kill-session -t botscheduler")
         logger.info('ERROR! Retarting the bot in 15 seconds...')
         time.sleep(15)
-        main(retry + 1, vkbot)
+        main(retry + 1)
     except KeyboardInterrupt:
         logger.info('bye-bye')
         return
     except:
-        VK_API_SESSION.method('messages.send', {
+        vk_api_session.method('messages.send', {
             'chat_id': DAILY_TO,
             'message': f'Unexpected exception caught in VkBot.run():\n{traceback.format_exc()}',
             'random_id': 0

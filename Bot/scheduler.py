@@ -13,8 +13,8 @@ from loguru import logger
 import messages
 from Bot.tgbot import tgbot
 from Bot.utils import sendMessage, chunks, punish, getUserName
-from config.config import DATABASE, PASSWORD, USER, TG_CHAT_ID, DAILY_TO, API, TG_BACKUP_THREAD_ID, PHOTO_NOT_FOUND, \
-    YANDEX_TOKEN, COMMANDS, VK_API_SESSION, GROUP_ID
+from config.config import DATABASE, PASSWORD, USER, TG_CHAT_ID, DAILY_TO, api, TG_BACKUP_THREAD_ID, PHOTO_NOT_FOUND, \
+    YANDEX_TOKEN, COMMANDS, vk_api_session, GROUP_ID
 from db import pool
 
 
@@ -63,7 +63,7 @@ async def updateInfo():
 
                 for i in users:
                     try:
-                        names = await API.users.get(user_ids=[y[0] for y in i])
+                        names = await api.users.get(user_ids=[y[0] for y in i])
                         await c.executemany('update usernames set name = %s where uid=%s',
                                             [(f"{name.first_name} {name.last_name}", name.id) for name in names])
                     except:
@@ -71,7 +71,7 @@ async def updateInfo():
 
                 for i in chats:
                     try:
-                        chatnames = await API.messages.get_conversations_by_id(peer_ids=[2000000000 + y[0] for y in i])
+                        chatnames = await api.messages.get_conversations_by_id(peer_ids=[2000000000 + y[0] for y in i])
                         await c.executemany(
                             'update chatnames set name = %s where chat_id=%s',
                             [(chat.chat_settings.title, chat.peer.id - 2000000000) for chat in chatnames.items])
@@ -80,7 +80,7 @@ async def updateInfo():
 
                 for i in groups:
                     try:
-                        names = await API.groups.get_by_id(group_ids=[y[0] for y in i])
+                        names = await api.groups.get_by_id(group_ids=[y[0] for y in i])
                         await c.executemany('update groupnames set name = %s where group_id=%s',
                                             [(name.name, -abs(name.id)) for name in names.groups])
                     except:
@@ -91,9 +91,9 @@ async def updateInfo():
                                 await c.execute('select chat_id from publicchatssettings where last_update>%s',
                                                 (int(time.time()) - 43200,))).fetchall()],))).fetchall():
                     try:
-                        link = VK_API_SESSION.method(
+                        link = vk_api_session.method(
                             'messages.getInviteLink', {'peer_id': 2000000000 + i[0], 'group_id': GROUP_ID})['link']
-                        vkchat = VK_API_SESSION.method(
+                        vkchat = vk_api_session.method(
                             'messages.getConversationsById', {'peer_ids': 2000000000 + i[0]})
                         photo = PHOTO_NOT_FOUND
                         if ('items' in vkchat and len(vkchat['items']) and 'chat_settings' in vkchat['items'][0] and
@@ -186,7 +186,7 @@ async def run_notifications():
                             call = True
                         elif i[2] == 2:
                             try:
-                                members = await API.messages.get_conversation_members(i[1] + 2000000000)
+                                members = await api.messages.get_conversation_members(i[1] + 2000000000)
                                 call = ''.join(
                                     [f"[id{y.member_id}|\u200b\u206c]" for y in members.items if y.member_id > 0])
                             except:
@@ -200,7 +200,7 @@ async def run_notifications():
                                 'select uid from accesslvl where chat_id=%s and access_level>0 and uid>0', (i[1],))
                             chat = [y[0] for y in await ac.fetchall()]
                             try:
-                                members = await API.messages.get_conversation_members(i[1] + 2000000000)
+                                members = await api.messages.get_conversation_members(i[1] + 2000000000)
                                 call = ''.join([f"[id{y.member_id}|\u200b\u206c]" for y in members.items
                                                 if y.member_id > 0 and y.member_id not in chat])
                             except:

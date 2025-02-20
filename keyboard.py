@@ -419,13 +419,15 @@ def resetaccess_accept(uid, chat_id, lvl):
     return kb.get_json()
 
 
-def report(uid, repid, chat_id, text):
+def report(uid, repid, chat_id, text, photos):
     kb = Keyboard(inline=True)
 
-    kb.add(Callback('Ответить', {"cmd": "answer_report", "uid": uid, "chat_id": chat_id, "repid": repid, "text": text}),
-           KeyboardButtonColor.POSITIVE)
-    kb.add(Callback('Варн', {"cmd": "warn_report", "uid": uid, "chat_id": chat_id, "repid": repid}),
-           KeyboardButtonColor.NEGATIVE)
+    kb.add(Callback('Ответить', {"cmd": "report_answer", "uid": uid, "chat_id": chat_id, "repid": repid, "text": text,
+                                 "photos": photos}), KeyboardButtonColor.POSITIVE)
+    kb.add(Callback('Удалить', {"cmd": "report_delete", "uid": uid, "chat_id": chat_id, "repid": repid}),
+           KeyboardButtonColor.PRIMARY)
+    kb.add(Callback('Заблокировать', {"cmd": "report_ban", "uid": uid, "chat_id": chat_id, "repid": repid, "text": text}
+                    ), KeyboardButtonColor.NEGATIVE)
 
     return kb.get_json()
 

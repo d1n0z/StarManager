@@ -11,7 +11,7 @@ from Bot.checkers import haveAccess
 from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserAccessLevel, getUserName, getUserNickname, kickUser, \
     getUserBan, getChatName, getGroupName, getpool, sendMessage, ischatPubic
-from config.config import API
+from config.config import api
 from db import pool
 
 bl = BotLabeler()
@@ -54,11 +54,11 @@ async def skick(message: Message):
         ch_nickname = await getUserNickname(id, chat_id)
         u_nickname = await getUserNickname(uid, chat_id)
         if await kickUser(id, chat_id):
-            await API.messages.send(disable_mentions=1, random_id=0, chat_id=chat_id, message=messages.kick(
+            await api.messages.send(disable_mentions=1, random_id=0, chat_id=chat_id, message=messages.kick(
                 u_name, u_nickname, uid, ch_name, ch_nickname, id, kick_cause))
             success += 1
 
-    await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
+    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
                             message=messages.skick(
                                 id, ch_name, await getUserNickname(id, edit.peer_id - 2000000000), len(chats), success))
 
@@ -148,10 +148,10 @@ async def sban(message: Message):
                 await conn.commit()
 
         if await kickUser(id, chat_id):
-            await API.messages.send(disable_mentions=1, random_id=0, message=msg, chat_id=chat_id)
+            await api.messages.send(disable_mentions=1, random_id=0, message=msg, chat_id=chat_id)
         success += 1
 
-    await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
+    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
                             message=messages.sban(
                                 id, ch_name, await getUserNickname(id, edit.peer_id - 2000000000), len(chats), success))
 
@@ -187,7 +187,7 @@ async def sunban(message: Message):
                 await conn.commit()
         success += 1
 
-    await API.messages.edit(
+    await api.messages.edit(
         peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
         message=messages.sunban(id, await getUserName(id), await getUserNickname(id, edit.peer_id - 2000000000),
                                 len(chats), success))
@@ -237,7 +237,7 @@ async def ssnick(message: Message):
             uid, u_name, u_nick[0] if u_nick else None, id, name, ch_nick[0] if ch_nick else None, nickname))
         success += 1
 
-    await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
+    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
                             message=messages.ssnick(
                                 id, name, await getUserNickname(id, edit.peer_id - 2000000000), len(chats), success))
 
@@ -267,7 +267,7 @@ async def srnick(message: Message):
         if not await haveAccess('srnick', chat_id, u_acc) or await getUserAccessLevel(id, chat_id) > u_acc:
             continue
         try:
-            await API.messages.send(disable_mentions=1, random_id=0, chat_id=chat_id, message=messages.rnick(
+            await api.messages.send(disable_mentions=1, random_id=0, chat_id=chat_id, message=messages.rnick(
                 uid, u_name, await getUserNickname(uid, chat_id), id, ch_name, await getUserNickname(id, chat_id)))
             async with (await pool()).connection() as conn:
                 async with conn.cursor() as c:
@@ -277,7 +277,7 @@ async def srnick(message: Message):
             pass
         success += 1
 
-    await API.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
+    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
                             message=messages.srnick(id, ch_name, len(chats), success))
 
 
@@ -301,12 +301,12 @@ async def szov(message: Message):
     for chat_id in chats:
         if not await haveAccess('szov', chat_id, await getUserAccessLevel(uid, chat_id)):
             continue
-        members = await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)
-        await API.messages.send(random_id=0, chat_id=chat_id, message=messages.zov(
+        members = await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)
+        await api.messages.send(random_id=0, chat_id=chat_id, message=messages.zov(
             uid, name, await getUserNickname(uid, chat_id), text, members.items))
         success += 1
 
-    await API.messages.edit(
+    await api.messages.edit(
         peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
         message=messages.szov(
             uid, name, await getUserNickname(uid, edit.peer_id - 2000000000), data[1], len(chats), success))
@@ -315,10 +315,10 @@ async def szov(message: Message):
 @bl.chat_message(SearchCMD('chat'))
 async def chat(message: Message):
     chat_id = message.peer_id - 2000000000
-    members = (await API.messages.get_conversation_members(peer_id=chat_id + 2000000000)).items
+    members = (await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)).items
     id = [i for i in members if i.is_admin and i.is_owner][0].member_id
 
-    names = await API.users.get(user_ids=id)
+    names = await api.users.get(user_ids=id)
     try:
         name = f"{names[0].first_name} {names[0].last_name}"
         prefix = 'id'

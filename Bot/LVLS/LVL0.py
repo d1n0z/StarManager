@@ -3,7 +3,6 @@ import re
 import time
 from datetime import datetime
 
-from vkbottle import AiohttpClient
 from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 
@@ -14,10 +13,10 @@ from Bot.tgbot import tgbot
 from Bot.utils import (getIDFromMessage, getUserName, getRegDate, kickUser, getUserNickname, getUserAccessLevel,
                        getUserLastMessage, getUserMute, getUserBan, getUserXP, getUserNeededXP,
                        getUserPremium, uploadImage, addUserXP, isChatAdmin, getUserWarns, getUserMessages,
-                       setUserAccessLevel, getChatName, getULvlBanned, getChatSettings, deleteMessages,
-                       speccommandscheck, getUserPremmenuSettings, getUserPremmenuSetting, chatPremium, getURepBanned,
-                       getUserLeague, getUserLVL)
-from config.config import (API, LVL_NAMES, PATH, REPORT_CD, REPORT_TO, COMMANDS, TG_CHAT_ID, TG_TRANSFER_THREAD_ID,
+                       setUserAccessLevel, getULvlBanned, getChatSettings, deleteMessages,
+                       speccommandscheck, getUserPremmenuSettings, getUserPremmenuSetting, chatPremium, getUserLeague,
+                       getUserLVL)
+from config.config import (api, LVL_NAMES, PATH, COMMANDS, TG_CHAT_ID, TG_TRANSFER_THREAD_ID,
                            CMDLEAGUES)
 from db import pool
 from media.stats.stats_img import createStatsImage
@@ -39,7 +38,7 @@ async def id(message: Message):
     if id < 0:
         return await message.reply(disable_mentions=1, message=messages.id_group())
 
-    user = await API.users.get(user_ids=id)
+    user = await api.users.get(user_ids=id)
     if user[0].deactivated:
         return await message.reply(disable_mentions=1, message=messages.id_deleted())
     await message.reply(disable_mentions=1, message=messages.id(
@@ -72,7 +71,7 @@ async def top(message: Message):
             msgs = await (await c.execute(
                 'select uid, messages from messages where uid>0 and messages>0 and chat_id=%s and '
                 'uid=ANY(%s) order by messages desc limit 10', (chat_id, [i.member_id for i in (
-                    await API.messages.get_conversation_members(peer_id=message.peer_id)).items]))).fetchall()
+                    await api.messages.get_conversation_members(peer_id=message.peer_id)).items]))).fetchall()
     await message.reply(disable_mentions=1, message=await messages.top(msgs),
                         keyboard=keyboard.top(chat_id, message.from_id))
 
@@ -99,8 +98,8 @@ async def stats(message: Message):
     last_message = await getUserLastMessage(id, chat_id)
     if isinstance(last_message, int):
         last_message = datetime.fromtimestamp(last_message).strftime('%d.%m.%Y')
-    r = await AiohttpClient().request_content(
-        (await API.users.get(user_ids=id, fields='photo_max_orig'))[0].photo_max_orig)
+    r = await api.http_client.request_content(
+        (await api.users.get(user_ids=id, fields='photo_max_orig'))[0].photo_max_orig)
     with open(PATH + f'media/temp/{id}ava.jpg', "wb") as f:
         f.write(r)
 
@@ -115,45 +114,21 @@ async def stats(message: Message):
     lvl = await getUserLVL(id)
     if not lvl:
         lvl = 1
-    await message.reply(disable_mentions=1, attachment=await uploadImage(await createStatsImage(
-        await getUserWarns(id, chat_id), await getUserMessages(id, chat_id), id, await getUserAccessLevel(id, chat_id),
-        await getUserNickname(id, chat_id), await getRegDate(id, '%d.%m.%Y', 'Неизвестно'), last_message,
-        await getUserPremium(id), min(xp, 99999999), min(lvl, 999), invites[0],
-        await getUserName(id), await getUserMute(id, chat_id), await getUserBan(id, chat_id),
-        lvl_name[0] if lvl_name else LVL_NAMES[acc],
-        await getUserNeededXP(xp, lvl) if lvl < 999 else 0,
-        await getUserPremmenuSetting(id, 'border_color', False), await getUserLeague(id))))
-    await deleteMessages(reply.conversation_message_id, chat_id)
-
-
-@bl.chat_message(SearchCMD('report'))
-async def report(message: Message):
-    uid = message.from_id
-    if await getURepBanned(uid):
-        return await message.reply(disable_mentions=1, message=messages.repbanned())
-    chat_id = message.peer_id - 2000000000
-    data = message.text.split()
-    if len(data) <= 1:
-        return await message.reply(disable_mentions=1, message=messages.report_empty())
-
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            repu = await (await c.execute(
-                'select time from reports where uid=%s order by time desc limit 1', (uid,))).fetchone()
-    if repu and time.time() - repu[0] < REPORT_CD:
-        return await message.reply(disable_mentions=1, message=messages.report_cd())
-
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            repid = await (await c.execute('select id from reports order by id desc limit 1')).fetchone()
-            repid = (repid[0] + 1) if repid else 1
-            await c.execute('insert into reports (uid, id, time) VALUES (%s, %s, %s)', (uid, repid, int(time.time())))
-            await conn.commit()
-
-    await API.messages.send(disable_mentions=1, chat_id=REPORT_TO, random_id=0, message=messages.report(
-        uid, await getUserName(uid), ' '.join(data[1:]), repid, chat_id, await getChatName(chat_id)),
-                            keyboard=keyboard.report(uid, repid, chat_id, ' '.join(data[1:])))
-    await message.reply(disable_mentions=1, message=messages.report_sent(repid))
+    try:
+        await message.reply(disable_mentions=1, attachment=await uploadImage(await createStatsImage(
+            await getUserWarns(id, chat_id), await getUserMessages(id, chat_id), id,
+            await getUserAccessLevel(id, chat_id), await getUserNickname(id, chat_id),
+            await getRegDate(id, '%d.%m.%Y', 'Неизвестно'), last_message, await getUserPremium(id),
+            min(xp, 99999999), min(lvl, 999), invites[0], await getUserName(id), await getUserMute(id, chat_id),
+            await getUserBan(id, chat_id), lvl_name[0] if lvl_name else LVL_NAMES[acc],
+            await getUserNeededXP(xp, lvl) if lvl < 999 else 0, await getUserPremmenuSetting(id, 'border_color', False),
+            await getUserLeague(id))))
+    except Exception as e:
+        await deleteMessages(reply.conversation_message_id, chat_id)
+        await message.reply(disable_mentions=1, message='❌ Ошибка. Пожалуйста, попробуйте позже.')
+        raise e
+    else:
+        await deleteMessages(reply.conversation_message_id, chat_id)
 
 
 @bl.chat_message(SearchCMD('help'))
@@ -404,7 +379,7 @@ async def chats(message: Message):
 
 
 @bl.chat_message(SearchCMD('guess'))
-async def chats(message: Message):
+async def guess(message: Message):
     if st := await speccommandscheck(message.from_id, 'guess', 10):
         return await message.reply(
             disable_mentions=1, message=messages.speccommandscooldown(int(10 - (time.time() - st) + 1)))
@@ -425,3 +400,33 @@ async def chats(message: Message):
         bet = bet / 100 * 90
     await addUserXP(message.from_id, bet)
     await message.reply(disable_mentions=1, message=messages.guess_win(int(bet), data[2], prem))
+
+
+@bl.chat_message(SearchCMD('promo'))
+async def promo(message: Message):
+    data = message.text.split()
+    if len(data) != 2:
+        return await message.reply(disable_mentions=1, message=messages.promo_hint())
+    uid = message.from_id
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            code = await (await c.execute(
+                'select code, date, usage, xp from promocodes where code=%s', (data[1],))).fetchone()
+            if code and ((code[1] and time.time() > code[1] or (
+                    code[2] and (len(await (await c.execute('select id from promocodeuses where code=%s',
+                                                            (data[1],))).fetchall()) >= code[2])))):
+                await c.execute('delete from promocodes where code=%s', (data[1],))
+                await c.execute('delete from promocodeuses where code=%s', (data[1],))
+                await conn.commit()
+                code = None
+            if not code or (await (await c.execute('select id from promocodeuses where code=%s and uid=%s',
+                                                   (data[1], uid))).fetchone()):
+                return await message.reply(
+                    disable_mentions=1, message=messages.promo_alreadyusedornotexists(
+                        uid, await getUserNickname(uid, message.chat_id), await getUserName(uid)))
+            await c.execute('insert into promocodeuses (code, uid) values (%s, %s)', (data[1], uid))
+            await conn.commit()
+    await addUserXP(uid, int(code[3]))
+    await message.reply(disable_mentions=1, message=messages.promo(
+        uid, await getUserNickname(uid, message.chat_id), await getUserName(uid), code[0], code[3]))
+
