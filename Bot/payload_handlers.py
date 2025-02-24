@@ -36,8 +36,7 @@ async def join(message: MessageEvent):
 
     if cmd == 'join' or (cmd == 'rejoin' and not payload['activate']):
         try:
-            members = await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)
-            members = members.items
+            members = (await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)).items
         except:
             return await api.messages.send(random_id=0, message=messages.notadmin(), chat_id=chat_id)
 
