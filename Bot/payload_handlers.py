@@ -86,14 +86,15 @@ async def join(message: MessageEvent):
                                 (chat_id, int(time.time())))
                 await conn.commit()
 
-        try:
-            await tgbot.send_message(chat_id=TG_CHAT_ID, message_thread_id=TG_NEWCHAT_THREAD_ID,
-                                     text=f'{chat_id} | {await getChatName(chat_id)} | '
-                                          f'{await getChatOwner(chat_id)} | {await getChatMembers(chat_id)} | '
-                                          f'{datetime.now().strftime("%H:%M:%S")}',
-                                     disable_web_page_preview=True, parse_mode='HTML')
-        except:
-            pass
+        if cmd == 'join':
+            try:
+                await tgbot.send_message(chat_id=TG_CHAT_ID, message_thread_id=TG_NEWCHAT_THREAD_ID,
+                                         text=f'{chat_id} | {await getChatName(chat_id)} | '
+                                              f'{await getChatOwner(chat_id)} | {await getChatMembers(chat_id)} | '
+                                              f'{datetime.now().strftime("%H:%M:%S")}',
+                                         disable_web_page_preview=True, parse_mode='HTML')
+            except:
+                pass
 
         return await editMessage(messages.start(), peer_id, message.conversation_message_id)
     elif cmd == 'rejoin' and payload['activate']:
