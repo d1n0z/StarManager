@@ -1,6 +1,5 @@
 import time
 from datetime import datetime
-from math import ceil
 
 from Bot.checkers import getUInfBanned, getULvlBanned
 from Bot.tgbot import tgbot
@@ -39,7 +38,7 @@ async def add_msg_counter(chat_id, uid, audio=False, sticker=False) -> bool:
             await conn.commit()
 
     if audio:
-        addxp = 6
+        addxp = 20
         try:
             await tgbot.send_message(chat_id=TG_CHAT_ID, message_thread_id=TG_AUDIO_THREAD_ID,
                                      text=f'{chat_id} | {await getChatName(chat_id)} | '
@@ -49,9 +48,9 @@ async def add_msg_counter(chat_id, uid, audio=False, sticker=False) -> bool:
         except:
             pass
     elif sticker:
-        addxp = 2
+        addxp = 5
     else:
-        addxp = 4
+        addxp = 10
     if await getUserPremium(uid):
         addxp *= 1.5
     if await chatPremium(chat_id):

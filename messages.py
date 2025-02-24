@@ -4,7 +4,8 @@ from datetime import datetime
 
 from memoization import cached
 
-from Bot.utils import getUserNickname, pointMinutes, pointDays, pointHours, pointWords, getUserName, getChatAccessName
+from Bot.utils import getUserNickname, pointMinutes, pointDays, pointHours, pointWords, getUserName, getChatAccessName, \
+    getGroupName
 from config.config import COMMANDS, LVL_NAMES, COMMANDS_DESC, SETTINGS_POSITIONS, \
     SETTINGS_COUNTABLE_CHANGEPUNISHMENTMESSAGE, SETTINGS_COUNTABLE_NO_PUNISHMENT
 from db import syncpool
@@ -212,9 +213,11 @@ def unwarn_myself():
     return get('unwarn_myself')
 
 
-def clear(names, u_name, uid):
-    return get('clear', uid=uid, u_name=u_name, users=", ".join(
-        set([f"[{'id' if int(id) > 0 else 'club'}{id}|{name}]" for id, name in names.items()])))
+async def clear(deleting, uid, chat_id):
+    return get('clear', uid=uid, u_name=await getUserName(uid) or await getUserNickname(uid, chat_id), users=", ".join(
+        set([f"[{'id' if int(id) > 0 else 'club'}{id}|"
+             f"{(await getUserName(id) or await getUserNickname(id, chat_id)) if id > 0 else await getGroupName(id)}]"
+             for id in deleting])))
 
 
 def clear_hint():
@@ -2142,3 +2145,11 @@ def pin_hint():
 
 def pin_cannot():
     return get('pin_cannot')
+
+
+def unpin_notpinned():
+    return get('unpin_notpinned')
+
+
+def unpin_cannot():
+    return get('unpin_cannot')

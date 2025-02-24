@@ -216,7 +216,7 @@ async def setChatMute(uid: int | Iterable[int], chat_id: int, mute_time: int | f
         return
 
 
-async def uploadImage(file: str, uid: int | None = None, count: int = 0, delay: float = 0.5) -> str | None:
+async def uploadImage(file: str, uid: int | None = None, count: int = 0, delay: float = 1) -> str | None:
     if not uid:
         uid = await getHiddenAlbumUser()
     try:
@@ -238,7 +238,7 @@ async def uploadImage(file: str, uid: int | None = None, count: int = 0, delay: 
             await asyncio.sleep(1)
         if count != 5:
             await asyncio.sleep(delay)
-            return await uploadImage(file, uid, count + 1, delay + 0.5)
+            return await uploadImage(file, uid, count + 1, delay + 1)
         raise e
 
 
@@ -384,35 +384,8 @@ async def getUserLVL(uid, none=0) -> int:
 
 
 @AsyncLRU(maxsize=0)
-async def getLVLFromXP(xp):
-    if not xp:
-        return 1
-    lvl, incr, xp = 0, 0, xp + 1
-    while xp > 0:
-        xp -= 200 + incr
-        lvl += 1
-        incr += 20
-        if incr > 100:
-            incr = 20
-    return lvl
-
-
-@AsyncLRU(maxsize=0)
-async def getXPFromLVL(lvl):
-    if lvl == 1:
-        return 0
-    xp, incr = 0, 0
-    for _ in range(lvl - 1):
-        xp += 200 + incr
-        incr += 20
-        if incr > 100:
-            incr = 20
-    return xp
-
-
-@AsyncLRU(maxsize=0)
-async def getUserNeededXP(xp, lvl):
-    return await getXPFromLVL(lvl + 1) - xp
+async def getUserNeededXP(xp):
+    return 1000 - xp
 
 
 @AsyncTTL(time_to_live=120, maxsize=0)
@@ -506,10 +479,9 @@ async def addUserXP(uid, addxp, checklvlbanned=True):
         async with conn.cursor() as c:
             if u := await (await c.execute('select id, xp, lvl, league from xp where uid=%s', (uid,))).fetchone():
                 uxp, ulvl, ulg = u[1] + addxp, u[2], u[3]
-                while uxp >= await getXPFromLVL(ulvl + 1):
-                    ulvl += 1
-                    uxp -= await getXPFromLVL(ulvl)
-                if ulg != len(LEAGUE_LVL) and await getLVLFromXP(uxp) > LEAGUE_LVL[ulg]:
+                ulvl += uxp // 1000
+                uxp %= 1000
+                if ulg != len(LEAGUE_LVL) and ulvl > LEAGUE_LVL[ulg]:
                     return await c.execute('update xp set xp = 0, league = %s, lvl = %s where id=%s',
                                            (ulg + 1, u[0], ulvl))
                 await c.execute('update xp set xp = %s, lvl = %s where id=%s', (uxp, ulvl, u[0]))
@@ -678,8 +650,8 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings):
 
 
 async def speccommandscheck(uid: int, cmd: str, cd: int) -> int | bool:
-    if uid in DEVS:
-        return False
+    # if uid in DEVS:
+    #     return False
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             if s := await (await c.execute('select time from speccommandscooldown where uid=%s and time>%s and cmd=%s',

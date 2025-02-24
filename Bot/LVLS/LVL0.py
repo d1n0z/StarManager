@@ -121,7 +121,7 @@ async def stats(message: Message):
             await getRegDate(id, '%d.%m.%Y', 'Неизвестно'), last_message, await getUserPremium(id),
             min(xp, 99999999), min(lvl, 999), invites[0], await getUserName(id), await getUserMute(id, chat_id),
             await getUserBan(id, chat_id), lvl_name[0] if lvl_name else LVL_NAMES[acc],
-            await getUserNeededXP(xp, lvl) if lvl < 999 else 0, await getUserPremmenuSetting(id, 'border_color', False),
+            await getUserNeededXP(xp) if lvl < 999 else 0, await getUserPremmenuSetting(id, 'border_color', False),
             await getUserLeague(id))))
     except Exception as e:
         await deleteMessages(reply.conversation_message_id, chat_id)

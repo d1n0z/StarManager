@@ -384,9 +384,22 @@ async def pin(message: Message):
     if not message.reply_message:
         return await message.reply(disable_mentions=1, message=messages.pin_hint())
     try:
-        if not await api.messages.pin(message.peer_id, message.conversation_message_id):
+        if not await api.messages.pin(message.peer_id, message.reply_message.conversation_message_id):
             raise Exception
     except:
         return await message.reply(disable_mentions=1, message=messages.pin_cannot())
+    else:
+        await deleteMessages(message.conversation_message_id, message.chat_id)
+
+
+@bl.chat_message(SearchCMD('unpin'))
+async def unpin(message: Message):
+    if not (await api.messages.get_conversations_by_id(peer_ids=message.peer_id)).items[0].chat_settings.pinned_message:
+        return await message.reply(disable_mentions=1, message=messages.unpin_notpinned())
+    try:
+        if not await api.messages.unpin(message.peer_id):
+            raise Exception
+    except:
+        return await message.reply(disable_mentions=1, message=messages.unpin_cannot())
     else:
         await deleteMessages(message.conversation_message_id, message.chat_id)

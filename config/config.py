@@ -35,6 +35,7 @@ COMMANDS = {
     "gzov": 4,
 
     "skick": 5, "sban": 5, "sunban": 5, "ssnick": 5, "srnick": 5, "szov": 5, "chat": 5, "antitag": 5, "pin": 5,
+    "unpin": 5,
 
     "demote": 6, "gsetaccess": 6, "resetnick": 6, "resetaccess": 6, "gdelaccess": 6, "ssetaccess": 6, "sdelaccess": 6,
     "chatlimit": 6, "notif": 6, "ignore": 6, "unignore": 6, "ignorelist": 6, "purge": 6,
@@ -143,6 +144,8 @@ COMMANDS_DESC = {
     "chatsstats": "/chatsstats - информация по беседам.",
     "guess": "/guess - Угадать число.",
     "antitag": "/antitag - Запретить упоминание пользователя.",
+    "pin": "/pin - Закрепить сообщение.",
+    "unpin": "/unpin - Открепить сообщение.",
 }
 
 # chat ids

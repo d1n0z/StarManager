@@ -231,35 +231,33 @@ async def warn(message: Message):
 async def clear(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    u_ids = []
-    cmids = []
-    if len(message.fwd_messages) > 0:
-        for i in message.fwd_messages:
-            u_ids.append(str(i.from_id))
-            cmids.append(str(i.conversation_message_id))
-    if message.reply_message is not None:
-        u_ids.append(str(message.reply_message.from_id))
-        cmids.append(str(message.reply_message.conversation_message_id))
-    if len(u_ids) <= 0:
+
+    deleting = []
+    for i in (message.fwd_messages + [message.reply_message]) if message.reply_message else message.fwd_messages:
+        deleting.append((i.from_id, i.conversation_message_id))
+    # data = message.text.split()
+    # if (len(data) < 2 and not deleting) or (len(data) == 2 and not data[1].isdigit()) or (
+    #         len(data) == 3 and not (id := await getIDFromMessage(message.text, None,) and not data[2].isdigit())):
+    if not deleting:
         return await message.reply(disable_mentions=1, message=messages.clear_hint())
-    names = {}
-    for i in u_ids:
-        names[i] = await getUserName(int(i))
-
-    for ind, i in enumerate(u_ids):
-        if int(i) < 0:
-            continue
-        if await getUserAccessLevel(uid, chat_id) < await getUserAccessLevel(i, chat_id):
-            cmids.pop(ind)
-
-    if len(cmids) > 0:
+    deleting = [
+        i for i in deleting if await getUserAccessLevel(i[0], chat_id) <= await getUserAccessLevel(uid, chat_id)]
+    if deleting:
         try:
-            await api.messages.delete(peer_id=2000000000 + chat_id, cmids=cmids, delete_for_all=True)
-            await message.reply(disable_mentions=1, message=messages.clear(names, await getUserName(uid), uid))
+            deleted = await api.messages.delete(
+                peer_id=message.peer_id, cmids=[mid for _, mid in deleting], delete_for_all=True)
+            if all(True if i.error and 'admin message' in i.error.description else False for i in deleted):
+                return await message.reply(disable_mentions=1, message=messages.clear_admin())
+            if all(True if i.error else False for i in deleted):
+                return await message.reply(disable_mentions=1, message=messages.clear_old())
+            deleted = [i.conversation_message_id for i in deleted if i.error]
+            deleting = [i[0] for i in deleting if i[1] not in deleted]
         except VKAPIError[15]:
             await message.reply(disable_mentions=1, message=messages.clear_admin())
         except VKAPIError:
             await message.reply(disable_mentions=1, message=messages.clear_old())
+        else:
+            await message.reply(disable_mentions=1, message=await messages.clear(deleting, uid, chat_id))
     else:
         await message.reply(disable_mentions=1, message=messages.clear_higher())
 
