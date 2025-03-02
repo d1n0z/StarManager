@@ -23,7 +23,7 @@ from vkbottle_types.objects import MessagesMessage, MessagesMessageAttachmentTyp
 
 from config.config import (api, vk_api_session, VK_TOKEN_GROUP, GROUP_ID, SETTINGS, PATH,
                            NSFW_CATEGORIES, SETTINGS_ALT, SETTINGS_DEFAULTS, PREMMENU_DEFAULT, PREMMENU_TURN,
-                           LEAGUE_LVL, DEVS)
+                           LEAGUE_LVL, DEVS, IMPORTSETTINGS_DEFAULT)
 from db import pool
 
 _hiddenalbumuid = None
@@ -821,7 +821,7 @@ async def punish(uid, chat_id, setting_id):
                         'update ban set ban = %s, last_bans_times = %s, last_bans_causes = %s, last_bans_names = %s, '
                         'last_bans_dates = %s where chat_id=%s and uid=%s',
                         (int(time.time() + ban_time), f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}",
-                            chat_id, uid))).rowcount:
+                         chat_id, uid))).rowcount:
                     await c.execute(
                         'insert into ban (uid, chat_id, ban, last_bans_times, last_bans_causes, last_bans_names, '
                         'last_bans_dates) values (%s, %s, %s, %s, %s, %s, %s)',
@@ -914,3 +914,27 @@ async def getHiddenAlbumUser():
                 if (await api.messages.is_messages_from_group_allowed(group_id=GROUP_ID, user_id=i[0])).is_allowed:
                     _hiddenalbumuid = i[0]
                     return _hiddenalbumuid
+
+
+async def getImportSettings(uid, chat_id):
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if s := await (await c.execute(
+                    'select sys, acc, nicks, punishes, binds from importsettings where uid=%s and chat_id=%s',
+                    (uid, chat_id,))).fetchone():
+                return {'sys': s[0], 'acc': s[1], 'nicks': s[2], 'punishes': s[3], 'binds': s[4]}
+            return IMPORTSETTINGS_DEFAULT
+
+
+async def turnImportSetting(chat_id, uid, setting):
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if not (await c.execute('update importsettings set ' + setting + '=not ' + setting +
+                                    ' where chat_id=%s and uid=%s;', (chat_id, uid))).rowcount:
+                defaults = IMPORTSETTINGS_DEFAULT.copy()
+                defaults[setting] = not defaults[setting]
+                await c.execute(
+                    'insert into importsettings (uid, chat_id, sys, acc, nicks, punishes, binds) values (%s, %s, %s, %s'
+                    ', %s, %s, %s)', (uid, chat_id, defaults['sys'], defaults['acc'], defaults['nicks'],
+                                      defaults['punishes'], defaults['binds']))
+            await conn.commit()

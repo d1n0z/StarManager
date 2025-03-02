@@ -749,3 +749,26 @@ def antitag(uid):
     kb.add(Callback('Посмотреть список', {"cmd": "antitag_list", "uid": uid}))
 
     return kb.get_json()
+
+
+def import_(uid, importchatid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('Начать', {"cmd": "import_start", "uid": uid, "importchatid": importchatid}))
+    kb.add(Callback('Настроить', {"cmd": "import_settings", "uid": uid, "importchatid": importchatid}))
+
+    return kb.get_json()
+
+
+def import_settings(uid, importchatid, settings: dict):
+    kb = Keyboard(inline=True)
+
+    for k, (kn, i) in enumerate(settings.items()):
+        if k and k % 3 == 0:
+            kb.row()
+        kb.add(Callback(f'[{k + 1}]. {"Выключить" if i else "Включить"}',
+                        {"cmd": "import_turn", "uid": uid, "importchatid": importchatid, 'setting': kn}),
+               KeyboardButtonColor.NEGATIVE if i else KeyboardButtonColor.POSITIVE)
+    kb.add(Callback('Назад', {"cmd": "import", "uid": uid, "importchatid": importchatid}), KeyboardButtonColor.PRIMARY)
+
+    return kb.get_json()

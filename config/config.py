@@ -42,7 +42,7 @@ COMMANDS = {
 
     "mygroups": 7, "creategroup": 7, "delgroup": 7, "levelname": 7, "resetlevel": 7, "async": 7, "bind": 7, "unbind": 7,
     "delasync": 7, "addfilter": 7, "delfilter": 7, "filterlist": 7, "gaddfilter": 7, "gdelfilter": 7, "listasync": 7,
-    "editlevel": 7, "giveowner": 7, "settings": 7,
+    "editlevel": 7, "giveowner": 7, "settings": 7, "import": 7,
 
     "botinfo": 8, "msg": 8, "blacklist": 8, "addblack": 8, "delblack": 8, "setstatus": 8, "delstatus": 8, "inflist": 8,
     "statuslist": 8, "cmdcount": 8, "infban": 8, "infunban": 8, "getlink": 8, "backup": 8, "gps": 8, "checkleaved": 8,
@@ -319,6 +319,13 @@ NSFW_CATEGORIES = [
     "MALE_GENITALIA_EXPOSED",
 ]
 
+IMPORTSETTINGS_DEFAULT = {
+    'sys': True,
+    'acc': True,
+    'nicks': True,
+    'punishes': True,
+    'binds': False
+}
 
 api = API(VK_TOKEN_GROUP)
 vk_api_session = vk_api.VkApi(token=VK_TOKEN_GROUP, api_version='5.199')

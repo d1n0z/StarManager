@@ -728,5 +728,19 @@ class PromocodeUses(Model):
         table_name = f'promocodeuses'
 
 
+class ImportSettings(Model):
+    uid = IntegerField()
+    chat_id = IntegerField()
+    sys = BooleanField(default=True)
+    acc = BooleanField(default=True)
+    nicks = BooleanField(default=True)
+    punishes = BooleanField(default=True)
+    binds = BooleanField(default=False)
+
+    class Meta:
+        database = dbhandle
+        table_name = f'importsettings'
+
+
 if __name__ == '__main__':
     dbhandle.create_tables(Model.__subclasses__())

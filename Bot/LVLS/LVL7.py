@@ -392,3 +392,15 @@ async def listasync(message: Message):
     chats_info = [{"id": i, "name": names[k]} for k, i in enumerate(chat_ids)]
     await message.reply(disable_mentions=1, message=messages.listasync(chats_info, total),
                         keyboard=keyboard.listasync(uid, total))
+
+
+@bl.chat_message(SearchCMD('import'))
+async def import_(message: Message):
+    data = message.text.split()
+    if len(data) != 2 or not data[1].isdigit():
+        return await message.reply(disable_mentions=1, message=messages.import_hint())
+    importchatid = int(data[1])
+    if await getUserAccessLevel(message.from_id, importchatid) < 7:
+        return await message.reply(disable_mentions=1, message=messages.import_notowner())
+    await message.reply(disable_mentions=1, message=messages.import_(
+        message.chat_id, await getChatName(message.chat_id)), keyboard=keyboard.import_(message.from_id, importchatid))

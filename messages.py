@@ -2153,3 +2153,21 @@ def unpin_notpinned():
 
 def unpin_cannot():
     return get('unpin_cannot')
+
+
+def import_settings(chid, name, settings):
+    settings = {k: '🟢' if i else '🔴' for k, i in settings.items()}
+    return get('import_settings', chid=chid, name=name, sys=settings['sys'], acc=settings['acc'],
+               nicks=settings['nicks'], punishes=settings['punishes'], binds=settings['binds'])
+
+
+def import_hint():
+    return get('import_hint')
+
+
+def import_notowner():
+    return get('delasync_not_owner')
+
+
+def import_(chid, name):
+    return get('import', chid=chid, name=name)

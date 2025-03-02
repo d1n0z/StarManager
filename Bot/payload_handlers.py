@@ -18,7 +18,7 @@ from Bot.utils import (sendMessageEventAnswer, editMessage, getUserAccessLevel, 
                        getUserMute, getULvlBanned, getChatSettings, turnChatSetting, deleteMessages, setChatMute,
                        getChatAltSettings, getChatMembers, getChatOwner, getUserPremmenuSettings, getSilenceAllowed,
                        sendMessage, getSilence, setUserAccessLevel, getGroupName, isMessagesFromGroupAllowed,
-                       getURepBanned)
+                       getURepBanned, getImportSettings, turnImportSetting)
 from config.config import api, COMMANDS, SETTINGS_COUNTABLE, \
     TG_CHAT_ID, TG_NEWCHAT_THREAD_ID, SETTINGS_PREMIUM, LEAGUE, PREMMENU_DEFAULT
 from db import pool
@@ -1417,3 +1417,34 @@ async def antitag_list(message: MessageEvent):
             users = set([i[0] for i in await (await c.execute('select uid from antitag where chat_id=%s',
                                                               (chat_id,))).fetchall()])
     await editMessage(await messages.antitag_list(users, chat_id), peer_id, message.conversation_message_id)
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['import']))
+async def import_(message: MessageEvent):
+    importchatid = message.payload['importchatid']
+    if await getUserAccessLevel(message.from_id, importchatid) < 7:
+        return await editMessage(
+            await messages.import_notowner(), message.object.peer_id, message.conversation_message_id)
+    await editMessage(await messages.import_(importchatid, await getChatName(importchatid)),
+                      message.object.peer_id, message.conversation_message_id,
+                      keyboard.import_(message.user_id, importchatid))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['import_settings']))
+async def import_settings(message: MessageEvent):
+    importchid = message.payload['importchatid']
+    await editMessage(await messages.import_settings(
+        importchid, await getChatName(importchid), s := await getImportSettings(message.user_id, importchid)),
+                      message.object.peer_id, message.conversation_message_id, keyboard.import_settings(
+            message.user_id, importchid, s))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['import_turn']))
+async def import_turn(message: MessageEvent):
+    importchid = message.payload['importchatid']
+    setting = message.payload['setting']
+    await turnImportSetting(importchid, message.user_id, setting)
+    await editMessage(await messages.import_settings(
+        importchid, await getChatName(importchid), s := await getImportSettings(message.user_id, importchid)),
+                      message.object.peer_id, message.conversation_message_id, keyboard.import_settings(
+            message.user_id, importchid, s))
