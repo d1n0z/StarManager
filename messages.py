@@ -2171,3 +2171,11 @@ def import_notowner():
 
 def import_(chid, name):
     return get('import', chid=chid, name=name)
+
+
+def import_start(importchatid):
+    return get('import_start', chid=importchatid)
+
+
+def import_end(importchatid):
+    return get('import_end', chid=importchatid)

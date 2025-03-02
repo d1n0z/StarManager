@@ -49,6 +49,7 @@ def run():
     @bot.error_handler.register_error_handler(VKAPIError[7])
     @bot.error_handler.register_error_handler(VKAPIError[917])
     @bot.error_handler.register_error_handler(VKAPIError[100])
+    @bot.error_handler.register_error_handler(VKAPIError[6])
     @bot.error_handler.register_error_handler(pydantic.ValidationError)
     @bot.error_handler.register_error_handler(v1.ValidationError)
     @bot.error_handler.register_error_handler(v1.error_wrappers.ValidationError)

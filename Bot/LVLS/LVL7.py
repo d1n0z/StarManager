@@ -403,4 +403,4 @@ async def import_(message: Message):
     if await getUserAccessLevel(message.from_id, importchatid) < 7:
         return await message.reply(disable_mentions=1, message=messages.import_notowner())
     await message.reply(disable_mentions=1, message=messages.import_(
-        message.chat_id, await getChatName(message.chat_id)), keyboard=keyboard.import_(message.from_id, importchatid))
+        importchatid, await getChatName(importchatid)), keyboard=keyboard.import_(message.from_id, importchatid))

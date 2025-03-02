@@ -18,7 +18,7 @@ from Bot.utils import (sendMessageEventAnswer, editMessage, getUserAccessLevel, 
                        getUserMute, getULvlBanned, getChatSettings, turnChatSetting, deleteMessages, setChatMute,
                        getChatAltSettings, getChatMembers, getChatOwner, getUserPremmenuSettings, getSilenceAllowed,
                        sendMessage, getSilence, setUserAccessLevel, getGroupName, isMessagesFromGroupAllowed,
-                       getURepBanned, getImportSettings, turnImportSetting)
+                       getImportSettings, turnImportSetting)
 from config.config import api, COMMANDS, SETTINGS_COUNTABLE, \
     TG_CHAT_ID, TG_NEWCHAT_THREAD_ID, SETTINGS_PREMIUM, LEAGUE, PREMMENU_DEFAULT
 from db import pool
@@ -1422,10 +1422,10 @@ async def antitag_list(message: MessageEvent):
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['import']))
 async def import_(message: MessageEvent):
     importchatid = message.payload['importchatid']
-    if await getUserAccessLevel(message.from_id, importchatid) < 7:
+    if await getUserAccessLevel(message.user_id, importchatid) < 7:
         return await editMessage(
-            await messages.import_notowner(), message.object.peer_id, message.conversation_message_id)
-    await editMessage(await messages.import_(importchatid, await getChatName(importchatid)),
+            messages.import_notowner(), message.object.peer_id, message.conversation_message_id)
+    await editMessage(messages.import_(importchatid, await getChatName(importchatid)),
                       message.object.peer_id, message.conversation_message_id,
                       keyboard.import_(message.user_id, importchatid))
 
@@ -1433,7 +1433,7 @@ async def import_(message: MessageEvent):
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['import_settings']))
 async def import_settings(message: MessageEvent):
     importchid = message.payload['importchatid']
-    await editMessage(await messages.import_settings(
+    await editMessage(messages.import_settings(
         importchid, await getChatName(importchid), s := await getImportSettings(message.user_id, importchid)),
                       message.object.peer_id, message.conversation_message_id, keyboard.import_settings(
             message.user_id, importchid, s))
@@ -1444,7 +1444,96 @@ async def import_turn(message: MessageEvent):
     importchid = message.payload['importchatid']
     setting = message.payload['setting']
     await turnImportSetting(importchid, message.user_id, setting)
-    await editMessage(await messages.import_settings(
+    await editMessage(messages.import_settings(
         importchid, await getChatName(importchid), s := await getImportSettings(message.user_id, importchid)),
                       message.object.peer_id, message.conversation_message_id, keyboard.import_settings(
             message.user_id, importchid, s))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['import_start']))
+async def import_start(message: MessageEvent):
+    importchatid = message.payload['importchatid']
+    await editMessage(messages.import_start(importchatid), message.object.peer_id, message.conversation_message_id)
+    chatid = message.object.peer_id - 2000000000
+    settings = await getImportSettings(message.user_id, importchatid)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            if settings['sys']:
+                if t := await (await c.execute('select activated, allowed from silencemode where chat_id=%s',
+                                               (importchatid,))).fetchone():
+                    await c.execute('insert into silencemode (chat_id, activated, allowed) values (%s, %s, %s)',
+                                    (chatid, *t))
+                for i in await (await c.execute('select filter from filters where chat_id=%s',
+                                                (importchatid,))).fetchall():
+                    await c.execute('insert into filters (chat_id, filter) values (%s, %s)', (chatid, *i))
+                for i in await (await c.execute('select cmd, lvl from commandlevels where chat_id=%s',
+                                                (importchatid,))).fetchall():
+                    await c.execute('insert into commandlevels (chat_id, cmd, lvl) values (%s, %s, %s)', (chatid, *i))
+                for i in await (await c.execute('select setting, pos, "value", punishment, value2, pos2 from settings '
+                                                'where chat_id=%s', (importchatid,))).fetchall():
+                    await c.execute('insert into settings (chat_id, setting, pos, value, punishment, value2, pos2) '
+                                    'values (%s, %s, %s, %s, %s, %s, %s)', (chatid, *i))
+                if t := await (await c.execute(
+                        'select msg, url, photo, button_label from welcome where chat_id=%s', (importchatid,)
+                )).fetchone():
+                    await c.execute(
+                        'insert into welcome (chat_id, msg, url, photo, button_label) values (%s, %s, %s, %s, %s)',
+                        (chatid, *t))
+                for i in await (await c.execute('select lvl, name from accessnames where chat_id=%s',
+                                                (importchatid,))).fetchall():
+                    await c.execute('insert into accessnames (chat_id, lvl, name) values (%s, %s, %s)', (chatid, *i))
+                for i in await (await c.execute('select uid from ignore where chat_id=%s', (importchatid,))).fetchall():
+                    await c.execute('insert into ignore (chat_id, uid) values (%s, %s)', (chatid, *i))
+                if t := await (await c.execute('select time from chatlimit where chat_id=%s',
+                                               (importchatid,))).fetchone():
+                    await c.execute('insert into chatlimit (chat_id, time) values (%s, %s)', (chatid, *t))
+                for i in await (await c.execute('select tag, every, status, time, name, description, text from '
+                                                'notifications where chat_id=%s', (importchatid,))).fetchall():
+                    await c.execute('insert into notifications (chat_id, tag, every, status, time, name, description, '
+                                    'text) values (%s, %s, %s, %s, %s, %s, %s, %s)', (chatid, *i))
+                for i in await (await c.execute('select url from antispamurlexceptions where chat_id=%s',
+                                                (importchatid,))).fetchall():
+                    await c.execute('insert into antispamurlexceptions (chat_id, url) values (%s, %s)', (chatid, *i))
+                for i in await (await c.execute('select uid from antitag where chat_id=%s',
+                                                (importchatid,))).fetchall():
+                    await c.execute('insert into antitag (chat_id, uid) values (%s, %s)', (chatid, *i))
+                for i in await (await c.execute('select uid, sys, acc, nicks, punishes, binds from importsettings where'
+                                                ' chat_id=%s', (importchatid,))).fetchall():
+                    await c.execute('insert into importsettings (chat_id, uid, sys, acc, nicks, punishes, binds) values'
+                                    ' (%s, %s, %s, %s, %s, %s, %s)', (chatid, *i))
+            if settings['acc']:
+                for i in await (await c.execute('select uid, access_level from accesslvl where chat_id=%s',
+                                                (importchatid,))).fetchall():
+                    await c.execute('insert into accesslvl (chat_id, uid, access_level) values (%s, %s, %s)',
+                                    (chatid, *i))
+            if settings['nicks']:
+                for i in await (await c.execute('select uid, nickname from nickname where chat_id=%s',
+                                                (importchatid,))).fetchall():
+                    await c.execute('insert into nickname (chat_id, uid, nickname) values (%s, %s, %s)', (chatid, *i))
+            if settings['punishes']:
+                for i in await (await c.execute(
+                        'select uid, warns, last_warns_times, last_warns_names, last_warns_dates, last_warns_causes '
+                        'from warn where chat_id=%s', (importchatid,))).fetchall():
+                    await c.execute('insert into warn (chat_id, uid, warns, last_warns_times, last_warns_names, '
+                                    'last_warns_dates, last_warns_causes) values (%s, %s, %s, %s, %s, %s, %s)', 
+                                    (chatid, *i))
+                for i in await (await c.execute(
+                        'select uid, ban, last_bans_times, last_bans_names, last_bans_dates, last_bans_causes '
+                        'from ban where chat_id=%s', (importchatid,))).fetchall():
+                    await c.execute('insert into ban (chat_id, uid, ban, last_bans_times, last_bans_names, '
+                                    'last_bans_dates, last_bans_causes) values (%s, %s, %s, %s, %s, %s, %s)', 
+                                    (chatid, *i))
+                for i in await (await c.execute(
+                        'select uid, mute, last_mutes_times, last_mutes_names, last_mutes_dates, last_mutes_causes '
+                        'from mute where chat_id=%s', (importchatid,))).fetchall():
+                    await c.execute('insert into mute (chat_id, uid, mute, last_mutes_times, last_mutes_names, '
+                                    'last_mutes_dates, last_mutes_causes) values (%s, %s, %s, %s, %s, %s, %s)', 
+                                    (chatid, *i))
+            if settings['binds']:
+                for i in await (await c.execute('select uid from gpool where chat_id=%s',
+                                                (importchatid,))).fetchall():
+                    await c.execute('insert into gpool (chat_id, uid) values (%s, %s)', (chatid, *i))
+                for i in await (await c.execute('select uid, "group" from chatgroups where chat_id=%s',
+                                                (importchatid,))).fetchall():
+                    await c.execute('insert into chatgroups (chat_id, uid, "group") values (%s, %s, %s)', (chatid, *i))
+    await editMessage(messages.import_end(importchatid), message.object.peer_id, message.conversation_message_id)
