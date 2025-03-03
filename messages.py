@@ -2179,3 +2179,15 @@ def import_start(importchatid):
 
 def import_end(importchatid):
     return get('import_end', chid=importchatid)
+
+
+def newpost_toolate(name, uid):
+    return get('newpost_toolate', n=name, uid=uid)
+
+
+def newpost(name, uid):
+    return get('newpost', n=name, uid=uid)
+
+
+def newpost_dup(name, uid):
+    return get('newpost_dup', n=name, uid=uid)

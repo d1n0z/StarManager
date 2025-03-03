@@ -742,5 +742,14 @@ class ImportSettings(Model):
         table_name = f'importsettings'
 
 
+class NewPostComments(Model):
+    uid = IntegerField()
+    pid = IntegerField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'newpostcomments'
+
+
 if __name__ == '__main__':
     dbhandle.create_tables(Model.__subclasses__())

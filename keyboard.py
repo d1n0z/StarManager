@@ -189,7 +189,7 @@ def settings_category(uid, category, settings):
         if c % 2 == 0:
             kb.row()
         c += 1
-    if c % 2 == 0:
+    if c % 2 == 1:
         kb.row()
     kb.add(Callback('Назад', {"uid": uid, "cmd": "settings_menu"}))
 

@@ -11,6 +11,7 @@ config.read(f'{__file__.replace("config.py", "")}config.ini')
 PATH = config['SERVICE']['PATH']
 
 VK_TOKEN_GROUP = config['VK']['VK_TOKEN_GROUP']
+VK_SERVICE_TOKEN = config['VK']['VK_SERVICE_TOKEN']
 GROUP_ID = abs(int(config['VK']['GROUP_ID']))
 VK_APP_ID = config['VK']['VK_APP_ID']
 VK_APP_SECRET = config['VK']['VK_APP_SECRET']
@@ -176,6 +177,7 @@ def SETTINGS():
             "kickLeaving": 1,
             "kickBlockingViolator": 0,
             "deleteAccessAndNicknameOnLeave": 0,
+            "disallowPings": 0,
             "nightmode": 0,
             "welcome": 0,
             "captcha": 0,
@@ -218,6 +220,7 @@ SETTINGS_POSITIONS = {
         "kickLeaving": ["Выкл.", "Вкл."],
         "kickBlockingViolator": ["Удалить сообщ.", "Исключить"],
         "deleteAccessAndNicknameOnLeave": ["Выкл.", "Вкл."],
+        "disallowPings": ["Выкл.", "Вкл."],
         "nightmode": ["Выкл.", "Вкл."],
         "welcome": ["Выкл.", "Вкл."],
         "captcha": ["Выкл.", "Вкл."],
@@ -329,6 +332,7 @@ IMPORTSETTINGS_DEFAULT = {
 
 api = API(VK_TOKEN_GROUP)
 vk_api_session = vk_api.VkApi(token=VK_TOKEN_GROUP, api_version='5.199')
+service_vk_api_session = vk_api.VkApi(token=VK_SERVICE_TOKEN, api_version='5.199')
 
 USER = config['DATABASE']['USER']
 PASSWORD = config['DATABASE']['PASSWORD']
