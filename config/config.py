@@ -26,7 +26,7 @@ COMMANDS = {
     "deanon": 0, "chats": 0, "catalog": 0, "guess": 0, "promo": 0,
 
     "kick": 1, "mute": 1, "warn": 1, "clear": 1, "staff": 1, "olist": 1, "getnick": 1, "snick": 1, "rnick": 1,
-    "nlist": 1, "check": 1, "mkick": 1,
+    "nlist": 1, "check": 1, "mkick": 1, "scan": 1,
 
     "unmute": 2, "unwarn": 2, "mutelist": 2, "warnlist": 2, "setaccess": 2, "delaccess": 2,
 
@@ -39,7 +39,7 @@ COMMANDS = {
     "unpin": 5,
 
     "demote": 6, "gsetaccess": 6, "resetnick": 6, "resetaccess": 6, "gdelaccess": 6, "ssetaccess": 6, "sdelaccess": 6,
-    "chatlimit": 6, "notif": 6, "ignore": 6, "unignore": 6, "ignorelist": 6, "purge": 6,
+    "chatlimit": 6, "notif": 6, "ignore": 6, "unignore": 6, "ignorelist": 6, "purge": 6, "rename": 6,
 
     "mygroups": 7, "creategroup": 7, "delgroup": 7, "levelname": 7, "resetlevel": 7, "async": 7, "bind": 7, "unbind": 7,
     "delasync": 7, "addfilter": 7, "delfilter": 7, "filterlist": 7, "gaddfilter": 7, "gdelfilter": 7, "listasync": 7,
@@ -148,7 +148,13 @@ COMMANDS_DESC = {
     "pin": "/pin - Закрепить сообщение.",
     "unpin": "/unpin - Открепить сообщение.",
     "import": "/import - Импортировать настройки из других бесед.",
+    "rename": "/rename - Изменить название беседы.",
+    "scan": "/scan - Сканировать ссылки на наличие вирусов.",
+    "anon": "/anon - Отправить анонимное сообщение.",
+    "deanon": "/deanon - Узнать отправителя анонимного сообщения.",
 }
+COMMANDS_PREMIUM = ['premmenu', 'mkick', 'ignore', 'unignore', 'ignorelist', 'chatlimit', 'editlevel', 'levelname',
+                    'resetlevel', 'anon', 'deanon', 'prefix']
 
 # chat ids
 DAILY_TO = int(config['SERVICE']['DAILY_TO'])
@@ -359,6 +365,15 @@ YOOKASSA_MERCHANT_ID = int(config['YOOKASSA']['YOOKASSA_MERCHANT_ID'])
 YOOKASSA_TOKEN = config['YOOKASSA']['YOOKASSA_TOKEN']
 
 YANDEX_TOKEN = config['YANDEX']['TOKEN']
+
+GOOGLE_TOKEN = config['GOOGLE']['TOKEN']
+GOOGLE_THREATS = {
+    "MALWARE": 'вредоносное ПО',
+    "SOCIAL_ENGINEERING": 'социальная инженерия',
+    "THREAT_TYPE_UNSPECIFIED": 'тип угрозы не указан',
+    "UNWANTED_SOFTWARE": 'нежелательное ПО',
+    "POTENTIALLY_HARMFUL_APPLICATION": 'потенциально вредоносное приложение'
+}
 
 PREMIUM_COST = {30: 99, 90: 249, 180: 499}
 data = {

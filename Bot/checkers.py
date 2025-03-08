@@ -5,7 +5,7 @@ from cache.async_ttl import AsyncTTL
 
 import messages
 from Bot.utils import getUserAccessLevel, getUserPremium, getUserLastMessage, getUserMute, getChatSettings, \
-    deleteMessages
+    deleteMessages, getUserPrefixes
 from config.config import COMMANDS, api, PREFIX, DEVS, MAIN_DEVS, LVL_BANNED_COMMANDS, PM_COMMANDS
 from db import pool
 
@@ -41,15 +41,6 @@ async def haveAccess(cmd, chat_id, uacc, premium=0) -> int | bool:
         return COMMANDS[cmd] <= uacc
     except:
         return 7 <= uacc
-
-
-async def getUserPrefixes(u_prem, uid) -> list:
-    if u_prem:
-        async with (await pool()).connection() as conn:
-            async with conn.cursor() as c:
-                prefixes = await (await c.execute('select prefix from prefix where uid=%s', (uid,))).fetchall()
-        return PREFIX + [i[0] for i in prefixes]
-    return PREFIX
 
 
 @AsyncTTL(maxsize=0)

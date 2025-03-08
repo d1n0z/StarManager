@@ -41,7 +41,7 @@ async def anon(message: GroupTypes.MessageNew):
     for i in data:
         for y in i.split('/'):
             try:
-                if whoiscached(y)['domain_name'] is None:
+                if not whoiscached(y):
                     continue
             except:
                 continue

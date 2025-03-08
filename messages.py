@@ -7,7 +7,7 @@ from memoization import cached
 from Bot.utils import getUserNickname, pointMinutes, pointDays, pointHours, pointWords, getUserName, getChatAccessName, \
     getGroupName
 from config.config import COMMANDS, LVL_NAMES, COMMANDS_DESC, SETTINGS_POSITIONS, \
-    SETTINGS_COUNTABLE_CHANGEPUNISHMENTMESSAGE, SETTINGS_COUNTABLE_NO_PUNISHMENT
+    SETTINGS_COUNTABLE_CHANGEPUNISHMENTMESSAGE, SETTINGS_COUNTABLE_NO_PUNISHMENT, GOOGLE_THREATS, COMMANDS_PREMIUM
 from db import syncpool
 
 
@@ -44,16 +44,17 @@ async def top(top):
 
 
 def help(page=0, cmds=COMMANDS):
-    if page == 8:
-        return get('help_page8')
-
-    descs = {0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [], 8: []}
-    for k, i in cmds.items():
-        try:
-            descs[int(i)].append(COMMANDS_DESC[k])
-        except:
-            pass
-    return get(f'help_page{page}') + ''.join([f'{i}\n' for i in descs[page]]) + get('help_last')
+    descs = {i: [] for i in range(0, 9)}
+    if page != 8:
+        for k, i in cmds.items():
+            try:
+                descs[int(i)].append(COMMANDS_DESC[k])
+            except:
+                pass
+        return get(f'help_page{page}') + ''.join([f'{i}\n' for i in descs[page]]) + get('help_last')
+    else:
+        return get(
+            f'help_page{page}') + ''.join([f'{COMMANDS_DESC[i]}\n' for i in COMMANDS_PREMIUM]) + get('help_last')
 
 
 def helpdev():
@@ -2191,3 +2192,32 @@ def newpost(name, uid):
 
 def newpost_dup(name, uid):
     return get('newpost_dup', n=name, uid=uid)
+
+
+def rename_hint():
+    return get('rename_hint')
+
+
+def rename_toolong():
+    return get('rename_toolong')
+
+
+def rename_error():
+    return get('rename_error')
+
+
+def rename(uid, name, nick):
+    return get('rename', uid=uid, n=nick or name)
+
+
+def scan_hint():
+    return get('scan_hint')
+
+
+def scan(url, threats, redirect, shortened):
+    return get(
+        'scan', url=url,
+        threats=f'🔴 В ссылке обнаружены вирусы: {", ".join(GOOGLE_THREATS.get(i) or i for i in threats)}.' if threats
+        else '🟢 В ссылке не обнаружены вирусы.', redirect=f'🔴 В ссылке есть переадресация: {redirect}.' if redirect
+        else '🟢 В ссылке нет переадресаций.', shortened=f'🔴 Ссылка была сокращена: {shortened}.' if shortened
+        else '🟢 Не является короткой ссылкой.',)

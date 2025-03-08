@@ -2,8 +2,7 @@ from vkbottle import ABCRule
 from vkbottle.bot import Message, MessageEvent
 from vkbottle_types.events.bot_events import MessageNew
 
-from Bot.checkers import getUserPrefixes
-from Bot.utils import getUserPremium, sendMessageEventAnswer
+from Bot.utils import getUserPremium, sendMessageEventAnswer, getUserPrefixes
 from config.config import PM_COMMANDS
 
 

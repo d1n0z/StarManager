@@ -225,7 +225,7 @@ async def queue_handler(event: MessageNew):
                 if len(text) < 2:
                     return await sendMessage(chat_id + 2000000000, messages.settings_change_countable_format_error())
                 try:
-                    if whoiscached(text[-1])['domain_name'] is None:
+                    if not whoiscached(text[-1]):
                         raise
                 except:
                     return await sendMessage(chat_id + 2000000000, messages.get(queue[3] + '_no_url'))
@@ -246,7 +246,7 @@ async def queue_handler(event: MessageNew):
                 if action == 'add':
                     url = event.object.message.text.replace(' ', '').replace('https://', '').replace('/', '')
                     try:
-                        if whoiscached(url)['domain_name'] is None:
+                        if not whoiscached(url):
                             raise
                     except:
                         return await sendMessage(chat_id + 2000000000,

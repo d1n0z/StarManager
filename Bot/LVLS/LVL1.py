@@ -10,7 +10,8 @@ import keyboard
 import messages
 from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserName, getUserNickname, isChatAdmin, \
-    getUserAccessLevel, kickUser, getUserPremium, getUserMute, setChatMute, getUserBan, getUserWarns
+    getUserAccessLevel, kickUser, getUserPremium, getUserMute, setChatMute, getUserBan, getUserWarns, whoiscached, \
+    scanURLMalware, scanURLRedirect, scanURLShortened
 from config.config import api
 from db import pool
 
@@ -344,8 +345,10 @@ async def getnick(message: Message):
     async with (await pool()).connection() as conn:
         async with conn.cursor() as c:
             res = await (await c.execute(
-                "select uid, nickname from nickname where chat_id=%s and uid>0 and lower(nickname) like %s order by "
-                "nickname limit 30", (chat_id, '%%' + query.lower() + '%%'))).fetchall()
+                "select uid, nickname from nickname where chat_id=%s and uid>0 and uid=ANY(%s) and lower(nickname) "
+                "like %s order by nickname limit 30",
+                (chat_id, [i.member_id for i in (await api.messages.get_conversation_members(
+                    peer_id=message.peer_id)).items], '%%' + query.lower() + '%%'))).fetchall()
     if not res:
         return await message.reply(disable_mentions=1, message=messages.getnick_no_result(query))
     await message.reply(disable_mentions=1, message=await messages.getnick(res, query))
@@ -394,3 +397,20 @@ async def check(message: Message):
                          ban if ban > 0 else 0, await getUserWarns(id, chat_id), mute if mute > 0 else 0)
     kb = keyboard.check(message.from_id, id)
     await message.reply(disable_mentions=1, message=msg, keyboard=kb)
+
+
+@bl.chat_message(SearchCMD('scan'))
+async def scan(message: Message):
+    data = message.text.split()
+    if len(data) < 2 and not message.reply_message:
+        return await message.reply(disable_mentions=1, message=messages.scan_hint())
+    links = set()
+    for i in (message.reply_message.text.split() + data[1:]) if message.reply_message else data[1:]:
+        for y in i.split('/'):
+            if not whoiscached(y):
+                continue
+            links.add(i if '://' in i else 'https://' + i)
+    if not links:
+        return await message.reply(disable_mentions=1, message=messages.scan_hint())
+    await message.reply(disable_mentions=1, message=''.join([messages.scan(
+        i, scanURLMalware(i), scanURLRedirect(i), scanURLShortened(i)) + '\n\n' for i in links]))

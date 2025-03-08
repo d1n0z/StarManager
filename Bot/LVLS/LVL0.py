@@ -107,13 +107,10 @@ async def stats(message: Message):
         async with conn.cursor() as c:
             lvl_name = await (await c.execute('select name from accessnames where chat_id=%s and lvl=%s',
                                               (chat_id, acc))).fetchone()
-            invites = await (await c.execute(
-                'select count(*) as c from refferal where from_id=%s and chat_id=%s',
-                (id, chat_id))).fetchone()
+            invites = await (await c.execute('select count(*) as c from refferal where from_id=%s and chat_id=%s',
+                                             (id, chat_id))).fetchone()
     xp = int(await getUserXP(id))
-    lvl = await getUserLVL(id)
-    if not lvl:
-        lvl = 1
+    lvl = await getUserLVL(id) or 1
     try:
         await message.reply(disable_mentions=1, attachment=await uploadImage(await createStatsImage(
             await getUserWarns(id, chat_id), await getUserMessages(id, chat_id), id,

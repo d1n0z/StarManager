@@ -10,10 +10,10 @@ import messages
 from Bot.action_handlers import action_handle
 from Bot.add_msg_count import add_msg_counter
 from Bot.answers_handlers import answer_handler
-from Bot.checkers import getUChatLimit, getUserPrefixes
+from Bot.checkers import getUChatLimit
 from Bot.utils import getUserLastMessage, getUserAccessLevel, getUserMute, sendMessage, deleteMessages, \
     getChatSettings, kickUser, getUserName, getUserNickname, antispamChecker, punish, getUserBan, getUserBanInfo, \
-    getUserPremium, getIDFromMessage, getUserPremmenuSetting, getChatName
+    getUserPremium, getIDFromMessage, getUserPremmenuSetting, getChatName, getUserPrefixes
 from config.config import ADMINS, PM_COMMANDS
 from db import pool
 

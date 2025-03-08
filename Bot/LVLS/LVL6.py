@@ -329,3 +329,23 @@ async def purge(message: Message):
             await conn.commit()
     await editMessage(messages.purge(dtdnicknames, dtdaccesslevels) if dtdnicknames > 0 or dtdaccesslevels > 0 else
                       messages.purge_empty(), message.peer_id, edit.conversation_message_id)
+
+
+@bl.chat_message(SearchCMD('rename'))
+async def rename(message: Message):
+    data = message.text.split()
+    if len(data) < 2:
+        return await message.reply(disable_mentions=1, message=messages.rename_hint())
+    if len(' '.join(data[1:])) >= 100:
+        return await message.reply(disable_mentions=1, message=messages.rename_toolong())
+    chat_id = message.chat_id
+    try:
+        await api.messages.edit_chat(chat_id, ' '.join(data[1:]))
+    except:
+        return await message.reply(disable_mentions=1, message=messages.rename_error())
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            await c.execute('delete from chatnames where chat_id=%s', (chat_id,))
+            await conn.commit()
+    await message.reply(disable_mentions=1, message=messages.rename(message.from_id, await getUserName(message.from_id),
+                                                                    await getUserNickname(message.from_id, chat_id)))

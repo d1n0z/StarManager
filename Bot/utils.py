@@ -6,10 +6,12 @@ import time
 from ast import literal_eval
 from datetime import date, datetime
 from typing import Iterable, Any
+from urllib.parse import urlparse
 
+import dns.resolver
+import pysafebrowsing
 import requests
 import urllib3
-import whois
 import xmltodict
 from cache.async_lru import AsyncLRU
 from cache.async_ttl import AsyncTTL
@@ -17,13 +19,12 @@ from memoization import cached
 from multicolorcaptcha import CaptchaGenerator
 from nudenet import NudeDetector
 from vkbottle import PhotoMessageUploader
-from vkbottle.bot import Bot
 from vkbottle.tools.mini_types.bot.foreign_message import ForeignMessageMin
 from vkbottle_types.objects import MessagesMessage, MessagesMessageAttachmentType, MessagesSendUserIdsResponseItem
 
-from config.config import (api, vk_api_session, VK_TOKEN_GROUP, GROUP_ID, SETTINGS, PATH,
+from config.config import (api, vk_api_session, GROUP_ID, SETTINGS, PATH,
                            NSFW_CATEGORIES, SETTINGS_ALT, SETTINGS_DEFAULTS, PREMMENU_DEFAULT, PREMMENU_TURN,
-                           LEAGUE_LVL, DEVS, IMPORTSETTINGS_DEFAULT)
+                           LEAGUE_LVL, IMPORTSETTINGS_DEFAULT, GOOGLE_TOKEN, PREFIX)
 from db import pool
 
 _hiddenalbumuid = None
@@ -595,9 +596,22 @@ async def NSFWDetector(pic_path):
     return False
 
 
-@cached
 def whoiscached(text):
-    return whois.whois(text)
+    # return whois.whois(text)  # doesn't work
+    try:
+        dns.resolver.resolve(text, 'A')
+        return True
+    except:
+        return False
+
+
+async def getUserPrefixes(u_prem, uid) -> list:
+    if u_prem:
+        async with (await pool()).connection() as conn:
+            async with conn.cursor() as c:
+                prefixes = await (await c.execute('select prefix from prefix where uid=%s', (uid,))).fetchall()
+        return PREFIX + [i[0] for i in prefixes]
+    return PREFIX
 
 
 async def antispamChecker(chat_id, uid, message: MessagesMessage, settings):
@@ -616,14 +630,12 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings):
                 if setting is not None and setting[0] is not None:
                     if len(message.text) >= setting[0]:
                         return 'maximumCharsInMessage'
-            if settings['antispam']['disallowLinks']:
+            if settings['antispam']['disallowLinks'] and not any(
+                    message.text.startswith(i) for i in await getUserPrefixes(await getUserPremium(uid), uid)):
                 data = message.text.split()
                 for i in data:
                     for y in i.split('/'):
-                        try:
-                            if whoiscached(y)['domain_name'] is None or y in ['vk.com', 'vk.ru']:
-                                continue
-                        except:
+                        if not whoiscached(y) or y in ['vk.com', 'vk.ru']:
                             continue
                         if not await (await c.execute(
                                 'select id from antispamurlexceptions where chat_id=%s and '
@@ -938,3 +950,34 @@ async def turnImportSetting(chat_id, uid, setting):
                     ', %s, %s, %s)', (uid, chat_id, defaults['sys'], defaults['acc'], defaults['nicks'],
                                       defaults['punishes'], defaults['binds']))
             await conn.commit()
+
+
+@cached
+def scanURLMalware(url):
+    try:
+        url = requests.get(url, allow_redirects=True, timeout=2).url
+    except requests.RequestException:
+        return []
+    sb = pysafebrowsing.SafeBrowsing(key=GOOGLE_TOKEN)
+    sb = sb.lookup_url(url)
+    return sb['threats'] if 'threats' in sb and sb['threats'] else []
+
+
+@cached
+def scanURLRedirect(url):
+    try:
+        response = requests.get(url, allow_redirects=False, timeout=2)
+        return response.headers.get('Location') if 300 <= response.status_code < 400 else None
+    except requests.RequestException:
+        return None
+
+
+@cached
+def scanURLShortened(url):
+    try:
+        response = requests.get(url, allow_redirects=True, timeout=2)
+        return response.url if (
+                urlparse(response.url).netloc.replace('www.', '') != urlparse(url).netloc.replace('www.', '')
+        ) else False
+    except requests.RequestException:
+        return False
