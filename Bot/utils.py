@@ -605,6 +605,16 @@ def whoiscached(text):
         return False
 
 
+def whoiscachedurl(text):
+    # return whois.whois(text)  # doesn't work
+    for i in text.split('/'):
+        try:
+            dns.resolver.resolve(i, 'A')
+            return True
+        except:
+            continue
+
+
 async def getUserPrefixes(u_prem, uid) -> list:
     if u_prem:
         async with (await pool()).connection() as conn:

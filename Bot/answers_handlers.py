@@ -11,7 +11,7 @@ from vkbottle_types.objects import MessagesMessageAttachmentType
 import keyboard
 import messages
 from Bot.utils import (getUserName, getChatName, sendMessage, editMessage, uploadImage, deleteMessages,
-                       getUserNickname, hex_to_rgb, whoiscached)
+                       getUserNickname, hex_to_rgb, whoiscachedurl)
 from config.config import REPORT_TO, SETTINGS_COUNTABLE_MULTIPLE_ARGUMENTS, PATH, SETTINGS_COUNTABLE_SPECIAL_LIMITS
 from db import pool
 
@@ -225,8 +225,8 @@ async def queue_handler(event: MessageNew):
                 if len(text) < 2:
                     return await sendMessage(chat_id + 2000000000, messages.settings_change_countable_format_error())
                 try:
-                    if not whoiscached(text[-1]):
-                        raise
+                    if not whoiscachedurl(text[-1]):
+                        raise Exception
                 except:
                     return await sendMessage(chat_id + 2000000000, messages.get(queue[3] + '_no_url'))
                 async with (await pool()).connection() as conn:
@@ -236,17 +236,17 @@ async def queue_handler(event: MessageNew):
                             await c.execute('insert into welcome (chat_id, url, button_label) values (%s, %s, %s)',
                                             (chat_id, text[-1], ' '.join(text[0:-1])))
                         await conn.commit()
-            await sendMessage(chat_id + 2000000000, messages.get(f'{queue[3]}_done'),
-                              keyboard.settings_change_countable(uid, "main", "welcome", onlybackbutton=True))
+            print(await sendMessage(chat_id + 2000000000, messages.get(f'{queue[3]}_done'),
+                                    keyboard.settings_change_countable(uid, "main", "welcome", onlybackbutton=True)))
         elif queue[3] == 'settings_listaction':
             setting = additional['setting']
             # type = additional['type']
             if setting == 'disallowLinks':
                 action = additional['action']
                 if action == 'add':
-                    url = event.object.message.text.replace(' ', '').replace('https://', '').replace('/', '')
+                    url = event.object.message.text.replace(' ', '')
                     try:
-                        if not whoiscached(url):
+                        if not whoiscachedurl(url):
                             raise
                     except:
                         return await sendMessage(chat_id + 2000000000,

@@ -31,7 +31,7 @@ async def message_handle(event: MessageNew) -> Any:
                 return
         if len(event.object.message.attachments) == 0:
             return await sendMessage(chat_id, messages.pm())
-        elif event.object.message.attachments[0].market is not None:
+        elif event.object.message.attachments[0].market:
             return await sendMessage(chat_id, messages.pm_market(), kbd=keyboard.pm_market())
 
     if await answer_handler(event):
