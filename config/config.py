@@ -152,6 +152,7 @@ COMMANDS_DESC = {
     "scan": "/scan - Сканировать ссылки на наличие вирусов.",
     "anon": "/anon - Отправить анонимное сообщение.",
     "deanon": "/deanon - Узнать отправителя анонимного сообщения.",
+    "notif": "/notif - Настройка напоминаний в беседе.",
 }
 COMMANDS_PREMIUM = ['premmenu', 'mkick', 'ignore', 'unignore', 'ignorelist', 'chatlimit', 'editlevel', 'levelname',
                     'resetlevel', 'anon', 'deanon', 'prefix']
