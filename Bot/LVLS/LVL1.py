@@ -414,3 +414,16 @@ async def scan(message: Message):
         return await message.reply(disable_mentions=1, message=messages.scan_hint())
     await message.reply(disable_mentions=1, message=''.join([messages.scan(
         i, scanURLMalware(i), scanURLRedirect(i), scanURLShortened(i)) + '\n\n' for i in links]))
+
+
+@bl.chat_message(SearchCMD('invited'))
+async def invited(message: Message):
+    id = await getIDFromMessage(message.text, message.reply_message)
+    if not id:
+        id = message.from_id
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            invites = await (await c.execute('select count(*) as c from refferal where from_id=%s and chat_id=%s',
+                                             (id, message.chat_id))).fetchone()
+    await message.reply(disable_mentions=1, message=messages.invites(
+        id, await getUserName(id), await getUserNickname(id, message.chat_id), invites[0]))

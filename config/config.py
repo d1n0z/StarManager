@@ -23,10 +23,10 @@ LVL_NAMES = ["Обычный Пользователь", "Смотрящий", "�
 COMMANDS = {
     "start": 0, "help": 0, "id": 0, "stats": 0, "top": 0, "q": 0, "premium": 0, "bonus": 0, "transfer": 0,
     "duel": 0, "cmd": 0, "premmenu": 0, "test": 0, "getdev": 0, "anon": 0, "chatid": 0, "prefix": 0,
-    "deanon": 0, "chats": 0, "catalog": 0, "guess": 0, "promo": 0,
+    "deanon": 0, "chats": 0, "catalog": 0, "guess": 0, "promo": 0, "rep": 0,
 
     "kick": 1, "mute": 1, "warn": 1, "clear": 1, "staff": 1, "olist": 1, "getnick": 1, "snick": 1, "rnick": 1,
-    "nlist": 1, "check": 1, "mkick": 1, "scan": 1,
+    "nlist": 1, "check": 1, "mkick": 1, "scan": 1, "invited": 1,
 
     "unmute": 2, "unwarn": 2, "mutelist": 2, "warnlist": 2, "setaccess": 2, "delaccess": 2,
 
@@ -153,6 +153,8 @@ COMMANDS_DESC = {
     "anon": "/anon - Отправить анонимное сообщение.",
     "deanon": "/deanon - Узнать отправителя анонимного сообщения.",
     "notif": "/notif - Настройка напоминаний в беседе.",
+    "rep": "/rep - Изменить репутацию пользователя.",
+    "invited": "/invited - Количество приглашенных участников.",
 }
 COMMANDS_PREMIUM = ['premmenu', 'mkick', 'ignore', 'unignore', 'ignorelist', 'chatlimit', 'editlevel', 'levelname',
                     'resetlevel', 'anon', 'deanon', 'prefix']

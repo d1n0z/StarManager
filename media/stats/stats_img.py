@@ -6,7 +6,7 @@ from config.config import PATH, LEAGUE
 
 
 async def createStatsImage(warns, messages, uid, access_level, nickname, reg_date, last_activity, prem, xp, userlvl,
-                           invites, name, mute, ban, lvl_name, neededxp, color, league):
+                           reputation, reptop, name, mute, ban, lvl_name, neededxp, color, league):
     pss = list('xxx')
     if warns > 0:
         pss[2] = 'w'
@@ -35,7 +35,8 @@ async def createStatsImage(warns, messages, uid, access_level, nickname, reg_dat
     draw.text((107, 186), f'{messages}', font=font, fill=(255, 255, 255))
     draw.text((107, 260), f'{reg_date}', font=font, fill=(255, 255, 255))
     draw.text((107, 335), f'{last_activity}', font=font, fill=(255, 255, 255))
-    draw.text((107, 410), f'{invites} чел.', font=font, fill=(255, 255, 255))
+    draw.text((107, 410), f'{"+" if reputation > 0 else ""}{reputation} (#{reptop})', font=font,
+              fill=(180, 216, 167) if reputation >= 0 else (231, 154, 154))
 
     draw.text((img.size[0] // 2, 323), f'{name}', font=font, fill=(255, 255, 255), anchor='ma')
     if nickname is not None:
@@ -79,6 +80,7 @@ async def createStatsImage(warns, messages, uid, access_level, nickname, reg_dat
     draw.text((775, 285), f'{xp}', font=font, fill=(255, 255, 255), anchor='ma')
     lvlfont = ImageFont.truetype(f'{PATH}media/fonts/statsimg_font_bold.ttf', 35 if userlvl < 100 else 30)
     fontsmall = ImageFont.truetype(f'{PATH}media/fonts/statsimg_font_bold.ttf', 17)
+    fontgrey = ImageFont.truetype(f'{PATH}media/fonts/statsimg_font_bold.ttf', 15)
 
     if prem > 0:
         premfont = ImageFont.truetype(f'{PATH}media/fonts/statsimg_font_bold.ttf', 30)
@@ -141,7 +143,7 @@ async def createStatsImage(warns, messages, uid, access_level, nickname, reg_dat
     avadraw = ImageDraw.Draw(avamask_im)
     avadraw.ellipse((0, 0, 143, 143), fill=255)
     img.paste(ava, (511, 156), mask=avamask_im)
-    lvl = Image.open(f'{PATH}media/stats/dot.png')
+    lvl = Image.open(f'{PATH}media/stats/icon/dot.png')
     img.paste(lvl, mask=lvl)
 
     # leagueborder = Image.open(f'{PATH}media/stats/leagues/{league}.png')
@@ -152,6 +154,12 @@ async def createStatsImage(warns, messages, uid, access_level, nickname, reg_dat
     draw.text(xy=(392, 249), text='ЛИГА', font=fontsmall, fill=(255, 255, 255), anchor='ma')
     # draw.text((392, 288), LEAGUE[league], font=fontmedium, fill=(255, 255, 255), anchor='ma')
     draw.text((392, 284.5), LEAGUE[league - 1], font=font, fill=(255, 255, 255), anchor='ma')
+
+    draw.rectangle(((100, 390), (220, 410)), (29, 29, 29))
+    draw.rectangle(((40, 380), (100, 450)), (29, 29, 29))
+    rep = Image.open(f'{PATH}media/stats/icon/rep.png')
+    img.paste(rep, (38, 382), mask=rep)
+    draw.text(xy=(151, 392), text='Репутация', font=fontgrey, fill=(113, 113, 113), anchor='ma')
 
     img.save(f'{PATH}media/temp/frame{uid}.png')
     return f'{PATH}media/temp/frame{uid}.png'

@@ -3,6 +3,7 @@ import locale
 import os
 import tempfile
 import time
+import traceback
 from ast import literal_eval
 from datetime import date, datetime
 from typing import Iterable, Any
@@ -237,7 +238,7 @@ async def uploadImage(file: str, uid: int | None = None, count: int = 0, delay: 
             uid = await getHiddenAlbumUser()
         if 'too many' in str(e).lower():
             await asyncio.sleep(1)
-        if count != 5:
+        if count != 2:
             await asyncio.sleep(delay)
             return await uploadImage(file, uid, count + 1, delay + 1)
         raise e
@@ -895,6 +896,22 @@ async def getSilenceAllowed(chat_id):
     return []
 
 
+async def getUserRep(uid):
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            rep = await (await c.execute('select rep from reputation where uid=%s', (uid,))).fetchone()
+    return rep[0] if rep else 0
+
+
+async def getRepTop(uid):
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            top = [i[0] for i in await (await c.execute(
+                'select uid from reputation order by rep desc')).fetchall()]
+            allu = await (await c.execute('select count(*) as c from allusers')).fetchone()
+    return top.index(uid) if uid in top else allu[0]
+
+
 @cached
 def hex_to_rgb(value):
     value = value.lstrip('#')
@@ -936,6 +953,7 @@ async def getHiddenAlbumUser():
                 if (await api.messages.is_messages_from_group_allowed(group_id=GROUP_ID, user_id=i[0])).is_allowed:
                     _hiddenalbumuid = i[0]
                     return _hiddenalbumuid
+                await asyncio.sleep(0.51)
 
 
 async def getImportSettings(uid, chat_id):

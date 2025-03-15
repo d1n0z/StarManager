@@ -768,8 +768,8 @@ async def top_duels(message: MessageEvent):
         keyboard.top_duels(peer_id - 2000000000, message.user_id))
 
 
-@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['top_duels_in_group']))
-async def top_duels_in_group(message: MessageEvent):
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['top_duels_in_chat']))
+async def top_duels_in_chat(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
     async with (await pool()).connection() as conn:
@@ -780,7 +780,61 @@ async def top_duels_in_group(message: MessageEvent):
                     peer_id=chat_id + 2000000000)).items],))).fetchall()
     lvln = {i[0]: i[1] for i in lvln}
     await editMessage(await messages.top_duels(lvln, 'в беседе'), peer_id, message.conversation_message_id,
-                      keyboard.top_duels_in_group(chat_id, message.user_id))
+                      keyboard.top_duels_in_chat(chat_id, message.user_id))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['top_rep']))
+async def top_rep(message: MessageEvent):
+    peer_id = message.object.peer_id
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            top = await (await c.execute(
+                'select uid, rep from reputation where uid>0 order by rep desc limit 10')).fetchall()
+    await editMessage(
+        await messages.top_rep(top, 'общее | положительные'), peer_id, message.conversation_message_id,
+        keyboard.top_rep(peer_id - 2000000000, message.user_id))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['top_rep_neg']))
+async def top_rep_neg(message: MessageEvent):
+    peer_id = message.object.peer_id
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            top = await (await c.execute(
+                'select uid, rep from reputation where uid>0 order by rep limit 10')).fetchall()
+    await editMessage(
+        await messages.top_rep(top, 'общее | отрицательные'), peer_id, message.conversation_message_id,
+        keyboard.top_rep_neg(peer_id - 2000000000, message.user_id))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['top_rep_in_chat']))
+async def top_rep_in_chat(message: MessageEvent):
+    peer_id = message.object.peer_id
+    chat_id = peer_id - 2000000000
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            top = await (await c.execute(
+                'select uid, rep from reputation where uid>0 and uid=ANY(%s) order by rep desc limit 10',
+                ([i.member_id for i in (await api.messages.get_conversation_members(
+                    peer_id=chat_id + 2000000000)).items],))).fetchall()
+    await editMessage(
+        await messages.top_rep(top, 'в беседе | положительные'), peer_id, message.conversation_message_id,
+        keyboard.top_rep_in_chat(peer_id - 2000000000, message.user_id))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['top_rep_in_chat_neg']))
+async def top_rep_in_chat_neg(message: MessageEvent):
+    peer_id = message.object.peer_id
+    chat_id = peer_id - 2000000000
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            top = await (await c.execute(
+                'select uid, rep from reputation where uid>0 and uid=ANY(%s) order by rep limit 10',
+                ([i.member_id for i in (await api.messages.get_conversation_members(
+                    peer_id=chat_id + 2000000000)).items],))).fetchall()
+    await editMessage(
+        await messages.top_rep(top, 'в беседе | отрицательные'), peer_id, message.conversation_message_id,
+        keyboard.top_rep_in_chat_neg(peer_id - 2000000000, message.user_id))
 
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['resetnick_accept']))

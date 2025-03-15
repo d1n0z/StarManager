@@ -1261,8 +1261,15 @@ async def top_lvls(top, chattop):
 
 async def top_duels(duels, category='общее'):
     msg = get('top_duels', category=category)
-    for k, item in enumerate(duels.items()):
+    for k, item in enumerate(duels.items()) if top else []:
         msg += f"[{k + 1}]. [id{item[0]}|{await getUserName(item[0])}] - {item[1]} побед\n"
+    return msg
+
+
+async def top_rep(top, category):
+    msg = get('top_rep', category=category)
+    for k, item in enumerate(top[:10]) if top else []:
+        msg += f'[{k + 1}]. [id{item[0]}|{await getUserName(item[0])}] - {"+" if item[1] > 0 else ""}{item[1]}\n'
     return msg
 
 
@@ -2221,3 +2228,31 @@ def scan(url, threats, redirect, shortened):
         else '🟢 В ссылке не обнаружены вирусы.', redirect=f'🔴 В ссылке есть переадресация: {redirect}.' if redirect
         else '🟢 В ссылке нет переадресаций.', shortened=f'🔴 Ссылка была сокращена: {shortened}.' if shortened
         else '🟢 Не является короткой ссылкой.',)
+
+
+def rep_hint():
+    return get('rep_hint')
+
+
+def rep_myself():
+    return get('rep_myself')
+
+
+def rep_notinchat():
+    return get('rep_notinchat')
+
+
+def rep_limit(uprem, lasttime):
+    timeleft = (lasttime + 86400) - time.time()
+    return (get('rep_limit', hours=pointHours((timeleft // 3600) * 3600),
+                minutes=pointMinutes(timeleft - (timeleft // 3600) * 3600)) +
+            ('\n⭐ С Premium-статусом лимит расширяется до 3 изменений в сутки.' if not uprem else ''))
+
+
+def rep(isup, uid, uname, unick, id, name, nick, rep, reptop):
+    return get('rep', up1='🟢' if isup else '🔴', up2='повысил' if isup else 'понизил',
+               uid=uid, un=unick or uname, id=id, n=nick or name, rep=f'{"+" if rep > 0 else ""}{rep}', reptop=reptop)
+
+
+def invites(id, name, nick, invites):
+    return get('invites', id=id, n=nick or name, invites=invites)

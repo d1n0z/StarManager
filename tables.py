@@ -751,5 +751,24 @@ class NewPostComments(Model):
         table_name = f'newpostcomments'
 
 
+class Reputation(Model):
+    uid = IntegerField()
+    rep = IntegerField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'reputation'
+
+
+class RepHistory(Model):
+    uid = IntegerField()
+    id = IntegerField()
+    time = BigIntegerField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'rephistory'
+
+
 if __name__ == '__main__':
     dbhandle.create_tables(Model.__subclasses__())

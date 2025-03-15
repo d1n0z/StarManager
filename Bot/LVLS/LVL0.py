@@ -1,6 +1,7 @@
 import random
 import re
 import time
+import traceback
 from datetime import datetime
 
 from vkbottle.bot import Message
@@ -15,9 +16,9 @@ from Bot.utils import (getIDFromMessage, getUserName, getRegDate, kickUser, getU
                        getUserPremium, uploadImage, addUserXP, isChatAdmin, getUserWarns, getUserMessages,
                        setUserAccessLevel, getULvlBanned, getChatSettings, deleteMessages,
                        speccommandscheck, getUserPremmenuSettings, getUserPremmenuSetting, chatPremium, getUserLeague,
-                       getUserLVL)
+                       getUserLVL, getUserRep, getRepTop)
 from config.config import (api, LVL_NAMES, PATH, COMMANDS, TG_CHAT_ID, TG_TRANSFER_THREAD_ID,
-                           CMDLEAGUES)
+                           CMDLEAGUES, DEVS)
 from db import pool
 from media.stats.stats_img import createStatsImage
 
@@ -107,8 +108,6 @@ async def stats(message: Message):
         async with conn.cursor() as c:
             lvl_name = await (await c.execute('select name from accessnames where chat_id=%s and lvl=%s',
                                               (chat_id, acc))).fetchone()
-            invites = await (await c.execute('select count(*) as c from refferal where from_id=%s and chat_id=%s',
-                                             (id, chat_id))).fetchone()
     xp = int(await getUserXP(id))
     lvl = await getUserLVL(id) or 1
     try:
@@ -116,11 +115,13 @@ async def stats(message: Message):
             await getUserWarns(id, chat_id), await getUserMessages(id, chat_id), id,
             await getUserAccessLevel(id, chat_id), await getUserNickname(id, chat_id),
             await getRegDate(id, '%d.%m.%Y', 'Неизвестно'), last_message, await getUserPremium(id),
-            min(xp, 99999999), min(lvl, 999), invites[0], await getUserName(id), await getUserMute(id, chat_id),
-            await getUserBan(id, chat_id), lvl_name[0] if lvl_name else LVL_NAMES[acc],
+            min(xp, 99999999), min(lvl, 999), await getUserRep(id), await getRepTop(id), await getUserName(id),
+            await getUserMute(id, chat_id), await getUserBan(id, chat_id), lvl_name[0] if lvl_name else LVL_NAMES[acc],
             await getUserNeededXP(xp) if lvl < 999 else 0, await getUserPremmenuSetting(id, 'border_color', False),
             await getUserLeague(id))))
     except Exception as e:
+        if message.from_id in DEVS:
+            traceback.print_exc()
         await deleteMessages(reply.conversation_message_id, chat_id)
         await message.reply(disable_mentions=1, message='❌ Ошибка. Пожалуйста, попробуйте позже.')
         raise e
@@ -427,3 +428,32 @@ async def promo(message: Message):
     await message.reply(disable_mentions=1, message=messages.promo(
         uid, await getUserNickname(uid, message.chat_id), await getUserName(uid), code[0], code[3]))
 
+
+@bl.chat_message(SearchCMD('rep'))
+async def rep(message: Message):
+    data = message.text.split()
+    id = await getIDFromMessage(message.text, message.reply_message, 3)
+    if len(data) not in (2, 3) or data[1] not in ('+', '-') or not id or id < 0:
+        return await message.reply(disable_mentions=1, message=messages.rep_hint())
+    if id == message.from_id:
+        return await message.reply(disable_mentions=1, message=messages.rep_myself())
+    if id not in [i.member_id for i in (await api.messages.get_conversation_members(peer_id=message.peer_id)).items]:
+        return await message.reply(disable_mentions=1, message=messages.rep_notinchat())
+    uid = message.from_id
+    uprem = await getUserPremium(uid)
+    async with (await pool()).connection() as conn:
+        async with conn.cursor() as c:
+            rephistory = await (await c.execute(
+                'select time from rephistory where uid=%s and id=%s and time>%s order by time',
+                (uid, id, int(time.time() - 86400)))).fetchall()
+            if len(rephistory) >= (3 if uprem else 1):
+                return await message.reply(disable_mentions=1, message=messages.rep_limit(uprem, rephistory[0][0]))
+            if not (await c.execute(f'update reputation set rep=rep {data[1]} 1 where uid=%s', (id,))).rowcount:
+                await c.execute('insert into reputation (uid, rep) values (%s, %s)', (id, eval(f'0{data[1]}1')))
+            await c.execute('insert into rephistory (uid, id, time) values (%s, %s, %s)',
+                            (uid, id, int(time.time())))
+            await conn.commit()
+    await message.reply(disable_mentions=1, message=messages.rep(
+        data[1] == '+', uid, await getUserName(uid), await getUserNickname(uid, message.chat_id),
+        id, await getUserName(id), await getUserNickname(id, message.chat_id), await getUserRep(id),
+        await getRepTop(id)))
