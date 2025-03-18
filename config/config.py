@@ -177,7 +177,7 @@ LVL_BANNED_COMMANDS = ['bonus', 'transfer', 'duel', 'guess', 'promo']
 LEAGUE_LVL = [0, 200, 400, 600, 800, 999]
 LEAGUE = ['Бронза', 'Серебро', 'Золото', 'Платина', 'Алмаз', 'Легенда']
 CREATEGROUPLEAGUES = [6, 7, 8, 9, 9, 9]
-CMDLEAGUES = [10, 12, 15, 19]
+CMDLEAGUES = [10, 12, 15, 19, 19, 19]
 
 
 def SETTINGS():

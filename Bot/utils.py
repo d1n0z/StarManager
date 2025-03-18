@@ -483,9 +483,11 @@ async def addUserXP(uid, addxp, checklvlbanned=True):
                 uxp, ulvl, ulg = u[1] + addxp, u[2], u[3]
                 ulvl += uxp // 1000
                 uxp %= 1000
-                if ulg != len(LEAGUE_LVL) and ulvl > LEAGUE_LVL[ulg]:
-                    return await c.execute('update xp set xp = 0, league = %s, lvl = %s where id=%s',
-                                           (ulg + 1, u[0], ulvl))
+                if ulg != len(LEAGUE_LVL) and ulvl >= LEAGUE_LVL[ulg]:
+                    await c.execute('update xp set xp = 0, league = %s, lvl = 1 where id=%s',
+                                    (ulg + 1, u[0]))
+                    await conn.commit()
+                    return
                 await c.execute('update xp set xp = %s, lvl = %s where id=%s', (uxp, ulvl, u[0]))
             else:
                 await c.execute(

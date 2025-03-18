@@ -10,7 +10,7 @@ _syncpool = None
 async def pool():
     global _pool
     if _pool is None:
-        _pool = AsyncConnectionPool(DATABASE_STR, min_size=10, max_size=300, open=False)
+        _pool = AsyncConnectionPool(DATABASE_STR, min_size=10, max_size=700, open=False)
         await _pool.open()
     return _pool
 
