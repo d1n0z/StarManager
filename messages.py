@@ -1756,24 +1756,24 @@ def stats_loading():
     return get('stats_loading')
 
 
-def infunban_noban():
-    return get('infunban_noban')
+def unblock_noban():
+    return get('unblock_noban')
 
 
-def infunban_hint():
-    return get('infunban_hint')
+def unblock_hint():
+    return get('unblock_hint')
 
 
-def infunban():
-    return get('infunban')
+def unblock():
+    return get('unblock')
 
 
-def infban_hint():
-    return get('infban_hint')
+def block_hint():
+    return get('block_hint')
 
 
-def infban():
-    return get('infban')
+def block():
+    return get('block')
 
 
 def resetlvl(id, u_name):
@@ -1979,11 +1979,11 @@ def captcha(uid, n, ctime, punishment: str):
         punishment = 'кикнуты'
     elif punishment.startswith('mute'):
         t = punishment.split("|")[-1]
-        punishment = f'замучены на {t} {pointHours(t)}'
+        punishment = f'замучены на {pointWords(int(t), ("час", "часа", "часов"))}'
     elif punishment.startswith('ban'):
         t = punishment.split("|")[-1]
-        punishment = f'забанены на {t} {pointDays(t)}'
-    return get('captcha', uid=uid, n=n, time=ctime, punishment=punishment)
+        punishment = f'забанены на {pointWords(int(t), ("день", "дня", "дней"))}'
+    return get('captcha', uid=uid, n=n, time=pointWords(ctime, ("минута", "минуты", "минут")), punishment=punishment)
 
 
 def captcha_punish(uid, n, punishment):
@@ -2256,3 +2256,19 @@ def rep(isup, uid, uname, unick, id, name, nick, rep, reptop):
 
 def invites(id, name, nick, invites):
     return get('invites', id=id, n=nick or name, invites=invites)
+
+
+def block_chatblocked(id, reason):
+    return get('block_chatblocked', id=id, reason=f'Комментарий: {reason}' if reason else '')
+
+
+def block_userblocked(id, reason):
+    return get('block_userblocked', id=id, reason=f'Комментарий: {reason}' if reason else '')
+
+
+def block_blockeduserinvite(id, name, nick):
+    return get('block_blockeduserinvite', id=id, n=nick or name)
+
+
+def block_chatunblocked(id):
+    return get('block_chatunblocked', id=id)

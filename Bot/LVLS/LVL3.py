@@ -34,11 +34,10 @@ async def inactive(message: Message):
     if not count.isdigit() or (count := int(count)) <= 0:
         return await message.reply(disable_mentions=1, message=messages.inactive_hint())
     count = time.time() - count * 86400
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            res = await (await c.execute(
-                'select uid from lastmessagedate where chat_id=%s and uid>0 and last_message<%s',
-                (chat_id, count))).fetchall()
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            res = await conn.fetch('select uid from lastmessagedate where chat_id=$1 and uid>0 and last_message<$2',
+                                   chat_id, count)
     kicked = 0
     if len(res) <= 0:
         return await message.reply(disable_mentions=1, message=messages.inactive_no_results())
@@ -109,11 +108,11 @@ async def ban(message: Message):
             await getUserName(id), await getUserNickname(id, chat_id), id, ch_ban))
 
     ban_date = datetime.now().strftime('%Y.%m.%d %H:%M:%S')
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            res = await (await c.execute(
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            res = await conn.fetchrow(
                 'select last_bans_times, last_bans_causes, last_bans_names, last_bans_dates from ban where '
-                'chat_id=%s and uid=%s', (chat_id, id))).fetchone()
+                'chat_id=$1 and uid=$2', chat_id, id)
     if res is not None:
         ban_times = literal_eval(res[0])
         ban_causes = literal_eval(res[1])
@@ -132,19 +131,16 @@ async def ban(message: Message):
     ban_names.append(f'[id{uid}|{u_name}]')
     ban_dates.append(ban_date)
 
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            if not (await c.execute(
-                    'update ban set ban = %s, last_bans_times = %s, last_bans_causes = %s, last_bans_names = %s, '
-                    'last_bans_dates = %s where chat_id=%s and uid=%s',
-                    (int(time.time() + ban_time), f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}",
-                        chat_id, id))).rowcount:
-                await c.execute(
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            if not await conn.fetchval(
+                    'update ban set ban = $1, last_bans_times = $2, last_bans_causes = $3, last_bans_names = $4, '
+                    'last_bans_dates = $5 where chat_id=$6 and uid=$7 returning 1', time.time() + ban_time,
+                    f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}", chat_id, id):
+                await conn.execute(
                     'insert into ban (uid, chat_id, ban, last_bans_times, last_bans_causes, last_bans_names, '
-                    'last_bans_dates) values (%s, %s, %s, %s, %s, %s, %s)',
-                    (id, chat_id, int(time.time() + ban_time), f"{ban_times}", f"{ban_causes}", f"{ban_names}",
-                     f"{ban_dates}"))
-            await conn.commit()
+                    'last_bans_dates) values ($1, $2, $3, $4, $5, $6, $7)', id, chat_id,
+                    time.time() + ban_time, f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}")
 
     await message.reply(disable_mentions=1, message=messages.ban(
         uid, u_name, await getUserNickname(uid, chat_id), id, await getUserName(id), await getUserNickname(id, chat_id),
@@ -172,10 +168,9 @@ async def unban(message: Message):
     if await getUserBan(id, chat_id) <= time.time():
         return await message.reply(disable_mentions=1, message=messages.unban_no_ban(
             id, await getUserName(id), await getUserNickname(id, chat_id)))
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            await c.execute('update ban set ban = 0 where chat_id=%s and uid=%s', (chat_id, id))
-            await conn.commit()
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            await conn.execute('update ban set ban = 0 where chat_id=$1 and uid=$2', chat_id, id)
     await message.reply(disable_mentions=1, message=messages.unban(
         await getUserName(uid), await getUserNickname(uid, chat_id), uid, await getUserName(id),
         await getUserNickname(id, chat_id), id))
@@ -183,11 +178,11 @@ async def unban(message: Message):
 
 @bl.chat_message(SearchCMD('banlist'))
 async def banlist(message: Message):
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            res = await (await c.execute(
-                'select uid, chat_id, last_bans_causes, ban, last_bans_names from ban where chat_id=%s and '
-                'ban>%s order by uid desc', (message.peer_id - 2000000000, int(time.time())))).fetchall()
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            res = await conn.fetch(
+                'select uid, chat_id, last_bans_causes, ban, last_bans_names from ban where chat_id=$1 and '
+                'ban>$2 order by uid desc', message.peer_id - 2000000000, time.time())
     count = len(res)
     res = res[:30]
     await message.reply(disable_mentions=1, message=await messages.banlist(

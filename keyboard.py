@@ -2,7 +2,7 @@ from vkbottle import Keyboard, Callback, OpenLink, KeyboardButtonColor
 
 from config.config import (SETTINGS_POSITIONS, SETTINGS_COUNTABLE_CHANGEMENU, SETTINGS_COUNTABLE,
                            SETTINGS_COUNTABLE_NO_CATEGORY, SETTINGS_COUNTABLE_PUNISHMENT_NO_DELETE_MESSAGE,
-                           PREMMENU_TURN, LEAGUE)
+                           PREMMENU_TURN, LEAGUE, CONTACT_ADMIN)
 
 
 def join(chid):
@@ -819,4 +819,26 @@ def import_settings(uid, importchatid, settings: dict):
                KeyboardButtonColor.NEGATIVE if i else KeyboardButtonColor.POSITIVE)
     kb.add(Callback('Назад', {"cmd": "import", "uid": uid, "importchatid": importchatid}), KeyboardButtonColor.PRIMARY)
 
+    return kb.get_json()
+
+
+def blocklist(uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('Беседы', {"cmd": "blocklist_chats", "uid": uid}), KeyboardButtonColor.PRIMARY)
+
+    return kb.get_json()
+
+
+def blocklist_chats(uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('Пользователи', {"cmd": "blocklist", "uid": uid}), KeyboardButtonColor.PRIMARY)
+
+    return kb.get_json()
+
+
+def block_chatblocked():
+    kb = Keyboard(inline=True)
+    kb.add(OpenLink(label='Связаться с администратором', link=CONTACT_ADMIN))
     return kb.get_json()

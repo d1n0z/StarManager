@@ -11,7 +11,7 @@ from Bot.utils import getUserName, pointWords, addUserXP
 from BotTG import keyboard, states
 from config import config
 from config.config import TG_PUBLIC_CHAT_ID
-from db import pool
+from db import smallpool as pool
 
 router: Router = Router()
 
@@ -24,20 +24,19 @@ async def joingiveaway(query: CallbackQuery, state: FSMContext):
             raise Exception
     except:
         return await query.answer(text='Вы не являетесь участником группы.', show_alert=True)
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            vkid = await (await c.execute('select vkid from tglink where tgid=%s', (query.from_user.id,))).fetchone()
-    if not vkid:
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            linked = await conn.fetchval('select exists(select 1 from tglink where tgid=$1)', query.from_user.id)
+    if not linked:
         return await query.answer(text='Ваш аккаунт не привязан к профилю ВКонтакте.', show_alert=True)
 
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            await c.execute('insert into tggiveawayusers (tgid) values (%s) on conflict (tgid) do nothing',
-                            (query.from_user.id,))
-            await conn.commit()
-            count = await (await c.execute('select count(*) as c from tggiveawayusers')).fetchone()
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            await conn.execute('insert into tggiveawayusers (tgid) values ($1) on conflict (tgid) do nothing',
+                               query.from_user.id)
+            count = await conn.fetchval('select count(*) as c from tggiveawayusers')
     try:
-        await query.message.edit_reply_markup(reply_markup=keyboard.joingiveaway(count[0]))
+        await query.message.edit_reply_markup(reply_markup=keyboard.joingiveaway(count))
     except:
         pass
     await query.answer(text='Вы успешно участвуете в конкурсе.', show_alert=True)
@@ -49,11 +48,10 @@ async def startdeep(message: Message, state: FSMContext, command: CommandObject)
     payload = decode_payload(command.args)
     if not payload.isdigit():
         payload = 0
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            await c.execute('insert into tgwaitingforsubscription (tgid) values (%s) on conflict (tgid) do nothing ',
-                            (message.from_user.id,))
-            await conn.commit()
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            await conn.execute('insert into tgwaitingforsubscription (tgid) values ($1) on conflict (tgid) do nothing ',
+                               message.from_user.id)
     msg = await message.bot.send_message(
         chat_id=message.from_user.id, reply_markup=keyboard.check(int(payload)),
         text=f'<b>⭐️ Добро пожаловать, <a href="tg://user?id={message.from_user.id}">{message.from_user.first_name}'
@@ -66,14 +64,13 @@ async def startdeep(message: Message, state: FSMContext, command: CommandObject)
 @router.callback_query(keyboard.Callback.filter(F.type == 'start'))
 @router.message(CommandStart(), F.chat.type == "private")
 async def start(message: Message | CallbackQuery, state: FSMContext):
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            if await (await c.execute('select id from tgwaitingforsubscription where tgid=%s',
-                                      (message.from_user.id,))).fetchone():
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            if await conn.fetchval('select 1 from tgwaitingforsubscription where tgid=$1', message.from_user.id):
                 return
-            if isinstance(message, Message):
-                await message.delete()
-            vkid = await (await c.execute('select vkid from tglink where tgid=%s', (message.from_user.id,))).fetchone()
+            vkid = await conn.fetchval('select vkid from tglink where tgid=$1', message.from_user.id)
+    if isinstance(message, Message):
+        await message.delete()
     if not vkid:
         msg = await message.bot.send_message(
             chat_id=message.from_user.id, reply_markup=keyboard.link(),
@@ -84,7 +81,7 @@ async def start(message: Message | CallbackQuery, state: FSMContext):
     else:
         msg = await message.bot.send_message(
             chat_id=message.from_user.id, reply_markup=keyboard.unlink(),
-            text=f'<b>⭐️ Добро пожаловать, <a href="https://vk.com/id{vkid[0]}">{await getUserName(vkid[0])}</a>.\n\n'
+            text=f'<b>⭐️ Добро пожаловать, <a href="https://vk.com/id{vkid}">{await getUserName(vkid)}</a>.\n\n'
                  f'Вы успешно привязали профиль ВК, теперь в случае выигрыша опыт автоматически будет выдан на аккаунт.'
                  f'\n\nКроме того, вы можете получать по 150 опыта за каждого приглашенного друга в нашу группу.</b>',)
     await state.clear()
@@ -105,11 +102,10 @@ async def link(query: CallbackQuery, state: FSMContext):
 
 @router.callback_query(keyboard.Callback.filter(F.type == 'unlink'))
 async def unlink(query: CallbackQuery, state: FSMContext):
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            if (await c.execute('update tglink set tgid=null where tgid=%s', (query.from_user.id,))).rowcount:
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            if await conn.fetchval('update tglink set tgid=null where tgid=$1 returning 1', query.from_user.id):
                 text = f'<b>✅ Вы успешно отвязали аккаунт.</b>'
-                await conn.commit()
             else:
                 text = f'<b>⚠️ Аккаунт не привязан.</b>'
     msg = await query.bot.send_message(chat_id=query.from_user.id, reply_markup=keyboard.back(), text=text)
@@ -119,10 +115,9 @@ async def unlink(query: CallbackQuery, state: FSMContext):
 
 @router.callback_query(keyboard.Callback.filter(F.type == 'ref'))
 async def ref(query: CallbackQuery, state: FSMContext):
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            cnt = (await (await c.execute('select count(*) as c from tgreferrals where fromtgid=%s',
-                                          (query.from_user.id,))).fetchone())[0]
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            cnt = await conn.fetchval('select count(*) as c from tgreferrals where fromtgid=$1', query.from_user.id)
     msg = await query.bot.send_message(
         chat_id=query.from_user.id, reply_markup=keyboard.back(),
         text=f'<b>👤 Пригласите ваших друзей подписаться на нашу группу бота в Telegram и получайте за каждого друга '
@@ -142,23 +137,21 @@ async def checksub(query: CallbackQuery, state: FSMContext):
     except:
         return await query.answer(text='Вы не являетесь участником группы.', show_alert=True)
     if (ref := int(query.data.split(':')[-1].split('_')[-1])) and ref != query.from_user.id:
-        async with (await pool()).connection() as conn:
-            async with conn.cursor() as c:
-                await c.execute('delete from tgwaitingforsubscription where tgid=%s', (query.from_user.id,))
-                if not (await (await c.execute('select id from tgreferrals where tgid=%s',
-                                               (query.from_user.id,))).fetchone()) and (
-                        vkid := await (await c.execute('select vkid from tglink where tgid=%s', (ref,))).fetchone()):
-                    await c.execute('insert into tgreferrals (fromtgid, tgid) values (%s, %s)',
-                                    (int(ref), query.from_user.id))
-                    await addUserXP(vkid[0], 150)
-                    try:
-                        await query.bot.send_message(
-                            chat_id=ref, text=f'<b>🎁 Пользователь <a href="tg://user?id='
-                                              f'{query.from_user.id}">{query.from_user.first_name}</a> подписался по '
-                                              f'вашей ссылке, вы получили <code>+150 опыта</code>.</b>',)
-                    except:
-                        traceback.print_exc()
-                await conn.commit()
+        async with (await pool()).acquire() as conn:
+            async with conn.transaction():
+                await conn.execute('delete from tgwaitingforsubscription where tgid=$1', query.from_user.id)
+                if not await conn.fetchval('select 1 from tgreferrals where tgid=$1', query.from_user.id) and (
+                        vkid := await conn.fetchval('select vkid from tglink where tgid=$1', ref)):
+                    await conn.execute(
+                        'insert into tgreferrals (fromtgid, tgid) values ($1, $2)', int(ref), query.from_user.id)
+        await addUserXP(vkid, 150)
+        try:
+            await query.bot.send_message(
+                chat_id=ref, text=f'<b>🎁 Пользователь <a href="tg://user?id='
+                                  f'{query.from_user.id}">{query.from_user.first_name}</a> подписался по '
+                                  f'вашей ссылке, вы получили <code>+150 опыта</code>.</b>',)
+        except:
+            traceback.print_exc()
     msg = await query.bot.send_message(
         chat_id=query.from_user.id, reply_markup=keyboard.link(),
         text=f'<b>⭐️ Добро пожаловать, <a href="tg://user?id={query.from_user.id}">{query.from_user.first_name}'
@@ -174,15 +167,14 @@ async def link(message: Message, state: FSMContext):
     await message.delete()
 
     await state.clear()
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            vkid = await (await c.execute('select vkid from tglink where code=%s', (message.text,))).fetchone()
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            vkid = await conn.fetchval('select vkid from tglink where code=$1', message.text)
             if not vkid:
                 text = f'<b>⚠️ Неверный код. Введите код из <code>/code</code>:</b>'
                 await state.set_state(states.Link.link.state)
             else:
-                text = f'<b>✅ Вы успешно привязали аккаунт(<a href="https://vk.com/id{vkid[0]}">id{vkid[0]}</a>).</b>'
-                await c.execute('update tglink set tgid = %s where vkid=%s', (message.from_user.id, vkid[0],))
-                await conn.commit()
+                text = f'<b>✅ Вы успешно привязали аккаунт(<a href="https://vk.com/id{vkid}">id{vkid}</a>).</b>'
+                await conn.execute('update tglink set tgid = $1 where vkid=$2', message.from_user.id, vkid)
     msg = await message.bot.send_message(chat_id=message.from_user.id, reply_markup=keyboard.back(), text=text)
     await state.update_data(msg=msg)

@@ -19,17 +19,15 @@ bl = BotLabeler()
 async def asynch(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            if await (await c.execute('select id from gpool where uid=%s and chat_id=%s', (uid, chat_id))).fetchone():
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            if await conn.fetchval('select exists(select 1 from gpool where uid=$1 and chat_id=$2)', uid, chat_id):
                 return await message.reply(disable_mentions=1, message=messages.async_already_bound())
-            bound = (await (await c.execute('select count(*) as c from gpool where uid=%s', (uid,))).fetchone())[0]
-            u_premium = True if await (await c.execute(
-                'select id from premium where uid=%s', (uid,))).fetchone() else False
+            bound = await conn.fetchval('select count(*) as c from gpool where uid=$1', uid)
+            u_premium = True if await conn.fetchval('select exists(select 1 from premium where uid=$1)', uid) else False
             if (not u_premium and bound >= 30) or (u_premium and bound >= 100):
                 return await message.reply(disable_mentions=1, message=messages.async_limit())
-            await c.execute('insert into gpool (uid, chat_id) values (%s, %s)', (uid, chat_id))
-            await conn.commit()
+            await conn.execute('insert into gpool (uid, chat_id) values ($1, $2)', uid, chat_id)
     await message.reply(disable_mentions=1, message=messages.async_done(
         uid, await getUserName(uid), await getUserNickname(uid, chat_id)))
 
@@ -43,11 +41,10 @@ async def delasync(message: Message):
     else:
         delchid = chat_id
     uid = message.from_id
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            if not (await c.execute('delete from gpool where uid=%s and chat_id=%s', (uid, delchid))).rowcount:
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            if not await conn.fetchval('delete from gpool where uid=$1 and chat_id=$2 returning 1', uid, delchid):
                 return await message.reply(disable_mentions=1, message=messages.delasync_already_unbound())
-            await conn.commit()
     await message.reply(disable_mentions=1, message=messages.delasync_done(
         uid, await getUserName(uid), await getUserNickname(uid, chat_id), await getChatName(delchid)))
 
@@ -65,17 +62,15 @@ async def creategroup(message: Message):
     uid = message.from_id
     u_premium = await getUserPremium(uid)
     limit = CREATEGROUPLEAGUES[await getUserLeague(uid) - 1] if not u_premium else 12
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            if len(set(i[0] for i in await (await c.execute(
-                    'select "group" from chatgroups where uid=%s', (uid,))).fetchall())) >= limit:
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            if len(set(i[0] for i in await conn.fetch('select "group" from chatgroups where uid=$1', uid))) >= limit:
                 return await message.reply(disable_mentions=1, message=messages.creategroup_premium())
-            if await (await c.execute('select id from chatgroups where uid=%s and "group"=%s',
-                                      (uid, group_name))).fetchone():
+            if await conn.fetchval(
+                    'select exists(select 1 from chatgroups where uid=$1 and "group"=$2)', uid, group_name):
                 return await message.reply(disable_mentions=1, message=messages.creategroup_already_created(group_name))
-            await c.execute('insert into chatgroups (uid, "group", chat_id) values (%s, %s, %s)',
-                            (uid, group_name, chat_id))
-            await conn.commit()
+            await conn.execute(
+                'insert into chatgroups (uid, "group", chat_id) values ($1, $2, $3)', uid, group_name, chat_id)
     await message.reply(disable_mentions=1, message=messages.creategroup_done(
         uid, await getUserName(uid), await getUserNickname(uid, chat_id), group_name))
 
@@ -88,17 +83,16 @@ async def bind(message: Message):
         return await message.reply(disable_mentions=1, message=messages.bind_hint())
     group_name = ' '.join(data[1:])
     uid = message.from_id
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            if not await (await c.execute('select id from chatgroups where uid=%s and "group"=%s',
-                                          (uid, group_name))).fetchone():
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            if not await conn.fetchval(
+                    'select exists(select 1 from chatgroups where uid=$1 and "group"=$2)', uid, group_name):
                 return await message.reply(disable_mentions=1, message=messages.bind_group_not_found(group_name))
-            if await (await c.execute('select id from chatgroups where "group"=%s and chat_id=%s',
-                                      (group_name, chat_id))).fetchone():
+            if await conn.fetchval(
+                    'select exists(select 1 from chatgroups where "group"=$1 and chat_id=$2)', group_name, chat_id):
                 return await message.reply(disable_mentions=1, message=messages.bind_chat_already_bound(group_name))
-            await c.execute('insert into chatgroups (uid, "group", chat_id) values (%s, %s, %s)',
-                            (uid, group_name, chat_id))
-            await conn.commit()
+            await conn.execute(
+                'insert into chatgroups (uid, "group", chat_id) values ($1, $2, $3)', uid, group_name, chat_id)
     await message.reply(disable_mentions=1, message=messages.bind(
         uid, await getUserName(uid), await getUserNickname(uid, chat_id), group_name))
 
@@ -110,14 +104,13 @@ async def unbind(message: Message):
     if len(data) <= 1:
         return await message.reply(disable_mentions=1, message=messages.unbind_hint())
     group_name = ' '.join(data[1:])
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            if not await (await c.execute('select id from chatgroups where "group"=%s', (group_name,))).fetchone():
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            if not await conn.fetchval('select exists(select 1 from chatgroups where "group"=$1)', group_name):
                 return await message.reply(disable_mentions=1, message=messages.unbind_group_not_found(group_name))
-            if not (await c.execute(
-                    'delete from chatgroups where "group"=%s and chat_id=%s', (group_name, chat_id))).rowcount:
+            if not await conn.fetchval(
+                    'delete from chatgroups where "group"=$1 and chat_id=$2 returning 1', group_name, chat_id):
                 return await message.reply(disable_mentions=1, message=messages.unbind_chat_already_unbound(group_name))
-            await conn.commit()
     uid = message.from_id
     await message.reply(disable_mentions=1, message=messages.unbind(
         uid, await getUserName(uid), await getUserNickname(uid, chat_id), group_name))
@@ -131,11 +124,11 @@ async def delgroup(message: Message):
     if len(data) <= 1:
         return await message.reply(disable_mentions=1, message=messages.delgroup_hint())
     group_name = ' '.join(data[1:])
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            if not (await c.execute('delete from chatgroups where "group"=%s and uid=%s', (group_name, uid))).rowcount:
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            if not await conn.fetchval(
+                    'delete from chatgroups where "group"=$1 and uid=$2 returning 1', group_name, uid):
                 return await message.reply(disable_mentions=1, message=messages.delgroup_not_found(group_name))
-            await conn.commit()
     await message.reply(disable_mentions=1, message=messages.delgroup(
         uid, await getUserName(uid), await getUserNickname(uid, chat_id), group_name))
 
@@ -143,13 +136,12 @@ async def delgroup(message: Message):
 @bl.chat_message(SearchCMD('mygroups'))
 async def mygroups(message: Message):
     uid = message.from_id
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            groups = [i[0] for i in await (await c.execute(
-                'select "group" from chatgroups where uid=%s order by id desc', (uid,))).fetchall()]
-            groups = {i: (await (await c.execute(
-                'select count(*) as c from chatgroups where "group"=%s and uid=%s',
-                (i, uid))).fetchone())[0] for i in list(set(groups))}
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            groups = [i[0] for i in await conn.fetch(
+                'select "group" from chatgroups where uid=$1 order by id desc', uid)]
+            groups = {i: await conn.fetchval('select count(*) as c from chatgroups where "group"=$1 and uid=$2',
+                                             i, uid) for i in list(set(groups))}
     if len(groups) <= 0:
         return await message.reply(disable_mentions=1, message=messages.mygroups_no_groups())
     msg = f'🟣 Список ваших групп (Всего: {len(groups)})\n\n'
@@ -167,12 +159,11 @@ async def addfilter(message: Message):
     addfilter = ' '.join(data[1:])
     uid = message.from_id
     u_name = await getUserName(uid)
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            if not await (await c.execute(
-                    'select id from filters where chat_id=%s and filter=%s', (chat_id, addfilter))).fetchone():
-                await c.execute('insert into filters (chat_id, filter) values (%s, %s)', (chat_id, addfilter))
-                await conn.commit()
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            if not await conn.fetchval(
+                    'select exists(select 1 from filters where chat_id=$1 and filter=$2)', chat_id, addfilter):
+                await conn.execute('insert into filters (chat_id, filter) values ($1, $2)', chat_id, addfilter)
     await message.reply(disable_mentions=1, message=messages.addfilter(
         uid, u_name, await getUserNickname(uid, chat_id)))
 
@@ -184,12 +175,11 @@ async def delfilter(message: Message):
     if len(data) <= 1:
         return await message.reply(disable_mentions=1, message=messages.delfilter_hint())
     delfilter = ' '.join(data[1:])
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            if not (await c.execute('delete from filters where chat_id=%s and filter=%s',
-                                    (chat_id, delfilter))).rowcount:
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            if not await conn.fetchval(
+                    'delete from filters where chat_id=$1 and filter=$2 returning 1', chat_id, delfilter):
                 return await message.reply(disable_mentions=1, message=messages.delfilter_no_filter())
-            await conn.commit()
     uid = message.from_id
     await message.reply(disable_mentions=1, message=messages.delfilter(
         uid, await getUserName(uid), await getUserNickname(uid, chat_id)))
@@ -198,9 +188,9 @@ async def delfilter(message: Message):
 @bl.chat_message(SearchCMD('filterlist'))
 async def filterlist(message: Message):
     chat_id = message.peer_id - 2000000000
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            filters = await (await c.execute('select filter from filters where chat_id=%s', (chat_id,))).fetchall()
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            filters = await conn.fetch('select filter from filters where chat_id=$1', chat_id)
     if len(filters) == 0:
         return await message.reply(
             disable_mentions=1,
@@ -234,12 +224,11 @@ async def gaddfilter(message: Message):
         u_acc = await getUserAccessLevel(uid, chat_id)
         if not await haveAccess('gaddfilter', chat_id, u_acc):
             continue
-        async with (await pool()).connection() as conn:
-            async with conn.cursor() as c:
-                if not await (await c.execute('select id from filters where chat_id=%s and filter=%s',
-                                              (chat_id, addfilter))).fetchone():
-                    await c.execute('insert into filters (chat_id, filter) values (%s, %s)', (chat_id, addfilter))
-                    await conn.commit()
+        async with (await pool()).acquire() as conn:
+            async with conn.transaction():
+                if not await conn.fetchval(
+                        'select exists(select 1 from filters where chat_id=$1 and filter=$2)', chat_id, addfilter):
+                    await conn.execute('insert into filters (chat_id, filter) values ($1, $2)', chat_id, addfilter)
         success += 1
     await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.message_id, message=messages.gaddfilter(
         uid, await getUserName(uid), len(chats), success))
@@ -265,10 +254,9 @@ async def gdelfilter(message: Message):
         u_acc = await getUserAccessLevel(uid, chat_id)
         if not await haveAccess('grnick', chat_id, u_acc):
             continue
-        async with (await pool()).connection() as conn:
-            async with conn.cursor() as c:
-                await c.execute('delete from filters where chat_id=%s and filter=%s', (chat_id, delfilter))
-                await conn.commit()
+        async with (await pool()).acquire() as conn:
+            async with conn.transaction():
+                await conn.execute('delete from filters where chat_id=$1 and filter=$2', chat_id, delfilter)
         success += 1
     await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.message_id,
                             message=messages.gdelfilter(uid, await getUserName(uid), len(chats), success))
@@ -292,18 +280,16 @@ async def editlevel(message: Message):
         return await message.reply(disable_mentions=1, message=messages.editlvl_hint())
     if command not in COMMANDS or COMMANDS[command] not in range(0, 8):
         return await message.reply(disable_mentions=1, message=messages.editlvl_command_not_found())
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            bl = await (await c.execute(
-                'select id, lvl from commandlevels where chat_id=%s and cmd=%s', (chat_id, command))).fetchone()
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            bl = await conn.fetchrow('select id, lvl from commandlevels where chat_id=$1 and cmd=$2', chat_id, command)
             if bl:
                 original_lvl = bl[1]
-                await c.execute('update commandlevels set lvl = %s where id=%s', (given_lvl, bl[0]))
+                await conn.execute('update commandlevels set lvl = $1 where id=$2', given_lvl, bl[0])
             else:
                 original_lvl = COMMANDS[command]
-                await c.execute('insert into commandlevels (chat_id, cmd, lvl) values (%s, %s, %s)',
-                                (chat_id, command, given_lvl))
-            await conn.commit()
+                await conn.execute(
+                    'insert into commandlevels (chat_id, cmd, lvl) values ($1, $2, $3)', chat_id, command, given_lvl)
     await message.reply(disable_mentions=1, message=messages.editlvl(
         uid, await getUserName(uid), await getUserNickname(uid, chat_id), command, original_lvl, given_lvl))
 
@@ -334,13 +320,12 @@ async def levelname(message: Message):
     if len(data) < 3 or lvl < 0 or lvl > 8:
         return await message.reply(disable_mentions=1, message=messages.levelname_hint())
 
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            if not (await c.execute('update accessnames set name = %s where chat_id=%s and lvl=%s',
-                                    (' '.join(data[2:]), chat_id, lvl))).rowcount:
-                await c.execute('insert into accessnames (chat_id, lvl, name) values (%s, %s, %s)',
-                                (chat_id, lvl, ' '.join(data[2:])))
-            await conn.commit()
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            if not await conn.fetchval('update accessnames set name = $1 where chat_id=$2 and lvl=$3 returning 1',
+                                       ' '.join(data[2:]), chat_id, lvl):
+                await conn.execute('insert into accessnames (chat_id, lvl, name) values ($1, $2, $3)',
+                                   chat_id, lvl, ' '.join(data[2:]))
     uid = message.from_id
     await message.reply(disable_mentions=1, message=messages.levelname(
         uid, await getUserName(uid), await getUserNickname(uid, chat_id), lvl, ' '.join(data[2:])))
@@ -361,11 +346,10 @@ async def resetlevel(message: Message):
     if len(data) < 2 or lvl < 0 or lvl > 8:
         return await message.reply(disable_mentions=1, message=messages.resetlevel_hint())
 
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            await c.execute('update accessnames set name = %s where chat_id=%s and lvl=%s',
-                            (LVL_NAMES[lvl], chat_id, lvl))
-            await conn.commit()
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            await conn.execute(
+                'update accessnames set name = $1 where chat_id=$2 and lvl=$3', LVL_NAMES[lvl], chat_id, lvl)
     uid = message.from_id
     await message.reply(disable_mentions=1, message=messages.levelname(
         uid, await getUserName(uid), await getUserNickname(uid, chat_id), lvl, LVL_NAMES[lvl]))
@@ -379,10 +363,9 @@ async def settings(message: Message):
 @bl.chat_message(SearchCMD('listasync'))
 async def listasync(message: Message):
     uid = message.from_id
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            chat_ids = [i[0] for i in await (await c.execute('select chat_id from gpool where uid=%s order by id desc',
-                                                             (uid,))).fetchall()]
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            chat_ids = [i[0] for i in await conn.fetch('select chat_id from gpool where uid=$1 order by id desc', uid)]
     total = len(chat_ids)
     chat_ids = chat_ids[:15]
     names = []

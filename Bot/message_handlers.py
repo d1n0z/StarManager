@@ -14,7 +14,7 @@ from Bot.checkers import getUChatLimit
 from Bot.utils import getUserLastMessage, getUserAccessLevel, getUserMute, sendMessage, deleteMessages, \
     getChatSettings, kickUser, getUserName, getUserNickname, antispamChecker, punish, getUserBan, getUserBanInfo, \
     getUserPremium, getIDFromMessage, getUserPremmenuSetting, getChatName, getUserPrefixes
-from config.config import ADMINS, PM_COMMANDS
+from config.config import PM_COMMANDS, ADMINS
 from db import pool
 
 
@@ -43,14 +43,13 @@ async def message_handle(event: MessageNew) -> Any:
     if uid in ADMINS:
         print(f'{uid}({chat_id}): {msg}')
 
-    async with ((await pool()).connection() as conn):
-        async with conn.cursor() as c:
-            await c.execute('insert into allusers (uid) values (%s) on conflict (uid) do nothing', (uid,))
-            await c.execute('insert into allchats (chat_id) values (%s) on conflict (chat_id) do nothing', (chat_id,))
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            await conn.execute('insert into allusers (uid) values ($1) on conflict (uid) do nothing', uid)
+            await conn.execute('insert into allchats (chat_id) values ($1) on conflict (chat_id) do nothing', chat_id)
 
-            if (await (await c.execute('select id from filters where chat_id=%s and filter=ANY(%s)',
-                                       (chat_id, [i.lower() for i in msg.lower().split()]))).fetchone() and
-                    not await getUserAccessLevel(uid, chat_id)):
+            if await conn.fetchval('select exists(select 1 from filters where chat_id=$1 and filter=ANY($2))',
+                                   chat_id, msg.lower().split()) and not await getUserAccessLevel(uid, chat_id):
                 return await deleteMessages(event.object.message.conversation_message_id, chat_id)
 
             data = event.object.message.text.split()
@@ -59,9 +58,9 @@ async def message_handle(event: MessageNew) -> Any:
                     pinged := [i for i in [
                         await getIDFromMessage(event.object.message.text, None, place=k) for k in range(
                             1, len(data) + 1) if not data[k - 1].isdigit()] if i]):
-                if (await (await c.execute('select id from antitag where chat_id=%s', (chat_id,))).fetchone() and
-                        (await (await c.execute('select id from antitag where chat_id=%s and uid=ANY(%s)',
-                                                (chat_id, pinged))).fetchone()) and
+                if (await conn.fetchval('select exists(select 1 from antitag where chat_id=$1)', chat_id) and
+                        await conn.fetchval('select exists(select 1 from antitag where chat_id=$1 and uid=ANY($2))',
+                                            chat_id, pinged) and
                         await deleteMessages(event.object.message.conversation_message_id, chat_id)):
                     return await sendMessage(event.object.message.peer_id, messages.antitag_on(
                         uid, await getUserNickname(uid, chat_id), await getUserName(uid)))
@@ -70,9 +69,8 @@ async def message_handle(event: MessageNew) -> Any:
                         if not await sendMessage(
                                 i, f'💥 [id{i}|{await getUserName(i)}], вас тегнул [id{uid}|{await getUserName(uid)}] '
                                    f'в чате ({await getChatName(chat_id)}) с текстом: "{event.object.message.text}"'):
-                            await c.execute(
-                                'update premmenu set pos = %s where uid=%s and setting=%s', (0, uid, 'tagnotif'))
-            await conn.commit()
+                            await conn.execute(
+                                'update premmenu set pos = $1 where uid=$2 and setting=$3', 0, uid, 'tagnotif')
 
     if (ban := await getUserBan(uid, chat_id)) >= time.time():
         await deleteMessages(event.object.message.conversation_message_id, chat_id)
@@ -96,10 +94,10 @@ async def message_handle(event: MessageNew) -> Any:
             event.object.message.text.replace('*', '@').lower().split()):
         return await deleteMessages(event.object.message.conversation_message_id, chat_id)
     if settings['main']['nightmode'] and uacc < 6:
-        async with (await pool()).connection() as conn:
-            async with conn.cursor() as c:
-                chatsetting = await (await c.execute(
-                    'select value2 from settings where chat_id=%s and setting=\'nightmode\'', (chat_id,))).fetchone()
+        async with (await pool()).acquire() as conn:
+            async with conn.transaction():
+                chatsetting = await conn.fetchrow(
+                    'select value2 from settings where chat_id=$1 and setting=\'nightmode\'', chat_id)
         if chatsetting and (setting := chatsetting[0]):
             setting = setting.split('-')
             now = datetime.now()
@@ -126,26 +124,22 @@ async def message_handle(event: MessageNew) -> Any:
         sticker = False
 
     if settings['antispam']['messagesPerMinute']:
-        async with (await pool()).connection() as conn:
-            async with conn.cursor() as c:
-                uantispammessages = (await (await c.execute(
-                    'select count(*) as c from antispammessages where chat_id=%s and from_id=%s',
-                    (chat_id, uid))).fetchone())[0]
-                setting = await (await c.execute(
-                    'select "value" from settings where chat_id=%s and setting=\'messagesPerMinute\'',
-                    (chat_id,))).fetchone()
-                if setting[0] and uantispammessages < setting[0]:
-                    await c.execute(
-                        'insert into antispammessages (cmid, chat_id, from_id, time) values (%s, %s, %s, %s)',
-                        (event.object.message.conversation_message_id, chat_id, uid, event.object.message.date))
-                    await conn.commit()
+        async with (await pool()).acquire() as conn:
+            async with conn.transaction():
+                uantispammessages = await conn.fetchval(
+                    'select count(*) as c from antispammessages where chat_id=$1 and from_id=$2', chat_id, uid)
+                setting = await conn.fetchval(
+                    'select "value" from settings where chat_id=$1 and setting=\'messagesPerMinute\'', chat_id)
+                if setting and uantispammessages < setting:
+                    await conn.execute(
+                        'insert into antispammessages (cmid, chat_id, from_id, time) values ($1, $2, $3, $4)',
+                        event.object.message.conversation_message_id, chat_id, uid, event.object.message.date)
 
     if uacc < 5 and (setting := await antispamChecker(chat_id, uid, event.object.message, settings)):
-        async with (await pool()).connection() as conn:
-            async with conn.cursor() as c:
-                setting = await (await c.execute(
-                    'select id, setting, "value" from settings where chat_id=%s and setting=%s',
-                    (chat_id, setting))).fetchone()
+        async with (await pool()).acquire() as conn:
+            async with conn.transaction():
+                setting = await conn.fetchrow(
+                    'select id, setting, "value" from settings where chat_id=$1 and setting=$2', chat_id, setting)
         if punishment := await punish(uid, chat_id, setting[0]):
             await deleteMessages(event.object.message.conversation_message_id, chat_id)
             if punishment != 'del':

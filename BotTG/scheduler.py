@@ -4,11 +4,12 @@ import traceback
 
 import aiocron
 
-from Bot.utils import addUserXP, getULvlBanned, getUserName
+from Bot.checkers import getULvlBanned
+from Bot.utils import addUserXP, getUserName
 from BotTG import keyboard
 from BotTG.bot import bot
 from config import config
-from db import pool
+from db import smallpool as pool
 
 
 async def new():
@@ -21,10 +22,9 @@ async def new():
                  f'привязать профиль ВК для получения приза (<a href="https://t.me/{config.TG_BOT_USERNAME}?start=0">'
                  f'клик</a>). После выполнения всех условий нажмите кнопку "</b>Хочу участвовать<b>".</b></blockquote>'
                  f'\n\n<b>🕒 Окончание конкурса будет завтра в <code>09:00</code> по МСК</b>')
-        async with (await pool()).connection() as conn:
-            async with conn.cursor() as c:
-                await c.execute('insert into tggiveaways (mid) values (%s)', (msg.message_id,))
-                await conn.commit()
+        async with (await pool()).acquire() as conn:
+            async with conn.transaction():
+                await conn.execute('insert into tggiveaways (mid) values ($1)', msg.message_id)
     except:
         traceback.print_exc()
 
@@ -32,15 +32,15 @@ async def new():
 async def end():
     try:
         winners = []
-        async with (await pool()).connection() as conn:
-            async with conn.cursor() as c:
-                mid = await (await c.execute('select mid from tggiveaways')).fetchone()
-                users = await (await c.execute('select tgid from tggiveawayusers')).fetchall()
-                await c.execute('delete from tggiveaways')
-                await c.execute('delete from tggiveawayusers')
+        async with (await pool()).acquire() as conn:
+            async with conn.transaction():
+                mid = await conn.fetch('select mid from tggiveaways')
+                users = await conn.fetch('select tgid from tggiveawayusers')
+                await conn.execute('delete from tggiveaways')
+                await conn.execute('delete from tggiveawayusers')
                 random.shuffle(users)
                 for i in users:
-                    user = await (await c.execute('select vkid, tgid from tglink where tgid=%s', (i[0],))).fetchone()
+                    user = await conn.fetchrow('select vkid, tgid from tglink where tgid=$1', i[0])
                     if user and not await getULvlBanned(user[0]):
                         winners.append(user)
                         if len(winners) == 3:

@@ -212,8 +212,8 @@ class UserJoinedDate(Model):
     time = BigIntegerField(default=0)
 
     class Meta:
-        database = dbhandle
         table_name = f'userjoineddate'
+        database = dbhandle
 
 
 class XP(Model):
@@ -379,13 +379,14 @@ class Likes(Model):
         table_name = f'likes'
 
 
-class InfBanned(Model):
-    uid = IntegerField(default=0, unique=True, index=True)
-    type = TextField(null=True)
+class Blocked(Model):
+    uid = IntegerField(default=0, index=True)
+    type = TextField()
+    reason = TextField(null=True)
 
     class Meta:
         database = dbhandle
-        table_name = f'infbanned'
+        table_name = f'blocked'
 
 
 class LeavedChats(Model):

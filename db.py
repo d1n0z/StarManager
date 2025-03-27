@@ -1,4 +1,5 @@
-from psycopg_pool import AsyncConnectionPool, ConnectionPool
+from asyncpg import create_pool as create_asyncpool
+from psycopg_pool import ConnectionPool
 
 from config.config import DATABASE_STR
 
@@ -10,14 +11,20 @@ _syncpool = None
 async def pool():
     global _pool
     if _pool is None:
-        _pool = AsyncConnectionPool(DATABASE_STR, min_size=10, max_size=700, open=False)
-        await _pool.open()
+        _pool = await create_asyncpool(DATABASE_STR, max_size=300, max_inactive_connection_lifetime=15)
+    return _pool
+
+
+async def smallpool():
+    global _pool
+    if _pool is None:
+        _pool = await create_asyncpool(DATABASE_STR, min_size=1, max_inactive_connection_lifetime=30)
     return _pool
 
 
 def syncpool() -> ConnectionPool:
     global _syncpool
     if _syncpool is None:
-        _syncpool = ConnectionPool(DATABASE_STR, max_size=100, open=False)
+        _syncpool = ConnectionPool(DATABASE_STR, min_size=1, max_size=10, open=False)
         _syncpool.open()
     return _syncpool

@@ -40,10 +40,7 @@ async def anon(message: GroupTypes.MessageNew):
         return
     for i in data:
         for y in i.split('/'):
-            try:
-                if not whoiscached(y):
-                    continue
-            except:
+            if not whoiscached(y):
                 continue
             await sendMessage(message.peer_id, messages.anon_link())
             return
@@ -54,14 +51,14 @@ async def anon(message: GroupTypes.MessageNew):
         await sendMessage(message.peer_id, messages.anon_not_member())
         return
     date = datetime.now().replace(hour=0, minute=0, second=0)
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            if (cnt := await (await c.execute('select count(*) as c from anonmessages where fromid=%s and time>%s',
-                                              (uid, date.timestamp()))).fetchone()) and cnt[0] >= 25:
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            if (cnt := await conn.fetchval('select count(*) as c from anonmessages where fromid=$1 and time>$2',
+                                           uid, date.timestamp())) and cnt >= 25:
                 await sendMessage(message.peer_id, messages.anon_limit())
                 return
-            mid = (await (await c.execute('insert into anonmessages (fromid, chat_id, time) values (%s, %s, %s) '
-                                          'returning id', (uid, chatid, time.time()))).fetchone())[0]
+            mid = await conn.fetchval('insert into anonmessages (fromid, chat_id, time) values ($1, $2, $3) '
+                                      'returning id', uid, chatid, time.time())
     await sendMessage(chatid + 2000000000, messages.anon_message(mid, ' '.join(data[2:])))
     await sendMessage(message.peer_id, messages.anon_sent(mid, await getChatName(chatid)))
 
@@ -80,10 +77,9 @@ async def deanon(message: GroupTypes.MessageNew):
     if not id.isdigit():
         await sendMessage(message.peer_id, messages.deanon_help())
         return
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            deanon_target = await (await c.execute(
-                'select chat_id, fromid, time from anonmessages where id=%s', (id,))).fetchone()
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            deanon_target = await conn.fetchrow('select chat_id, fromid, time from anonmessages where id=$1', id)
     if deanon_target is None:
         await sendMessage(message.peer_id, messages.deanon_target_not_found())
         return
@@ -99,16 +95,13 @@ async def deanon(message: GroupTypes.MessageNew):
 async def code(message: GroupTypes.MessageNew):
     message = message.object.message
     uid = message.from_id
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            code = await (await c.execute('select code from tglink where vkid=%s', (uid,))).fetchone()
-            if code:
-                code = code[0]
-            else:
-                while not code or await (await c.execute('select id from tglink where code=%s', (code,))).fetchone():
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            code = await conn.fetchval('select code from tglink where vkid=$1', uid)
+            if not code:
+                while not code or await conn.fetchval('select exists(select 1 from tglink where code=$1)', code):
                     code = ''.join([random.choice(string.ascii_letters + string.digits) for _ in range(6)])
-                await c.execute('insert into tglink (tgid, vkid, code) values (null, %s, %s)', (uid, code))
-                await conn.commit()
+                await conn.execute('insert into tglink (tgid, vkid, code) values (null, $1, $2)', uid, code)
     await sendMessage(message.peer_id, messages.code(code))
 
 
@@ -129,20 +122,18 @@ async def report(message: GroupTypes.MessageNew):
         await sendMessage(message.peer_id, messages.report_empty())
         return
 
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            repu = await (await c.execute(
-                'select time from reports where uid=%s order by time desc limit 1', (uid,))).fetchone()
-    if repu and time.time() - repu[0] < REPORT_CD and uid not in DEVS:
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            repu = await conn.fetchval('select time from reports where uid=$1 order by time desc limit 1', uid)
+    if repu is not None and time.time() - repu < REPORT_CD and uid not in DEVS:
         await sendMessage(message.peer_id, messages.report_cd())
         return
 
-    async with (await pool()).connection() as conn:
-        async with conn.cursor() as c:
-            repid = await (await c.execute('select id from reports order by id desc limit 1')).fetchone()
-            repid = (repid[0] + 1) if repid else 1
-            await c.execute('insert into reports (uid, id, time) VALUES (%s, %s, %s)', (uid, repid, int(time.time())))
-            await conn.commit()
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            repid = await conn.fetchval('select id from reports order by id desc limit 1')
+            repid = (repid + 1) if repid else 1
+            await conn.execute('insert into reports (uid, id, time) VALUES ($1, $2, $3)', uid, repid, time.time())
 
     photos = ','.join(photos) or None
     await api.messages.send(disable_mentions=1, chat_id=REPORT_TO, random_id=0, message=messages.report(
