@@ -12,9 +12,9 @@ from loguru import logger
 
 import messages
 from Bot.tgbot import tgbot
-from Bot.utils import sendMessage, chunks, punish, getUserName
+from Bot.utils import sendMessage, chunks, punish, getUserName, beautifyNumber
 from config.config import DATABASE, PASSWORD, USER, TG_CHAT_ID, DAILY_TO, api, TG_BACKUP_THREAD_ID, PHOTO_NOT_FOUND, \
-    YANDEX_TOKEN, COMMANDS, vk_api_session, GROUP_ID, PATH
+    YANDEX_TOKEN, COMMANDS, vk_api_session, GROUP_ID, PATH, implicitapi
 from db import smallpool as pool
 
 
@@ -57,6 +57,11 @@ async def updateInfo():
     try:
         async with (await pool()).acquire() as conn:
             async with conn.transaction():
+                alluserscount = beautifyNumber(await conn.fetchval('select count(*) from allusers'))
+                allchatscount = beautifyNumber(await conn.fetchval('select count(*) from allchats'))
+                await implicitapi.status.set(
+                    group_id=GROUP_ID, text=f'👥 Пользователей: {alluserscount} | 💬 Бесед: {allchatscount}')
+
                 users = chunks(await conn.fetch('select uid from usernames'), 999)
                 chats = chunks(await conn.fetch('select chat_id from chatnames'), 99)
                 groups = chunks(await conn.fetch('select group_id from groupnames'), 499)
@@ -210,9 +215,7 @@ async def run_notifications():
                         await conn.execute('update notifications set status = $1, time = $2 where id=$3',
                                            0 if not i[3] else 1, int(i[4] + (i[3] * 60)) if i[3] else i[4], i[0])
                     except:
-                        if i[1] == 34356:
-                            traceback.print_exc()
-                        pass
+                        traceback.print_exc()
     except:
         traceback.print_exc()
         await sendMessage(DAILY_TO + 2000000000, f'e from schedule run_notifications:\n' + traceback.format_exc())

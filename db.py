@@ -11,7 +11,7 @@ _syncpool = None
 async def pool():
     global _pool
     if _pool is None:
-        _pool = await create_asyncpool(DATABASE_STR, max_size=300, max_inactive_connection_lifetime=15)
+        _pool = await create_asyncpool(DATABASE_STR, min_size=5, max_size=100, max_inactive_connection_lifetime=15)
     return _pool
 
 

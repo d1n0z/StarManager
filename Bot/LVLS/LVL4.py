@@ -9,7 +9,7 @@ import messages
 from Bot.checkers import haveAccess
 from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserAccessLevel, getUserName, getUserNickname, kickUser, getUserBan, \
-    setChatMute, getUserWarns, getgpool
+    setChatMute, getUserWarns, getgpool, editMessage
 from config.config import api
 from db import pool
 
@@ -59,8 +59,8 @@ async def gkick(message: Message):
                 pass
             success += 1
 
-    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
-                            message=messages.gkick(id, ch_name, ch_nickname, len(chats), success))
+    await editMessage(peer_id=edit.peer_id, cmid=edit.conversation_message_id,
+                      msg=messages.gkick(id, ch_name, ch_nickname, len(chats), success))
 
 
 @bl.chat_message(SearchCMD('gban'))
@@ -161,8 +161,8 @@ async def gban(message: Message):
                 ban_cause, ban_time // 86400), chat_id=chat_id)
         success += 1
 
-    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
-                            message=messages.gban(id, ch_name, ch_nick, len(chats), success))
+    await editMessage(peer_id=edit.peer_id, cmid=edit.conversation_message_id,
+                      msg=messages.gban(id, ch_name, ch_nick, len(chats), success))
 
 
 @bl.chat_message(SearchCMD('gunban'))
@@ -194,11 +194,12 @@ async def gunban(message: Message):
             continue
         async with (await pool()).acquire() as conn:
             async with conn.transaction():
-                if await conn.fetchval('update ban set ban = 0 where chat_id=$1 and uid=$2 returning 1', chat_id, id):
+                if await conn.fetchval('update ban set ban = 0 where chat_id=$1 and uid=$2 and ban>$3 returning 1',
+                                       chat_id, id, time.time()):
                     success += 1
 
-    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
-                            message=messages.gunban(id, name, nick, len(chats), success))
+    await editMessage(peer_id=edit.peer_id, cmid=edit.conversation_message_id,
+                      msg=messages.gunban(id, name, nick, len(chats), success))
 
 
 @bl.chat_message(SearchCMD('gmute'))
@@ -284,8 +285,8 @@ async def gmute(message: Message):
             mute_cause, int(mute_time / 60)))
         success += 1
 
-    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
-                            message=messages.gmute(id, ch_name, ch_nick, len(chats), success))
+    await editMessage(peer_id=edit.peer_id, cmid=edit.conversation_message_id,
+                      msg=messages.gmute(id, ch_name, ch_nick, len(chats), success))
 
 
 @bl.chat_message(SearchCMD('gunmute'))
@@ -324,8 +325,8 @@ async def gunmute(message: Message):
         await api.messages.send(disable_mentions=1, random_id=0, chat_id=chat_id, message=messages.unmute(
             u_name, await getUserNickname(uid, chat_id), uid, ch_name, await getUserNickname(id, chat_id), id))
         success += 1
-    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
-                            message=messages.gunmute(id, ch_name, ch_nick, len(chats), success))
+    await editMessage(peer_id=edit.peer_id, cmid=edit.conversation_message_id,
+                      msg=messages.gunmute(id, ch_name, ch_nick, len(chats), success))
 
 
 @bl.chat_message(SearchCMD('gwarn'))
@@ -407,8 +408,8 @@ async def gwarn(message: Message):
         await api.messages.send(disable_mentions=1, random_id=0, message=msg, chat_id=chat_id)
         success += 1
 
-    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
-                            message=messages.gwarn(id, ch_name, ch_nick, len(chats), success))
+    await editMessage(peer_id=edit.peer_id, cmid=edit.conversation_message_id,
+                      msg=messages.gwarn(id, ch_name, ch_nick, len(chats), success))
 
 
 @bl.chat_message(SearchCMD('gunwarn'))
@@ -449,8 +450,8 @@ async def gunwarn(message: Message):
             u_name, await getUserNickname(uid, chat_id), uid, ch_name, await getUserNickname(id, chat_id), id))
         success += 1
 
-    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
-                            message=messages.gunwarn(id, ch_name, ch_nick, len(chats), success))
+    await editMessage(peer_id=edit.peer_id, cmid=edit.conversation_message_id,
+                      msg=messages.gunwarn(id, ch_name, ch_nick, len(chats), success))
 
 
 @bl.chat_message(SearchCMD('gsnick'))
@@ -497,8 +498,8 @@ async def gsnick(message: Message):
             nickname))
         success += 1
 
-    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
-                            message=messages.gsnick(id, ch_name, ch_nick, len(chats), success))
+    await editMessage(peer_id=edit.peer_id, cmid=edit.conversation_message_id,
+                      msg=messages.gsnick(id, ch_name, ch_nick, len(chats), success))
 
 
 @bl.chat_message(SearchCMD('grnick'))
@@ -537,8 +538,8 @@ async def grnick(message: Message):
             pass
         success += 1
 
-    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
-                            message=messages.grnick(id, ch_name, ch_nick, len(chats), success))
+    await editMessage(peer_id=edit.peer_id, cmid=edit.conversation_message_id,
+                      msg=messages.grnick(id, ch_name, ch_nick, len(chats), success))
 
 
 @bl.chat_message(SearchCMD('gzov'))
@@ -567,5 +568,5 @@ async def gzov(message: Message):
             uid, u_name, await getUserNickname(uid, chat_id), cause, members))
         success += 1
 
-    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
-                            message=messages.gzov(uid, u_name, u_nick, len(chats), success))
+    await editMessage(peer_id=edit.peer_id, cmid=edit.conversation_message_id,
+                      msg=messages.gzov(uid, u_name, u_nick, len(chats), success))

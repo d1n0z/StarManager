@@ -925,3 +925,8 @@ def scanURLShortened(url):
         ) else False
     except requests.RequestException:
         return False
+
+
+@cached
+def beautifyNumber(n):
+    return ''.join((i + ' ') if k % 3 == 2 and k != len(str(n)) - 1 else i for k, i in enumerate(str(n)[::-1]))[::-1]

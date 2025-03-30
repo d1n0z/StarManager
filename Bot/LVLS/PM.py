@@ -79,7 +79,7 @@ async def deanon(message: GroupTypes.MessageNew):
         return
     async with (await pool()).acquire() as conn:
         async with conn.transaction():
-            deanon_target = await conn.fetchrow('select chat_id, fromid, time from anonmessages where id=$1', id)
+            deanon_target = await conn.fetchrow('select chat_id, fromid, time from anonmessages where id=$1', int(id))
     if deanon_target is None:
         await sendMessage(message.peer_id, messages.deanon_target_not_found())
         return

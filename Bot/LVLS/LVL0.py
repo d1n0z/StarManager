@@ -442,3 +442,22 @@ async def rep(message: Message):
         data[1] == '+', uid, await getUserName(uid), await getUserNickname(uid, message.chat_id),
         id, await getUserName(id), await getUserNickname(id, message.chat_id), await getUserRep(id),
         await getRepTop(id)))
+
+
+@bl.chat_message(SearchCMD('short'))
+async def short(message: Message):
+    uid = message.from_id
+    if not await getUserPremium(uid):
+        return await message.reply(disable_mentions=1, message=messages.no_prem())
+    data = message.text.split()
+    if len(data) != 2:
+        return await message.reply(disable_mentions=1, message=messages.short_hint())
+    try:
+        shortened = await api.utils.get_short_link(url=data[1], private=0)
+        if not shortened or not shortened.short_url:
+            raise Exception
+    except:
+        return await message.reply(disable_mentions=1, message=messages.short_failed())
+    await message.reply(disable_mentions=1, message=messages.short(
+        shortened.short_url, (await api.utils.get_short_link(
+            f'https://vk.com/cc?act=stats&key={shortened.key}')).short_url))

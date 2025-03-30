@@ -73,7 +73,8 @@ async def join(message: MessageEvent):
                 await conn.execute('delete from antispamurlexceptions where chat_id=$1', chat_id)
                 await conn.execute('delete from botjoineddate where chat_id=$1', chat_id)
                 await conn.execute('delete from captcha where chat_id=$1', chat_id)
-                await conn.execute('insert into botjoineddate (chat_id, time) values ($1, $2)', chat_id, time.time())
+                await conn.execute('insert into botjoineddate (chat_id, time) values ($1, $2) on conflict (chat_id) '
+                                   'do update set time=$2', chat_id, time.time())
 
         if cmd == 'join':
             try:
@@ -989,7 +990,7 @@ async def notification_tag_change(message: MessageEvent):
         async with conn.transaction():
             notif = await conn.fetchrow(
                 'update notifications set tag = $1 where chat_id=$2 and name=$3 returning text, time, every, status',
-                ctype, peer_id - 2000000000, name)
+                int(ctype), peer_id - 2000000000, name)
     await editMessage(messages.notification(name, notif[0], notif[1], notif[2], ctype, notif[3]), peer_id,
                       message.conversation_message_id, keyboard.notification(message.user_id, notif[3], name))
 

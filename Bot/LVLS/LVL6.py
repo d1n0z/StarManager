@@ -252,7 +252,7 @@ async def chatlimit(message: Message):
         async with conn.transaction():
             chlim = await conn.fetchval('select time from chatlimit where chat_id=$1', chat_id)
             lpos = chlim or 1
-            if chlim:
+            if chlim is not None:
                 await conn.execute('update chatlimit set time = $1 where chat_id=$2', st, chat_id)
             else:
                 await conn.execute('insert into chatlimit (chat_id, time) values ($1, $2)', chat_id, st)

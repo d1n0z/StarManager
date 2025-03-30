@@ -8,7 +8,7 @@ import messages
 from Bot.checkers import haveAccess
 from Bot.rules import SearchCMD
 from Bot.utils import getUserPremium, getUserName, getUserNickname, getChatName, getUserAccessLevel, getIDFromMessage, \
-    getgpool, getUserLeague
+    getgpool, getUserLeague, editMessage
 from config.config import api, COMMANDS, LVL_NAMES, CREATEGROUPLEAGUES
 from db import pool
 
@@ -216,8 +216,8 @@ async def gaddfilter(message: Message):
     uid = message.from_id
     if len(chats) == 0:
         return await message.reply(disable_mentions=1, message=messages.chat_unbound())
-    msg = messages.gaddfilter_start(uid, await getUserName(uid), await getUserNickname(uid, chat_id), len(chats))
-    edit = await message.reply(disable_mentions=1, message=msg)
+    edit = await message.reply(disable_mentions=1, message=messages.gaddfilter_start(
+        uid, await getUserName(uid), await getUserNickname(uid, chat_id), len(chats)))
     addfilter = ' '.join(data[1:])
     success = 0
     for chat_id in chats:
@@ -230,8 +230,8 @@ async def gaddfilter(message: Message):
                         'select exists(select 1 from filters where chat_id=$1 and filter=$2)', chat_id, addfilter):
                     await conn.execute('insert into filters (chat_id, filter) values ($1, $2)', chat_id, addfilter)
         success += 1
-    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.message_id, message=messages.gaddfilter(
-        uid, await getUserName(uid), len(chats), success))
+    await editMessage(messages.gaddfilter(
+        uid, await getUserName(uid), len(chats), success), edit.peer_id, edit.conversation_message_id)
 
 
 @bl.chat_message(SearchCMD('gdelfilter'))
@@ -258,8 +258,8 @@ async def gdelfilter(message: Message):
             async with conn.transaction():
                 await conn.execute('delete from filters where chat_id=$1 and filter=$2', chat_id, delfilter)
         success += 1
-    await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.message_id,
-                            message=messages.gdelfilter(uid, await getUserName(uid), len(chats), success))
+    await editMessage(peer_id=edit.peer_id, cmid=edit.message_id,
+                      msg=messages.gdelfilter(uid, await getUserName(uid), len(chats), success))
 
 
 @bl.chat_message(SearchCMD('editlevel'))
@@ -285,7 +285,10 @@ async def editlevel(message: Message):
             bl = await conn.fetchrow('select id, lvl from commandlevels where chat_id=$1 and cmd=$2', chat_id, command)
             if bl:
                 original_lvl = bl[1]
-                await conn.execute('update commandlevels set lvl = $1 where id=$2', given_lvl, bl[0])
+                if given_lvl == COMMANDS[command]:
+                    await conn.execute('delete from commandlevels where id=$1', bl[0])
+                else:
+                    await conn.execute('update commandlevels set lvl = $1 where id=$2', given_lvl, bl[0])
             else:
                 original_lvl = COMMANDS[command]
                 await conn.execute(

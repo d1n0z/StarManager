@@ -34,7 +34,7 @@ async def end():
         winners = []
         async with (await pool()).acquire() as conn:
             async with conn.transaction():
-                mid = await conn.fetch('select mid from tggiveaways')
+                mid = await conn.fetchval('select mid from tggiveaways')
                 users = await conn.fetch('select tgid from tggiveawayusers')
                 await conn.execute('delete from tggiveaways')
                 await conn.execute('delete from tggiveawayusers')
@@ -64,7 +64,7 @@ async def end():
                      'аккаунтах. Следующий конкурс в <code>10:00</code> МСК.</b>')
         else:
             text += '<b>⚠️ Никто не участвовал в этом конкурсе.</b>'
-        await bot.edit_message_text(chat_id=config.TG_PUBLIC_CHAT_ID, message_id=mid[0], text=text)
+        await bot.edit_message_text(chat_id=config.TG_PUBLIC_CHAT_ID, message_id=mid, text=text)
     except:
         traceback.print_exc()
 

@@ -89,7 +89,7 @@ async def message_handle(event: MessageNew) -> Any:
                 await sendMessage(event.object.message.peer_id,
                                   messages.kicked(uid, await getUserName(uid), await getUserNickname(uid, chat_id)))
         return
-    if settings['main']['disallowPings'] and any(
+    if uacc == 0 and settings['main']['disallowPings'] and any(
             i in ['@all', '@online', '@everyone', '@here', '@все', '@тут', '@здесь', '@онлайн'] for i in
             event.object.message.text.replace('*', '@').lower().split()):
         return await deleteMessages(event.object.message.conversation_message_id, chat_id)
@@ -117,6 +117,8 @@ async def message_handle(event: MessageNew) -> Any:
         audio = False
     try:
         if event.object.message.attachments[0].type == MessagesMessageAttachmentType.STICKER:
+            if settings['main']['disallowStickers']:
+                return await deleteMessages(event.object.message.conversation_message_id, chat_id)
             sticker = True
         else:
             sticker = False

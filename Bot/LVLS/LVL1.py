@@ -50,31 +50,18 @@ async def mkick(message: Message):
     if not await getUserPremium(uid):
         return await message.reply(disable_mentions=1, message=messages.no_prem())
 
-    data = message.text.split()
     ids = []
-    for i in data[1:]:
-        id = None
-        if i.find('[id') != -1:
-            id = i[i.find('[id') + 3:i.find('|')]
-        elif i.find('vk.') != -1:
-            id = i[i.find('vk.'):]
-            id = id[id.find('/') + 1:]
-            id = await api.users.get(user_ids=id)
-            id = id[0].id
-        elif i.isdigit():
-            id = i
-        if id and int(id) != int(uid):
-            ids.append(int(id))
-
-    strids = [str(x) for x in ids if str(x).isdigit()]
-    if len(strids) <= 0:
+    for i in message.text.split()[1:]:
+        if id := await getIDFromMessage(i, None, 1):
+            ids.append(id)
+    if not ids:
         return await message.reply(disable_mentions=1, message=messages.mkick_error())
 
-    names = await api.users.get(user_ids=strids)
+    names = await api.users.get(user_ids=ids)
     u_acc = await getUserAccessLevel(uid, chat_id)
     kick_res_count = 0
     msg = ''
-    for ind, id in enumerate(strids):
+    for ind, id in enumerate(ids):
         if u_acc <= await getUserAccessLevel(id, chat_id) or not await kickUser(id, chat_id):
             continue
         ch_nickname = await getUserNickname(id, chat_id)
@@ -364,7 +351,7 @@ async def olist(message: Message):
     members_online = {}
     for i in members:
         if i.online:
-            if i.online_mobile or i.online_app:
+            if i.online_mobile:
                 online_mobile = True
             else:
                 online_mobile = False

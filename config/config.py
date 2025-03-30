@@ -1,16 +1,19 @@
+import platform
 from ast import literal_eval
 
 from vk_api import vk_api
-from vkbottle import API, AiohttpClient
+from vkbottle import API
 from configparser import ConfigParser
 
 
 config = ConfigParser()
-config.read(f'{__file__.replace("config.py", "")}config2.ini')
+config.read(f'{__file__.replace("config.py", "")}config{"" if platform.system() == "Linux" else "2"}.ini')
+# remove this weird path, use your own
 
 PATH = config['SERVICE']['PATH']
 
 VK_TOKEN_GROUP = config['VK']['VK_TOKEN_GROUP']
+VK_TOKEN_IMPLICIT_FLOW = config['VK']['VK_TOKEN_IMPLICIT_FLOW']
 VK_SERVICE_TOKEN = config['VK']['VK_SERVICE_TOKEN']
 GROUP_ID = abs(int(config['VK']['GROUP_ID']))
 VK_APP_ID = config['VK']['VK_APP_ID']
@@ -23,7 +26,7 @@ LVL_NAMES = ["Обычный Пользователь", "Смотрящий", "�
 COMMANDS = {
     "start": 0, "help": 0, "id": 0, "stats": 0, "top": 0, "q": 0, "premium": 0, "bonus": 0, "transfer": 0,
     "duel": 0, "cmd": 0, "premmenu": 0, "test": 0, "getdev": 0, "anon": 0, "chatid": 0, "prefix": 0,
-    "deanon": 0, "chats": 0, "catalog": 0, "guess": 0, "promo": 0, "rep": 0, "report": 0,
+    "deanon": 0, "chats": 0, "catalog": 0, "guess": 0, "promo": 0, "rep": 0, "report": 0, "short": 0,
 
     "kick": 1, "mute": 1, "warn": 1, "clear": 1, "staff": 1, "olist": 1, "getnick": 1, "snick": 1, "rnick": 1,
     "nlist": 1, "check": 1, "mkick": 1, "scan": 1, "invited": 1,
@@ -190,6 +193,7 @@ def SETTINGS():
             "kickBlockingViolator": 0,
             "deleteAccessAndNicknameOnLeave": 0,
             "disallowPings": 0,
+            "disallowStickers": 0,
             "nightmode": 0,
             "welcome": 0,
             "captcha": 0,
@@ -233,6 +237,7 @@ SETTINGS_POSITIONS = {
         "kickBlockingViolator": ["Удалить сообщ.", "Исключить"],
         "deleteAccessAndNicknameOnLeave": ["Выкл.", "Вкл."],
         "disallowPings": ["Выкл.", "Вкл."],
+        "disallowStickers": ["Выкл.", "Вкл."],
         "nightmode": ["Выкл.", "Вкл."],
         "welcome": ["Выкл.", "Вкл."],
         "captcha": ["Выкл.", "Вкл."],
@@ -343,6 +348,7 @@ IMPORTSETTINGS_DEFAULT = {
 }
 
 api = API(VK_TOKEN_GROUP)
+implicitapi = API(VK_TOKEN_IMPLICIT_FLOW)
 vk_api_session = vk_api.VkApi(token=VK_TOKEN_GROUP, api_version='5.199')
 service_vk_api_session = vk_api.VkApi(token=VK_SERVICE_TOKEN, api_version='5.199')
 

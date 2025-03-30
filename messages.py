@@ -431,7 +431,8 @@ def inactive_no_results():
 
 def inactive(uid, name, nick, count):
     return get('inactive_no_active') if int(count) <= 0 else get(
-        'inactive', uid=uid, n=nick or name, count=count)
+        'inactive', uid=uid, n=nick or name, count=pointWords(
+            int(count), ('неактивного участника', 'неактивных участника', 'неактивных участников')))
 
 
 def ban_hint():
@@ -2272,3 +2273,15 @@ def block_blockeduserinvite(id, name, nick):
 
 def block_chatunblocked(id):
     return get('block_chatunblocked', id=id)
+
+
+def short_hint():
+    return get('short_hint')
+
+
+def short_failed():
+    return get('short_failed')
+
+
+def short(url, stat):
+    return get('short', url=url, stat=stat)
