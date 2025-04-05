@@ -4,7 +4,6 @@ import subprocess
 import time
 import traceback
 from datetime import datetime
-from zipfile import ZipFile
 
 import aiocron
 import yadisk
@@ -14,19 +13,16 @@ import messages
 from Bot.tgbot import tgbot
 from Bot.utils import sendMessage, chunks, punish, getUserName, beautifyNumber
 from config.config import DATABASE, PASSWORD, USER, TG_CHAT_ID, DAILY_TO, api, TG_BACKUP_THREAD_ID, PHOTO_NOT_FOUND, \
-    YANDEX_TOKEN, COMMANDS, vk_api_session, GROUP_ID, PATH, implicitapi
+    YANDEX_TOKEN, COMMANDS, vk_api_session, GROUP_ID, PATH, implicitapi, STATUSCHECKER_TO, STATUSCHECKER_CMD, DEV_TGID
 from db import smallpool as pool
 
 
 async def backup() -> None:
     try:
-        os.system('rm backup*.zip *.sql > /dev/null 2>&1')
-        name = f"backup{datetime.now().strftime('%d-%m-%Y:%H:%M:%S')}.zip"
-        db = f"{DATABASE}.sql"
-        subprocess.run(f'PGPASSWORD="{PASSWORD}" pg_dump -h localhost -U {USER} -f {DATABASE}.sql {DATABASE}',
+        os.system(f'sudo rm {PATH}{DATABASE}-*.sql.gz > /dev/null 2>&1')
+        name = f"{DATABASE}-{datetime.now().isoformat(timespec='seconds')}.sql.gz"
+        subprocess.run(f'PGPASSWORD="{PASSWORD}" pg_dump -h localhost -U {USER} {DATABASE} | gzip > {name}',
                        shell=True)
-        with ZipFile(name, "a") as myzip:
-            myzip.write(f"{db}")
 
         drive = yadisk.AsyncClient(token=YANDEX_TOKEN)
         async with drive:
@@ -42,10 +38,6 @@ async def backup() -> None:
 
         try:
             os.remove(name)
-        except:
-            traceback.print_exc()
-        try:
-            os.remove(db)
         except:
             traceback.print_exc()
     except Exception as e:
@@ -244,6 +236,20 @@ async def run_nightmode_notifications():
             DAILY_TO + 2000000000, f'e from schedule run_nightmode_notifications:\n' + traceback.format_exc())
 
 
+async def botstatuschecker():
+    try:
+        await implicitapi.messages.send(
+            random_id=0, peer_ids=STATUSCHECKER_TO + 2000000000, message=STATUSCHECKER_CMD)
+        await asyncio.sleep(60)
+        if (await implicitapi.messages.get_history(
+                count=1, peer_id=STATUSCHECKER_TO + 2000000000)).items[0].from_id != -GROUP_ID:
+            await tgbot.send_message(chat_id=DEV_TGID, text='Bot status: down...')
+    except:
+        traceback.print_exc()
+        await sendMessage(
+            DAILY_TO + 2000000000, f'e from schedule run_nightmode_notifications:\n' + traceback.format_exc())
+
+
 async def run():
     loop = asyncio.get_event_loop()
     asyncio.set_event_loop(loop)
@@ -253,4 +259,5 @@ async def run():
     aiocron.crontab('*/1 * * * *', func=everyminute, loop=loop)
     aiocron.crontab('0 6/12 * * *', func=backup, loop=loop)
     aiocron.crontab('0 1/3 * * *', func=updateInfo, loop=loop)
+    aiocron.crontab('*/3 * * * *', func=botstatuschecker, loop=loop)
     # aiocron.crontab('50 23 * * *', func=reboot, loop=loop)

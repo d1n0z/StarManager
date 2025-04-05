@@ -165,10 +165,14 @@ COMMANDS_PREMIUM = ['premmenu', 'mkick', 'ignore', 'unignore', 'ignorelist', 'ch
 # chat ids
 DAILY_TO = int(config['SERVICE']['DAILY_TO'])
 REPORT_TO = int(config['SERVICE']['REPORT_TO'])
+STATUSCHECKER_TO = int(config['SERVICE']['STATUSCHECKER_TO'])
+STATUSCHECKER_CMD = '/duel'
+
 PHOTO_NOT_FOUND = config['SERVICE']['PHOTO_NOT_FOUND']
 
 REPORT_CD = 300  # cooldown in seconds
 
+DEV_TGID = literal_eval(config['SERVICE']['DEV_TGID'])
 DEVS = literal_eval(config['SERVICE']['DEVS'])
 ADMINS = literal_eval(config['SERVICE']['ADMINS'])
 MAIN_DEVS = literal_eval(config['SERVICE']['MAIN_DEVS'])
