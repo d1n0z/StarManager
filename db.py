@@ -4,7 +4,7 @@ from psycopg_pool import ConnectionPool
 from config.config import DATABASE_STR
 
 
-async def init_connection(conn):
+async def init_connection(conn):  # just testin'
     await conn.execute("SET idle_in_transaction_session_timeout = '15s'")
 
 _pool = None
