@@ -106,9 +106,8 @@ async def mute(message: Message):
     mute_date = datetime.now().strftime('%Y.%m.%d %H:%M:%S')
 
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            ms = await conn.fetchrow('select last_mutes_times, last_mutes_causes, last_mutes_names, last_mutes_dates '
-                                     'from mute where chat_id=$1 and uid=$2', chat_id, id)
+        ms = await conn.fetchrow('select last_mutes_times, last_mutes_causes, last_mutes_names, last_mutes_dates '
+                                 'from mute where chat_id=$1 and uid=$2', chat_id, id)
     if ms is not None:
         mute_times = literal_eval(ms[0])
         mute_causes = literal_eval(ms[1])
@@ -131,15 +130,14 @@ async def mute(message: Message):
     mute_dates.append(mute_date)
 
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if not await conn.fetchval(
-                    'update mute set mute = $1, last_mutes_times = $2, last_mutes_causes = $3, last_mutes_names = $4, '
-                    'last_mutes_dates = $5 where chat_id=$6 and uid=$7 returning 1', time.time() + mute_time,
-                    f"{mute_times}", f"{mute_causes}", f"{mute_names}", f"{mute_dates}", chat_id, id):
-                await conn.execute(
-                    'insert into mute (uid, chat_id, mute, last_mutes_times, last_mutes_causes, last_mutes_names, '
-                    'last_mutes_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)', id, chat_id, time.time() + mute_time,
-                    f"{mute_times}", f"{mute_causes}", f"{mute_names}", f"{mute_dates}")
+        if not await conn.fetchval(
+                'update mute set mute = $1, last_mutes_times = $2, last_mutes_causes = $3, last_mutes_names = $4, '
+                'last_mutes_dates = $5 where chat_id=$6 and uid=$7 returning 1', time.time() + mute_time,
+                f"{mute_times}", f"{mute_causes}", f"{mute_names}", f"{mute_dates}", chat_id, id):
+            await conn.execute(
+                'insert into mute (uid, chat_id, mute, last_mutes_times, last_mutes_causes, last_mutes_names, '
+                'last_mutes_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)', id, chat_id, time.time() + mute_time,
+                f"{mute_times}", f"{mute_causes}", f"{mute_names}", f"{mute_dates}")
 
     await setChatMute(id, chat_id, mute_time)
     await message.reply(disable_mentions=1, message=messages.mute(
@@ -164,9 +162,8 @@ async def warn(message: Message):
         return await message.reply(disable_mentions=1, message=messages.warn_higher())
 
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            res = await conn.fetchrow('select warns, last_warns_times, last_warns_causes, last_warns_names, '
-                                      'last_warns_dates from warn where chat_id=$1 and uid=$2', chat_id, id)
+        res = await conn.fetchrow('select warns, last_warns_times, last_warns_causes, last_warns_names, '
+                                  'last_warns_dates from warn where chat_id=$1 and uid=$2', chat_id, id)
     if res is not None:
         warns = res[0] + 1
         warn_times = literal_eval(res[1])
@@ -195,15 +192,14 @@ async def warn(message: Message):
                             await getUserNickname(id, chat_id), id, warn_cause)
 
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if not await conn.fetchval(
-                    'update warn set warns = $1, last_warns_times = $2, last_warns_causes = $3, last_warns_names = $4, '
-                    'last_warns_dates = $5 where chat_id=$6 and uid=$7 returning 1',
-                    warns, f"{warn_times}", f"{warn_causes}", f"{warn_names}", f"{warn_dates}", chat_id, id):
-                await conn.execute(
-                    'insert into warn (uid, chat_id, warns, last_warns_times, last_warns_causes, last_warns_names, '
-                    'last_warns_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-                    id, chat_id, warns, f"{warn_times}", f"{warn_causes}", f"{warn_names}", f"{warn_dates}")
+        if not await conn.fetchval(
+                'update warn set warns = $1, last_warns_times = $2, last_warns_causes = $3, last_warns_names = $4, '
+                'last_warns_dates = $5 where chat_id=$6 and uid=$7 returning 1',
+                warns, f"{warn_times}", f"{warn_causes}", f"{warn_names}", f"{warn_dates}", chat_id, id):
+            await conn.execute(
+                'insert into warn (uid, chat_id, warns, last_warns_times, last_warns_causes, last_warns_names, '
+                'last_warns_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                id, chat_id, warns, f"{warn_times}", f"{warn_causes}", f"{warn_names}", f"{warn_dates}")
     await message.reply(disable_mentions=1, message=msg, keyboard=keyboard.punish_unpunish(
         uid, id, 'warn', message.conversation_message_id))
 
@@ -265,11 +261,10 @@ async def snick(message: Message):
 
     oldnickname = await getUserNickname(id, chat_id)
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if not await conn.fetchval(
-                    'update nickname set nickname = $1 where chat_id=$2 and uid=$3 returning 1', nickname, chat_id, id):
-                await conn.execute(
-                    'insert into nickname (uid, chat_id, nickname) VALUES ($1, $2, $3)', id, chat_id, nickname)
+        if not await conn.fetchval(
+                'update nickname set nickname = $1 where chat_id=$2 and uid=$3 returning 1', nickname, chat_id, id):
+            await conn.execute(
+                'insert into nickname (uid, chat_id, nickname) VALUES ($1, $2, $3)', id, chat_id, nickname)
 
     await message.reply(disable_mentions=1, message=messages.snick(
         uid, await getUserName(uid), await getUserNickname(uid, chat_id), id, await getUserName(id),
@@ -292,8 +287,7 @@ async def rnick(message: Message):
         return await message.reply(disable_mentions=1, message=messages.rnick_user_has_no_nick())
 
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            await conn.execute('delete from nickname where chat_id=$1 and uid=$2', chat_id, id)
+        await conn.execute('delete from nickname where chat_id=$1 and uid=$2', chat_id, id)
     await message.reply(disable_mentions=1, message=messages.rnick(
         uid, await getUserName(uid), await getUserNickname(uid, chat_id), id, await getUserName(id), ch_nickname))
 
@@ -301,11 +295,10 @@ async def rnick(message: Message):
 @bl.chat_message(SearchCMD('nlist'))
 async def nlist(message: Message):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            res = await conn.fetch(
-                'select uid, nickname from nickname where chat_id=$1 and uid>0 and uid=ANY($2) and nickname is not null'
-                ' order by nickname', message.peer_id - 2000000000, [i.member_id for i in (
-                    await api.messages.get_conversation_members(peer_id=message.peer_id)).items])
+        res = await conn.fetch(
+            'select uid, nickname from nickname where chat_id=$1 and uid>0 and uid=ANY($2) and nickname is not null'
+            ' order by nickname', message.peer_id - 2000000000, [i.member_id for i in (
+                await api.messages.get_conversation_members(peer_id=message.peer_id)).items])
     count = len(res)
     res = res[:30]
     await message.reply(disable_mentions=1, message=messages.nlist(
@@ -320,12 +313,11 @@ async def getnick(message: Message):
         return await message.reply(disable_mentions=1, message=messages.getnick_hint())
     query = ' '.join(data[1:])
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            res = await conn.fetch(
-                "select uid, nickname from nickname where chat_id=$1 and uid>0 and uid=ANY($2) and lower(nickname) "
-                "like $3 order by nickname limit 30", chat_id, [i.member_id for i in (
-                    await api.messages.get_conversation_members(peer_id=message.peer_id)).items],
-                '%%' + query.lower() + '%%')
+        res = await conn.fetch(
+            "select uid, nickname from nickname where chat_id=$1 and uid>0 and uid=ANY($2) and lower(nickname) "
+            "like $3 order by nickname limit 30", chat_id, [i.member_id for i in (
+                await api.messages.get_conversation_members(peer_id=message.peer_id)).items],
+            '%%' + query.lower() + '%%')
     if not res:
         return await message.reply(disable_mentions=1, message=messages.getnick_no_result(query))
     await message.reply(disable_mentions=1, message=await messages.getnick(res, query))
@@ -335,10 +327,9 @@ async def getnick(message: Message):
 async def staff(message: Message):
     chat_id = message.peer_id - 2000000000
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            res = await conn.fetch(
-                'select uid, access_level from accesslvl where chat_id=$1 and uid>0 and access_level>0 and '
-                'access_level<8 order by access_level desc', chat_id)
+        res = await conn.fetch(
+            'select uid, access_level from accesslvl where chat_id=$1 and uid>0 and access_level>0 and '
+            'access_level<8 order by access_level desc', chat_id)
     await message.reply(disable_mentions=1, message=await messages.staff(
         res, await api.users.get(user_ids=[i[0] for i in res if i[0] > 0]), chat_id))
 
@@ -399,8 +390,7 @@ async def invited(message: Message):
     if not id:
         id = message.from_id
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            invites = await conn.fetchval(
-                'select count(*) as c from refferal where from_id=$1 and chat_id=$2', id, message.chat_id)
+        invites = await conn.fetchval(
+            'select count(*) as c from refferal where from_id=$1 and chat_id=$2', id, message.chat_id)
     await message.reply(disable_mentions=1, message=messages.invites(
         id, await getUserName(id), await getUserNickname(id, message.chat_id), invites))

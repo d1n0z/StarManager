@@ -19,11 +19,10 @@ class CommandMiddleware(BaseMiddleware[Message]):
                 self.event.geo = datetime.now()
 
             async with (await pool()).acquire() as conn:
-                async with conn.transaction():
-                    if not isinstance(cmd, bool):
-                        await conn.execute('insert into cmdsusage (uid, cmd) values ($1, $2)', self.event.from_id, cmd)
-                    await conn.execute('insert into middlewaresstatistics (timestart, timeend) values ($1, $2)',
-                                       timestart, datetime.now())
+                if not isinstance(cmd, bool):
+                    await conn.execute('insert into cmdsusage (uid, cmd) values ($1, $2)', self.event.from_id, cmd)
+                await conn.execute('insert into middlewaresstatistics (timestart, timeend) values ($1, $2)',
+                                   timestart, datetime.now())
         except:
             traceback.print_exc()
             raise
@@ -33,6 +32,5 @@ class CommandMiddleware(BaseMiddleware[Message]):
             return
         if self.handlers:
             async with (await pool()).acquire() as conn:
-                async with conn.transaction():
-                    await conn.execute('insert into commandsstatistics (cmd, timestart, timeend) values ($1, $2, $3)',
-                                       self.event.out, self.event.geo, datetime.now())
+                await conn.execute('insert into commandsstatistics (cmd, timestart, timeend) values ($1, $2, $3)',
+                                   self.event.out, self.event.geo, datetime.now())

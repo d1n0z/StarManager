@@ -3,7 +3,6 @@ import locale
 import os
 import tempfile
 import time
-import traceback
 from ast import literal_eval
 from datetime import date, datetime
 from typing import Iterable, Any
@@ -36,15 +35,14 @@ async def getUserName(uid: int) -> str:
     if uid < 0:
         return await getGroupName(uid)
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if name := await conn.fetchval('select name from usernames where uid=$1', uid):
-                return name
-            name = await api.users.get(user_ids=uid)
-            if not name:
-                return 'UNKNOWN'
-            await conn.execute('insert into usernames (uid, name) values ($1, $2)',
-                               uid, f"{name[0].first_name} {name[0].last_name}")
-            return f"{name[0].first_name} {name[0].last_name}"
+        if name := await conn.fetchval('select name from usernames where uid=$1', uid):
+            return name
+        name = await api.users.get(user_ids=uid)
+        if not name:
+            return 'UNKNOWN'
+        await conn.execute('insert into usernames (uid, name) values ($1, $2)',
+                           uid, f"{name[0].first_name} {name[0].last_name}")
+        return f"{name[0].first_name} {name[0].last_name}"
 
 
 async def kickUser(uid: int, chat_id: int) -> bool:
@@ -52,9 +50,8 @@ async def kickUser(uid: int, chat_id: int) -> bool:
         await api.messages.remove_chat_user(chat_id=chat_id, member_id=uid)
         if (await getChatSettings(chat_id))['main']['deleteAccessAndNicknameOnLeave']:
             async with (await pool()).acquire() as conn:
-                async with conn.transaction():
-                    await conn.execute('delete from accesslvl where chat_id=$1 and uid=$2', chat_id, uid)
-                    await conn.execute('delete from nickname where chat_id=$1 and uid=$2', chat_id, uid)
+                await conn.execute('delete from accesslvl where chat_id=$1 and uid=$2', chat_id, uid)
+                await conn.execute('delete from nickname where chat_id=$1 and uid=$2', chat_id, uid)
             await setChatMute(uid, chat_id, 0)
     except:
         return False
@@ -140,28 +137,26 @@ async def editMessage(msg: str, peer_id: int, cmid: int, kb=None, attachment=Non
 @AsyncTTL(time_to_live=300, maxsize=0)
 async def getChatName(chat_id: int = None) -> str:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if name := await conn.fetchval('select name from chatnames where chat_id=$1', chat_id):
-                return name
-            try:
-                chatname = await api.messages.get_conversations_by_id(peer_ids=chat_id + 2000000000, group_id=GROUP_ID)
-                chatname = chatname.items[0].chat_settings.title
-            except:
-                chatname = 'UNKNOWN'
-            await conn.execute('insert into chatnames (chat_id, name) values ($1, $2)', chat_id, chatname)
+        if name := await conn.fetchval('select name from chatnames where chat_id=$1', chat_id):
+            return name
+        try:
+            chatname = await api.messages.get_conversations_by_id(peer_ids=chat_id + 2000000000, group_id=GROUP_ID)
+            chatname = chatname.items[0].chat_settings.title
+        except:
+            chatname = 'UNKNOWN'
+        await conn.execute('insert into chatnames (chat_id, name) values ($1, $2)', chat_id, chatname)
     return chatname
 
 
 @AsyncTTL(time_to_live=300, maxsize=0)
 async def getGroupName(group_id: int) -> str:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if name := await conn.fetchval('select name from groupnames where group_id=$1', -abs(group_id)):
-                return name
-            name = await api.groups.get_by_id(group_ids=abs(group_id))
-            name = name.groups[0].name
-            await conn.execute('insert into groupnames (group_id, name) values ($1, $2)', -abs(group_id), name)
+        if name := await conn.fetchval('select name from groupnames where group_id=$1', -abs(group_id)):
             return name
+        name = await api.groups.get_by_id(group_ids=abs(group_id))
+        name = name.groups[0].name
+        await conn.execute('insert into groupnames (group_id, name) values ($1, $2)', -abs(group_id), name)
+        return name
 
 
 @AsyncTTL(maxsize=0)
@@ -222,8 +217,7 @@ async def uploadImage(file: str, uid: int | None = None, count: int = 0, delay: 
     except Exception as e:
         if 'internal' in str(e).lower() or 'access' in str(e).lower():
             async with (await pool()).acquire() as conn:
-                async with conn.transaction():
-                    await conn.execute('insert into hiddenalbumserverinternalerror (uid) values ($1)', uid)
+                await conn.execute('insert into hiddenalbumserverinternalerror (uid) values ($1)', uid)
             global _hiddenalbumuid
             _hiddenalbumuid = None
             uid = await getHiddenAlbumUser()
@@ -259,70 +253,61 @@ async def getRegDate(id: int, format: str = '%d %B %Y', none: Any = 'Не уда
 @AsyncTTL(time_to_live=2, maxsize=0)
 async def getUserAccessLevel(uid: int, chat_id: int, none: Any = 0) -> int | Any:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval(
-                'select access_level from accesslvl where chat_id=$1 and uid=$2', chat_id, uid) or none
+        return await conn.fetchval(
+            'select access_level from accesslvl where chat_id=$1 and uid=$2', chat_id, uid) or none
 
 
 async def getUserLastMessage(uid: int, chat_id: int, none: Any = 'Неизвестно') -> int | Any:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval(
-                'select last_message from lastmessagedate where chat_id=$1 and uid=$2', chat_id, uid) or none
+        return await conn.fetchval(
+            'select last_message from lastmessagedate where chat_id=$1 and uid=$2', chat_id, uid) or none
 
 
 async def getUserNickname(uid: int, chat_id: int, none: Any = None) -> str | Any:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval(
-                'select nickname from nickname where chat_id=$1 and uid=$2', chat_id, uid) or none
+        return await conn.fetchval(
+            'select nickname from nickname where chat_id=$1 and uid=$2', chat_id, uid) or none
 
 
 async def getUserMute(uid, chat_id, none=0) -> int:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval(
-                'select mute from mute where chat_id=$1 and uid=$2', chat_id, uid) or none
+        return await conn.fetchval(
+            'select mute from mute where chat_id=$1 and uid=$2', chat_id, uid) or none
 
 
 async def getUserWarns(uid, chat_id, none=0) -> int:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval('select warns from warn where chat_id=$1 and uid=$2', chat_id, uid) or none
+        return await conn.fetchval('select warns from warn where chat_id=$1 and uid=$2', chat_id, uid) or none
 
 
 async def getUserMuteInfo(uid, chat_id, none=None) -> dict:
     if none is None:
         none = {'times': [], 'causes': [], 'names': [], 'dates': []}
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            mute = await conn.fetchrow('select last_mutes_times, last_mutes_causes, last_mutes_names, last_mutes_dates '
-                                       'from mute where chat_id=$1 and uid=$2', chat_id, uid)
-        if mute:
-            return {'times': literal_eval(mute[0]), 'causes': literal_eval(mute[1]), 'names': literal_eval(mute[2]),
-                    'dates': literal_eval(mute[3])}
-        return none
+        mute = await conn.fetchrow('select last_mutes_times, last_mutes_causes, last_mutes_names, last_mutes_dates '
+                                   'from mute where chat_id=$1 and uid=$2', chat_id, uid)
+    if mute:
+        return {'times': literal_eval(mute[0]), 'causes': literal_eval(mute[1]), 'names': literal_eval(mute[2]),
+                'dates': literal_eval(mute[3])}
+    return none
 
 
 async def getUserBan(uid, chat_id, none=0) -> int:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval('select ban from ban where chat_id=$1 and uid=$2', chat_id, uid) or none
+        return await conn.fetchval('select ban from ban where chat_id=$1 and uid=$2', chat_id, uid) or none
 
 
 async def getChatAccessName(chat_id: int, lvl: int, none: Any = None) -> int | None:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval('select name from accessnames where chat_id=$1 and lvl=$2', chat_id, lvl) or none
+        return await conn.fetchval('select name from accessnames where chat_id=$1 and lvl=$2', chat_id, lvl) or none
 
 
 async def getUserBanInfo(uid, chat_id, none=None) -> dict:
     if none is None:
         none = {'times': [], 'causes': [], 'names': [], 'dates': []}
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            ban = await conn.fetchrow('select last_bans_times, last_bans_causes, last_bans_names, last_bans_dates '
-                                      'from ban where chat_id=$1 and uid=$2', chat_id, uid)
+        ban = await conn.fetchrow('select last_bans_times, last_bans_causes, last_bans_names, last_bans_dates '
+                                  'from ban where chat_id=$1 and uid=$2', chat_id, uid)
     if ban:
         return {'times': literal_eval(ban[0]), 'causes': literal_eval(ban[1]), 'names': literal_eval(ban[2]),
                 'dates': literal_eval(ban[3])}
@@ -331,20 +316,17 @@ async def getUserBanInfo(uid, chat_id, none=None) -> dict:
 
 async def getUserXP(uid, none=0) -> int:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval('select xp from xp where uid=$1', uid) or none
+        return await conn.fetchval('select xp from xp where uid=$1', uid) or none
 
 
 async def getUserLeague(uid, none=1) -> int:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval('select league from xp where uid=$1', uid) or none
+        return await conn.fetchval('select league from xp where uid=$1', uid) or none
 
 
 async def getUserLVL(uid, none=0) -> int:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval('select lvl from xp where uid=$1', uid) or none
+        return await conn.fetchval('select lvl from xp where uid=$1', uid) or none
 
 
 @AsyncLRU(maxsize=0)
@@ -355,14 +337,13 @@ async def getUserNeededXP(xp):
 @AsyncTTL(time_to_live=120, maxsize=0)
 async def getXPTop(returnval='count', limit: int = 10, league: int = 1, users: list = None) -> dict:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if users is not None:
-                top = await conn.fetch(
-                    'select uid, lvl, xp from xp where uid>0 and league=$1 and uid=ANY($2) order by lvl desc, xp desc '
-                    'limit $3', league, users, limit)
-            else:
-                top = await conn.fetch('select uid, lvl, xp from xp where uid>0 and league=$1 order by lvl desc, '
-                                       'xp desc limit $2', league, limit)
+        if users is not None:
+            top = await conn.fetch(
+                'select uid, lvl, xp from xp where uid>0 and league=$1 and uid=ANY($2) order by lvl desc, xp desc '
+                'limit $3', league, users, limit)
+        else:
+            top = await conn.fetch('select uid, lvl, xp from xp where uid>0 and league=$1 order by lvl desc, '
+                                   'xp desc limit $2', league, limit)
     if returnval == 'count':
         return {i[0]: k + 1 for k, i in enumerate(top)}
     elif returnval == 'lvl':
@@ -374,8 +355,7 @@ async def getXPTop(returnval='count', limit: int = 10, league: int = 1, users: l
 @AsyncTTL(time_to_live=16, maxsize=0)
 async def getUserPremium(uid, none=0) -> int:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval('select time from premium where uid=$1', uid) or none
+        return await conn.fetchval('select time from premium where uid=$1', uid) or none
 
 
 async def getUserPremmenuSetting(uid, setting, none):
@@ -383,77 +363,70 @@ async def getUserPremmenuSetting(uid, setting, none):
     if not prem:
         return none
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval(
-                ('select pos from premmenu where uid=$1 and setting=$2' if setting in PREMMENU_TURN else
-                 'select "value" from premmenu where uid=$1 and setting=$2'), uid, setting) or none
+        return await conn.fetchval(
+            ('select pos from premmenu where uid=$1 and setting=$2' if setting in PREMMENU_TURN else
+             'select "value" from premmenu where uid=$1 and setting=$2'), uid, setting) or none
 
 
 async def getUserPremmenuSettings(uid):
     settings = PREMMENU_DEFAULT.copy()
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            clear_by_fire = await conn.fetchval(
-                'select pos from premmenu where uid=$1 and setting=$2', uid, 'clear_by_fire')
-            if clear_by_fire is not None:
-                settings['clear_by_fire'] = clear_by_fire
-            border_color = await conn.fetchval(
-                'select "value" from premmenu where uid=$1 and setting=$2', uid, 'border_color')
-            if border_color is not None:
-                settings['border_color'] = border_color
-            tagnotif = await conn.fetchval('select pos from premmenu where uid=$1 and setting=$2', uid, 'tagnotif')
-            if tagnotif is not None:
-                settings['tagnotif'] = tagnotif
+        clear_by_fire = await conn.fetchval(
+            'select pos from premmenu where uid=$1 and setting=$2', uid, 'clear_by_fire')
+        if clear_by_fire is not None:
+            settings['clear_by_fire'] = clear_by_fire
+        border_color = await conn.fetchval(
+            'select "value" from premmenu where uid=$1 and setting=$2', uid, 'border_color')
+        if border_color is not None:
+            settings['border_color'] = border_color
+        tagnotif = await conn.fetchval('select pos from premmenu where uid=$1 and setting=$2', uid, 'tagnotif')
+        if tagnotif is not None:
+            settings['tagnotif'] = tagnotif
     return settings
 
 
 async def getChatCommandLevel(chat_id, cmd, none):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval(
-                'select lvl from commandlevels where chat_id=$1 and cmd=$2', chat_id, cmd) or none
+        return await conn.fetchval(
+            'select lvl from commandlevels where chat_id=$1 and cmd=$2', chat_id, cmd) or none
 
 
 async def getUserMessages(uid, chat_id, none=0) -> int:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval(
-                'select messages from messages where chat_id=$1 and uid=$2', chat_id, uid) or none
+        return await conn.fetchval(
+            'select messages from messages where chat_id=$1 and uid=$2', chat_id, uid) or none
 
 
 async def addUserXP(uid, addxp, checklvlbanned=True):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if checklvlbanned:
-                if (await conn.fetchval('select exists(select 1 from lvlbanned where uid=$1)', uid) or
-                        await conn.fetchval("select exists(select 1 from blocked where uid=$1 and type='user')", uid)):
-                    return
-            if u := await conn.fetchrow('select id, xp, lvl, league from xp where uid=$1', uid):
-                uxp, ulvl, ulg = u[1] + addxp, u[2], u[3]
-                ulvl += uxp // 1000
-                uxp %= 1000
-                if ulg != len(LEAGUE_LVL) and ulvl >= LEAGUE_LVL[ulg]:
-                    await conn.execute('update xp set xp = 0, league = $1, lvl = 1 where id=$2', ulg + 1, u[0])
-                    return
-                await conn.execute('update xp set xp = $1, lvl = $2 where id=$3', uxp, ulvl, u[0])
-            else:
-                await conn.execute('insert into xp (uid, xp, lm, lvm, lsm, league, lvl) values ($1, $2, $3, $3, $3, 1, '
-                                   '1)', uid, addxp, time.time())
+        if checklvlbanned:
+            if (await conn.fetchval('select exists(select 1 from lvlbanned where uid=$1)', uid) or
+                    await conn.fetchval("select exists(select 1 from blocked where uid=$1 and type='user')", uid)):
+                return
+        if u := await conn.fetchrow('select id, xp, lvl, league from xp where uid=$1', uid):
+            uxp, ulvl, ulg = u[1] + addxp, u[2], u[3]
+            ulvl += uxp // 1000
+            uxp %= 1000
+            if ulg != len(LEAGUE_LVL) and ulvl >= LEAGUE_LVL[ulg]:
+                await conn.execute('update xp set xp = 0, league = $1, lvl = 1 where id=$2', ulg + 1, u[0])
+                return
+            await conn.execute('update xp set xp = $1, lvl = $2 where id=$3', uxp, ulvl, u[0])
+        else:
+            await conn.execute('insert into xp (uid, xp, lm, lvm, lsm, league, lvl) values ($1, $2, $3, $3, $3, 1, '
+                               '1)', uid, addxp, time.time())
 
 
 @AsyncTTL(time_to_live=120, maxsize=0)
 async def getUserDuelWins(uid, none=0):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval('select wins from duelwins where uid=$1', uid) or none
+        return await conn.fetchval('select wins from duelwins where uid=$1', uid) or none
 
 
 @AsyncTTL(time_to_live=5, maxsize=0)
 async def getChatSettings(chat_id):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            dbchatsettings = {i[0]: i[1] for i in await conn.fetch(
-                'select setting, pos from settings where chat_id=$1', chat_id)}
+        dbchatsettings = {i[0]: i[1] for i in await conn.fetch(
+            'select setting, pos from settings where chat_id=$1', chat_id)}
     chatsettings = SETTINGS()
     for cat, settings in chatsettings.items():
         for setting, pos in settings.items():
@@ -467,37 +440,34 @@ async def getChatSettings(chat_id):
 async def getChatAltSettings(chat_id):
     chatsettings = SETTINGS_ALT()
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            for cat, settings in chatsettings.items():
-                for setting, pos in settings.items():
-                    chatsetting = await conn.fetchval(
-                        'select pos2 from settings where chat_id=$1 and setting=$2', chat_id, setting)
-                    if chatsetting is None:
-                        continue
-                    chatsettings[cat][setting] = chatsetting
+        for cat, settings in chatsettings.items():
+            for setting, pos in settings.items():
+                chatsetting = await conn.fetchval(
+                    'select pos2 from settings where chat_id=$1 and setting=$2', chat_id, setting)
+                if chatsetting is None:
+                    continue
+                chatsettings[cat][setting] = chatsetting
     return chatsettings
 
 
 async def turnChatSetting(chat_id, category, setting, alt=False):
     defaults = SETTINGS_DEFAULTS[setting] if setting in SETTINGS_DEFAULTS else {'pos': SETTINGS()[category][setting]}
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if not await conn.fetchval('update settings set ' + ('pos2=not pos2' if alt else 'pos=not pos') +
-                                       ' where chat_id=$1 and setting=$2 returning 1', chat_id, setting):
-                await conn.execute('insert into settings (chat_id, setting, ' + ('pos2' if alt else 'pos') +
-                                   ') values ($1, $2, $3)', chat_id, setting, not defaults['pos'])
+        if not await conn.fetchval('update settings set ' + ('pos2=not pos2' if alt else 'pos=not pos') +
+                                   ' where chat_id=$1 and setting=$2 returning 1', chat_id, setting):
+            await conn.execute('insert into settings (chat_id, setting, ' + ('pos2' if alt else 'pos') +
+                               ') values ($1, $2, $3)', chat_id, setting, not defaults['pos'])
 
 
 async def setUserAccessLevel(uid, chat_id, access_level):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if not access_level:
-                await conn.execute('delete from accesslvl where chat_id=$1 and uid=$2', chat_id, uid)
-            else:
-                if not await conn.fetchval('update accesslvl set access_level = $1 where chat_id=$2 and uid=$3 '
-                                           'returning 1', access_level, chat_id, uid):
-                    await conn.execute('insert into accesslvl (uid, chat_id, access_level) values ($1, $2, $3)',
-                                       uid, chat_id, access_level)
+        if not access_level:
+            await conn.execute('delete from accesslvl where chat_id=$1 and uid=$2', chat_id, uid)
+        else:
+            if not await conn.fetchval('update accesslvl set access_level = $1 where chat_id=$2 and uid=$3 '
+                                       'returning 1', access_level, chat_id, uid):
+                await conn.execute('insert into accesslvl (uid, chat_id, access_level) values ($1, $2, $3)',
+                                   uid, chat_id, access_level)
     if await getSilence(chat_id):
         if access_level in await getSilenceAllowed(chat_id):
             await setChatMute(uid, chat_id, 0)
@@ -507,9 +477,8 @@ async def setUserAccessLevel(uid, chat_id, access_level):
 
 async def getSilence(chat_id) -> bool:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval(
-                'select exists(select 1 from silencemode where chat_id=$1 and activated=True)', chat_id,)
+        return await conn.fetchval(
+            'select exists(select 1 from silencemode where chat_id=$1 and activated=True)', chat_id,)
 
 
 @AsyncTTL(time_to_live=120, maxsize=0)
@@ -562,55 +531,55 @@ def whoiscachedurl(text):
 async def getUserPrefixes(u_prem, uid) -> list:
     if u_prem:
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                prefixes = await conn.fetch('select prefix from prefix where uid=$1', uid)
+            prefixes = await conn.fetch('select prefix from prefix where uid=$1', uid)
         return PREFIX + [i[0] for i in prefixes]
     return PREFIX
 
 
 async def antispamChecker(chat_id, uid, message: MessagesMessage, settings):
-    async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if settings['antispam']['messagesPerMinute']:
-                setting = await conn.fetchrow("select \"value\" from settings where chat_id=$1 and "
-                                              "setting='messagesPerMinute'", chat_id)
-                if setting is not None and setting[0] is not None:
-                    if await conn.fetchval('select count(*) as c from antispammessages where chat_id=$1 and '
-                                           'from_id=$2', chat_id, uid) >= setting[0]:
-                        return 'messagesPerMinute'
-            if settings['antispam']['maximumCharsInMessage']:
-                setting = await conn.fetchrow(
-                    'select "value" from settings where chat_id=$1 and setting=\'maximumCharsInMessage\'', chat_id)
-                if setting and setting[0] is not None:
-                    if len(message.text) >= setting[0]:
-                        return 'maximumCharsInMessage'
-            if settings['antispam']['disallowLinks'] and not any(
-                    message.text.startswith(i) for i in await getUserPrefixes(await getUserPremium(uid), uid)):
-                data = message.text.split()
-                for i in data:
-                    for y in i.split('/'):
-                        if not whoiscached(y) or y in ['vk.com', 'vk.ru']:
-                            continue
-                        if not await conn.fetchval('select exists(select 1 from antispamurlexceptions where chat_id=$1'
-                                                   ' and url=$2)', chat_id, y.replace('https://', '').replace('/', '')):
-                            return 'disallowLinks'
-            if settings['antispam']['disallowNSFW']:
-                for i in message.attachments:
-                    if i.type != MessagesMessageAttachmentType.PHOTO:
+    if settings['antispam']['messagesPerMinute']:
+        async with (await pool()).acquire() as conn:
+            setting = await conn.fetchrow("select \"value\" from settings where chat_id=$1 and "
+                                          "setting='messagesPerMinute'", chat_id)
+            if setting is not None and setting[0] is not None:
+                if await conn.fetchval('select count(*) as c from antispammessages where chat_id=$1 and '
+                                       'from_id=$2', chat_id, uid) >= setting[0]:
+                    return 'messagesPerMinute'
+    if settings['antispam']['maximumCharsInMessage']:
+        async with (await pool()).acquire() as conn:
+            setting = await conn.fetchrow(
+                'select "value" from settings where chat_id=$1 and setting=\'maximumCharsInMessage\'', chat_id)
+        if setting and setting[0] is not None:
+            if len(message.text) >= setting[0]:
+                return 'maximumCharsInMessage'
+    if settings['antispam']['disallowLinks'] and not any(
+            message.text.startswith(i) for i in await getUserPrefixes(await getUserPremium(uid), uid)):
+        data = message.text.split()
+        async with (await pool()).acquire() as conn:
+            for i in data:
+                for y in i.split('/'):
+                    if not whoiscached(y) or y in ['vk.com', 'vk.ru']:
                         continue
-                    photo = i.photo.sizes[2]
-                    for y in i.photo.sizes:
-                        if y.width > photo.width:
-                            photo = y
-                    r = requests.get(photo.url)
-                    filename = PATH + f'media/temp/{time.time()}.jpg'
-                    with open(filename, "wb") as f:
-                        f.write(r.content)
-                        f.close()
-                    r.close()
-                    isNSFW = await NSFWDetector(filename)
-                    if isNSFW:
-                        return 'disallowNSFW'
+                    if not await conn.fetchval('select exists(select 1 from antispamurlexceptions where chat_id=$1'
+                                               ' and url=$2)', chat_id, y.replace('https://', '').replace('/', '')):
+                        return 'disallowLinks'
+    if settings['antispam']['disallowNSFW']:
+        for i in message.attachments:
+            if i.type != MessagesMessageAttachmentType.PHOTO:
+                continue
+            photo = i.photo.sizes[2]
+            for y in i.photo.sizes:
+                if y.width > photo.width:
+                    photo = y
+            r = requests.get(photo.url)
+            filename = PATH + f'media/temp/{time.time()}.jpg'
+            with open(filename, "wb") as f:
+                f.write(r.content)
+                f.close()
+            r.close()
+            isNSFW = await NSFWDetector(filename)
+            if isNSFW:
+                return 'disallowNSFW'
     return False
 
 
@@ -618,12 +587,11 @@ async def speccommandscheck(uid: int, cmd: str, cd: int) -> int | bool:
     # if uid in DEVS:
     #     return False
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if s := await conn.fetchval('select time from speccommandscooldown where uid=$1 and time>$2 and cmd=$3',
-                                        uid, time.time() - cd, cmd):
-                return s
-            await conn.execute(
-                'insert into speccommandscooldown (time, uid, cmd) values ($1, $2, $3)', time.time(), uid, cmd)
+        if s := await conn.fetchval('select time from speccommandscooldown where uid=$1 and time>$2 and cmd=$3',
+                                    uid, time.time() - cd, cmd):
+            return s
+        await conn.execute(
+            'insert into speccommandscooldown (time, uid, cmd) values ($1, $2, $3)', time.time(), uid, cmd)
     return False
 
 
@@ -686,11 +654,10 @@ def chunks(li, n):
 
 async def getURepBanned(uid) -> bool:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if (t := await conn.fetchval('select time from reportban where uid=$1', uid)) and (
-                    not t or time.time() < t):
-                return True
-            return False
+        if (t := await conn.fetchval('select time from reportban where uid=$1', uid)) and (
+                not t or time.time() < t):
+            return True
+        return False
 
 
 async def generateCaptcha(uid, chat_id, exp):
@@ -699,97 +666,98 @@ async def generateCaptcha(uid, chat_id, exp):
     name = f'{PATH}media/temp/captcha{uid}_{chat_id}.png'
     image.image.save(name, 'png')
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            c = await conn.fetchval(
-                'insert into captcha (chat_id, uid, exptime, result) values ($1, $2, $3, $4) returning id',
-                chat_id, uid, time.time() + exp * 60, str(image.equation_result))
+        c = await conn.fetchval(
+            'insert into captcha (chat_id, uid, exptime, result) values ($1, $2, $3, $4) returning id',
+            chat_id, uid, time.time() + exp * 60, str(image.equation_result))
     return name, c
 
 
 async def punish(uid, chat_id, setting_id):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            setting = await conn.fetchval('select punishment from settings where id=$1', setting_id)
-            if setting is None:
-                return False
-            punishment = setting.split('|')
-            if punishment[0] == 'deletemessage':
-                return 'del'
-            if punishment[0] == 'kick':
-                await kickUser(uid, chat_id)
-                return punishment
-            elif punishment[0] == 'mute':
-                ms = await conn.fetchrow(
-                    'select last_mutes_times, last_mutes_causes, last_mutes_names, last_mutes_dates from mute where '
-                    'chat_id=$1 and uid=$2', chat_id, uid)
-                if ms is not None:
-                    mute_times = literal_eval(ms[0])
-                    mute_causes = literal_eval(ms[1])
-                    mute_names = literal_eval(ms[2])
-                    mute_dates = literal_eval(ms[3])
-                else:
-                    mute_times, mute_causes, mute_names, mute_dates = [], [], [], []
+        setting = await conn.fetchval('select punishment from settings where id=$1', setting_id)
+    if setting is None:
+        return False
+    punishment = setting.split('|')
+    if punishment[0] == 'deletemessage':
+        return 'del'
+    if punishment[0] == 'kick':
+        await kickUser(uid, chat_id)
+        return punishment
+    elif punishment[0] == 'mute':
+        async with (await pool()).acquire() as conn:
+            ms = await conn.fetchrow(
+                'select last_mutes_times, last_mutes_causes, last_mutes_names, last_mutes_dates from mute where '
+                'chat_id=$1 and uid=$2', chat_id, uid)
+        if ms is not None:
+            mute_times = literal_eval(ms[0])
+            mute_causes = literal_eval(ms[1])
+            mute_names = literal_eval(ms[2])
+            mute_dates = literal_eval(ms[3])
+        else:
+            mute_times, mute_causes, mute_names, mute_dates = [], [], [], []
 
-                mute_date = datetime.now().strftime('%Y.%m.%d %H:%M:%S')
-                mute_time = int(punishment[1]) * 60
-                mute_times.append(mute_time)
-                mute_causes.append('Нарушение правил беседы')
-                mute_names.append(f'[club222139436|Star Manager]')
-                mute_dates.append(mute_date)
+        mute_date = datetime.now().strftime('%Y.%m.%d %H:%M:%S')
+        mute_time = int(punishment[1]) * 60
+        mute_times.append(mute_time)
+        mute_causes.append('Нарушение правил беседы')
+        mute_names.append(f'[club222139436|Star Manager]')
+        mute_dates.append(mute_date)
 
-                if not await conn.fetchval(
-                        'update mute set mute = $1, last_mutes_times = $2, last_mutes_causes = $3, '
-                        'last_mutes_names = $4, last_mutes_dates = $5 where chat_id=$6 and uid=$7 returning 1',
-                        time.time() + mute_time, f"{mute_times}", f"{mute_causes}", f"{mute_names}", f"{mute_dates}",
-                        chat_id, uid):
-                    await conn.execute(
-                        'insert into mute (uid, chat_id, mute, last_mutes_times, last_mutes_causes, last_mutes_names, '
-                        'last_mutes_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)', uid, chat_id, time.time() + mute_time,
-                        f"{mute_times}", f"{mute_causes}", f"{mute_names}", f"{mute_dates}")
+        async with (await pool()).acquire() as conn:
+            if not await conn.fetchval(
+                    'update mute set mute = $1, last_mutes_times = $2, last_mutes_causes = $3, '
+                    'last_mutes_names = $4, last_mutes_dates = $5 where chat_id=$6 and uid=$7 returning 1',
+                    time.time() + mute_time, f"{mute_times}", f"{mute_causes}", f"{mute_names}", f"{mute_dates}",
+                    chat_id, uid):
+                await conn.execute(
+                    'insert into mute (uid, chat_id, mute, last_mutes_times, last_mutes_causes, last_mutes_names, '
+                    'last_mutes_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)', uid, chat_id, time.time() + mute_time,
+                    f"{mute_times}", f"{mute_causes}", f"{mute_names}", f"{mute_dates}")
 
-                await setChatMute(uid, chat_id, mute_time)
-                return punishment
-            elif punishment[0] == 'ban':
-                ban_date = datetime.now().strftime('%Y.%m.%d %H:%M:%S')
-                res = await conn.fetchrow(
-                    'select last_bans_times, last_bans_causes, last_bans_names, last_bans_dates from ban where '
-                    'chat_id=$1 and uid=$2', chat_id, uid)
-                if res is not None:
-                    ban_times = literal_eval(res[0])
-                    ban_causes = literal_eval(res[1])
-                    ban_names = literal_eval(res[2])
-                    ban_dates = literal_eval(res[3])
-                else:
-                    ban_times, ban_causes, ban_names, ban_dates = [], [], [], []
+        await setChatMute(uid, chat_id, mute_time)
+        return punishment
+    elif punishment[0] == 'ban':
+        ban_date = datetime.now().strftime('%Y.%m.%d %H:%M:%S')
+        async with (await pool()).acquire() as conn:
+            res = await conn.fetchrow(
+                'select last_bans_times, last_bans_causes, last_bans_names, last_bans_dates from ban where '
+                'chat_id=$1 and uid=$2', chat_id, uid)
+        if res is not None:
+            ban_times = literal_eval(res[0])
+            ban_causes = literal_eval(res[1])
+            ban_names = literal_eval(res[2])
+            ban_dates = literal_eval(res[3])
+        else:
+            ban_times, ban_causes, ban_names, ban_dates = [], [], [], []
 
-                ban_cause = 'Нарушение правил беседы'
-                ban_time = int(punishment[1]) * 86400
-                ban_times.append(ban_time)
-                ban_causes.append(ban_cause)
-                ban_names.append(f'[club222139436|Star Manager]')
-                ban_dates.append(ban_date)
+        ban_cause = 'Нарушение правил беседы'
+        ban_time = int(punishment[1]) * 86400
+        ban_times.append(ban_time)
+        ban_causes.append(ban_cause)
+        ban_names.append(f'[club222139436|Star Manager]')
+        ban_dates.append(ban_date)
 
-                if not await conn.fetchval(
-                        'update ban set ban = $1, last_bans_times = $2, last_bans_causes = $3, last_bans_names = $4, '
-                        'last_bans_dates = $5 where chat_id=$6 and uid=$7 returning 1',
-                        time.time() + ban_time, f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}",
-                        chat_id, uid):
-                    await conn.execute(
-                        'insert into ban (uid, chat_id, ban, last_bans_times, last_bans_causes, last_bans_names, '
-                        'last_bans_dates) values ($1, $2, $3, $4, $5, $6, $7)', uid, chat_id, time.time() + ban_time,
-                        f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}")
+        async with (await pool()).acquire() as conn:
+            if not await conn.fetchval(
+                    'update ban set ban = $1, last_bans_times = $2, last_bans_causes = $3, last_bans_names = $4, '
+                    'last_bans_dates = $5 where chat_id=$6 and uid=$7 returning 1',
+                    time.time() + ban_time, f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}",
+                    chat_id, uid):
+                await conn.execute(
+                    'insert into ban (uid, chat_id, ban, last_bans_times, last_bans_causes, last_bans_names, '
+                    'last_bans_dates) values ($1, $2, $3, $4, $5, $6, $7)', uid, chat_id, time.time() + ban_time,
+                    f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}")
 
-                await kickUser(uid, chat_id)
-                return punishment
+        await kickUser(uid, chat_id)
+        return punishment
     return False
 
 
 async def getgpool(chat_id):
     try:
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                chats = [i[0] for i in await conn.fetch(
-                    'select chat_id from gpool where uid=(select uid from gpool where chat_id=$1)', chat_id)]
+            chats = [i[0] for i in await conn.fetch(
+                'select chat_id from gpool where uid=(select uid from gpool where chat_id=$1)', chat_id)]
         if len(chats) == 0:
             raise Exception
         return chats
@@ -800,11 +768,10 @@ async def getgpool(chat_id):
 async def getpool(chat_id, group):
     try:
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                chats = [i[0] for i in await conn.fetch(
-                    'select chat_id from chatgroups where "group"=$1 and uid='
-                    '(select uid from accesslvl where accesslvl.chat_id=$2 and access_level>6 '
-                    'order by access_level limit 1)', group, chat_id)]
+            chats = [i[0] for i in await conn.fetch(
+                'select chat_id from chatgroups where "group"=$1 and uid='
+                '(select uid from accesslvl where accesslvl.chat_id=$2 and access_level>6 '
+                'order by access_level limit 1)', group, chat_id)]
         if len(chats) == 0:
             raise Exception
         return chats
@@ -814,8 +781,7 @@ async def getpool(chat_id, group):
 
 async def getSilenceAllowed(chat_id):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            lvls = await conn.fetchval('select allowed from silencemode where chat_id=$1', chat_id)
+        lvls = await conn.fetchval('select allowed from silencemode where chat_id=$1', chat_id)
     if lvls is not None:
         return literal_eval(lvls)
     return []
@@ -823,15 +789,13 @@ async def getSilenceAllowed(chat_id):
 
 async def getUserRep(uid):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval('select rep from reputation where uid=$1', uid) or 0
+        return await conn.fetchval('select rep from reputation where uid=$1', uid) or 0
 
 
 async def getRepTop(uid):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            top = [i[0] for i in await conn.fetch('select uid from reputation order by rep desc')]
-            allu = await conn.fetchval('select count(*) as c from allusers')
+        top = [i[0] for i in await conn.fetch('select uid from reputation order by rep desc')]
+        allu = await conn.fetchval('select count(*) as c from allusers')
     return top.index(uid) if uid in top else allu
 
 
@@ -844,14 +808,12 @@ def hex_to_rgb(value):
 
 async def chatPremium(chat_id, none=False):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval('select premium from publicchats where chat_id=$1', chat_id) or none
+        return await conn.fetchval('select premium from publicchats where chat_id=$1', chat_id) or none
 
 
 async def ischatPubic(chat_id, none=False):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval('select isopen from publicchats where chat_id=$1', chat_id) or none
+        return await conn.fetchval('select isopen from publicchats where chat_id=$1', chat_id) or none
 
 
 @AsyncTTL(time_to_live=300, maxsize=0)
@@ -864,36 +826,34 @@ async def getHiddenAlbumUser():
     if _hiddenalbumuid:
         return _hiddenalbumuid
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            for i in await conn.fetch(
-                    'select uid from allusers where not uid=ANY($1) and uid>0',
-                    [i[0] for i in await conn.fetch('select uid from hiddenalbumserverinternalerror')]):
-                if (await api.messages.is_messages_from_group_allowed(group_id=GROUP_ID, user_id=i[0])).is_allowed:
-                    _hiddenalbumuid = i[0]
-                    return _hiddenalbumuid
-                await asyncio.sleep(0.51)
+        userspool = await conn.fetch(
+                'select uid from allusers where not uid=ANY($1) and uid>0',
+                [i[0] for i in await conn.fetch('select uid from hiddenalbumserverinternalerror')])
+    for i in userspool:
+        if (await api.messages.is_messages_from_group_allowed(group_id=GROUP_ID, user_id=i[0])).is_allowed:
+            _hiddenalbumuid = i[0]
+            return _hiddenalbumuid
+        await asyncio.sleep(0.51)
 
 
 async def getImportSettings(uid, chat_id):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if s := await conn.fetchrow('select sys, acc, nicks, punishes, binds from importsettings where uid=$1 and '
-                                        'chat_id=$2', uid, chat_id):
-                return {'sys': s[0], 'acc': s[1], 'nicks': s[2], 'punishes': s[3], 'binds': s[4]}
-            return IMPORTSETTINGS_DEFAULT
+        if s := await conn.fetchrow('select sys, acc, nicks, punishes, binds from importsettings where uid=$1 and '
+                                    'chat_id=$2', uid, chat_id):
+            return {'sys': s[0], 'acc': s[1], 'nicks': s[2], 'punishes': s[3], 'binds': s[4]}
+        return IMPORTSETTINGS_DEFAULT
 
 
 async def turnImportSetting(chat_id, uid, setting):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if not await conn.fetchval('update importsettings set ' + setting + '=not ' + setting +
-                                       ' where chat_id=$1 and uid=$2 returning 1', chat_id, uid):
-                defaults = IMPORTSETTINGS_DEFAULT.copy()
-                defaults[setting] = not defaults[setting]
-                await conn.execute(
-                    'insert into importsettings (uid, chat_id, sys, acc, nicks, punishes, binds) values ($1, $2, $3, $4'
-                    ', $5, $6, $7)', uid, chat_id, defaults['sys'], defaults['acc'], defaults['nicks'],
-                    defaults['punishes'], defaults['binds'])
+        if not await conn.fetchval('update importsettings set ' + setting + '=not ' + setting +
+                                   ' where chat_id=$1 and uid=$2 returning 1', chat_id, uid):
+            defaults = IMPORTSETTINGS_DEFAULT.copy()
+            defaults[setting] = not defaults[setting]
+            await conn.execute(
+                'insert into importsettings (uid, chat_id, sys, acc, nicks, punishes, binds) values ($1, $2, $3, $4'
+                ', $5, $6, $7)', uid, chat_id, defaults['sys'], defaults['acc'], defaults['nicks'],
+                defaults['punishes'], defaults['binds'])
 
 
 @cached

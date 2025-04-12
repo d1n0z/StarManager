@@ -1,10 +1,7 @@
 import asyncio
-import importlib
 import os
 import statistics
-import sys
 import time
-import traceback
 from datetime import datetime
 
 from vkbottle.bot import Message
@@ -16,9 +13,9 @@ from Bot.checkers import getUInfBanned
 from Bot.rules import SearchCMD
 from Bot.scheduler import backup
 from Bot.utils import getUserName, getIDFromMessage, getUserNickname, sendMessage, addUserXP, getChatName, \
-    setUserAccessLevel, pointWords, chunks, getURepBanned, pointMinutes
+    setUserAccessLevel, pointWords, chunks, getURepBanned
 from config.config import api, GROUP_ID, DEVS, PATH
-from db import pool, smallpool
+from db import pool
 
 bl = BotLabeler()
 
@@ -117,8 +114,7 @@ async def msg(message: Message):
     msg = messages.msg(devmsg)
     k = 0
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            chats = await conn.fetch('select chat_id from allchats')
+        chats = await conn.fetch('select chat_id from allchats')
     for i in chunks(chats, 2500):
         try:
             k += len(i)
@@ -148,8 +144,7 @@ async def addblack(message: Message):
     if id < 0:
         return await message.reply(messages.id_group())
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            await conn.execute('insert into blacklist (uid) values ($1) on conflict (uid) do nothing', id)
+        await conn.execute('insert into blacklist (uid) values ($1) on conflict (uid) do nothing', id)
     dev_name = await getUserName(uid)
     dev_nickname = await getUserNickname(uid, chat_id)
     await message.reply(messages.addblack(uid, dev_name, dev_nickname, id, await getUserName(id),
@@ -169,10 +164,9 @@ async def delblack(message: Message):
     if id < 0:
         return await message.reply(messages.id_group())
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if not await conn.fetchval('delete from blacklist where uid=$1 returning 1', id):
-                return await message.reply(messages.delblack_no_user(
-                    id, await getUserName(id), await getUserNickname(id, chat_id)))
+        if not await conn.fetchval('delete from blacklist where uid=$1 returning 1', id):
+            return await message.reply(messages.delblack_no_user(
+                id, await getUserName(id), await getUserNickname(id, chat_id)))
     dev_name = await getUserName(uid)
     dev_nickname = await getUserNickname(uid, chat_id)
     await message.reply(messages.delblack(uid, dev_name, dev_nickname, id, await getUserName(id),
@@ -184,8 +178,7 @@ async def delblack(message: Message):
 async def blacklist(message: Message):
     users = {}
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            blc = await conn.fetch('select uid from blacklist')
+        blc = await conn.fetch('select uid from blacklist')
     for user in blc:
         users[await getUserName(user[0])] = user[0]
     msg = f'⚛ Список пользователей в ЧС бота (Всего : {len(list(users))})\n\n'
@@ -205,11 +198,10 @@ async def setstatus(message: Message):
     if id < 0:
         return await message.reply(messages.id_group())
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if not await conn.fetchval(
-                    'update premium set time = $1 where uid=$2 returning 1', time.time() + int(data[2]) * 86400, id):
-                await conn.execute(
-                    'insert into premium (uid, time) values ($1, $2)', id, time.time() + int(data[2]) * 86400)
+        if not await conn.fetchval(
+                'update premium set time = $1 where uid=$2 returning 1', time.time() + int(data[2]) * 86400, id):
+            await conn.execute(
+                'insert into premium (uid, time) values ($1, $2)', id, time.time() + int(data[2]) * 86400)
 
     dev_name = await getUserName(uid)
     await message.reply(messages.setstatus(uid, dev_name, await getUserNickname(uid, chat_id),
@@ -228,8 +220,7 @@ async def delstatus(message: Message):
     if id < 0:
         return await message.reply(messages.id_group())
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            await conn.execute('delete from premium where uid=$1', id)
+        await conn.execute('delete from premium where uid=$1', id)
 
     dev_name = await getUserName(uid)
     await message.reply(messages.setstatus(uid, dev_name, await getUserNickname(uid, chat_id),
@@ -240,8 +231,7 @@ async def delstatus(message: Message):
 @bl.chat_message(SearchCMD('statuslist'))
 async def statuslist(message: Message):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            prem = await conn.fetch('select uid, time from premium')
+        prem = await conn.fetch('select uid, time from premium')
     await message.reply(await messages.statuslist(prem), keyboard=keyboard.statuslist(message.from_id, 0, len(prem)))
 
 
@@ -252,10 +242,9 @@ async def setprem(message: Message):
     if chat_id <= 0:
         return await message.reply(messages.setprem_hint())
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if not await conn.fetchval('update publicchats set premium = true where chat_id=$1 returning 1', chat_id):
-                await conn.execute(
-                    'insert into publicchats (chat_id, premium, isopen) values ($1, true, false)', chat_id)
+        if not await conn.fetchval('update publicchats set premium = true where chat_id=$1 returning 1', chat_id):
+            await conn.execute(
+                'insert into publicchats (chat_id, premium, isopen) values ($1, true, false)', chat_id)
 
     await message.reply(messages.setprem(chat_id))
     await sendMessage(message.peer_id, messages.premchat(uid, await getUserName(uid)))
@@ -267,16 +256,14 @@ async def delprem(message: Message):
     if chat_id <= 0:
         return await message.reply(messages.delprem_hint())
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            await conn.execute('update publicchats set premium = false where chat_id=$1', chat_id)
+        await conn.execute('update publicchats set premium = false where chat_id=$1', chat_id)
     await message.reply(messages.delprem(chat_id))
 
 
 @bl.chat_message(SearchCMD('premlist'))
 async def permlist(message: Message):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            prem = await conn.fetch('select chat_id from publicchats where premium=true')
+        prem = await conn.fetch('select chat_id from publicchats where premium=true')
     await message.reply(messages.premlist(prem))
 
 
@@ -297,8 +284,7 @@ async def resetlvl(message: Message):
     if not id:
         return await message.reply('🔶 Пользователь не найден')
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            await conn.execute('update xp set xp=0, lvl=0, league=1 where uid=$1', id)
+        await conn.execute('update xp set xp=0, lvl=0, league=1 where uid=$1', id)
     u_name = await getUserName(id)
     msgsent = messages.resetlvlcomplete(id, u_name)
     try:
@@ -316,17 +302,16 @@ async def block(message: Message):
         return await message.reply(messages.block_hint())
     reason = ' '.join(data[3:]) or None
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if not await conn.fetchval('select exists(select 1 from blocked where uid=$1 and type=$2)', id, data[1]):
-                await conn.execute('insert into blocked (uid, type, reason) values ($1, $2, $3)', id, data[1], reason)
-                if data[1] == 'chat':
-                    await sendMessage(id + 2000000000, messages.block_chatblocked(id, reason),
-                                      keyboard.block_chatblocked())
-                    await api.messages.remove_chat_user(id, member_id=-GROUP_ID)
-                else:
-                    await conn.execute('delete from xp where uid=$1', id)
-                    await conn.execute('delete from premium where uid=$1', id)
-                    await sendMessage(id, messages.block_userblocked(id, reason), keyboard.block_chatblocked())
+        if not await conn.fetchval('select exists(select 1 from blocked where uid=$1 and type=$2)', id, data[1]):
+            await conn.execute('insert into blocked (uid, type, reason) values ($1, $2, $3)', id, data[1], reason)
+            if data[1] == 'chat':
+                await sendMessage(id + 2000000000, messages.block_chatblocked(id, reason),
+                                  keyboard.block_chatblocked())
+                await api.messages.remove_chat_user(id, member_id=-GROUP_ID)
+            else:
+                await conn.execute('delete from xp where uid=$1', id)
+                await conn.execute('delete from premium where uid=$1', id)
+                await sendMessage(id, messages.block_userblocked(id, reason), keyboard.block_chatblocked())
     await message.reply(messages.block())
 
 
@@ -337,9 +322,8 @@ async def unblock(message: Message):
     if len(data) != 3 or data[1] not in ['chat', 'user'] or not id:
         return await message.reply(messages.unblock_hint())
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if not await conn.fetchval('delete from blocked where uid=$1 and type=$2 returning 1', id, data[1]):
-                return await message.reply(messages.unblock_noban())
+        if not await conn.fetchval('delete from blocked where uid=$1 and type=$2 returning 1', id, data[1]):
+            return await message.reply(messages.unblock_noban())
     if data[1] == 'chat':
         await sendMessage(id + 2000000000, messages.block_chatunblocked(id))
     await message.reply(messages.unblock())
@@ -348,8 +332,7 @@ async def unblock(message: Message):
 @bl.chat_message(SearchCMD('blocklist'))
 async def blocklist(message: Message):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            inf = await conn.fetch("select uid, reason from blocked where type='user'")
+        inf = await conn.fetch("select uid, reason from blocked where type='user'")
     msg = f'⚛ Список пользователей в блокировке бота (Всего : {len(inf)})\n\n'
     for user in inf:
         msg += f"➖ [id{user[0]}|{await getUserName(user[0])}]" + (f' | {user[1]}' if user[1] else '') + "\n"
@@ -359,9 +342,8 @@ async def blocklist(message: Message):
 @bl.chat_message(SearchCMD('cmdcount'))
 async def cmdcount(message: Message):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            cmdsraw = await conn.fetch(
-                'select cmd, timestart, timeend from commandsstatistics where timeend is not null')
+        cmdsraw = await conn.fetch(
+            'select cmd, timestart, timeend from commandsstatistics where timeend is not null')
     cmds = {}
     for i in cmdsraw:
         if i[0] not in cmds:
@@ -377,9 +359,7 @@ async def cmdcount(message: Message):
 @bl.chat_message(SearchCMD('msgsaverage'))
 async def msgsaverage(message: Message):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            msts = await conn.fetch(
-                'select timestart, timeend from messagesstatistics where timeend is not null')
+        msts = await conn.fetch('select timestart, timeend from messagesstatistics where timeend is not null')
     msgs = [i[1].timestamp() - i[0].timestamp() for i in msts]
     await message.reply(disable_mentions=1, message=f'Среднее время обработки - {statistics.mean(msgs)} секунд')
 
@@ -388,35 +368,34 @@ async def msgsaverage(message: Message):
 async def msgscount(message: Message):
     now = datetime.now()
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            msgs5minutes = await conn.fetchval(
-                'select count(*) as c from messagesstatistics where timeend is not null and '
-                'extract(minute from timestart)>=$1 and extract(hour from timestart)=$2 and '
-                'extract(day from timestart)=$3 and extract(month from timestart)=$4 and '
-                'extract(year from timestart)=$5', now.minute - 5, now.hour, now.day, now.month, now.year)
-            msgsminute = await conn.fetchval(
-                'select count(*) as c from messagesstatistics where timeend is not null and '
-                'extract(minute from timestart)=$1 and extract(hour from timestart)=$2 and '
-                'extract(day from timestart)=$3 and extract(month from timestart)=$4 and '
-                'extract(year from timestart)=$5', now.minute, now.hour, now.day, now.month, now.year)
-            msgshour = await conn.fetchval(
-                'select count(*) as c from messagesstatistics where timeend is not null and '
-                'extract(hour from timestart)=$1 and extract(day from timestart)=$2 and '
-                'extract(month from timestart)=$3 and extract(year from timestart)=$4',
-                now.hour, now.day, now.month, now.year)
-            msgslasthour = await conn.fetchval(
-                'select count(*) as c from messagesstatistics where timeend is not null and '
-                'extract(hour from timestart)=$1 and extract(day from timestart)=$2 and '
-                'extract(month from timestart)=$3 and extract(year from timestart)=$4',
-                now.hour - 1, now.day, now.month, now.year)
-            msgsday = await conn.fetchval(
-                'select count(*) as c from messagesstatistics where timeend is not null and '
-                'extract(day from timestart)=$1 and extract(month from timestart)=$2 and '
-                'extract(year from timestart)=$3', now.day,  now.month, now.year)
-            msgslastday = await conn.fetchval(
-                'select count(*) as c from messagesstatistics where timeend is not null and '
-                'extract(day from timestart)=$1 and extract(month from timestart)=$2 and '
-                'extract(year from timestart)=$3', now.day - 1,  now.month, now.year)
+        msgs5minutes = await conn.fetchval(
+            'select count(*) as c from messagesstatistics where timeend is not null and '
+            'extract(minute from timestart)>=$1 and extract(hour from timestart)=$2 and '
+            'extract(day from timestart)=$3 and extract(month from timestart)=$4 and '
+            'extract(year from timestart)=$5', now.minute - 5, now.hour, now.day, now.month, now.year)
+        msgsminute = await conn.fetchval(
+            'select count(*) as c from messagesstatistics where timeend is not null and '
+            'extract(minute from timestart)=$1 and extract(hour from timestart)=$2 and '
+            'extract(day from timestart)=$3 and extract(month from timestart)=$4 and '
+            'extract(year from timestart)=$5', now.minute, now.hour, now.day, now.month, now.year)
+        msgshour = await conn.fetchval(
+            'select count(*) as c from messagesstatistics where timeend is not null and '
+            'extract(hour from timestart)=$1 and extract(day from timestart)=$2 and '
+            'extract(month from timestart)=$3 and extract(year from timestart)=$4',
+            now.hour, now.day, now.month, now.year)
+        msgslasthour = await conn.fetchval(
+            'select count(*) as c from messagesstatistics where timeend is not null and '
+            'extract(hour from timestart)=$1 and extract(day from timestart)=$2 and '
+            'extract(month from timestart)=$3 and extract(year from timestart)=$4',
+            now.hour - 1, now.day, now.month, now.year)
+        msgsday = await conn.fetchval(
+            'select count(*) as c from messagesstatistics where timeend is not null and '
+            'extract(day from timestart)=$1 and extract(month from timestart)=$2 and '
+            'extract(year from timestart)=$3', now.day,  now.month, now.year)
+        msgslastday = await conn.fetchval(
+            'select count(*) as c from messagesstatistics where timeend is not null and '
+            'extract(day from timestart)=$1 and extract(month from timestart)=$2 and '
+            'extract(year from timestart)=$3', now.day - 1,  now.month, now.year)
     await message.reply(disable_mentions=1, message=f'{msgslastday} сообщений за вчера\n'
                                                     f'{msgslasthour} сообщений за прошлый час\n'
                                                     f'{msgs5minutes} сообщений за последние 5 минут\n'
@@ -428,9 +407,7 @@ async def msgscount(message: Message):
 @bl.chat_message(SearchCMD('mwaverage'))
 async def mwaverage(message: Message):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            mwst = await conn.fetch(
-                'select timestart, timeend from middlewaresstatistics where timeend is not null')
+        mwst = await conn.fetch('select timestart, timeend from middlewaresstatistics where timeend is not null')
     average = statistics.mean([i[1].timestamp() - i[0].timestamp() for i in mwst])
     await message.reply(disable_mentions=1, message=f'Среднее время работы мидлвари - {average} секунд')
 
@@ -454,9 +431,8 @@ async def reboot(message: Message):
             f'⌛ Перезагрузка произойдет через {pointWords(int(data[1]), ("минуту", "минуты", "минут"))}.')
         await asyncio.sleep(int(data[1]) * 60)
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            await conn.execute(
-                'insert into reboots (chat_id, time, sended) values ($1, $2, false)', message.chat_id, time.time())
+        await conn.execute(
+            'insert into reboots (chat_id, time, sended) values ($1, $2, false)', message.chat_id, time.time())
     await message.reply(messages.reboot())
     os.system(PATH + 'startup.sh')  # noqa
 
@@ -465,9 +441,8 @@ async def reboot(message: Message):
 async def sudo(message: Message):
     if 'reboot' in message.text:
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                await conn.execute(
-                    'insert into reboots (chat_id, time, sended) values ($1, $2, false)', message.chat_id, time.time())
+            await conn.execute(
+                'insert into reboots (chat_id, time, sended) values ($1, $2, false)', message.chat_id, time.time())
     await message.reply(os.popen(f'sudo {" ".join(message.text.split()[1:])}').read())
 
 
@@ -478,9 +453,8 @@ async def getuserchats(message: Message):
         return await message.reply('🔶 Пользователь не найден')
     limit = message.text.split()[-1]
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            top = await conn.fetch('select chat_id, messages from messages where uid=$1 order by messages desc limit '
-                                   '$2', id, int(limit) if limit.isdigit() else 100)
+        top = await conn.fetch('select chat_id, messages from messages where uid=$1 order by messages desc limit '
+                               '$2', id, int(limit) if limit.isdigit() else 100)
     msg = '✝ Беседы пользователя:\n'
     for i in top:
         if await getUInfBanned(id, i[0]):
@@ -497,9 +471,8 @@ async def getuserchats(message: Message):
 async def getchats(message: Message):
     limit = message.text.split()[-1]
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            top = await conn.fetch('select chat_id, messages from messages order by messages desc limit $1',
-                                   int(limit) if limit.isdigit() else 100)
+        top = await conn.fetch('select chat_id, messages from messages order by messages desc limit $1',
+                               int(limit) if limit.isdigit() else 100)
     msg = '✝ Беседы:\n'
     for i in top:
         if str(i[0]) in msg or await getUInfBanned(0, i[0]):
@@ -528,19 +501,18 @@ async def gettransferhistory(message: Message):
     limit = message.text.split()[-1]
     limit = int(limit) if limit.isdigit() else 100
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if message.text.lower().split()[0][-2:] == 'to':
-                transfers = await conn.fetch(
-                    'select from_id, to_id, amount, com from transferhistory where to_id=$1 '
-                    'order by time desc limit $2', id, limit)
-            elif message.text.lower().split()[0][-4:] == 'from':
-                transfers = await conn.fetch(
-                    'select from_id, to_id, amount, com from transferhistory where from_id=$1 '
-                    'order by time desc limit $2', id, limit)
-            else:
-                transfers = await conn.fetch(
-                    'select from_id, to_id, amount, com from transferhistory where from_id=$1 or to_id=$1'
-                    ' order by time desc limit $2', id, limit)
+        if message.text.lower().split()[0][-2:] == 'to':
+            transfers = await conn.fetch(
+                'select from_id, to_id, amount, com from transferhistory where to_id=$1 '
+                'order by time desc limit $2', id, limit)
+        elif message.text.lower().split()[0][-4:] == 'from':
+            transfers = await conn.fetch(
+                'select from_id, to_id, amount, com from transferhistory where from_id=$1 '
+                'order by time desc limit $2', id, limit)
+        else:
+            transfers = await conn.fetch(
+                'select from_id, to_id, amount, com from transferhistory where from_id=$1 or to_id=$1'
+                ' order by time desc limit $2', id, limit)
     msg = '✝ Общие трансферы пользователя:'
     for i in transfers:
         msg += (f'\n F: [id{i[0]}|{await getUserName(i[0])}] | T: [id{i[1]}|{await getUserName(i[1])}] | A: {i[2]} | C:'
@@ -555,8 +527,7 @@ async def lvlban(message: Message):
     if len(data) != 2 or not id:
         return await message.reply(messages.lvlban_hint())
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            await conn.execute('insert into lvlbanned (uid) values ($1) on conflict (uid) do nothing', id)
+        await conn.execute('insert into lvlbanned (uid) values ($1) on conflict (uid) do nothing', id)
     await message.reply(messages.lvlban())
 
 
@@ -567,17 +538,15 @@ async def lvlunban(message: Message):
     if len(data) != 2 or not id:
         return await message.reply(messages.lvlunban_hint())
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if not await conn.fetchval('delete from lvlbanned where uid=$1 returning 1', id):
-                return await message.reply(messages.lvlunban_noban())
+        if not await conn.fetchval('delete from lvlbanned where uid=$1 returning 1', id):
+            return await message.reply(messages.lvlunban_noban())
     await message.reply(messages.lvlunban())
 
 
 @bl.chat_message(SearchCMD('lvlbanlist'))
 async def lvlbanlist(message: Message):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            lvlban = await conn.fetch('select uid from lvlbanned')
+        lvlban = await conn.fetch('select uid from lvlbanned')
     msg = f'⚛ Список пользователей в lvlban бота (Всего : {len(lvlban)})\n\n'
     for user in lvlban:
         msg += f"➖ {user[0]} : | [id{user[0]}|{await getUserName(user[0])}]\n"
@@ -592,8 +561,7 @@ async def repban(message: Message):
         return await message.reply(messages.repban_hint())
     if not await getURepBanned(id):
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                await conn.execute('insert into reportban (uid, time) values ($1, $2)', id, None)
+            await conn.execute('insert into reportban (uid, time) values ($1, $2)', id, None)
     await message.reply(messages.repban())
 
 
@@ -604,17 +572,15 @@ async def repunban(message: Message):
     if len(data) != 2 or not id:
         return await message.reply(messages.repunban_hint())
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if not await conn.fetchval('delete from reportban where uid=$1 returning 1', id):
-                return await message.reply(messages.repunban_noban())
+        if not await conn.fetchval('delete from reportban where uid=$1 returning 1', id):
+            return await message.reply(messages.repunban_noban())
     await message.reply(messages.repunban())
 
 
 @bl.chat_message(SearchCMD('repbanlist'))
 async def repbanlist(message: Message):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            repban = await conn.fetch('select uid from reportban')
+        repban = await conn.fetch('select uid from reportban')
     msg = f'⚛ Список пользователей в reportban бота (Всего : {len(repban)})\n\n'
     for user in repban:
         msg += f"➖ {user[0]} : | [id{user[0]}|{await getUserName(user[0])}]\n"
@@ -624,9 +590,8 @@ async def repbanlist(message: Message):
 @bl.chat_message(SearchCMD('chatsstats'))
 async def chatsstats(message: Message):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            nm = await conn.fetchval('select count(*) as c from settings where setting=\'nightmode\' and pos=true')
-            c = await conn.fetchval('select count(*) as c from settings where setting=\'captcha\' and pos=true')
+        nm = await conn.fetchval('select count(*) as c from settings where setting=\'nightmode\' and pos=true')
+        c = await conn.fetchval('select count(*) as c from settings where setting=\'captcha\' and pos=true')
     msg = (f'🌓 Ночной режим включен в: {pointWords(nm or 0, ["беседе", "беседах", "беседах"])}\n'
            f'🔢 Капча включена в: {pointWords(c or 0, ["беседе", "беседах", "беседах"])}')
     await message.reply(msg)
@@ -635,8 +600,7 @@ async def chatsstats(message: Message):
 @bl.chat_message(SearchCMD('linked'))
 async def linked(message: Message):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            c = await conn.fetchval('select count(*) as c from tglink where tgid IS NOT NULL')
+        c = await conn.fetchval('select count(*) as c from tglink where tgid IS NOT NULL')
     await message.reply(f'Связано с Telegram : {pointWords(c, ("аккаунт", "аккаунта", "аккаунтов"))}.')
 
 
@@ -644,11 +608,10 @@ async def linked(message: Message):
 async def cmdstats(message: Message):
     data = message.text.split()
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if len(data) == 2:
-                c = await conn.fetch('select uid from cmdsusage where cmd=$1', data[1])
-            else:
-                c = await conn.fetch('select uid from cmdsusage')
+        if len(data) == 2:
+            c = await conn.fetch('select uid from cmdsusage where cmd=$1', data[1])
+        else:
+            c = await conn.fetch('select uid from cmdsusage')
     await message.reply(f'Использований: {pointWords(len(c), ("раз", "раза", "раз"))}.\n'
                         f'Уникальных использований: {pointWords(len(set(c)), ("раз", "раза", "раз"))}.')
 
@@ -668,11 +631,10 @@ async def promocreate(message: Message):
     except ValueError:
         return await message.reply(messages.promocreate_hint())
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if await conn.fetchval('select exists(select 1 from promocodes where code=$1)', data[1]):
-                return await message.reply(messages.promocreate_alreadyexists(data[1]))
-            await conn.execute('insert into promocodes (code, usage, date, xp) values ($1, $2, $3, $4)',
-                               data[1], usage, (date.timestamp() + 86399) if date else None, xp)
+        if await conn.fetchval('select exists(select 1 from promocodes where code=$1)', data[1]):
+            return await message.reply(messages.promocreate_alreadyexists(data[1]))
+        await conn.execute('insert into promocodes (code, usage, date, xp) values ($1, $2, $3, $4)',
+                           data[1], usage, (date.timestamp() + 86399) if date else None, xp)
     await message.reply(messages.promocreate(data[1], xp, usage, date))
 
 
@@ -682,17 +644,15 @@ async def promodel(message: Message):
     if len(data) != 2:
         return await message.reply(messages.promodel_hint())
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if not await conn.fetchval('delete from promocodes where code=$1 returning 1', data[1]):
-                return await message.reply(messages.promodel_notfound(data[1]))
+        if not await conn.fetchval('delete from promocodes where code=$1 returning 1', data[1]):
+            return await message.reply(messages.promodel_notfound(data[1]))
     await message.reply(messages.promodel(data[1]))
 
 
 @bl.chat_message(SearchCMD('promolist'))
 async def promolist(message: Message):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            promos = await conn.fetch('select code from promocodeuses where code=ANY($1)',
-                                      [i[0] for i in await conn.fetch('select code from promocodes')])
+        promos = await conn.fetch('select code from promocodeuses where code=ANY($1)',
+                                  [i[0] for i in await conn.fetch('select code from promocodes')])
     promos = [i[0] for i in promos]
     await message.reply(messages.promolist({k: promos.count(k) for k in set(promos)}))

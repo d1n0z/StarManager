@@ -7,6 +7,7 @@ from config.config import DATABASE_STR
 async def init_connection(conn):
     await conn.execute("SET idle_in_transaction_session_timeout = '15s'")
 
+
 _pool = None
 _syncpool = None
 

@@ -69,11 +69,10 @@ async def premium(message: Message):
 async def top(message: Message):
     chat_id = message.peer_id - 2000000000
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            msgs = await conn.fetch(
-                'select uid, messages from messages where uid>0 and messages>0 and chat_id=$1 and '
-                'uid=ANY($2) order by messages desc limit 10', chat_id, [i.member_id for i in (
-                    await api.messages.get_conversation_members(peer_id=message.peer_id)).items])
+        msgs = await conn.fetch(
+            'select uid, messages from messages where uid>0 and messages>0 and chat_id=$1 and '
+            'uid=ANY($2) order by messages desc limit 10', chat_id, [i.member_id for i in (
+                await api.messages.get_conversation_members(peer_id=message.peer_id)).items])
     await message.reply(disable_mentions=1, message=await messages.top(msgs),
                         keyboard=keyboard.top(chat_id, message.from_id))
 
@@ -131,8 +130,7 @@ async def stats(message: Message):
 async def help(message: Message):
     uid = message.from_id
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            cmds = await conn.fetch('select cmd, lvl from commandlevels where chat_id=$1', message.peer_id - 2000000000)
+        cmds = await conn.fetch('select cmd, lvl from commandlevels where chat_id=$1', message.peer_id - 2000000000)
     base = COMMANDS.copy()
     for i in cmds:
         base[i[0]] = int(i[1])
@@ -147,16 +145,14 @@ async def bonus(message: Message):
     name = await getUserName(uid)
 
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            lasttime = await conn.fetchval('select time from bonus where uid=$1', uid) or 0
+        lasttime = await conn.fetchval('select time from bonus where uid=$1', uid) or 0
     if time.time() - lasttime < (reqtime := 28800 if await chatPremium(chat_id) else 86400):
         return await message.reply(disable_mentions=1, message=messages.bonus_time(
             uid, None, name, lasttime + reqtime - time.time()))
 
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if not await conn.fetchval('update bonus set time = $1 where uid=$2 returning 1', time.time(), uid):
-                await conn.execute('insert into bonus (uid, time) values ($1, $2)', uid, time.time())
+        if not await conn.fetchval('update bonus set time = $1 where uid=$2 returning 1', time.time(), uid):
+            await conn.execute('insert into bonus (uid, time) values ($1, $2)', uid, time.time())
 
     addxp = random.randint(100, 180) if await getUserPremium(uid) else random.randint(20, 100)
     await addUserXP(uid, addxp)
@@ -183,9 +179,7 @@ async def cmd(message: Message):
             return await message.reply(disable_mentions=1, message=messages.resetcmd_not_found(cmd))
 
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                cmdn = await conn.fetchval('select name from cmdnames where uid=$1 and cmd=$2', uid, cmd)
-                await conn.execute('delete from cmdnames where uid=$1 and cmd=$2', uid, cmd)
+            cmdn = await conn.fetchval('delete from cmdnames where uid=$1 and cmd=$2 returning name', uid, cmd)
         if not cmdn:
             return await message.reply(disable_mentions=1, message=messages.resetcmd_not_changed(cmd))
 
@@ -203,8 +197,7 @@ async def cmd(message: Message):
             return await message.reply(disable_mentions=1, message=messages.cmd_changed_in_cmds())
 
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                cmdns = await conn.fetch('select cmd, name from cmdnames where uid=$1', uid)
+            cmdns = await conn.fetch('select cmd, name from cmdnames where uid=$1', uid)
         res = []
         for i in cmdns:
             if i[0] not in res:
@@ -218,10 +211,9 @@ async def cmd(message: Message):
             return await message.reply(disable_mentions=1, message=messages.cmd_char_limit())
 
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                if not await conn.fetchval(
-                        'update cmdnames set name = $1 where uid=$2 and cmd=$3 returning 1', changed, uid, cmd):
-                    await conn.execute('insert into cmdnames (uid, cmd, name) values ($1, $2, $3)', uid, cmd, changed)
+            if not await conn.fetchval(
+                    'update cmdnames set name = $1 where uid=$2 and cmd=$3 returning 1', changed, uid, cmd):
+                await conn.execute('insert into cmdnames (uid, cmd, name) values ($1, $2, $3)', uid, cmd, changed)
 
         await message.reply(disable_mentions=1, message=messages.cmd_set(
             uid, await getUserName(uid), await getUserNickname(uid, chat_id), cmd, changed))
@@ -307,10 +299,9 @@ async def transfer(message: Message):
             uid, await getUserName(uid), await getUserNickname(uid, chat_id)))
 
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            td = sum([i[0] for i in await conn.fetch(
-                'select amount from transferhistory where time>$1 and from_id=$2',
-                datetime.now().replace(hour=0, minute=0, second=0).timestamp(), uid)])
+        td = sum([i[0] for i in await conn.fetch(
+            'select amount from transferhistory where time>$1 and from_id=$2',
+            datetime.now().replace(hour=0, minute=0, second=0).timestamp(), uid)])
     if (td >= 1500 and not u_prem) or (td >= 3000 and not u_prem):
         return await message.reply(disable_mentions=1, message=messages.transfer_limit(u_prem))
 
@@ -330,9 +321,8 @@ async def transfer(message: Message):
     uname = await getUserName(uid)
     name = await getUserName(id)
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            await conn.execute('insert into transferhistory (to_id, from_id, time, amount, com) VALUES ($1, $2, $3, $4,'
-                               ' $5)', id, uid, time.time(), ftxp, u_prem)
+        await conn.execute('insert into transferhistory (to_id, from_id, time, amount, com) VALUES ($1, $2, $3, $4,'
+                           ' $5)', id, uid, time.time(), ftxp, u_prem)
     try:
         await tgbot.send_message(chat_id=TG_CHAT_ID, message_thread_id=TG_TRANSFER_THREAD_ID,
                                  text=f'{chat_id} | <a href="vk.com/id{uid}">{uname}</a> | '
@@ -397,21 +387,20 @@ async def promo(message: Message):
         return await message.reply(disable_mentions=1, message=messages.promo_hint())
     uid = message.from_id
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            code = await conn.fetchrow(
-                'select code, date, usage, xp from promocodes where code=$1', data[1])
-            if code and (code[1] and time.time() > code[1] or (
-                    code[2] and (len(await conn.fetch(
-                        'select id from promocodeuses where code=$1', data[1])) >= code[2]))):
-                await conn.execute('delete from promocodes where code=$1', data[1])
-                await conn.execute('delete from promocodeuses where code=$1', data[1])
-                code = None
-            if not code or await conn.fetchval(
-                    'select exists(select 1 from promocodeuses where code=$1 and uid=$2)', data[1], uid):
-                return await message.reply(
-                    disable_mentions=1, message=messages.promo_alreadyusedornotexists(
-                        uid, await getUserNickname(uid, message.chat_id), await getUserName(uid)))
-            await conn.execute('insert into promocodeuses (code, uid) values ($1, $2)', data[1], uid)
+        code = await conn.fetchrow(
+            'select code, date, usage, xp from promocodes where code=$1', data[1])
+        if code and (code[1] and time.time() > code[1] or (
+                code[2] and (len(await conn.fetch(
+                    'select id from promocodeuses where code=$1', data[1])) >= code[2]))):
+            await conn.execute('delete from promocodes where code=$1', data[1])
+            await conn.execute('delete from promocodeuses where code=$1', data[1])
+            code = None
+        if not code or await conn.fetchval(
+                'select exists(select 1 from promocodeuses where code=$1 and uid=$2)', data[1], uid):
+            return await message.reply(
+                disable_mentions=1, message=messages.promo_alreadyusedornotexists(
+                    uid, await getUserNickname(uid, message.chat_id), await getUserName(uid)))
+        await conn.execute('insert into promocodeuses (code, uid) values ($1, $2)', data[1], uid)
     await addUserXP(uid, int(code[3]))
     await message.reply(disable_mentions=1, message=messages.promo(
         uid, await getUserNickname(uid, message.chat_id), await getUserName(uid), code[0], code[3]))
@@ -430,14 +419,13 @@ async def rep(message: Message):
     uid = message.from_id
     uprem = await getUserPremium(uid)
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            rephistory = await conn.fetch('select time from rephistory where uid=$1 and id=$2 and time>$3 order by '
-                                          'time', uid, id, time.time() - 86400)
-            if len(rephistory) >= (3 if uprem else 1):
-                return await message.reply(disable_mentions=1, message=messages.rep_limit(uprem, rephistory[0][0]))
-            if not await conn.fetchval(f'update reputation set rep=rep {data[1]} 1 where uid=$1 returning 1', id):
-                await conn.execute('insert into reputation (uid, rep) values ($1, $2)', id, eval(f'0{data[1]}1'))
-            await conn.execute('insert into rephistory (uid, id, time) values ($1, $2, $3)', uid, id, time.time())
+        rephistory = await conn.fetch('select time from rephistory where uid=$1 and id=$2 and time>$3 order by '
+                                      'time', uid, id, time.time() - 86400)
+        if len(rephistory) >= (3 if uprem else 1):
+            return await message.reply(disable_mentions=1, message=messages.rep_limit(uprem, rephistory[0][0]))
+        if not await conn.fetchval(f'update reputation set rep=rep {data[1]} 1 where uid=$1 returning 1', id):
+            await conn.execute('insert into reputation (uid, rep) values ($1, $2)', id, eval(f'0{data[1]}1'))
+        await conn.execute('insert into rephistory (uid, id, time) values ($1, $2, $3)', uid, id, time.time())
     await message.reply(disable_mentions=1, message=messages.rep(
         data[1] == '+', uid, await getUserName(uid), await getUserNickname(uid, message.chat_id),
         id, await getUserName(id), await getUserNickname(id, message.chat_id), await getUserRep(id),

@@ -32,8 +32,7 @@ async def unmute(message: Message):
             id, await getUserName(id), await getUserNickname(id, chat_id)))
 
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            await conn.execute('update mute set mute = 0 where chat_id=$1 and uid=$2', chat_id, id)
+        await conn.execute('update mute set mute = 0 where chat_id=$1 and uid=$2', chat_id, id)
 
     await setChatMute(id, chat_id, 0)
     await message.reply(disable_mentions=1, message=messages.unmute(
@@ -44,10 +43,9 @@ async def unmute(message: Message):
 @bl.chat_message(SearchCMD('mutelist'))
 async def mutelist(message: Message):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            res = await conn.fetch(
-                'select uid, chat_id, last_mutes_causes, mute, last_mutes_names from mute where chat_id=$1 and '
-                'mute>$2 order by uid desc', message.peer_id - 2000000000, time.time())
+        res = await conn.fetch(
+            'select uid, chat_id, last_mutes_causes, mute, last_mutes_names from mute where chat_id=$1 and '
+            'mute>$2 order by uid desc', message.peer_id - 2000000000, time.time())
     muted_count = len(res)
     await message.reply(disable_mentions=1, message=await messages.mutelist(res[:30], muted_count),
                         keyboard=keyboard.mutelist(message.from_id, 0, muted_count))
@@ -69,11 +67,10 @@ async def unwarn(message: Message):
         return await message.reply(disable_mentions=1, message=messages.unwarn_higher())
 
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if not await conn.fetchval(
-                    'update warn set warns = warns - 1 where chat_id=$1 and uid=$2 returning 1', chat_id, id):
-                return await message.reply(disable_mentions=1, message=messages.unwarn_no_warns(
-                    id, await getUserName(id), await getUserNickname(id, chat_id)))
+        if not await conn.fetchval(
+                'update warn set warns = warns - 1 where chat_id=$1 and uid=$2 returning 1', chat_id, id):
+            return await message.reply(disable_mentions=1, message=messages.unwarn_no_warns(
+                id, await getUserName(id), await getUserNickname(id, chat_id)))
     await message.reply(disable_mentions=1, message=messages.unwarn(
         await getUserName(uid), await getUserNickname(uid, chat_id), uid, await getUserName(id),
         await getUserNickname(id, chat_id), id))
@@ -82,10 +79,9 @@ async def unwarn(message: Message):
 @bl.chat_message(SearchCMD('warnlist'))
 async def warnlist(message: Message):
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            res = await conn.fetch(
-                'select uid, chat_id, last_warns_causes, warns, last_warns_names from warn where chat_id=$1 and '
-                'warns>0 order by uid desc', message.peer_id - 2000000000)
+        res = await conn.fetch(
+            'select uid, chat_id, last_warns_causes, warns, last_warns_names from warn where chat_id=$1 and '
+            'warns>0 order by uid desc', message.peer_id - 2000000000)
     count = len(res)
     res = res[:30]
     await message.reply(disable_mentions=1, message=await messages.warnlist(res, count), keyboard=keyboard.warnlist(

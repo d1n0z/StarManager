@@ -182,9 +182,8 @@ async def ignore(message: Message):
     if id < 0:
         return await message.reply(disable_mentions=1, message=messages.id_group())
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if not await conn.fetchval('select exists(select 1 from ignore where chat_id=$1 and uid=$2)', chat_id, id):
-                await conn.execute('insert into ignore (chat_id, uid) values ($1, $2)', chat_id, id)
+        if not await conn.fetchval('select exists(select 1 from ignore where chat_id=$1 and uid=$2)', chat_id, id):
+            await conn.execute('insert into ignore (chat_id, uid) values ($1, $2)', chat_id, id)
     await message.reply(disable_mentions=1, message=messages.ignore(
         id, await getUserName(id), await getUserNickname(uid, chat_id)))
 
@@ -202,9 +201,8 @@ async def unignore(message: Message):
     chat_id = message.peer_id - 2000000000
     name = await getUserName(id)
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if not await conn.fetchval('delete from ignore where chat_id=$1 and uid=$2 returning 1', chat_id, id):
-                return await message.reply(disable_mentions=1, message=messages.unignore_not_ignored())
+        if not await conn.fetchval('delete from ignore where chat_id=$1 and uid=$2 returning 1', chat_id, id):
+            return await message.reply(disable_mentions=1, message=messages.unignore_not_ignored())
     await message.reply(disable_mentions=1, message=messages.unignore(id, name, await getUserNickname(uid, chat_id)))
 
 
@@ -213,9 +211,8 @@ async def ignorelist(message: Message):
     if int(await getUserPremium(message.from_id)) <= 0:
         return await message.reply(disable_mentions=1, message=messages.no_prem())
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            ids = [i[0] for i in await conn.fetch(
-                'select uid from ignore where chat_id=$1', message.peer_id - 2000000000)]
+        ids = [i[0] for i in await conn.fetch(
+            'select uid from ignore where chat_id=$1', message.peer_id - 2000000000)]
     raw_names = await api.users.get(user_ids=ids)
     names = []
     for i in raw_names:
@@ -249,13 +246,12 @@ async def chatlimit(message: Message):
         tst = 0
 
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            chlim = await conn.fetchval('select time from chatlimit where chat_id=$1', chat_id)
-            lpos = chlim or 1
-            if chlim is not None:
-                await conn.execute('update chatlimit set time = $1 where chat_id=$2', st, chat_id)
-            else:
-                await conn.execute('insert into chatlimit (chat_id, time) values ($1, $2)', chat_id, st)
+        chlim = await conn.fetchval('select time from chatlimit where chat_id=$1', chat_id)
+        lpos = chlim or 1
+        if chlim is not None:
+            await conn.execute('update chatlimit set time = $1 where chat_id=$2', st, chat_id)
+        else:
+            await conn.execute('insert into chatlimit (chat_id, time) values ($1, $2)', chat_id, st)
 
     await message.reply(disable_mentions=1, message=messages.chatlimit(
         uid, await getUserName(uid), await getUserNickname(uid, chat_id), tst, pfx, lpos))
@@ -285,21 +281,19 @@ async def notif(message: Message):
     if len(data) >= 2:
         name = ' '.join(data[1:])
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                notif = await conn.fetchval(
-                    'select count(*) as c from notifications where chat_id=$1 and name=$2', chat_id, name)
-                if not notif:
-                    await conn.execute(
-                        "insert into notifications (chat_id, tag, every, status, time, name, description, text) "
-                        "values ($1, 1, -1, 1, $2, $3, '', '')", chat_id, time.time() - 5, name)
-                    return await message.reply(disable_mentions=1, message=messages.notification(
-                        name, '', time.time(), -1, 1, 1), keyboard=keyboard.notification(uid, 1, name))
+            notif = await conn.fetchval(
+                'select count(*) as c from notifications where chat_id=$1 and name=$2', chat_id, name)
+            if not notif:
+                await conn.execute(
+                    "insert into notifications (chat_id, tag, every, status, time, name, description, text) "
+                    "values ($1, 1, -1, 1, $2, $3, '', '')", chat_id, time.time() - 5, name)
+                return await message.reply(disable_mentions=1, message=messages.notification(
+                    name, '', time.time(), -1, 1, 1), keyboard=keyboard.notification(uid, 1, name))
         return await message.reply(disable_mentions=1, message=messages.notif_already_exist(name))
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            activenotifs = await conn.fetchval(
-                'select count(*) as c from notifications where chat_id=$1 and status=1', chat_id)
-            notifs = await conn.fetchval('select count(*) as c from notifications where chat_id=$1', chat_id)
+        activenotifs = await conn.fetchval(
+            'select count(*) as c from notifications where chat_id=$1 and status=1', chat_id)
+        notifs = await conn.fetchval('select count(*) as c from notifications where chat_id=$1', chat_id)
     await message.reply(disable_mentions=1, message=messages.notif(notifs, activenotifs), keyboard=keyboard.notif(uid))
 
 
@@ -311,16 +305,15 @@ async def purge(message: Message):
     dtdnicknames = 0
     dtdaccesslevels = 0
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            for i in await conn.fetch('select id, uid from nickname where chat_id=$1', chat_id):
-                if i[1] not in users:
-                    await conn.execute('delete from nickname where id=$1', i[0])
-                    dtdnicknames += 1
-            for i in await conn.fetch('select id, uid from accesslvl where chat_id=$1', chat_id):
-                if i[1] not in users:
-                    await conn.execute('delete from accesslvl where id=$1', i[0])
-                    await setChatMute(i[1], chat_id, 0)
-                    dtdaccesslevels += 1
+        for i in await conn.fetch('select id, uid from nickname where chat_id=$1', chat_id):
+            if i[1] not in users:
+                await conn.execute('delete from nickname where id=$1', i[0])
+                dtdnicknames += 1
+        for i in await conn.fetch('select id, uid from accesslvl where chat_id=$1', chat_id):
+            if i[1] not in users:
+                await conn.execute('delete from accesslvl where id=$1', i[0])
+                await setChatMute(i[1], chat_id, 0)
+                dtdaccesslevels += 1
     await editMessage(messages.purge(dtdnicknames, dtdaccesslevels) if dtdnicknames > 0 or dtdaccesslevels > 0 else
                       messages.purge_empty(), message.peer_id, edit.conversation_message_id)
 
@@ -338,7 +331,6 @@ async def rename(message: Message):
     except:
         return await message.reply(disable_mentions=1, message=messages.rename_error())
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            await conn.execute('delete from chatnames where chat_id=$1', chat_id)
+        await conn.execute('delete from chatnames where chat_id=$1', chat_id)
     await message.reply(disable_mentions=1, message=messages.rename(message.from_id, await getUserName(message.from_id),
                                                                     await getUserNickname(message.from_id, chat_id)))

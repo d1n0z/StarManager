@@ -32,9 +32,8 @@ def run():
         timestart = datetime.now()
         await message_handle(event)
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                await conn.execute(
-                    'insert into messagesstatistics (timestart, timeend) values ($1, $2)', timestart, datetime.now())
+            await conn.execute(
+                'insert into messagesstatistics (timestart, timeend) values ($1, $2)', timestart, datetime.now())
 
     @labeler.raw_event(GroupEventType.WALL_REPLY_NEW, dataclass=GroupTypes.WallReplyNew)
     async def new_wall_reply(event: GroupTypes.WallReplyNew):

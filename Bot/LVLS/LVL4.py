@@ -125,9 +125,8 @@ async def gban(message: Message):
 
         ban_date = datetime.now().strftime('%Y.%m.%d %H:%M:%S')
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                res = await conn.fetchrow('select last_bans_times, last_bans_causes, last_bans_names, last_bans_dates '
-                                          'from ban where chat_id=$1 and uid=$2', chat_id, id)
+            res = await conn.fetchrow('select last_bans_times, last_bans_causes, last_bans_names, last_bans_dates '
+                                      'from ban where chat_id=$1 and uid=$2', chat_id, id)
         if res is not None:
             ban_times = literal_eval(res[0])
             ban_causes = literal_eval(res[1])
@@ -145,15 +144,14 @@ async def gban(message: Message):
         ban_dates.append(ban_date)
 
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                if not await conn.fetchval(
-                        'update ban set ban = $1, last_bans_times = $2, last_bans_causes = $3, last_bans_names = $4, '
-                        'last_bans_dates = $5 where chat_id=$6 and uid=$7 returning 1', time.time() + ban_time,
-                        f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}", chat_id, id):
-                    await conn.execute(
-                        'insert into ban (uid, chat_id, ban, last_bans_times, last_bans_causes, last_bans_names, '
-                        'last_bans_dates) values ($1, $2, $3, $4, $5, $6, $7)', id, chat_id, time.time() + ban_time,
-                        f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}")
+            if not await conn.fetchval(
+                    'update ban set ban = $1, last_bans_times = $2, last_bans_causes = $3, last_bans_names = $4, '
+                    'last_bans_dates = $5 where chat_id=$6 and uid=$7 returning 1', time.time() + ban_time,
+                    f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}", chat_id, id):
+                await conn.execute(
+                    'insert into ban (uid, chat_id, ban, last_bans_times, last_bans_causes, last_bans_names, '
+                    'last_bans_dates) values ($1, $2, $3, $4, $5, $6, $7)', id, chat_id, time.time() + ban_time,
+                    f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}")
 
         if await kickUser(id, chat_id):
             await api.messages.send(disable_mentions=1, random_id=0, message=messages.ban(
@@ -193,10 +191,9 @@ async def gunban(message: Message):
         if await getUserBan(id, chat_id) <= time.time():
             continue
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                if await conn.fetchval('update ban set ban = 0 where chat_id=$1 and uid=$2 and ban>$3 returning 1',
-                                       chat_id, id, time.time()):
-                    success += 1
+            if await conn.fetchval('update ban set ban = 0 where chat_id=$1 and uid=$2 and ban>$3 returning 1',
+                                   chat_id, id, time.time()):
+                success += 1
 
     await editMessage(peer_id=edit.peer_id, cmid=edit.conversation_message_id,
                       msg=messages.gunban(id, name, nick, len(chats), success))
@@ -245,9 +242,8 @@ async def gmute(message: Message):
             continue
 
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                res = await conn.fetchrow('select last_mutes_times, last_mutes_causes, last_mutes_names, '
-                                          'last_mutes_dates from mute where chat_id=$1 and uid=$2', chat_id, id)
+            res = await conn.fetchrow('select last_mutes_times, last_mutes_causes, last_mutes_names, '
+                                      'last_mutes_dates from mute where chat_id=$1 and uid=$2', chat_id, id)
         if res is not None:
             mute_times = literal_eval(res[0])
             mute_causes = literal_eval(res[1])
@@ -268,16 +264,15 @@ async def gmute(message: Message):
         mute_dates.append(mute_date)
 
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                if not await conn.fetchval(
-                        'update mute set mute = $1, last_mutes_times = $2, last_mutes_causes = $3, '
-                        'last_mutes_names = $4, last_mutes_dates = $5 where chat_id=$6 and uid=$7 returning 1',
-                        time.time() + mute_time, f"{mute_times}", f"{mute_causes}", f"{mute_names}", f"{mute_dates}",
-                        chat_id, id):
-                    await conn.execute(
-                        'insert into mute (uid, chat_id, mute, last_mutes_times, last_mutes_causes, last_mutes_names, '
-                        'last_mutes_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)', id, chat_id, time.time() + mute_time,
-                        f"{mute_times}", f"{mute_causes}", f"{mute_names}", f"{mute_dates}")
+            if not await conn.fetchval(
+                    'update mute set mute = $1, last_mutes_times = $2, last_mutes_causes = $3, '
+                    'last_mutes_names = $4, last_mutes_dates = $5 where chat_id=$6 and uid=$7 returning 1',
+                    time.time() + mute_time, f"{mute_times}", f"{mute_causes}", f"{mute_names}", f"{mute_dates}",
+                    chat_id, id):
+                await conn.execute(
+                    'insert into mute (uid, chat_id, mute, last_mutes_times, last_mutes_causes, last_mutes_names, '
+                    'last_mutes_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)', id, chat_id, time.time() + mute_time,
+                    f"{mute_times}", f"{mute_causes}", f"{mute_names}", f"{mute_dates}")
 
         await setChatMute(id, chat_id, mute_time)
         await api.messages.send(disable_mentions=1, random_id=0, chat_id=chat_id, message=messages.mute(
@@ -317,10 +312,9 @@ async def gunmute(message: Message):
         if u_acc <= ch_acc or not await haveAccess('gunmute', chat_id, u_acc):
             continue
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                if not await conn.fetchval(
-                        'update mute set mute = 0 where chat_id=$1 and uid=$2 returning 1', chat_id, id):
-                    continue
+            if not await conn.fetchval(
+                    'update mute set mute = 0 where chat_id=$1 and uid=$2 returning 1', chat_id, id):
+                continue
         await setChatMute(id, chat_id, 0)
         await api.messages.send(disable_mentions=1, random_id=0, chat_id=chat_id, message=messages.unmute(
             u_name, await getUserNickname(uid, chat_id), uid, ch_name, await getUserNickname(id, chat_id), id))
@@ -363,10 +357,9 @@ async def gwarn(message: Message):
 
         warn_date = datetime.now().strftime('%Y.%m.%d %H:%M:%S')
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                res = await conn.fetchrow(
-                    'select warns, last_warns_times, last_warns_causes, last_warns_names, last_warns_dates from warn '
-                    'where chat_id=$1 and uid=$2', chat_id, id)
+            res = await conn.fetchrow(
+                'select warns, last_warns_times, last_warns_causes, last_warns_names, last_warns_dates from warn '
+                'where chat_id=$1 and uid=$2', chat_id, id)
         if res is not None:
             warns = res[0] + 1
             warn_times = literal_eval(res[1])
@@ -395,15 +388,14 @@ async def gwarn(message: Message):
                                 await getUserNickname(id, chat_id), id, warn_cause)
 
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                if not await conn.fetchval(
-                        'update warn set warns = $1, last_warns_times = $2, last_warns_causes = $3, '
-                        'last_warns_names = $4, last_warns_dates = $5 where chat_id=$6 and uid=$7 returning 1',
-                        warns, f"{warn_times}", f"{warn_causes}", f"{warn_names}", f"{warn_dates}", chat_id, id):
-                    await conn.execute(
-                        'insert into warn (uid, chat_id, warns, last_warns_times, last_warns_causes, last_warns_names, '
-                        'last_warns_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)', id, chat_id, warns,
-                        f"{warn_times}", f"{warn_causes}", f"{warn_names}", f"{warn_dates}")
+            if not await conn.fetchval(
+                    'update warn set warns = $1, last_warns_times = $2, last_warns_causes = $3, '
+                    'last_warns_names = $4, last_warns_dates = $5 where chat_id=$6 and uid=$7 returning 1',
+                    warns, f"{warn_times}", f"{warn_causes}", f"{warn_names}", f"{warn_dates}", chat_id, id):
+                await conn.execute(
+                    'insert into warn (uid, chat_id, warns, last_warns_times, last_warns_causes, last_warns_names, '
+                    'last_warns_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)', id, chat_id, warns,
+                    f"{warn_times}", f"{warn_causes}", f"{warn_names}", f"{warn_dates}")
 
         await api.messages.send(disable_mentions=1, random_id=0, message=msg, chat_id=chat_id)
         success += 1
@@ -442,10 +434,9 @@ async def gunwarn(message: Message):
         if ch_warns == 0:
             continue
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                if not await conn.fetchval('update warn set warns = $1 where chat_id=$2 and uid=$3 returning 1',
-                                           ch_warns - 1, chat_id, id):
-                    continue
+            if not await conn.fetchval('update warn set warns = $1 where chat_id=$2 and uid=$3 returning 1',
+                                       ch_warns - 1, chat_id, id):
+                continue
         await api.messages.send(disable_mentions=1, random_id=0, chat_id=chat_id, message=messages.unwarn(
             u_name, await getUserNickname(uid, chat_id), uid, ch_name, await getUserNickname(id, chat_id), id))
         success += 1
@@ -486,12 +477,11 @@ async def gsnick(message: Message):
             continue
 
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                if not await conn.fetchval(
-                        'update nickname set nickname = $1 where chat_id=$2 and uid=$3 returning 1',
-                        nickname, chat_id, id):
-                    await conn.execute(
-                        'insert into nickname (uid, chat_id, nickname) values ($1, $2, $3)', id, chat_id, nickname)
+            if not await conn.fetchval(
+                    'update nickname set nickname = $1 where chat_id=$2 and uid=$3 returning 1',
+                    nickname, chat_id, id):
+                await conn.execute(
+                    'insert into nickname (uid, chat_id, nickname) values ($1, $2, $3)', id, chat_id, nickname)
 
         await api.messages.send(disable_mentions=1, random_id=0, chat_id=chat_id, message=messages.snick(
             uid, u_name, await getUserNickname(uid, chat_id), id, ch_name, await getUserNickname(id, chat_id),
@@ -532,8 +522,7 @@ async def grnick(message: Message):
             await api.messages.send(disable_mentions=1, random_id=0, chat_id=chat_id, message=messages.rnick(
                 uid, u_name, await getUserNickname(uid, chat_id), id, ch_name, ch_nickname))
             async with (await pool()).acquire() as conn:
-                async with conn.transaction():
-                    await conn.execute('delete from nickname where chat_id=$1 and uid=$2', chat_id, id)
+                await conn.execute('delete from nickname where chat_id=$1 and uid=$2', chat_id, id)
         except:
             pass
         success += 1

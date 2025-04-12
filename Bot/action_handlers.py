@@ -22,40 +22,36 @@ async def action_handle(event: MessageNew) -> None:
         if (await getChatSettings(chat_id))['main']['kickLeaving']:
             await kickUser(uid, chat_id=chat_id)
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                await conn.execute('delete from captcha where chat_id=$1 and uid=$2', chat_id, uid)
-                await conn.execute(
-                    'delete from typequeue where chat_id=$1 and uid=$2 and type=\'captcha\'', chat_id, uid)
+            await conn.execute('delete from captcha where chat_id=$1 and uid=$2', chat_id, uid)
+            await conn.execute('delete from typequeue where chat_id=$1 and uid=$2 and type=\'captcha\'', chat_id, uid)
         return
 
     if action.type.value != 'chat_invite_user':
         return
     id = event.from_id
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            await conn.execute('insert into allusers (uid) values ($1) on conflict (uid) do nothing', id)
-            if not await conn.fetchval('update userjoineddate set time = $1 where chat_id=$2 and uid=$3 returning 1',
-                                       time.time(), chat_id, id):
-                await conn.execute('insert into userjoineddate (chat_id, uid, time) values ($1, $2, $3)',
-                                   chat_id, id, time.time())
+        await conn.execute('insert into allusers (uid) values ($1) on conflict (uid) do nothing', id)
+        if not await conn.fetchval('update userjoineddate set time = $1 where chat_id=$2 and uid=$3 returning 1',
+                                   time.time(), chat_id, id):
+            await conn.execute('insert into userjoineddate (chat_id, uid, time) values ($1, $2, $3)',
+                               chat_id, id, time.time())
 
     if uid == -GROUP_ID:
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                if reason := await conn.fetchval("select reason from blocked where uid=$1 and type='chat'", chat_id):
-                    await sendMessage(event.peer_id, messages.block_chatblocked(id, reason),
-                                      keyboard.block_chatblocked())
-                    await api.messages.remove_chat_user(id, user_id=-GROUP_ID)
-                    return
-                if await conn.fetchval('select exists(select 1 from blacklist where uid=$1)', id):
-                    await sendMessage(event.peer_id, messages.blocked())
-                    await kickUser(-GROUP_ID, chat_id=chat_id)
-                    return
-                if not await conn.fetchval('select exists(select 1 from allchats where chat_id=$1)', chat_id):
-                    await conn.execute('insert into allchats (chat_id) values ($1)', chat_id)
-                    await sendMessage(event.peer_id, messages.join(), keyboard.join(chat_id))
-                    return
-                await conn.execute('delete from leavedchats where chat_id=$1', chat_id)
+            if reason := await conn.fetchval("select reason from blocked where uid=$1 and type='chat'", chat_id):
+                await sendMessage(event.peer_id, messages.block_chatblocked(id, reason),
+                                  keyboard.block_chatblocked())
+                await api.messages.remove_chat_user(id, user_id=-GROUP_ID)
+                return
+            if await conn.fetchval('select exists(select 1 from blacklist where uid=$1)', id):
+                await sendMessage(event.peer_id, messages.blocked())
+                await kickUser(-GROUP_ID, chat_id=chat_id)
+                return
+            if not await conn.fetchval('select exists(select 1 from allchats where chat_id=$1)', chat_id):
+                await conn.execute('insert into allchats (chat_id) values ($1)', chat_id)
+                await sendMessage(event.peer_id, messages.join(), keyboard.join(chat_id))
+                return
+            await conn.execute('delete from leavedchats where chat_id=$1', chat_id)
         await sendMessage(event.peer_id, messages.rejoin(), keyboard.rejoin(chat_id))
         return
 
@@ -76,15 +72,12 @@ async def action_handle(event: MessageNew) -> None:
         await sendMessage(event.peer_id, messages.block_blockeduserinvite(
             uid, await getUserName(uid), await getUserNickname(uid, chat_id)))
 
-    async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if id:
-                if not await conn.fetchval('update refferal set from_id = $1 where chat_id=$2 and uid=$3 returning 1',
-                                           id, chat_id, uid):
-                    await conn.execute('insert into refferal (chat_id, uid, from_id) values ($1, $2, $3)',
-                                       chat_id, uid, id)
-
-        async with conn.transaction():
+    if id:
+        async with (await pool()).acquire() as conn:
+            if not await conn.fetchval('update refferal set from_id = $1 where chat_id=$2 and uid=$3 returning 1',
+                                       id, chat_id, uid):
+                await conn.execute('insert into refferal (chat_id, uid, from_id) values ($1, $2, $3)',
+                                   chat_id, uid, id)
             if s := await conn.fetchrow(
                     'select pos, "value", punishment from settings where chat_id=$1 and setting=\'captcha\'',
                     chat_id):
@@ -92,14 +85,14 @@ async def action_handle(event: MessageNew) -> None:
                     captcha = await generateCaptcha(uid, chat_id, s[1])
                     m = await sendMessage(event.peer_id, messages.captcha(uid, await getUserName(uid), s[1], s[2]),
                                           photo=await uploadImage(captcha[0]))
-                    await conn.execute('update captcha set cmid = $1 where id=$2',
-                                       m[0].conversation_message_id, captcha[1])
-                    await conn.execute('insert into typequeue (chat_id, uid, "type", additional) '
-                                       'values ($1, $2, \'captcha\', \'{}\')', chat_id, uid)
                     if m:
+                        await conn.execute('update captcha set cmid = $1 where id=$2',
+                                           m[0].conversation_message_id, captcha[1])
+                        await conn.execute('insert into typequeue (chat_id, uid, "type", additional) '
+                                           'values ($1, $2, \'captcha\', \'{}\')', chat_id, uid)
                         return
 
-        async with conn.transaction():
+        async with (await pool()).acquire() as conn:
             if s := await conn.fetchrow(
                     'select pos, pos2 from settings where chat_id=$1 and setting=\'welcome\'', chat_id):
                 welcome = await conn.fetchrow(

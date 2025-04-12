@@ -20,8 +20,7 @@ async def isAdmin(chat_id) -> bool:
 
 async def isSGW(uid, msgtime) -> bool:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            ugw = await conn.fetchval('select time from globalwarns where uid=$1', uid)
+        ugw = await conn.fetchval('select time from globalwarns where uid=$1', uid)
     if ugw is not None and ugw > msgtime:
         return True
     return False
@@ -29,8 +28,7 @@ async def isSGW(uid, msgtime) -> bool:
 
 async def haveAccess(cmd, chat_id, uacc, premium=0) -> int | bool:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            cmdacc = await conn.fetchval('select lvl from commandlevels where chat_id=$1 and cmd=$2', chat_id, cmd)
+        cmdacc = await conn.fetchval('select lvl from commandlevels where chat_id=$1 and cmd=$2', chat_id, cmd)
     if cmd == 'check' and premium:
         return True
     if cmdacc is not None:
@@ -44,16 +42,14 @@ async def haveAccess(cmd, chat_id, uacc, premium=0) -> int | bool:
 @AsyncTTL(maxsize=0)
 async def getUserIgnore(uid, chat_id) -> bool:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval('select exists(select 1 from ignore where chat_id=$1 and uid=$2)', chat_id, uid)
+        return await conn.fetchval('select exists(select 1 from ignore where chat_id=$1 and uid=$2)', chat_id, uid)
 
 
 @AsyncTTL(maxsize=0)
 async def getUInfBanned(uid, chat_id) -> bool:
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval("select exists(select 1 from infbanned where (uid=$1 and type='chat') or "
-                                       "(uid=$2 and type='user'))", chat_id, uid)
+        return await conn.fetchval("select exists(select 1 from infbanned where (uid=$1 and type='chat') or "
+                                   "(uid=$2 and type='user'))", chat_id, uid)
 
 
 @AsyncTTL(maxsize=0)
@@ -61,16 +57,14 @@ async def getULvlBanned(uid) -> bool:
     if await getUInfBanned(uid, None):
         return True
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            return await conn.fetchval('select exists(select 1 from lvlbanned where uid=$1)', uid)
+        return await conn.fetchval('select exists(select 1 from lvlbanned where uid=$1)', uid)
 
 
 async def getUChatLimit(msgtime, last_message, u_acc, chat_id) -> bool:
     if u_acc >= 6:
         return False
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            chl = await conn.fetchval('select time from chatlimit where chat_id=$1', chat_id)
+        chl = await conn.fetchval('select time from chatlimit where chat_id=$1', chat_id)
     if not chl or msgtime - last_message >= chl:
         return False
     return True
@@ -86,23 +80,22 @@ async def checkCMD(message, chat_id, fixing=False, accesstoalldevs=False, return
         return False
 
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if text[:1] in PREFIX:
-                prefix = text[:1]
-            else:
-                prefix = await conn.fetchval(
-                    'select prefix from prefix where uid=$1 and prefix=ANY($2)', uid, [text[:1], text[:2]])
-            if not prefix:
-                return False
+        if text[:1] in PREFIX:
+            prefix = text[:1]
+        else:
+            prefix = await conn.fetchval(
+                'select prefix from prefix where uid=$1 and prefix=ANY($2)', uid, [text[:1], text[:2]])
+        if not prefix:
+            return False
 
-            if (cmd := text.replace(prefix, '', 1)) in COMMANDS:
-                pass
-            elif cmd := await conn.fetchval('select cmd from cmdnames where uid=$1 and name=$2', uid, cmd):
-                pass
-            else:
-                if (cmd in PM_COMMANDS or text.replace(prefix, '', 1) in PM_COMMANDS) and message.peer_id >= 2000000000:
-                    await message.reply(messages.pmcmd())
-                return False
+        if (cmd := text.replace(prefix, '', 1)) in COMMANDS:
+            pass
+        elif cmd := await conn.fetchval('select cmd from cmdnames where uid=$1 and name=$2', uid, cmd):
+            pass
+        else:
+            if (cmd in PM_COMMANDS or text.replace(prefix, '', 1) in PM_COMMANDS) and message.peer_id >= 2000000000:
+                await message.reply(messages.pmcmd())
+            return False
 
     if fixing and uid not in (DEVS if accesstoalldevs else MAIN_DEVS):
         await message.reply(disable_mentions=1, message=messages.inprogress())
@@ -123,21 +116,22 @@ async def checkCMD(message, chat_id, fixing=False, accesstoalldevs=False, return
         return False
 
     settings = await getChatSettings(chat_id)
-    async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            if settings['main']['nightmode'] and u_acc < 6:
-                if setting := await conn.fetchval(
-                        'select value2 from settings where chat_id=$1 and setting=\'nightmode\'', chat_id):
-                    setting = setting.split('-')
-                    now = datetime.now()
-                    start = datetime.strptime(setting[0], '%H:%M').replace(year=now.year)
-                    end = datetime.strptime(setting[1], '%H:%M').replace(year=now.year)
-                    if not (now.hour < start.hour or now.hour > end.hour or (
-                            now.hour == start.hour and now.minute < start.minute) or (
-                                    now.hour == end.hour and now.minute >= end.minute)):
-                        await deleteMessages(message.conversation_message_id, chat_id)
-                        return False
-            if settings['main']['captcha']:
+    if settings['main']['nightmode'] and u_acc < 6:
+        async with (await pool()).acquire() as conn:
+            setting = await conn.fetchval(
+                'select value2 from settings where chat_id=$1 and setting=\'nightmode\'', chat_id)
+        if setting:
+            setting = setting.split('-')
+            now = datetime.now()
+            start = datetime.strptime(setting[0], '%H:%M').replace(year=now.year)
+            end = datetime.strptime(setting[1], '%H:%M').replace(year=now.year)
+            if not (now.hour < start.hour or now.hour > end.hour or (
+                    now.hour == start.hour and now.minute < start.minute) or (
+                            now.hour == end.hour and now.minute >= end.minute)):
+                await deleteMessages(message.conversation_message_id, chat_id)
+                return False
+        if settings['main']['captcha']:
+            async with (await pool()).acquire() as conn:
                 if await conn.fetchval(
                         'select exists(select id from typequeue where chat_id=$1 and uid=$2 and type=\'captcha\')',
                         chat_id, uid):

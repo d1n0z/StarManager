@@ -10,7 +10,7 @@ import messages
 from Bot.checkers import haveAccess
 from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserAccessLevel, getUserName, getUserNickname, kickUser, \
-    getUserBan, getChatName, getGroupName, getpool, sendMessage, ischatPubic, deleteMessages
+    getUserBan, getChatName, getGroupName, getpool, sendMessage, deleteMessages
 from config.config import api
 from db import pool
 
@@ -113,10 +113,9 @@ async def sban(message: Message):
                            await getUserNickname(id, chat_id), ban_cause, ban_time // 86400)
         ban_date = datetime.now().strftime('%Y.%m.%d %H:%M:%S')
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                res = await conn.fetchrow(
-                    'select last_bans_times, last_bans_causes, last_bans_names, last_bans_dates from ban where '
-                    'chat_id=$1 and uid=$2', chat_id, id)
+            res = await conn.fetchrow(
+                'select last_bans_times, last_bans_causes, last_bans_names, last_bans_dates from ban where '
+                'chat_id=$1 and uid=$2', chat_id, id)
         if res is not None:
             ban_times = literal_eval(res[0])
             ban_causes = literal_eval(res[1])
@@ -134,15 +133,14 @@ async def sban(message: Message):
         ban_dates.append(ban_date)
 
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                if not await conn.fetchval(
-                        'update ban set ban = $1, last_bans_times = $2, last_bans_causes = $3, last_bans_names = $4, '
-                        'last_bans_dates = $5 where chat_id=$6 and uid=$7 returning 1', time.time() + ban_time,
-                        f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}", chat_id, id):
-                    await conn.execute(
-                        'insert into ban (uid, chat_id, ban, last_bans_times, last_bans_causes, last_bans_names, '
-                        'last_bans_dates) values ($1, $2, $3, $4, $5, $6, $7)', id, chat_id, time.time() + ban_time,
-                        f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}")
+            if not await conn.fetchval(
+                    'update ban set ban = $1, last_bans_times = $2, last_bans_causes = $3, last_bans_names = $4, '
+                    'last_bans_dates = $5 where chat_id=$6 and uid=$7 returning 1', time.time() + ban_time,
+                    f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}", chat_id, id):
+                await conn.execute(
+                    'insert into ban (uid, chat_id, ban, last_bans_times, last_bans_causes, last_bans_names, '
+                    'last_bans_dates) values ($1, $2, $3, $4, $5, $6, $7)', id, chat_id, time.time() + ban_time,
+                    f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}")
 
         if await kickUser(id, chat_id):
             await api.messages.send(disable_mentions=1, random_id=0, message=msg, chat_id=chat_id)
@@ -179,9 +177,8 @@ async def sunban(message: Message):
                 await getUserBan(id, chat_id) <= time.time()):
             continue
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                if await conn.fetchval('update ban set ban = 0 where chat_id=$1 and uid=$2 returning 1', chat_id, id):
-                    success += 1
+            if await conn.fetchval('update ban set ban = 0 where chat_id=$1 and uid=$2 returning 1', chat_id, id):
+                success += 1
 
     await api.messages.edit(
         peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
@@ -219,13 +216,12 @@ async def ssnick(message: Message):
         if not await haveAccess('ssnick', chat_id, u_acc) or await getUserAccessLevel(id, chat_id) > u_acc:
             continue
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                ch_nick = await conn.fetchval('select nickname from nickname where chat_id=$1 and uid=$2', chat_id, id)
-                u_nick = await conn.fetchval('select nickname from nickname where chat_id=$1 and uid=$2', chat_id, uid)
-                if not await conn.fetchval('update nickname set nickname = $1 where chat_id=$2 and uid=$3 returning 1',
-                                           nickname, chat_id, id):
-                    await conn.execute(
-                        'insert into nickname (uid, chat_id, nickname) values ($1, $2, $3)', id, chat_id, nickname)
+            ch_nick = await conn.fetchval('select nickname from nickname where chat_id=$1 and uid=$2', chat_id, id)
+            u_nick = await conn.fetchval('select nickname from nickname where chat_id=$1 and uid=$2', chat_id, uid)
+            if not await conn.fetchval('update nickname set nickname = $1 where chat_id=$2 and uid=$3 returning 1',
+                                       nickname, chat_id, id):
+                await conn.execute(
+                    'insert into nickname (uid, chat_id, nickname) values ($1, $2, $3)', id, chat_id, nickname)
         await sendMessage(chat_id + 2000000000, messages.snick(uid, u_name, u_nick, id, name, ch_nick, nickname))
         success += 1
 
@@ -259,12 +255,11 @@ async def srnick(message: Message):
         if not await haveAccess('srnick', chat_id, u_acc) or await getUserAccessLevel(id, chat_id) > u_acc:
             continue
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                if await conn.fetchval('delete from nickname where chat_id=$1 and uid=$2 returning 1', chat_id, id):
-                    await sendMessage(chat_id + 200000000, messages.rnick(
-                        uid, u_name, await getUserNickname(uid, chat_id), id, ch_name,
-                        await getUserNickname(id, chat_id)))
-                    success += 1
+            if await conn.fetchval('delete from nickname where chat_id=$1 and uid=$2 returning 1', chat_id, id):
+                await sendMessage(chat_id + 200000000, messages.rnick(
+                    uid, u_name, await getUserNickname(uid, chat_id), id, ch_name,
+                    await getUserNickname(id, chat_id)))
+                success += 1
 
     await api.messages.edit(peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,
                             message=messages.srnick(id, ch_name, len(chats), success))
@@ -316,27 +311,26 @@ async def chat(message: Message):
         name = await getGroupName(-int(id))
 
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            chatgroup = 'Привязана' if await conn.fetchval(
-                'select exists(select 1 from chatgroups where chat_id=$1)', chat_id) else 'Не привязана'
-            gpool = 'Привязана' if await conn.fetchval(
-                'select exists(select 1 from gpool where chat_id=$1)', chat_id) else 'Не привязана'
+        chatgroup = 'Привязана' if await conn.fetchval(
+            'select exists(select 1 from chatgroups where chat_id=$1)', chat_id) else 'Не привязана'
+        gpool = 'Привязана' if await conn.fetchval(
+            'select exists(select 1 from gpool where chat_id=$1)', chat_id) else 'Не привязана'
 
-            muted = await conn.fetchval(
-                'select count(*) as c from mute where chat_id=$1 and mute>$2', chat_id, time.time())
-            banned = await conn.fetchval(
-                'select count(*) as c from ban where chat_id=$1 and ban>$2', chat_id, time.time())
+        muted = await conn.fetchval(
+            'select count(*) as c from mute where chat_id=$1 and mute>$2', chat_id, time.time())
+        banned = await conn.fetchval(
+            'select count(*) as c from ban where chat_id=$1 and ban>$2', chat_id, time.time())
 
-            if bjd := await conn.fetchval('select time from botjoineddate where chat_id=$1', chat_id):
-                bjd = datetime.utcfromtimestamp(bjd).strftime('%d.%m.%Y %H:%M')
-            else:
-                bjd = 'Невозможно определить'
+        if bjd := await conn.fetchval('select time from botjoineddate where chat_id=$1', chat_id):
+            bjd = datetime.utcfromtimestamp(bjd).strftime('%d.%m.%Y %H:%M')
+        else:
+            bjd = 'Невозможно определить'
 
-            if await conn.fetchval(
-                    'select exists(select 1 from publicchats where chat_id=$1 and isopen=true)', chat_id):
-                public = 'Открытый'
-            else:
-                public = 'Приватный'
+        if await conn.fetchval(
+                'select exists(select 1 from publicchats where chat_id=$1 and isopen=true)', chat_id):
+            public = 'Открытый'
+        else:
+            public = 'Приватный'
 
     await message.reply(disable_mentions=1, message=messages.chat(
         abs(id), name, chat_id, chatgroup, gpool, public, muted, banned, len(members), bjd, prefix,
@@ -355,13 +349,11 @@ async def antitag(message: Message):
     chat_id = message.peer_id - 2000000000
     if data[1] == 'add':
         async with (await pool()).acquire() as conn:
-            async with conn.transaction():
-                await conn.execute('insert into antitag (uid, chat_id) values ($1, $2)', id, chat_id)
+            await conn.execute('insert into antitag (uid, chat_id) values ($1, $2)', id, chat_id)
         return await message.reply(disable_mentions=1, message=messages.antitag_add(
             id, await getUserName(id), await getUserNickname(id, chat_id)))
     async with (await pool()).acquire() as conn:
-        async with conn.transaction():
-            await conn.execute('delete from antitag where uid=$1 and chat_id=$2', id, chat_id)
+        await conn.execute('delete from antitag where uid=$1 and chat_id=$2', id, chat_id)
     return await message.reply(disable_mentions=1, message=messages.antitag_del(
             id, await getUserName(id), await getUserNickname(id, chat_id)))
 
