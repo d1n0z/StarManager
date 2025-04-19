@@ -14,4 +14,4 @@ dev
 venv
 test.py
 requirements.txt
-site
+star_manager(django,old)
