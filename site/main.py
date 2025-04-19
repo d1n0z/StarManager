@@ -318,7 +318,8 @@ async def yookassa(request: Request):
 3️⃣ Срок: <code>{f"{days} дней" if not chat_id else "навсегда"}</code>
 4️⃣ Сумма: <code>{query["amount"]["value"][:-3]} рублей</code>
 5️⃣ Покупатель: <a href="https://vk.com/id{from_id}">@id{from_id}</a>
-6️⃣ Получатель: {f'<a href="https://vk.com/id{uid if uid else from_id}">@id{uid if uid else from_id}</a>' if not chat_id else f"беседа {chat_id}"}
+6️⃣ Получатель: {f'<a href="https://vk.com/id{uid or from_id}">@id{uid or from_id}</a>' 
+            if not chat_id else f"беседа {chat_id}"}
 7️⃣ Дата: <code>{datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}</code>
 8️⃣ Способ: <code>Юкасса</code>'''})
 
@@ -361,14 +362,14 @@ async def yookassa(request: Request):
                f'ознакомиться с информацией по ссылке — vk.cc/cJuJpg\n\n📗 Номер платежа: #{order_id}\n📗 Время '
                f'покупки: {datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}')
     try:
-        await config.api.messages.send(user_id=uid if uid else from_id, message=msg, random_id=0)
+        await config.api.messages.send(user_id=uid or from_id, message=msg, random_id=0)
     except:
         pass
 
     if chat_id:
         comment = f'Для беседы id{chat_id}'
-    elif gid := int(query['metadata']['gift']):
-        comment = f'Подарок для @id{gid}'
+    elif uid:
+        comment = f'Подарок для @id{uid}'
     else:
         comment = '-'
     try:
