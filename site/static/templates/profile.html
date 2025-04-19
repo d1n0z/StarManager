@@ -219,8 +219,8 @@
     <div class="stars" id="stars"></div>
     <div class="container">
         <div class="profile-header">
-            <img src="https://via.placeholder.com/120" alt="Avatar">
-            <h1>Иван Иванов</h1>
+            <img src="{{ user.photo }}" alt="Avatar">
+            <h1>{{ user.first_name }} {{ user.last_name }}</h1>
         </div>
         <div class="tabs">
             <button class="tab active" onclick="showTab('info')">Информация</button>
@@ -230,49 +230,35 @@
             <div class="stats-list">
                 <div class="stats-item">
                     <span>Уровень</span>
-                    <p>12 (2450 / 3000 опыта)</p>
+                    <p>{{ lvl }} ({{ xp }} / {{ xpneeded }} опыта)</p>
                     <div class="progress-bar">
-                        <div class="progress" style="width: 81.67%;"></div> <!-- 2450 / 3000 -->
+                        <div class="progress" style="width: {{ progress }}%;"></div>
                     </div>
                 </div>
                 <div class="stats-item">
                     <span>Чатов</span>
-                    <p>7</p>
+                    <p>{{ chats }}</p>
                 </div>
                 <div class="stats-item">
                     <span>Репутация</span>
-                    <p>87</p>
-                </div>
-                <div class="stats-item">
-                    <span>Топ пользователя</span>
-                    <p>#34</p>
+                    <p>{{ rep }}</p>
                 </div>
                 <div class="stats-item">
                     <span>Premium подписка</span>
-                    <p>Активна (42 дня)</p>
+                    <p>{{ premium }}</p>
                 </div>
             </div>
         </div>
         <div id="history" class="tab-content">
             <div class="history-list">
+                {% for item in paymenthistory %}
                 <div class="history-item">
-                    <p><span>Дата:</span> 15.03.2025</p>
-                    <p><span>Тип:</span> Premium подписка (90 дней)</p>
-                    <p><span>Сумма:</span> 249 ₽</p>
-                    <p><span>Комментарий:</span> Подарок другу (vk.com/id12345)</p>
+                    <p><span>Тип:</span> {{ item.type }}</p>
+                    <p><span>Дата:</span> {{ item.date }}</p>
+                    <p><span>Сумма:</span> {{ item.sum }} ₽</p>
+                    <p><span>Комментарий:</span> {{ item.comment }}</p>
                 </div>
-                <div class="history-item">
-                    <p><span>Дата:</span> 10.12.2024</p>
-                    <p><span>Тип:</span> Premium чат</p>
-                    <p><span>Сумма:</span> 199 ₽</p>
-                    <p><span>Комментарий:</span> -</p>
-                </div>
-                <div class="history-item">
-                    <p><span>Дата:</span> 01.09.2024</p>
-                    <p><span>Тип:</span> Покупка опыта (500)</p>
-                    <p><span>Сумма:</span> 25 ₽</p>
-                    <p><span>Комментарий:</span> -</p>
-                </div>
+                {% endfor %}
             </div>
         </div>
     </div>

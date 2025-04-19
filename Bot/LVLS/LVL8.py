@@ -206,7 +206,8 @@ async def setstatus(message: Message):
     dev_name = await getUserName(uid)
     await message.reply(messages.setstatus(uid, dev_name, await getUserNickname(uid, chat_id),
                                            id, await getUserName(id), await getUserNickname(id, chat_id)))
-    await sendMessage(id, messages.ugiveStatus(data[2], uid, dev_name))
+    await sendMessage(id, messages.ugiveStatus(id, await getUserNickname(id, chat_id), await getUserName(id),
+                                               uid, await getUserNickname(uid, chat_id), dev_name, data[2]))
 
 
 @bl.chat_message(SearchCMD('delstatus'))
@@ -214,7 +215,6 @@ async def delstatus(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     id = await getIDFromMessage(message.text, message.reply_message)
-    data = message.text.split()
     if id == 0:
         return await message.reply(messages.delstatus_hint())
     if id < 0:
@@ -223,9 +223,9 @@ async def delstatus(message: Message):
         await conn.execute('delete from premium where uid=$1', id)
 
     dev_name = await getUserName(uid)
-    await message.reply(messages.setstatus(uid, dev_name, await getUserNickname(uid, chat_id),
+    await message.reply(messages.delstatus(uid, dev_name, await getUserNickname(uid, chat_id),
                                            id, await getUserName(id), await getUserNickname(id, chat_id)))
-    await sendMessage(id, messages.ugiveStatus(data[2], uid, dev_name))
+    await sendMessage(id, messages.udelStatus(uid, dev_name))
 
 
 @bl.chat_message(SearchCMD('statuslist'))

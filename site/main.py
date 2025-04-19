@@ -52,13 +52,21 @@ class Subscription(BaseModel):
 
 class User(BaseModel):
     id: int
-    name: str
+    first_name: str
+    last_name: str
     photo: Optional[str] = None
     email: Optional[str] = None
 
 
 class PromoCheck(BaseModel):
     promo: str
+
+
+class PaymentHistory(BaseModel):
+    type: str
+    date: str
+    sum: int
+    comment: str
 
 
 async def get_current_user(request: Request):
@@ -130,7 +138,7 @@ async def auth_vk_callback(request: Request):
         user_data = user_resp.json()
 
     user = user_data["response"][0]
-    request.session["user"] = User(id=user["id"], name=user["first_name"] + ' ' + user["last_name"],
+    request.session["user"] = User(id=user["id"], first_name=user["first_name"], last_name=user["last_name"],
                                    photo=user.get("photo_200"), email=email).model_dump()
 
     return RedirectResponse(url="/")
@@ -140,6 +148,34 @@ async def auth_vk_callback(request: Request):
 async def logout(request: Request):
     request.session.pop("user", None)
     return RedirectResponse(url="/")
+
+
+@app.get("/profile", response_class=HTMLResponse)
+async def profile(request: Request):
+    user = User.model_construct(**request.session['user']) if 'user' in request.session else None
+    if not user:
+        return RedirectResponse(url="/login")
+    async with (await pool()).acquire() as conn:
+        lvl, xp = await conn.fetchrow('select lvl, xp from xp where uid=$1', user.id) or (1, 0)
+        chats = await conn.fetchval('select count(*) as c from userjoineddate where uid=$1', user.id)
+        rep = await conn.fetchval('select rep from reputation where uid=$1', user.id) or 0
+        if rep > 0:
+            rep = '+' + str(rep)
+        premium = await conn.fetchval('select time from premium where uid=$1', user.id) or 0
+        paymenthistory = await conn.fetch('select date, type, sum, comment from paymenthistory where uid=$1', user.id)
+    paymenthistory = [PaymentHistory(date=datetime.fromtimestamp(int(i[0])).strftime('%d.%m.%Y'),
+                                     type=i[1], sum=i[2], comment=i[3]) for i in paymenthistory]
+    if premium > 0:
+        premium = f'{int((premium - time.time()) / 86400) + 1} дней'
+    else:
+        premium = 'Отсутствует'
+    return templates.TemplateResponse(
+        request=request,
+        name="profile.html",
+        context={**config.data, "user": request.session.get("user"), "lvl": lvl, "xp": int(xp), "xpneeded": 1000,
+                 "progress": xp / 1000 * 100, "chats": chats, "rep": str(rep), "premium": premium,
+                 "paymenthistory": paymenthistory}
+    )
 
 
 @app.post("/api/validate-promo")
@@ -163,6 +199,7 @@ async def create_payment(request: Request):
     user = User.model_construct(**request.session['user']) if 'user' in request.session else None
     if not user:
         return JSONResponse(status_code=401, content={"detail": "auth_required", "redirect_url": "/login"})
+    ouid = user.id
     try:
         data = Subscription(**(await request.json()))
     except pydantic.ValidationError:
@@ -173,7 +210,7 @@ async def create_payment(request: Request):
         raise HTTPException(status_code=400, detail="Не указан ID чата.")
     if data.gift:
         try:
-            user = (await config.api.users.get(user_ids=data.gift_link.split('/')[-1]))[0]
+            user = (await config.api.users.get(user_ids=data.gift_link.replace('@', '').split('/')[-1]))[0]
         except:
             raise HTTPException(status_code=400, detail="Указанного пользователя не существует.")
     else:
@@ -233,8 +270,9 @@ async def create_payment(request: Request):
             'pid': oid,
             'chat_id': 0 if origcost != config.data['premiumchat'] else data.chat_id,
             'origcost': origcost,
+            'gift': 0 if user.id == ouid else user.id,
         },
-        'merchant_customer_id': user.id,
+        'merchant_customer_id': ouid,
         'confirmation': {
             'type': 'redirect',
             'locale': 'ru_RU',
@@ -259,50 +297,86 @@ async def yookassa(request: Request):
     order_id = int(query['metadata']['pid'])
     chat_id = int(query['metadata']['chat_id'])
     order_id_p = query['id']
+    from_id = int(query['merchant_customer_id'])
+    uid = int(query['metadata']['gift'])
 
     async with (await pool()).acquire() as conn:
         if not await conn.fetchval('update payments set success=1 where id=$1 returning 1', order_id):
             return JSONResponse(content='YES')
-        uid = await conn.fetchval('select uid from payments where id=$1', order_id)
 
-    if chat_id == 0:
-        val = list(
-            config.PREMIUM_COST.keys())[list(config.PREMIUM_COST.values()).index(int(query['metadata']['origcost']))]
-    else:
-        val = chat_id
+    days = list(config.PREMIUM_COST.keys())[
+        list(config.PREMIUM_COST.values()).index(int(query['metadata']['origcost']))] if not chat_id else 0
 
     async with httpx.AsyncClient() as client:
         await client.get(f"https://api.telegram.org/bot{config.TG_TOKEN}/sendMessage", params={
             'chat_id': config.TG_CHAT_ID,
             'message_thread_id': config.TG_PREMIUM_THREAD_ID,
-            'text': f'💰 ID : {order_id} | IDP : {order_id_p} | ' +
-                    (f'Срок : {val} дней' if chat_id == 0 else f'Беседа : {val}') +
-                    f' | Сумма : {int(query["amount"]["value"][:-3])} рублей | Пользователь : @id{uid} | '
-                    f'Время : {datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}'
-        })
+            'parse_mode': 'html',
+            'disable_web_page_preview': True,
+            'text': f'''1️⃣ Номер: <b>#{order_id}</b> 
+2️⃣ Тип:<code> {"Premium-статус" if not chat_id else "Premium-беседа"}</code>
+3️⃣ Срок: <code>{f"{days} дней" if not chat_id else "навсегда"}</code>
+4️⃣ Сумма: <code>{query["amount"]["value"][:-3]} рублей</code>
+5️⃣ Покупатель: <a href="https://vk.com/id{from_id}">@id{from_id}</a>
+6️⃣ Получатель: {f'<a href="https://vk.com/id{uid if uid else from_id}">@id{uid if uid else from_id}</a>' if not chat_id else f"беседа {chat_id}"}
+7️⃣ Дата: <code>{datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}</code>
+8️⃣ Способ: <code>Юкасса</code>'''})
 
     async with (await pool()).acquire() as conn:
         if chat_id == 0:
-            lttime = await conn.fetchval('select time from premium where uid=$1', uid)
+            lttime = await conn.fetchval('select time from premium where uid=$1', uid or from_id)
             if lttime is None:
                 await conn.execute(
-                    'insert into premium (uid, time) VALUES ($1, $2)', uid, int(val * 86400 + time.time()))
+                    'insert into premium (uid, time) VALUES ($1, $2)', uid or from_id, int(days * 86400 + time.time()))
             else:
-                await conn.execute('update premium set time = $1 where uid=$2', int(val * 86400 + lttime), uid)
-        else:
-            if not await conn.fetchval('update publicchats set premium = $1 where chat_id=$2 returning 1', True, val):
                 await conn.execute(
-                    'insert into publicchats (chat_id, premium, isopen) values ($1, $2, $3)', val, True, False)
+                    'update premium set time = $1 where uid=$2', int(days * 86400 + lttime), uid or from_id)
+        else:
+            if not await conn.fetchval('update publicchats set premium=true where chat_id=$1 returning 1', chat_id):
+                await conn.execute(
+                    'insert into publicchats (chat_id, premium, isopen) values ($1, true, false)', chat_id)
 
     Configuration.account_id = config.YOOKASSA_MERCHANT_ID
     Configuration.secret_key = config.YOOKASSA_TOKEN
     Payment.capture(order_id_p)
 
+    if chat_id:
+        user = (await config.api.users.get(user_ids=from_id))[0]
+        msg = (f'⭐️ [id{user.id}|{user.first_name} {user.last_name}], вы успешно приобрели Premium-статус для беседы '
+               f'id{chat_id}, поздравляю! Чтобы узнать все подробности и возможности Premium-статуса, вы можете '
+               f'ознакомиться с информацией по ссылке — vk.cc/cJuJpg\n\n📗 Номер платежа: #{order_id}\n📗 Время '
+               f'покупки: {datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}')
+    elif uid:
+        user = (await config.api.users.get(user_ids=uid))[0]
+        fromuser = (await config.api.users.get(user_ids=from_id))[0]
+        msg = (f'🎁 [id{user.id}|{user.first_name} {user.last_name}], вы получили Premium-подписку в подарок от '
+               f'пользователя [id{fromuser.id}|{fromuser.first_name} {fromuser.last_name}]. Чтобы узнать все '
+               f'подробности и возможности Premium-статуса, вы можете ознакомиться с информацией по ссылке — '
+               f'vk.cc/cJuJpg\n\n📗 Номер платежа: #{order_id}\n📗 Время '
+               f'покупки: {datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}')
+    else:
+        user = (await config.api.users.get(user_ids=from_id))[0]
+        msg = (f'⭐️ [id{user.id}|{user.first_name} {user.last_name}], вы успешно приобрели Premium-подписку сроком на '
+               f'{days} дней, поздравляю! Чтобы узнать все подробности и возможности Premium-пользователей, вы можете '
+               f'ознакомиться с информацией по ссылке — vk.cc/cJuJpg\n\n📗 Номер платежа: #{order_id}\n📗 Время '
+               f'покупки: {datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}')
     try:
-        await config.api.messages.send(user_id=uid, message=(
-                f"🟢 Заказ #{order_id} был успешно оплачен.\n\n✨ Поздравляю, вы получили " +
-                (f"Premium-подписку сроком на {val} дней" if chat_id == 0 else f"Premium-статус для беседы id{val}") +
-                "!\nЧтобы узнать все подробности о Premium-подписке перейдите по ссылке — vk.cc/crO0a5"), random_id=0)
+        await config.api.messages.send(user_id=uid if uid else from_id, message=msg, random_id=0)
+    except:
+        pass
+
+    if chat_id:
+        comment = f'Для беседы id{chat_id}'
+    elif gid := int(query['metadata']['gift']):
+        comment = f'Подарок для @id{gid}'
+    else:
+        comment = '-'
+    try:
+        async with (await pool()).acquire() as conn:
+            await conn.execute('insert into paymenthistory (uid, pid, date, type, sum, comment) values ($1, $2, $3, $4,'
+                               ' $5, $6)', int(query['merchant_customer_id']), order_id, int(time.time()),
+                               f'Premium-подписка ({days} дней)' if chat_id == 0 else 'Premium-беседа',
+                               int(float(query['amount']['value'])), comment)
     except:
         pass
 

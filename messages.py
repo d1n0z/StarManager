@@ -1148,12 +1148,9 @@ def settings_listaction_done(setting, action, data):
     return get(f'settings_listaction_{setting}_{action}_done', data=data)
 
 
-def giveStatus(date):
-    return get('giveStatus', date=date)
-
-
-def ugiveStatus(date, gave, name):
-    return get('ugiveStatus', date=date, gave=gave, name=name)
+def ugiveStatus(id, nick, name, uid, unick, uname, days):
+    return get('ugiveStatus', id=id, n=nick or name, uid=uid, un=unick or uname, days=days,
+               gtime=datetime.now().strftime("%d.%m.%Y / %H:%M:%S"))
 
 
 def udelStatus(uid, dev_name):

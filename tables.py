@@ -800,5 +800,18 @@ class PremPromo(Model):
         table_name = f'prempromo'
 
 
+class PaymentHistory(Model):
+    uid = IntegerField()
+    pid = IntegerField()
+    date = BigIntegerField()
+    type = TextField()
+    sum = IntegerField()
+    comment = TextField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'paymenthistory'
+
+
 if __name__ == '__main__':
     dbhandle.create_tables(Model.__subclasses__())

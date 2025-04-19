@@ -52,7 +52,7 @@
             z-index: 2;
         }
 
-        .login-btn, .user-info {
+        .login-btn, .user-info, .profile-btn {
             padding: 8px 16px;
             background: #21262D;
             border: 1px solid #30363D;
@@ -64,7 +64,7 @@
             cursor: pointer;
         }
 
-        .login-btn:hover {
+        .login-btn:hover, .profile-btn:hover {
             background: #30363D;
         }
 
@@ -239,6 +239,7 @@
             <div class="user-info">
                 <img src="{{ user.photo }}" alt="Avatar">
                 <span>{{ user.first_name }} {{ user.last_name }}</span>
+                <a href="/profile/" class="profile-btn" style="margin-left: 10px;">Профиль</a>
                 <a href="/logout/" class="login-btn" style="margin-left: 10px;">Выйти</a>
             </div>
         {% else %}
@@ -255,7 +256,7 @@
                     ВКонтакте
                 </a>
                 <a href="{{ tg }}" class="social-btn" target="_blank">
-                    <img src="https://telegram.org/favicon.ico" alt="Telegram">
+                    <img src="https://telegram.Org/favicon.ico" alt="Telegram">
                     Telegram
                 </a>
             </div>
