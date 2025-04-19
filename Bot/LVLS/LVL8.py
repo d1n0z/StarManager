@@ -656,3 +656,54 @@ async def promolist(message: Message):
                                   [i[0] for i in await conn.fetch('select code from promocodes')])
     promos = [i[0] for i in promos]
     await message.reply(messages.promolist({k: promos.count(k) for k in set(promos)}))
+
+
+@bl.chat_message(SearchCMD('allowinvite'))
+async def allowinvite(message: Message):
+    data = message.text.split()
+    if len(data) != 2 or data[1] not in ('1', '2'):
+        return await message.reply(messages.allowinvite_hint())
+    if data[-1] == '1':
+        async with (await pool()).acquire() as conn:
+            await conn.execute(
+                'insert into referralbonus (chat_id) values ($1) on conflict (chat_id) do nothing', message.chat_id)
+        await message.reply(messages.allowinvite_on())
+    else:
+        async with (await pool()).acquire() as conn:
+            await conn.execute('delete from referralbonus where chat_id=$1', message.chat_id)
+        await message.reply(messages.allowinvite_off())
+
+
+@bl.chat_message(SearchCMD('prempromocreate'))
+async def prempromocreate(message: Message):
+    data = message.text.split()
+    if len(data) != 4 or not data[2].isdigit():
+        return await message.reply(messages.prempromocreate_hint())
+    try:
+        date = datetime.strptime(data[3], '%d.%m.%Y')
+    except ValueError:
+        return await message.reply(messages.prempromocreate_hint())
+    async with (await pool()).acquire() as conn:
+        if await conn.fetchval('select exists(select 1 from prempromo where promo=$1)', data[1]):
+            return await message.reply(messages.prempromocreate_alreadyexists(data[1]))
+        await conn.execute('insert into prempromo (promo, val, start, "end") values ($1, $2, $3, $4)',
+                           data[1], int(data[2]), time.time(), (date.timestamp() + 86399))
+    await message.reply(messages.prempromocreate(data[1], data[2], date))
+
+
+@bl.chat_message(SearchCMD('prempromodel'))
+async def prempromodel(message: Message):
+    data = message.text.split()
+    if len(data) != 2:
+        return await message.reply(messages.prempromodel_hint())
+    async with (await pool()).acquire() as conn:
+        if not await conn.fetchval('delete from prempromo where promo=$1 returning 1', data[1]):
+            return await message.reply(messages.prempromodel_notfound(data[1]))
+    await message.reply(messages.prempromodel(data[1]))
+
+
+@bl.chat_message(SearchCMD('prempromolist'))
+async def prempromolist(message: Message):
+    async with (await pool()).acquire() as conn:
+        promos = await conn.fetch('select promo, "end" from prempromo')
+    await message.reply(messages.prempromolist(promos))

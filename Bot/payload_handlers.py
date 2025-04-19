@@ -1303,6 +1303,10 @@ async def turnpublic(message: MessageEvent):
             bjd = datetime.utcfromtimestamp(bjd).strftime('%d.%m.%Y %H:%M')
         else:
             bjd = 'Невозможно определить'
+        if await conn.fetchval('select exists(select 1 from publicchats where chat_id=$1 and premium=true)', chat_id):
+            prem = 'Есть'
+        else:
+            prem = 'Отсутствует'
         if await conn.fetchval(
                 'select exists(select 1 from publicchats where chat_id=$1 and isopen=true)', chat_id):
             public = 'Открытый'
@@ -1320,8 +1324,7 @@ async def turnpublic(message: MessageEvent):
         prefix = 'club'
     await editMessage(messages.chat(
         id, name, chat_id, chatgroup, gpool, public, muted, banned, len(members), bjd, prefix,
-        await getChatName(chat_id)
-    ), peer_id, message.conversation_message_id, keyboard.chat(
+        await getChatName(chat_id), prem), peer_id, message.conversation_message_id, keyboard.chat(
         message.user_id, public == 'Открытый'))
 
 

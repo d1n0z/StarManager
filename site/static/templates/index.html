@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Star Manager Bot</title>
+    <link href="https://fonts.googleapis.com/css2?family=SF+Mono&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'SF Mono', monospace;
+        }
+
+        body {
+            background: #0D1117;
+            color: #C9D1D9;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        .stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: #58A6FF;
+            border-radius: 50%;
+            animation: twinkle 4s infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.8; }
+        }
+
+        .header {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 2;
+        }
+
+        .login-btn, .user-info {
+            padding: 8px 16px;
+            background: #21262D;
+            border: 1px solid #30363D;
+            border-radius: 6px;
+            color: #C9D1D9;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .login-btn:hover {
+            background: #30363D;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-info img {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+        }
+
+        .content {
+            position: relative;
+            z-index: 1;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .intro {
+            text-align: center;
+            padding: 60px 0;
+            border-bottom: 1px solid #30363D;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .intro h1 {
+            font-size: 24px;
+            color: #58A6FF;
+            margin-bottom: 20px;
+        }
+
+        .intro p {
+            font-size: 16px;
+            color: #8B949E;
+            line-height: 1.5;
+            max-width: 600px;
+            margin: 0 auto 30px;
+        }
+
+        .social-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .social-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #21262D;
+            border: 1px solid #30363D;
+            border-radius: 6px;
+            color: #C9D1D9;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .social-btn:hover {
+            background: #30363D;
+            border-color: #58A6FF;
+        }
+
+        .social-btn img {
+            width: 20px;
+            height: 20px;
+        }
+
+        .premium {
+            padding: 60px 0;
+            text-align: center;
+        }
+
+        .premium h2 {
+            font-size: 20px;
+            color: #58A6FF;
+            margin-bottom: 20px;
+        }
+
+        .premium p {
+            font-size: 16px;
+            color: #8B949E;
+            line-height: 1.5;
+            max-width: 600px;
+            margin: 0 auto 30px;
+        }
+
+        .buy-btn {
+            padding: 10px 20px;
+            background: #58A6FF;
+            border: none;
+            border-radius: 6px;
+            color: #0D1117;
+            font-size: 14px;
+            text-decoration: none;
+            transition: background 0.2s ease;
+        }
+
+        .buy-btn:hover {
+            background: #79B8FF;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            justify-content: center;
+            align-items: center;
+            z-index: 3;
+        }
+
+        .modal-content {
+            background: #161B22;
+            padding: 20px;
+            border: 1px solid #30363D;
+            border-radius: 6px;
+            text-align: center;
+            max-width: 300px;
+            width: 100%;
+        }
+
+        .modal-content a {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #58A6FF;
+            color: #0D1117;
+            border-radius: 6px;
+            text-decoration: none;
+            transition: background 0.2s ease;
+        }
+
+        .modal-content a:hover {
+            background: #79B8FF;
+        }
+
+        @media (max-width: 480px) {
+            .intro h1, .premium h2 {
+                font-size: 18px;
+            }
+            .intro p, .premium p {
+                font-size: 14px;
+            }
+            .social-btn, .buy-btn {
+                font-size: 12px;
+            }
+            .header {
+                top: 10px;
+                right: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="stars" id="stars"></div>
+    <div class="header">
+        {% if user %}
+            <div class="user-info">
+                <img src="{{ user.photo }}" alt="Avatar">
+                <span>{{ user.first_name }} {{ user.last_name }}</span>
+                <a href="/logout/" class="login-btn" style="margin-left: 10px;">Выйти</a>
+            </div>
+        {% else %}
+            <a href="/login/" class="login-btn">Войти</a>
+        {% endif %}
+    </div>
+    <div class="content">
+        <div class="intro">
+            <h1>Star Manager Bot</h1>
+            <p>Это надёжный и эффективный бот для модерации бесед в социальной сети ВКонтакте. Наш бот предоставляет вам мощные инструменты для управления беседами, обеспечивая порядок и безопасность для всех участников.</p>
+            <div class="social-links">
+                <a href="{{ vk }}" class="social-btn" target="_blank">
+                    <img src="https://vk.com/favicon.ico" alt="VK">
+                    ВКонтакте
+                </a>
+                <a href="{{ tg }}" class="social-btn" target="_blank">
+                    <img src="https://telegram.org/favicon.ico" alt="Telegram">
+                    Telegram
+                </a>
+            </div>
+        </div>
+        <div class="premium">
+            <h2>Premium возможности</h2>
+            <p>Premium подписка предоставляет дополнительные возможности для ваших бесед и аккаунта. Приобретая подписку, вы получаете доступ к эксклюзивным командам и функциям. Кроме того, приобретая подписку, вы вносите свой вклад в поддержание надёжной работоспособности бота и его непрерывное совершенствование.</p>
+            <a href="payment" class="buy-btn">Приобрести</a>
+        </div>
+    </div>
+    <div class="modal" id="login-modal">
+        <div class="modal-content">
+            <p>Авторизация через ВКонтакте</p>
+            <a href="#" onclick="loginWithVK()">Войти через VK</a>
+        </div>
+    </div>
+
+    <script>
+        const starsContainer = document.getElementById('stars');
+        for (let i = 0; i < 50; i++) {
+            const star = document.createElement('div');
+            star.className = 'star';
+            star.style.left = `${Math.random() * 100}%`;
+            star.style.top = `${Math.random() * 100}%`;
+            star.style.animationDelay = `${Math.random() * 4}s`;
+            starsContainer.appendChild(star);
+        }
+
+        function showLoginModal() {
+            document.getElementById('login-modal').style.display = 'flex';
+        }
+
+        function hideLoginModal() {
+            document.getElementById('login-modal').style.display = 'none';
+        }
+
+        function loginWithVK() {
+            // Здесь должен быть код для авторизации через VK API
+            // Для примера имитация успешного входа
+            const mockUser = {
+                name: "Иван Иванов",
+                avatar: "https://via.placeholder.com/24"
+            };
+            document.querySelector('.login-btn').style.display = 'none';
+            const userInfo = document.querySelector('.user-info');
+            userInfo.style.display = 'flex';
+            document.getElementById('user-name').textContent = mockUser.name;
+            document.getElementById('user-avatar').src = mockUser.avatar;
+            hideLoginModal();
+        }
+
+        // Закрытие модального окна при клике вне его
+        document.getElementById('login-modal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('login-modal')) {
+                hideLoginModal();
+            }
+        });
+    </script>
+</body>
+</html>

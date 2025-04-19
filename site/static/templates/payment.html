@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Оплата Premium - Star Manager</title>
+    <link href="https://fonts.googleapis.com/css2?family=SF+Mono&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'SF Mono', monospace;
+        }
+
+        body {
+            background: #0D1117;
+            color: #C9D1D9;
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stars {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: #58A6FF;
+            border-radius: 50%;
+            animation: twinkle 4s infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.8; }
+        }
+
+        .container {
+            background: #161B22;
+            padding: 30px;
+            border: 1px solid #30363D;
+            border-radius: 6px;
+            max-width: 400px;
+            width: 100%;
+            position: relative;
+            z-index: 1;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        h1 {
+            font-size: 20px;
+            color: #58A6FF;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+
+        .tab {
+            padding: 8px 16px;
+            background: #21262D;
+            border: 1px solid #30363D;
+            border-radius: 6px;
+            color: #C9D1D9;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tab.active {
+            background: #58A6FF;
+            color: #0D1117;
+            border-color: #58A6FF;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #8B949E;
+            font-size: 14px;
+        }
+
+        select, input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #30363D;
+            border-radius: 6px;
+            background: #0D1117;
+            color: #C9D1D9;
+            font-size: 14px;
+            transition: border-color 0.2s ease;
+        }
+
+        select:focus, input[type="text"]:focus {
+            border-color: #58A6FF;
+            outline: none;
+        }
+
+        .promo-valid {
+            border-color: #00FF00 !important;
+        }
+
+        .promo-invalid {
+            border-color: #FF5555 !important;
+        }
+
+        .input-invalid {
+            border-color: #FF5555 !important;
+        }
+
+        .checkbox {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+            cursor: pointer;
+        }
+
+        .checkbox input[type="checkbox"] {
+            display: none;
+        }
+
+        .checkbox-label {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #C9D1D9;
+            font-size: 14px;
+            user-select: none;
+        }
+
+        .checkbox-custom {
+            width: 16px;
+            height: 16px;
+            border: 1px solid #30363D;
+            border-radius: 4px;
+            background: #0D1117;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        .checkbox input[type="checkbox"]:checked + .checkbox-custom {
+            background: #58A6FF;
+            border-color: #58A6FF;
+        }
+
+        .checkbox-custom::after {
+            content: '';
+            position: absolute;
+            width: 5px;
+            height: 10px;
+            border: solid #0D1117;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg) scale(0);
+            top: 1px;
+            left: 5px;
+            transition: transform 0.2s ease;
+        }
+
+        .checkbox input[type="checkbox"]:checked + .checkbox-custom::after {
+            transform: rotate(45deg) scale(1);
+        }
+
+        .payment-methods {
+            display: flex;
+            gap: 10px;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .payment-option {
+            flex: 1;
+            padding: 10px;
+            background: #21262D;
+            border: 1px solid #30363D;
+            border-radius: 6px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s ease;
+            position: relative;
+        }
+
+        .payment-option input[type="radio"] {
+            display: none;
+        }
+
+        .payment-option label {
+            color: #C9D1D9;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            margin: 0;
+            transition: color 0.2s ease;
+        }
+
+        .payment-option input[type="radio"]:checked + label {
+            color: #58A6FF;
+        }
+
+        .payment-option input[type="radio"]:checked + label::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            right: 2px;
+            bottom: 2px;
+            border: 2px solid #58A6FF;
+            border-radius: 4px;
+            pointer-events: none;
+        }
+
+        .price {
+            text-align: center;
+            font-size: 18px;
+            color: #58A6FF;
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            min-height: 24px; /* Reserve space for discounted price */
+        }
+
+        .original-price {
+            color: #58A6FF; /* Default color when no promo */
+        }
+
+        .original-price.discounted {
+            color: #8B949E;
+            text-decoration: line-through;
+        }
+
+        .discounted-price {
+            color: #58A6FF;
+        }
+
+        .buy-btn {
+            width: 100%;
+            padding: 10px;
+            background: #58A6FF;
+            border: none;
+            border-radius: 6px;
+            color: #0D1117;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s ease, opacity 0.2s ease;
+        }
+
+        .buy-btn:hover {
+            background: #79B8FF;
+        }
+
+        .buy-btn:disabled {
+            background: #30363D;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        #gift-input {
+            display: none;
+        }
+
+        .error-message {
+            color: #FF5555;
+            font-size: 14px;
+            text-align: center;
+            margin-bottom: 15px;
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            right: 0;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            pointer-events: none;
+        }
+
+        .error-message.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+            }
+            h1 {
+                font-size: 18px;
+            }
+            .payment-methods {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .price {
+                flex-direction: column;
+                gap: 5px;
+            }
+            .error-message {
+                position: static;
+                margin-bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="stars" id="stars"></div>
+    <div class="container">
+        <h1>Выберите план</h1>
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('subscription')">Premium подписка</button>
+            <button class="tab" onclick="showTab('chat')">Premium чат</button>
+        </div>
+
+        <div id="subscription" class="tab-content">
+            <div class="form-group">
+                <label>Срок подписки</label>
+                <select id="duration" onchange="updatePrice()">
+                    <option value="30">30 дней - {{ low }} ₽</option>
+                    <option value="90">90 дней - {{ medium }} ₽</option>
+                    <option value="180">180 дней - {{ high }} ₽</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="checkbox">
+                    <input type="checkbox" id="gift" onchange="toggleGift()">
+                    <span class="checkbox-custom"></span>
+                    <span class="checkbox-label">Подарок другу</span>
+                </label>
+                <input type="text" id="gift-input" placeholder="Ссылка на ВК или ID пользователя" oninput="validateForm()">
+            </div>
+            <div class="form-group">
+                <label>Промокод</label>
+                <input type="text" id="promo-sub" placeholder="Введите промокод" oninput="debouncedValidatePromo(this)">
+            </div>
+            <div class="form-group">
+                <label>Метод оплаты</label>
+                <div class="payment-methods">
+                    <div class="payment-option">
+                        <input type="radio" id="yukassa" name="payment" value="yukassa" checked>
+                        <label for="yukassa">ЮKassa (карты)</label>
+                    </div>
+                </div>
+            </div>
+            <div class="price" id="sub-price">
+                <span class="original-price" id="sub-original-price">{{ low }} ₽</span>
+                <span class="discounted-price" id="sub-discounted-price" style="display: none;"></span>
+            </div>
+        </div>
+
+        <div id="chat" class="tab-content" style="display: none;">
+            <div class="form-group">
+                <label>ID чата</label>
+                <input type="text" id="chat-id" placeholder="Введите ID чата" oninput="validateForm()">
+            </div>
+            <div class="form-group">
+                <label>Промокод</label>
+                <input type="text" id="promo-chat" placeholder="Введите промокод" oninput="debouncedValidatePromo(this)">
+            </div>
+            <div class="form-group">
+                <label>Метод оплаты</label>
+                <div class="payment-methods">
+                    <div class="payment-option">
+                        <input type="radio" id="yukassa-chat" name="payment-chat" value="yukassa" checked>
+                        <label for="yukassa-chat">ЮKassa (карты)</label>
+                    </div>
+                </div>
+            </div>
+            <div class="price" id="chat-price">
+                <span class="original-price" id="chat-original-price">199 ₽</span>
+                <span class="discounted-price" id="chat-discounted-price" style="display: none;"></span>
+            </div>
+        </div>
+
+        <div class="error-message" id="error-message"></div>
+        <button class="buy-btn" id="buy-btn" onclick="generatePaymentLink()">Купить</button>
+    </div>
+
+    <script>
+        const prices = { 30: {{ low }}, 90: {{ medium }}, 180: {{ high }} };
+        const chatBasePrice = 199;
+        const starsContainer = document.getElementById('stars');
+        for (let i = 0; i < 50; i++) {
+            const star = document.createElement('div');
+            star.className = 'star';
+            star.style.left = `${Math.random() * 100}%`;
+            star.style.top = `${Math.random() * 100}%`;
+            star.style.animationDelay = `${Math.random() * 4}s`;
+            starsContainer.appendChild(star);
+        }
+
+        // Cache for promo validation results
+        const promoCache = {
+            sub: { code: null, valid: false, discount: null, error: null },
+            chat: { code: null, valid: false, discount: null, error: null }
+        };
+
+        // Debounce function to limit API calls
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        function showTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            document.getElementById(tab).style.display = 'block';
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            document.querySelector(`.tab[onclick="showTab('${tab}')"]`).classList.add('active');
+            resetPrice(tab);
+            validateForm();
+        }
+
+        function toggleGift() {
+            const giftInput = document.getElementById('gift-input');
+            giftInput.style.display = document.getElementById('gift').checked ? 'block' : 'none';
+            validateForm();
+        }
+
+        function resetPrice(tab) {
+            if (tab === 'subscription') {
+                const duration = document.getElementById('duration').value;
+                const subOriginalPrice = document.getElementById('sub-original-price');
+                const subDiscountedPrice = document.getElementById('sub-discounted-price');
+                subOriginalPrice.textContent = `${prices[duration]} ₽`;
+                subOriginalPrice.classList.remove('discounted');
+                subDiscountedPrice.style.display = 'none';
+                document.getElementById('promo-sub').value = '';
+                document.getElementById('promo-sub').classList.remove('promo-valid', 'promo-invalid');
+                promoCache.sub = { code: null, valid: false, discount: null, error: null };
+            } else {
+                const chatOriginalPrice = document.getElementById('chat-original-price');
+                const chatDiscountedPrice = document.getElementById('chat-discounted-price');
+                chatOriginalPrice.textContent = `${chatBasePrice} ₽`;
+                chatOriginalPrice.classList.remove('discounted');
+                chatDiscountedPrice.style.display = 'none';
+                document.getElementById('promo-chat').value = '';
+                document.getElementById('promo-chat').classList.remove('promo-valid', 'promo-invalid');
+                promoCache.chat = { code: null, valid: false, discount: null, error: null };
+            }
+            document.getElementById('error-message').classList.remove('active');
+            document.getElementById('error-message').textContent = '';
+            validateForm();
+        }
+
+        function updatePrice() {
+            const duration = document.getElementById('duration').value;
+            const subOriginalPrice = document.getElementById('sub-original-price');
+            const subDiscountedPrice = document.getElementById('sub-discounted-price');
+            subOriginalPrice.textContent = `${prices[duration]} ₽`;
+            subOriginalPrice.classList.remove('discounted');
+            subDiscountedPrice.style.display = 'none';
+            document.getElementById('error-message').classList.remove('active');
+            document.getElementById('error-message').textContent = '';
+            promoCache.sub = { code: null, valid: false, discount: null, error: null };
+            validateForm();
+        }
+
+        function validateForm() {
+            const activeTab = document.querySelector('.tab.active').textContent;
+            const errorMessage = document.getElementById('error-message');
+            const buyBtn = document.getElementById('buy-btn');
+            const giftCheckbox = document.getElementById('gift');
+            const giftInput = document.getElementById('gift-input');
+            const chatIdInput = document.getElementById('chat-id');
+            const promoSubInput = document.getElementById('promo-sub');
+            const promoChatInput = document.getElementById('promo-chat');
+
+            let error = null;
+
+            if (activeTab === 'Premium подписка') {
+                // Check gift input if checkbox is checked
+                if (giftCheckbox.checked && !giftInput.value.trim()) {
+                    error = 'Введите ссылку на ВК или ID пользователя';
+                    giftInput.classList.add('input-invalid');
+                } else {
+                    giftInput.classList.remove('input-invalid');
+                }
+
+                // Check promo code error
+                if (promoCache.sub.error) {
+                    error = promoCache.sub.error;
+                    promoSubInput.classList.add('promo-invalid');
+                } else if (promoSubInput.value.trim() && !promoCache.sub.valid) {
+                    // Avoid showing error during async validation
+                    buyBtn.disabled = true;
+                    return;
+                } else {
+                    promoSubInput.classList.remove('promo-invalid');
+                }
+            } else {
+                // Check chat ID
+                if (!chatIdInput.value.trim()) {
+                    error = 'Введите ID чата';
+                    chatIdInput.classList.add('input-invalid');
+                } else {
+                    chatIdInput.classList.remove('input-invalid');
+                }
+
+                // Check promo code error
+                if (promoCache.chat.error) {
+                    error = promoCache.chat.error;
+                    promoChatInput.classList.add('promo-invalid');
+                } else if (promoChatInput.value.trim() && !promoCache.chat.valid) {
+                    // Avoid showing error during async validation
+                    buyBtn.disabled = true;
+                    return;
+                } else {
+                    promoChatInput.classList.remove('promo-invalid');
+                }
+            }
+
+            if (error) {
+                errorMessage.textContent = error;
+                errorMessage.classList.add('active');
+                buyBtn.disabled = true;
+            } else {
+                errorMessage.textContent = '';
+                errorMessage.classList.remove('active');
+                buyBtn.disabled = false;
+            }
+        }
+
+        async function validatePromo(input) {
+            const promo = input.value.trim();
+            const errorMessage = document.getElementById('error-message');
+            const isSubscription = input.id === 'promo-sub';
+            const cacheKey = isSubscription ? 'sub' : 'chat';
+            const originalPriceElement = document.getElementById(isSubscription ? 'sub-original-price' : 'chat-original-price');
+            const discountedPriceElement = document.getElementById(isSubscription ? 'sub-discounted-price' : 'chat-discounted-price');
+
+            // Check cache to avoid redundant UI updates
+            const cached = promoCache[cacheKey];
+            if (cached.code === promo && (
+                (promo === '' && !cached.valid) ||
+                (cached.valid && cached.discount !== null) ||
+                (!cached.valid && cached.error !== null)
+            )) {
+                validateForm();
+                return; // No change in state, skip UI update
+            }
+
+            // Store current promo in cache
+            promoCache[cacheKey].code = promo;
+
+            // Reset styles
+            input.classList.remove('promo-valid', 'promo-invalid');
+            errorMessage.classList.remove('active');
+            errorMessage.textContent = '';
+            originalPriceElement.classList.remove('discounted');
+            discountedPriceElement.style.display = 'none';
+
+            if (!promo) {
+                promoCache[cacheKey] = { code: '', valid: false, discount: null, error: null };
+                if (isSubscription) {
+                    updatePrice();
+                } else {
+                    originalPriceElement.textContent = `${chatBasePrice} ₽`;
+                }
+                validateForm();
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/validate-promo', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ promo })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.valid) {
+                    const originalPrice = isSubscription ? prices[document.getElementById('duration').value] : chatBasePrice;
+                    const discountPercentage = result.discount;
+                    const discountedPrice = Math.floor(originalPrice * ((100 - discountPercentage) / 100)) + 1;
+
+                    // Only update UI if the result differs from cache
+                    if (!cached.valid || cached.discount !== discountPercentage) {
+                        input.classList.add('promo-valid');
+                        originalPriceElement.textContent = `${originalPrice} ₽`;
+                        originalPriceElement.classList.add('discounted');
+                        discountedPriceElement.textContent = `${discountedPrice} ₽`;
+                        discountedPriceElement.style.display = 'inline';
+                    }
+
+                    promoCache[cacheKey] = { code: promo, valid: true, discount: discountPercentage, error: null };
+                } else {
+                    const errorText = result.detail || 'Недействительный промокод';
+                    if (!cached.valid && cached.error !== errorText) {
+                        input.classList.add('promo-invalid');
+                        errorMessage.textContent = errorText;
+                        errorMessage.classList.add('active');
+                        if (isSubscription) {
+                            const duration = document.getElementById('duration').value;
+                            originalPriceElement.textContent = `${prices[duration]} ₽`;
+                        } else {
+                            originalPriceElement.textContent = `${chatBasePrice} ₽`;
+                        }
+                    }
+                    promoCache[cacheKey] = { code: promo, valid: false, discount: null, error: errorText };
+                }
+            } catch (err) {
+                console.error('Promo validation error:', err);
+                const errorText = 'Ошибка проверки промокода';
+                if (!cached.valid && cached.error !== errorText) {
+                    input.classList.add('promo-invalid');
+                    errorMessage.textContent = errorText;
+                    errorMessage.classList.add('active');
+                    if (isSubscription) {
+                        const duration = document.getElementById('duration').value;
+                        originalPriceElement.textContent = `${prices[duration]} ₽`;
+                    } else {
+                        originalPriceElement.textContent = `${chatBasePrice} ₽`;
+                    }
+                }
+                promoCache[cacheKey] = { code: promo, valid: false, discount: null, error: errorText };
+            }
+
+            validateForm();
+        }
+
+        // Debounced version of validatePromo
+        const debouncedValidatePromo = debounce(validatePromo, 300);
+
+        async function generatePaymentLink() {
+            const errorMessage = document.getElementById('error-message');
+            const buyBtn = document.getElementById('buy-btn');
+
+            // Double-check form validity
+            validateForm();
+            if (buyBtn.disabled) {
+                return; // Prevent submission if form is invalid
+            }
+
+            errorMessage.classList.remove('active');
+            errorMessage.textContent = '';
+
+            const activeTab = document.querySelector('.tab.active').textContent;
+
+            let payload = {};
+
+            if (activeTab === 'Premium подписка') {
+                payload = {
+                    type: 'subscription',
+                    duration: document.getElementById('duration').value,
+                    gift: document.getElementById('gift').checked,
+                    gift_link: document.getElementById('gift-input').value || null,
+                    promo: document.getElementById('promo-sub').value,
+                    payment: document.querySelector('input[name="payment"]:checked').value
+                };
+            } else {
+                payload = {
+                    type: 'chat',
+                    chat_id: document.getElementById('chat-id').value,
+                    promo: document.getElementById('promo-chat').value,
+                    payment: document.querySelector('input[name="payment-chat"]:checked').value
+                };
+            }
+
+            try {
+                const response = await fetch('/api/payment', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                if (response.status === 401 && result?.redirect_url) {
+                    window.location.href = result.redirect_url;
+                    return;
+                }
+                if (response.ok && result?.payment_url) {
+                    window.location.href = result.payment_url;
+                } else {
+                    errorMessage.textContent = result.detail;
+                    errorMessage.classList.add('active');
+                    buyBtn.disabled = true;
+                }
+            } catch (err) {
+                console.error('Fetch error:', err);
+                errorMessage.textContent = 'Не удалось отправить данные.';
+                errorMessage.classList.add('active');
+                buyBtn.disabled = true;
+            }
+        }
+    </script>
+</body>
+</html>

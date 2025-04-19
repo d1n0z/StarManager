@@ -771,5 +771,34 @@ class RepHistory(Model):
         table_name = f'rephistory'
 
 
+class ReferralBonus(Model):
+    chat_id = IntegerField(index=True, unique=True)
+
+    class Meta:
+        database = dbhandle
+        table_name = f'referralbonus'
+
+
+class ReferralBonusHistory(Model):
+    chat_id = IntegerField()
+    uid = IntegerField()
+    from_id = IntegerField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'referralbonushistory'
+
+
+class PremPromo(Model):
+    promo = TextField()
+    val = IntegerField()
+    start = BigIntegerField()
+    end = BigIntegerField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'prempromo'
+
+
 if __name__ == '__main__':
     dbhandle.create_tables(Model.__subclasses__())

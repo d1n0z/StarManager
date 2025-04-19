@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Профиль - Star Manager</title>
+    <link href="https://fonts.googleapis.com/css2?family=SF+Mono&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'SF Mono', monospace;
+        }
+
+        body {
+            background: #0D1117;
+            color: #C9D1D9;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+            padding: 20px;
+        }
+
+        .stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: #58A6FF;
+            border-radius: 50%;
+            animation: twinkle 4s infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.8; }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 0;
+        }
+
+        .profile-header {
+            text-align: center;
+            margin-bottom: 40px;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .profile-header img {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 3px solid #58A6FF;
+            box-shadow: 0 0 15px rgba(88, 166, 255, 0.5);
+            margin-bottom: 20px;
+        }
+
+        .profile-header h1 {
+            font-size: 26px;
+            color: #58A6FF;
+            text-shadow: 0 0 5px rgba(88, 166, 255, 0.3);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 8px 20px;
+            background: #21262D;
+            border: 1px solid #30363D;
+            border-radius: 6px;
+            color: #C9D1D9;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tab.active {
+            background: #58A6FF;
+            color: #0D1117;
+            border-color: #58A6FF;
+            box-shadow: 0 0 10px rgba(88, 166, 255, 0.5);
+        }
+
+        .tab-content {
+            display: none;
+            background: #161B22;
+            border: 1px solid #30363D;
+            border-radius: 6px;
+            padding: 20px;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .stats-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .stats-item {
+            padding: 10px;
+            background: #21262D;
+            border: 1px solid #30363D;
+            border-radius: 6px;
+        }
+
+        .stats-item span {
+            color: #58A6FF;
+            font-size: 14px;
+        }
+
+        .stats-item p {
+            color: #C9D1D9;
+            font-size: 16px;
+            margin-top: 5px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #30363D;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .progress {
+            height: 100%;
+            background: #58A6FF;
+            transition: width 0.5s ease;
+        }
+
+        .history-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            padding: 10px;
+            background: #21262D;
+            border: 1px solid #30363D;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            transition: all 0.2s ease;
+        }
+
+        .history-item:hover {
+            border-color: #58A6FF;
+            box-shadow: 0 0 10px rgba(88, 166, 255, 0.3);
+        }
+
+        .history-item p {
+            font-size: 14px;
+            color: #C9D1D9;
+        }
+
+        .history-item p span {
+            color: #58A6FF;
+        }
+
+        @media (max-width: 768px) {
+            .profile-header img {
+                width: 100px;
+                height: 100px;
+            }
+            .profile-header h1 {
+                font-size: 22px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px 10px;
+            }
+            .profile-header img {
+                width: 80px;
+                height: 80px;
+            }
+            .profile-header h1 {
+                font-size: 18px;
+            }
+            .tabs {
+                flex-direction: column;
+                gap: 5px;
+            }
+            .tab {
+                padding: 6px 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="stars" id="stars"></div>
+    <div class="container">
+        <div class="profile-header">
+            <img src="https://via.placeholder.com/120" alt="Avatar">
+            <h1>Иван Иванов</h1>
+        </div>
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('info')">Информация</button>
+            <button class="tab" onclick="showTab('history')">История покупок</button>
+        </div>
+        <div id="info" class="tab-content active">
+            <div class="stats-list">
+                <div class="stats-item">
+                    <span>Уровень</span>
+                    <p>12 (2450 / 3000 опыта)</p>
+                    <div class="progress-bar">
+                        <div class="progress" style="width: 81.67%;"></div> <!-- 2450 / 3000 -->
+                    </div>
+                </div>
+                <div class="stats-item">
+                    <span>Чатов</span>
+                    <p>7</p>
+                </div>
+                <div class="stats-item">
+                    <span>Репутация</span>
+                    <p>87</p>
+                </div>
+                <div class="stats-item">
+                    <span>Топ пользователя</span>
+                    <p>#34</p>
+                </div>
+                <div class="stats-item">
+                    <span>Premium подписка</span>
+                    <p>Активна (42 дня)</p>
+                </div>
+            </div>
+        </div>
+        <div id="history" class="tab-content">
+            <div class="history-list">
+                <div class="history-item">
+                    <p><span>Дата:</span> 15.03.2025</p>
+                    <p><span>Тип:</span> Premium подписка (90 дней)</p>
+                    <p><span>Сумма:</span> 249 ₽</p>
+                    <p><span>Комментарий:</span> Подарок другу (vk.com/id12345)</p>
+                </div>
+                <div class="history-item">
+                    <p><span>Дата:</span> 10.12.2024</p>
+                    <p><span>Тип:</span> Premium чат</p>
+                    <p><span>Сумма:</span> 199 ₽</p>
+                    <p><span>Комментарий:</span> -</p>
+                </div>
+                <div class="history-item">
+                    <p><span>Дата:</span> 01.09.2024</p>
+                    <p><span>Тип:</span> Покупка опыта (500)</p>
+                    <p><span>Сумма:</span> 25 ₽</p>
+                    <p><span>Комментарий:</span> -</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const starsContainer = document.getElementById('stars');
+        for (let i = 0; i < 50; i++) {
+            const star = document.createElement('div');
+            star.className = 'star';
+            star.style.left = `${Math.random() * 100}%`;
+            star.style.top = `${Math.random() * 100}%`;
+            star.style.animationDelay = `${Math.random() * 4}s`;
+            starsContainer.appendChild(star);
+        }
+
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.getElementById(tabId).classList.add('active');
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelector(`.tab[onclick="showTab('${tabId}')"]`).classList.add('active');
+        }
+    </script>
+</body>
+</html>

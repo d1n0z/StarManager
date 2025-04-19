@@ -1180,9 +1180,9 @@ def premium_sent(uid, name, nickname):
     return get('premium_sent', uid=uid, n=nickname or name)
 
 
-def chat(uid, uname, chat_id, bind, gbind, public, muted, banned, users, time, prefix, chat_name):
+def chat(uid, uname, chat_id, bind, gbind, public, muted, banned, users, time, prefix, chat_name, prem):
     return get('chat', prefix=prefix, uid=uid, uname=uname, chat_id=chat_id, chat_name=chat_name, bind=bind,
-               gbind=gbind, public=public, banned=banned, muted=muted, users=users, time=time)
+               gbind=gbind, public=public, banned=banned, muted=muted, users=users, time=time, prem=prem)
 
 
 async def getnick(res, query):
@@ -2285,3 +2285,49 @@ def short_failed():
 
 def short(url, stat):
     return get('short', url=url, stat=stat)
+
+
+def referralbonus(id, name, nickname, uid, uname, unickname):
+    return get('referralbonus', id=id, n=nickname or name, uid=uid, un=unickname or uname)
+
+
+def allowinvite_hint():
+    return get('allowinvite_hint')
+
+
+def allowinvite_on():
+    return get('allowinvite_on')
+
+
+def allowinvite_off():
+    return get('allowinvite_off')
+
+
+def prempromocreate_hint():
+    return get('prempromocreate_hint')
+
+
+def prempromocreate_alreadyexists(code):
+    return get('prempromocreate_alreadyexists', code=code)
+
+
+def prempromocreate(code, val, date):
+    return get(
+        'prempromocreate', code=code, val=val, date=f'\n🕒 Доступен до {date.strftime("%d.%m.%Y")} (включительно).')
+
+
+def prempromodel_hint():
+    return get('prempromodel_hint')
+
+
+def prempromodel_notfound(code):
+    return get('prempromodel_notfound', code=code)
+
+
+def prempromodel(code):
+    return get('prempromodel', code=code)
+
+
+def prempromolist(promos):
+    return get('prempromolist', promos=''.join([
+        f'[{k + 1}]. {i[0]} - до {datetime.fromtimestamp(i[1]).strftime("%d.%m.%Y")}\n' for k, i in enumerate(promos)]))

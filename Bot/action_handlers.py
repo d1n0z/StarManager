@@ -6,7 +6,7 @@ import keyboard
 import messages
 from Bot.checkers import getUInfBanned
 from Bot.utils import (kickUser, getUserName, getUserBan, getUserBanInfo, getUserNickname, getChatSettings, sendMessage,
-                       getUserAccessLevel, deleteMessages, uploadImage, generateCaptcha)
+                       getUserAccessLevel, deleteMessages, uploadImage, generateCaptcha, addUserXP)
 from config.config import GROUP_ID, api
 from db import pool
 
@@ -78,6 +78,16 @@ async def action_handle(event: MessageNew) -> None:
                                        id, chat_id, uid):
                 await conn.execute('insert into refferal (chat_id, uid, from_id) values ($1, $2, $3)',
                                    chat_id, uid, id)
+            if (id and uid != id and await conn.fetchval(
+                    'select exists(select 1 from referralbonus where chat_id=$1)', chat_id) and not await conn.fetchval(
+                'select exists(select 1 from referralbonushistory where chat_id=$1 and uid=$2 and from_id=$3)',
+                    chat_id, uid, id)):
+                await addUserXP(id, 250)
+                await conn.execute('insert into referralbonushistory (chat_id, uid, from_id) values ($1, $2, $3)',
+                                   chat_id, uid, id)
+                await sendMessage(event.peer_id, messages.referralbonus(
+                    id, await getUserName(id), await getUserNickname(id, chat_id), uid, await getUserName(uid),
+                    await getUserNickname(uid, chat_id)))
             if s := await conn.fetchrow(
                     'select pos, "value", punishment from settings where chat_id=$1 and setting=\'captcha\'',
                     chat_id):
@@ -91,8 +101,6 @@ async def action_handle(event: MessageNew) -> None:
                         await conn.execute('insert into typequeue (chat_id, uid, "type", additional) '
                                            'values ($1, $2, \'captcha\', \'{}\')', chat_id, uid)
                         return
-
-        async with (await pool()).acquire() as conn:
             if s := await conn.fetchrow(
                     'select pos, pos2 from settings where chat_id=$1 and setting=\'welcome\'', chat_id):
                 welcome = await conn.fetchrow(

@@ -326,15 +326,19 @@ async def chat(message: Message):
         else:
             bjd = 'Невозможно определить'
 
-        if await conn.fetchval(
-                'select exists(select 1 from publicchats where chat_id=$1 and isopen=true)', chat_id):
+        if await conn.fetchval('select exists(select 1 from publicchats where chat_id=$1 and isopen=true)', chat_id):
             public = 'Открытый'
         else:
             public = 'Приватный'
 
+        if await conn.fetchval('select exists(select 1 from publicchats where chat_id=$1 and premium=true)', chat_id):
+            prem = 'Есть'
+        else:
+            prem = 'Отсутствует'
+
     await message.reply(disable_mentions=1, message=messages.chat(
         abs(id), name, chat_id, chatgroup, gpool, public, muted, banned, len(members), bjd, prefix,
-        await getChatName(chat_id)), keyboard=None if not await haveAccess(
+        await getChatName(chat_id), prem), keyboard=None if not await haveAccess(
         'settings', chat_id, await getUserAccessLevel(message.from_id, chat_id)) else (
         keyboard.chat(message.from_id, public == 'Открытый')))
 
