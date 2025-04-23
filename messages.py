@@ -2328,3 +2328,11 @@ def prempromodel(code):
 def prempromolist(promos):
     return get('prempromolist', promos=''.join([
         f'[{k + 1}]. {i[0]} - до {datetime.fromtimestamp(i[1]).strftime("%d.%m.%Y")}\n' for k, i in enumerate(promos)]))
+
+
+def bindlist_hint():
+    return get('bindlist_hint')
+
+
+def bindlist(group_name, group):
+    return get('bindlist', gr=group_name, grl=len(group), list=''.join([f'\n➖ {id} | {n}' for id, n in group]))

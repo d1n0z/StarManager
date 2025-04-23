@@ -23,7 +23,7 @@ async def pool():
 async def smallpool():
     global _pool
     if _pool is None:
-        _pool = await create_asyncpool(DATABASE_STR, min_size=1, max_inactive_connection_lifetime=30)
+        _pool = await create_asyncpool(DATABASE_STR, min_size=1, max_size=20, max_inactive_connection_lifetime=30)
     return _pool
 
 

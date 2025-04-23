@@ -1514,3 +1514,18 @@ async def blocklist(message: MessageEvent):
         msg += f"➖ [id{user[0]}|{await getUserName(user[0])}]" + (f' | {user[1]}' if user[1] else '') + "\n"
     await editMessage(msg, message.object.peer_id, message.conversation_message_id,
                       keyboard.blocklist(message.user_id))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['bindlist']))
+async def bindlist(message: MessageEvent):
+    page = message.payload['page']
+    group = message.payload['group']
+    print(1, page, group)
+    async with (await pool()).acquire() as conn:
+        res = await conn.fetch(
+            'select "chat_id" from chatgroups where uid=$1 and "group"=$2 order by chat_id', message.user_id, group)
+    if not (count := len(res)):
+        return
+    res = res[page * 15:page * 15 + 15]
+    await editMessage(messages.bindlist(group, [(i[0], await getChatName(i[0])) for i in res]), message.object.peer_id,
+                      message.conversation_message_id, keyboard.bindlist(message.user_id, group, page, count))

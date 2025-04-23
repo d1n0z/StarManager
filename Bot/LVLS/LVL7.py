@@ -111,6 +111,20 @@ async def unbind(message: Message):
         uid, await getUserName(uid), await getUserNickname(uid, chat_id), group_name))
 
 
+@bl.chat_message(SearchCMD('bindlist'))
+async def bindlist(message: Message):
+    data = message.text.split()
+    if len(data) == 1:
+        return await message.reply(disable_mentions=1, message=messages.bindlist_hint())
+    group_name = ' '.join(data[1:])
+    async with (await pool()).acquire() as conn:
+        if not (group := await conn.fetch('select "chat_id" from chatgroups where uid=$1 and "group"=$2 order by '
+                                          'chat_id', message.from_id, group_name)):
+            return await message.reply(disable_mentions=1, message=messages.bind_group_not_found(group_name))
+    await message.reply(disable_mentions=1, keyboard=keyboard.bindlist(message.from_id, group_name, 0, len(group)),
+                        message=messages.bindlist(group_name, [(i[0], await getChatName(i[0])) for i in group[:15]]))
+
+
 @bl.chat_message(SearchCMD('delgroup'))
 async def delgroup(message: Message):
     chat_id = message.peer_id - 2000000000

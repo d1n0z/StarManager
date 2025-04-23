@@ -842,3 +842,14 @@ def block_chatblocked():
     kb = Keyboard(inline=True)
     kb.add(OpenLink(label='Связаться с администратором', link=CONTACT_ADMIN))
     return kb.get_json()
+
+
+def bindlist(uid, group, page, count):
+    kb = Keyboard(inline=True)
+
+    if page != 0:
+        kb.add(Callback('⏪', {"cmd": "bindlist", "page": page - 1, "group": group, "uid": uid}))
+    if count > (15 * (page + 1)):
+        kb.add(Callback('⏩', {"cmd": "bindlist", "page": page + 1, "group": group, "uid": uid}))
+
+    return kb.get_json()
