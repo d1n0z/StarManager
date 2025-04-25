@@ -4,7 +4,7 @@ from cache.async_ttl import AsyncTTL
 
 import messages
 from Bot.utils import getUserAccessLevel, getUserPremium, getUserLastMessage, getUserMute, getChatSettings, \
-    deleteMessages, getUserPrefixes
+    deleteMessages, getUserPrefixes, getSilence, getSilenceAllowed
 from config.config import COMMANDS, api, PREFIX, DEVS, MAIN_DEVS, LVL_BANNED_COMMANDS, PM_COMMANDS
 from db import pool
 
@@ -103,12 +103,11 @@ async def checkCMD(message, chat_id, fixing=False, accesstoalldevs=False, return
 
     u_acc = await getUserAccessLevel(uid, chat_id)
     u_prem = await getUserPremium(uid)
-    if ((not await haveAccess(cmd, chat_id, u_acc, u_prem)) or
-            (prefix not in await getUserPrefixes(u_prem, uid)) or
-            (await getUserMute(uid, chat_id) > message.date) or
-            (await getUserIgnore(uid, chat_id)) or
-            (await getUInfBanned(uid, chat_id)) or
-            (await getUChatLimit(message.date, await getUserLastMessage(uid, chat_id, 0), u_acc, chat_id))):
+    if (not await haveAccess(cmd, chat_id, u_acc, u_prem) or
+            prefix not in await getUserPrefixes(u_prem, uid) or await getUserMute(uid, chat_id) > message.date or
+            await getUserIgnore(uid, chat_id) or await getUInfBanned(uid, chat_id) or
+            (await getSilence(chat_id) and u_acc not in await getSilenceAllowed(chat_id)) or
+            await getUChatLimit(message.date, await getUserLastMessage(uid, chat_id, 0), u_acc, chat_id)):
         return False
 
     if cmd in LVL_BANNED_COMMANDS and await getULvlBanned(uid):

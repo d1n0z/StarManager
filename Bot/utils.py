@@ -468,11 +468,6 @@ async def setUserAccessLevel(uid, chat_id, access_level):
                                        'returning 1', access_level, chat_id, uid):
                 await conn.execute('insert into accesslvl (uid, chat_id, access_level) values ($1, $2, $3)',
                                    uid, chat_id, access_level)
-    if await getSilence(chat_id):
-        if access_level in await getSilenceAllowed(chat_id):
-            await setChatMute(uid, chat_id, 0)
-        else:
-            await setChatMute(uid, chat_id)
 
 
 async def getSilence(chat_id) -> bool:
@@ -796,7 +791,7 @@ async def getRepTop(uid):
     async with (await pool()).acquire() as conn:
         top = [i[0] for i in await conn.fetch('select uid from reputation order by rep desc')]
         allu = await conn.fetchval('select count(*) as c from allusers')
-    return top.index(uid) if uid in top else allu
+    return (top.index(uid) + 1) if uid in top else allu
 
 
 @cached

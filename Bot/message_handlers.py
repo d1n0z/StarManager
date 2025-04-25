@@ -13,7 +13,8 @@ from Bot.answers_handlers import answer_handler
 from Bot.checkers import getUChatLimit
 from Bot.utils import getUserLastMessage, getUserAccessLevel, getUserMute, sendMessage, deleteMessages, \
     getChatSettings, kickUser, getUserName, getUserNickname, antispamChecker, punish, getUserBan, getUserBanInfo, \
-    getUserPremium, getIDFromMessage, getUserPremmenuSetting, getChatName, getUserPrefixes
+    getUserPremium, getIDFromMessage, getUserPremmenuSetting, getChatName, getUserPrefixes, getSilence, \
+    getSilenceAllowed
 from config.config import PM_COMMANDS, ADMINS
 from db import pool
 
@@ -82,6 +83,8 @@ async def message_handle(event: MessageNew) -> Any:
             msgtime, await getUserLastMessage(uid, chat_id, 0), uacc, chat_id):
         return await deleteMessages(event.object.message.conversation_message_id, chat_id)
     settings = await getChatSettings(chat_id)
+    if await getSilence(chat_id) and uacc not in await getSilenceAllowed(chat_id):
+        return await deleteMessages(event.object.message.conversation_message_id, chat_id)
     if await getUserMute(uid, chat_id) > int(msgtime):
         await deleteMessages(event.object.message.conversation_message_id, chat_id)
         if settings['main']['kickBlockingViolator']:

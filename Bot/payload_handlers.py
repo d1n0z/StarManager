@@ -20,7 +20,7 @@ from Bot.utils import (sendMessageEventAnswer, editMessage, getUserAccessLevel, 
                        sendMessage, getSilence, setUserAccessLevel, getGroupName, isMessagesFromGroupAllowed,
                        getImportSettings, turnImportSetting)
 from config.config import api, COMMANDS, SETTINGS_COUNTABLE, \
-    TG_CHAT_ID, TG_NEWCHAT_THREAD_ID, SETTINGS_PREMIUM, LEAGUE, PREMMENU_DEFAULT
+    TG_CHAT_ID, TG_NEWCHAT_THREAD_ID, SETTINGS_PREMIUM, LEAGUE, PREMMENU_DEFAULT, DEVS
 from db import pool
 
 bl = BotLabeler()
@@ -646,11 +646,6 @@ async def giveowner(message: MessageEvent):
             return
         await conn.execute('delete from gpool where chat_id=$1', chat_id)
         await conn.execute('delete from chatgroups where chat_id=$1', chat_id)
-    if await getSilence(chat_id):
-        if 0 in await getSilenceAllowed(chat_id):
-            await setChatMute(uid, chat_id, 0)
-        else:
-            await setChatMute(uid, chat_id)
     await setUserAccessLevel(id, chat_id, 7)
     await setChatMute(id, chat_id, 0)
 
@@ -779,15 +774,8 @@ async def resetaccess_accept(message: MessageEvent):
     chat_id = peer_id - 2000000000
     lvl = int(message.payload['lvl'])
     async with (await pool()).acquire() as conn:
-        x = await conn.fetch('delete from accesslvl where chat_id=$1 and access_level=$2 and uid!=$3 returning uid',
-                             chat_id, lvl, uid)
-    if await getSilence(chat_id):
-        if 0 in await getSilenceAllowed(chat_id):
-            for id in x:
-                await setChatMute(id[0], chat_id, 0)
-        else:
-            for id in x:
-                await setChatMute(id[0], chat_id)
+        await conn.execute('delete from accesslvl where chat_id=$1 and access_level=$2 and uid!=$3',
+                           chat_id, lvl, uid)
     await editMessage(messages.resetaccess_accept(uid, await getUserName(uid), lvl), peer_id,
                       message.conversation_message_id)
 
@@ -1216,21 +1204,6 @@ async def timeout_turn(message: MessageEvent):
             activated = True
             await conn.execute(
                 "insert into silencemode (chat_id, activated, allowed) values ($1, $2, '[]')", chat_id, activated)
-        lvls = {i[0]: i[1] for i in await conn.fetch(
-            'select uid, access_level from accesslvl where chat_id=$1', chat_id)}
-    allowed = await getSilenceAllowed(chat_id)
-    for i in (await api.messages.get_conversation_members(peer_id)).items:
-        if i.member_id < 0:
-            continue
-        if i.member_id in lvls:
-            if lvls[i.member_id] in allowed or lvls[i.member_id] not in range(0, 7):
-                continue
-        elif 0 in allowed:
-            continue
-        if activated:
-            await setChatMute(i.member_id, chat_id)
-        else:
-            await setChatMute(i.member_id, chat_id, 0)
     if activated:
         await sendMessage(peer_id, messages.timeouton(
             uid, await getUserName(uid), await getUserNickname(uid, chat_id)))
