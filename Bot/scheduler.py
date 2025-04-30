@@ -252,10 +252,10 @@ async def botstatuschecker():
 async def mathgiveaway():
     try:
         now = datetime.now()
-        if now.hour in (9, 21) and now.minute == 0:
+        if now.hour in (9, 21) and now.minute < 15:
             math, ans = generateHardProblem()
             level, xp = 2, random.randint(1000, 1200)
-        elif now.hour in range(0, 23, 2) and now.minute == 0:
+        elif now.hour in range(0, 23, 2) and now.minute < 15:
             math, ans = generateMediumProblem()
             level, xp = 1, random.randint(500, 800)
         else:
@@ -284,6 +284,6 @@ async def run():
     aiocron.crontab('*/1 * * * *', func=everyminute, loop=loop)
     aiocron.crontab('0 6/12 * * *', func=backup, loop=loop)
     aiocron.crontab('0 1/3 * * *', func=updateInfo, loop=loop)
-    aiocron.crontab('*/15 * * * *', func=botstatuschecker, loop=loop)
+    # aiocron.crontab('*/15 * * * *', func=botstatuschecker, loop=loop)
     aiocron.crontab('*/15 * * * *', func=mathgiveaway, loop=loop)
     # aiocron.crontab('50 23 * * *', func=reboot, loop=loop)
