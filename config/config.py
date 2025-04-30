@@ -159,6 +159,7 @@ COMMANDS_DESC = {
     "notif": "/notif - Настройка напоминаний в беседе.",
     "rep": "/rep - Изменить репутацию пользователя.",
     "invited": "/invited - Количество приглашенных участников.",
+    "bindlist": "/bindlist - Список привязанных к указанной группе бесед.",
 }
 COMMANDS_PREMIUM = ['premmenu', 'mkick', 'ignore', 'unignore', 'ignorelist', 'chatlimit', 'editlevel', 'levelname',
                     'resetlevel', 'anon', 'deanon', 'prefix']
@@ -196,7 +197,6 @@ def SETTINGS():
         "main": {
             "kickInvitedByNoAccess": 1,
             "kickLeaving": 1,
-            "kickBlockingViolator": 0,
             "deleteAccessAndNicknameOnLeave": 0,
             "disallowPings": 0,
             "disallowStickers": 0,
@@ -240,7 +240,6 @@ SETTINGS_POSITIONS = {
     "main": {
         "kickInvitedByNoAccess": ["Выкл.", "Вкл."],
         "kickLeaving": ["Выкл.", "Вкл."],
-        "kickBlockingViolator": ["Удалить сообщ.", "Исключить"],
         "deleteAccessAndNicknameOnLeave": ["Выкл.", "Вкл."],
         "disallowPings": ["Выкл.", "Вкл."],
         "disallowStickers": ["Выкл.", "Вкл."],

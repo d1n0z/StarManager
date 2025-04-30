@@ -82,16 +82,10 @@ async def message_handle(event: MessageNew) -> Any:
     if (uacc := await getUserAccessLevel(uid, chat_id)) == 0 and await getUChatLimit(
             msgtime, await getUserLastMessage(uid, chat_id, 0), uacc, chat_id):
         return await deleteMessages(event.object.message.conversation_message_id, chat_id)
-    settings = await getChatSettings(chat_id)
-    if await getSilence(chat_id) and uacc not in await getSilenceAllowed(chat_id):
+    if ((await getSilence(chat_id) and uacc not in await getSilenceAllowed(chat_id)) or
+            await getUserMute(uid, chat_id) > int(msgtime)):
         return await deleteMessages(event.object.message.conversation_message_id, chat_id)
-    if await getUserMute(uid, chat_id) > int(msgtime):
-        await deleteMessages(event.object.message.conversation_message_id, chat_id)
-        if settings['main']['kickBlockingViolator']:
-            if await kickUser(uid, chat_id):
-                await sendMessage(event.object.message.peer_id,
-                                  messages.kicked(uid, await getUserName(uid), await getUserNickname(uid, chat_id)))
-        return
+    settings = await getChatSettings(chat_id)
     if uacc == 0 and settings['main']['disallowPings'] and any(
             i in ['@all', '@online', '@everyone', '@here', '@все', '@тут', '@здесь', '@онлайн'] for i in
             event.object.message.text.replace('*', '@').lower().split()):
