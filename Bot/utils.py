@@ -1,6 +1,7 @@
 import asyncio
 import locale
 import os
+import random
 import tempfile
 import time
 from ast import literal_eval
@@ -778,8 +779,8 @@ async def getSilenceAllowed(chat_id):
     async with (await pool()).acquire() as conn:
         lvls = await conn.fetchval('select allowed from silencemode where chat_id=$1', chat_id)
     if lvls is not None:
-        return literal_eval(lvls)
-    return []
+        return literal_eval(lvls) + [7, 8]
+    return [7, 8]
 
 
 async def getUserRep(uid):
@@ -885,3 +886,30 @@ def scanURLShortened(url):
 @cached
 def beautifyNumber(n):
     return ''.join((i + ' ') if k % 3 == 2 and k != len(str(n)) - 1 else i for k, i in enumerate(str(n)[::-1]))[::-1]
+
+
+def generateEasyProblem():
+    a, op, b = random.randint(10, 99), random.choice(['+', '-']), random.randint(10, 99)
+    return f"{a} {op} {b} = ?", (a + b) if op == '+'else (a - b)
+
+
+def generateMediumProblem():
+    x = random.randint(1, 33)
+    a = random.randint(10, 99)
+    b = random.randint(10, 99)
+    op = random.choice(['+', '-'])
+    if op == '+':
+        c = a * x + b
+    else:
+        c = a * x - b
+    return f"({a}X {op} {b} = {c}) → X = ?", x
+
+
+def generateHardProblem():
+    x = random.randint(1, 33)
+    a = random.randint(10, 99)
+    c = a * x
+    if random.randint(0, 1):
+        return f"({a}X * {x} = {c * x}) → X = ?", x
+    else:
+        return f"({c * x}X / {x} = {c}) → X = ?", x

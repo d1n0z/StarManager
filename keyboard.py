@@ -316,6 +316,7 @@ def top(chat_id, uid):
     kb.add(Callback('⚔ Дуэли', {"cmd": "top_duels", "chat_id": chat_id, "uid": uid}))
     kb.row()
     kb.add(Callback('📊 Репутация', {"cmd": "top_rep", "chat_id": chat_id, "uid": uid}))
+    kb.add(Callback('🔢 Примеры', {"cmd": "top_math", "chat_id": chat_id, "uid": uid}))
 
     return kb.get_json()
 
@@ -398,6 +399,14 @@ def top_rep_in_chat_neg(chat_id, uid):
     kb.add(Callback('🔼 Положительные', {"cmd": "top_rep_in_chat", "chat_id": chat_id, "uid": uid}),
            KeyboardButtonColor.POSITIVE)
     kb.add(Callback('🥯 Общее', {"cmd": "top_rep_neg", "chat_id": chat_id, "uid": uid}))
+
+    return kb.get_json()
+
+
+def top_math(chat_id, uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('◀ Назад', {"cmd": "top", "chat_id": chat_id, "uid": uid}))
 
     return kb.get_json()
 

@@ -1271,6 +1271,13 @@ async def top_rep(top, category):
     return msg
 
 
+async def top_math(top):
+    msg = get('top_math')
+    for k, item in enumerate(top[:10]) if top else []:
+        msg += f'[{k + 1}]. [id{item[0]}|{await getUserName(item[0])}] - {item[1]} ответов\n'
+    return msg
+
+
 def premmenu(settings, prem):
     msg = get('premmenu')
     c = 0
@@ -2336,3 +2343,17 @@ def bindlist_hint():
 
 def bindlist(group_name, group):
     return get('bindlist', gr=group_name, grl=len(group), list=''.join([f'\n➖ {id} | {n}' for id, n in group]))
+
+
+def math_problem(math, level, xp):
+    if level == 0:
+        level = '📗 Легкий'
+    elif level == 1:
+        level = '📘 Средний'
+    else:
+        level = '📕 Сложный'
+    return get('math_problem', math=math, level=level, xp=xp)
+
+
+def math_winner(uid, name, nick, ans, xp, math):
+    return get('math_winner', id=uid, n=nick or name, math=math.replace('?', ans), xp=xp)

@@ -753,6 +753,17 @@ async def top_rep_in_chat_neg(message: MessageEvent):
         keyboard.top_rep_in_chat_neg(peer_id - 2000000000, message.user_id))
 
 
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['top_math']))
+async def top_math(message: MessageEvent):
+    peer_id = message.object.peer_id
+    async with (await pool()).acquire() as conn:
+        top = [i[0] for i in await conn.fetch('select winner from mathgiveaway where winner>0')]
+    top = sorted([(i, top.count(i)) for i in set(top)], key=lambda x: x[1], reverse=True)[:10]
+    await editMessage(
+        await messages.top_math(top), peer_id, message.conversation_message_id,
+        keyboard.top_math(peer_id - 2000000000, message.user_id))
+
+
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['resetnick_accept']))
 async def resetnick_accept(message: MessageEvent):
     uid = message.user_id

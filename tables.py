@@ -813,5 +813,19 @@ class PaymentHistory(Model):
         table_name = f'paymenthistory'
 
 
+class MathGiveaway(Model):
+    math = TextField()
+    level = IntegerField()
+    cmid = IntegerField()
+    ans = IntegerField()
+    xp = IntegerField()
+    winner = IntegerField(null=True)
+    finished = BooleanField(default=False)
+
+    class Meta:
+        database = dbhandle
+        table_name = f'mathgiveaway'
+
+
 if __name__ == '__main__':
     dbhandle.create_tables(Model.__subclasses__())

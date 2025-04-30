@@ -38,15 +38,12 @@ class SearchPMCMD(ABCRule[Message]):
 
 class SearchPayloadCMD(ABCRule[Message]):
     def __init__(self, cmds: list = None, answer: bool = True, checksender: bool = True):
-        if cmds is None:
-            cmds = []
-        self.cmds = cmds
+        self.cmds = cmds or []
         self.answer = answer
         self.checksender = checksender
 
     async def check(self, event: MessageEvent) -> bool:
-        cmd = event.payload['cmd']
-        if cmd in self.cmds:
+        if event.payload['cmd'] in self.cmds:
             if self.answer:
                 await sendMessageEventAnswer(event.event_id, event.user_id, event.peer_id)
             if self.checksender:

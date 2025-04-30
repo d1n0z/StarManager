@@ -14,8 +14,8 @@ from Bot.checkers import getUChatLimit
 from Bot.utils import getUserLastMessage, getUserAccessLevel, getUserMute, sendMessage, deleteMessages, \
     getChatSettings, kickUser, getUserName, getUserNickname, antispamChecker, punish, getUserBan, getUserBanInfo, \
     getUserPremium, getIDFromMessage, getUserPremmenuSetting, getChatName, getUserPrefixes, getSilence, \
-    getSilenceAllowed
-from config.config import PM_COMMANDS, ADMINS
+    getSilenceAllowed, addUserXP
+from config.config import PM_COMMANDS, ADMINS, MATHGIVEAWAYS_TO
 from db import pool
 
 
@@ -148,4 +148,14 @@ async def message_handle(event: MessageNew) -> Any:
                     uid, await getUserName(uid), await getUserNickname(uid, chat_id), setting[1], punishment[0],
                     setting[2], punishment[1] if len(punishment) > 1 else None))
 
+    if chat_id == MATHGIVEAWAYS_TO and msg.isdigit():
+        async with (await pool()).acquire() as conn:
+            math = await conn.fetchrow(
+                'select id, cmid, ans, xp, math from mathgiveaway where finished=false order by id desc')
+            if math[2] == int(msg):
+                await conn.execute('update mathgiveaway set winner=$1, finished=true where id=$2', uid, math[0])
+                await addUserXP(uid, math[3])
+                await deleteMessages(math[1], MATHGIVEAWAYS_TO)
+                await sendMessage(MATHGIVEAWAYS_TO + 2000000000, messages.math_winner(
+                    uid, await getUserName(uid), await getUserNickname(uid, MATHGIVEAWAYS_TO), msg, math[3], math[4]))
     await add_msg_counter(chat_id, uid, audio, sticker)
