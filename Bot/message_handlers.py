@@ -142,7 +142,7 @@ async def message_handle(event: MessageNew) -> Any:
                     uid, await getUserName(uid), await getUserNickname(uid, chat_id), setting[1], punishment[0],
                     setting[2], punishment[1] if len(punishment) > 1 else None))
 
-    if chat_id == MATHGIVEAWAYS_TO and msg.isdigit():
+    if chat_id == MATHGIVEAWAYS_TO and msg.replace('-', '').isdigit():
         async with (await pool()).acquire() as conn:
             math = await conn.fetchrow(
                 'select id, cmid, ans, xp, math from mathgiveaway where finished=false order by id desc')
