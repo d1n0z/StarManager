@@ -360,13 +360,11 @@ async def getUserPremium(uid, none=0) -> int:
 
 
 async def getUserPremmenuSetting(uid, setting, none):
-    prem = await getUserPremium(uid)
-    if not prem:
-        return none
     async with (await pool()).acquire() as conn:
-        return await conn.fetchval(
+        res = await conn.fetchval(
             ('select pos from premmenu where uid=$1 and setting=$2' if setting in PREMMENU_TURN else
-             'select "value" from premmenu where uid=$1 and setting=$2'), uid, setting) or none
+             'select "value" from premmenu where uid=$1 and setting=$2'), uid, setting)
+    return res if res is not None else none
 
 
 async def getUserPremmenuSettings(uid):

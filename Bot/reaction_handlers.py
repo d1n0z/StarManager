@@ -10,7 +10,7 @@ async def reaction_handle(event: GroupTypes.MessageReactionEvent) -> None:
         return
     uid = event.object.reacted_id
 
-    if (not (await getUserPremium(uid) or await getUserLeague(uid)) >= 2 or
+    if (not (await getUserPremium(uid) or await getUserLeague(uid) >= 2) or
             not await getUserPremmenuSetting(uid, 'clear_by_fire', 1)):
         return
 

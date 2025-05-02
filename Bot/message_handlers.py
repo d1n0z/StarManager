@@ -146,7 +146,7 @@ async def message_handle(event: MessageNew) -> Any:
         async with (await pool()).acquire() as conn:
             math = await conn.fetchrow(
                 'select id, cmid, ans, xp, math from mathgiveaway where finished=false order by id desc')
-            if math[2] == int(msg):
+            if math and math[2] == int(msg):
                 await conn.execute('update mathgiveaway set winner=$1, finished=true where id=$2', uid, math[0])
                 await addUserXP(uid, math[3])
                 await deleteMessages(math[1], MATHGIVEAWAYS_TO)
