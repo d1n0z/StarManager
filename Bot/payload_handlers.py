@@ -20,7 +20,7 @@ from Bot.utils import (sendMessageEventAnswer, editMessage, getUserAccessLevel, 
                        sendMessage, getSilence, setUserAccessLevel, getGroupName, isMessagesFromGroupAllowed,
                        getImportSettings, turnImportSetting)
 from config.config import api, COMMANDS, SETTINGS_COUNTABLE, \
-    TG_CHAT_ID, TG_NEWCHAT_THREAD_ID, SETTINGS_PREMIUM, LEAGUE, PREMMENU_DEFAULT, DEVS
+    TG_CHAT_ID, TG_NEWCHAT_THREAD_ID, SETTINGS_PREMIUM, LEAGUE, PREMMENU_DEFAULT
 from db import pool
 
 bl = BotLabeler()

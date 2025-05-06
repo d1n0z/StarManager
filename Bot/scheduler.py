@@ -190,11 +190,11 @@ async def run_notifications():
                     elif i[2] == 3:
                         ac = await conn.fetch(
                             'select uid from accesslvl where chat_id=$1 and access_level>0 and uid>0', i[1])
-                        call = ''.join([f"[id{y[0]}|\u200b\u206c]" for y in await ac])
+                        call = ''.join([f"[id{y[0]}|\u200b\u206c]" for y in ac])
                     else:
                         ac = await conn.fetch(
                             'select uid from accesslvl where chat_id=$1 and access_level>0 and uid>0', i[1])
-                        chat = [y[0] for y in await ac]
+                        chat = [y[0] for y in ac]
                         try:
                             members = await api.messages.get_conversation_members(i[1] + 2000000000)
                             call = ''.join([f"[id{y.member_id}|\u200b\u206c]" for y in members.items
