@@ -414,7 +414,8 @@ async def rep(message: Message):
         return await message.reply(disable_mentions=1, message=messages.rep_hint())
     if id == message.from_id:
         return await message.reply(disable_mentions=1, message=messages.rep_myself())
-    if id not in [i.member_id for i in (await api.messages.get_conversation_members(peer_id=message.peer_id)).items]:
+    members = (await api.messages.get_conversation_members(peer_id=message.peer_id)).items
+    if len(members) < 2900 and id not in [i.member_id for i in members]:
         return await message.reply(disable_mentions=1, message=messages.rep_notinchat())
     uid = message.from_id
     uprem = await getUserPremium(uid)
