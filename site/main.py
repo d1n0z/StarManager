@@ -180,13 +180,15 @@ async def profile(request: Request):
 
 @app.post("/api/validate-promo")
 async def validate_promo(request: Request):
+    user = User.model_construct(**request.session['user']) if 'user' in request.session else None
     try:
         data = PromoCheck(**(await request.json()))
     except pydantic.ValidationError:
         raise HTTPException(status_code=400, detail="Неверный формат промокода")
 
     async with (await pool()).acquire() as conn:
-        promo_exists = await conn.fetchval('select val from prempromo where promo=$1', data.promo)
+        promo_exists = await conn.fetchval('select val from prempromo where promo=$1 and (uid=$2 or uid is null)',
+                                           data.promo, user.id if user else None)
 
     if promo_exists is not None:
         return JSONResponse(content={"valid": True, "discount": promo_exists})
@@ -243,8 +245,8 @@ async def create_payment(request: Request):
         oid = 1 if oid is None else (oid + 1)
         await conn.execute('insert into payments (id, uid, success) values ($1, $2, $3)', oid, user.id, 0)
         if data.promo:
-            promo = await conn.fetchval('select val from prempromo where promo=$1', data.promo)
-            cost = int(int(cost) * ((100 - promo) / 100)) + 1
+            promo = await conn.fetchrow('select val, uid, id from prempromo where promo=$1', data.promo)
+            cost = int(int(cost) * ((100 - promo[0]) / 100)) + 1
 
     payment = {
         'amount': {
@@ -270,6 +272,7 @@ async def create_payment(request: Request):
             'pid': oid,
             'chat_id': 0 if origcost != config.data['premiumchat'] else data.chat_id,
             'origcost': origcost,
+            'personal': promo[2] if data.promo and promo[1] else 0,
             'gift': 0 if user.id == ouid else user.id,
         },
         'merchant_customer_id': ouid,
@@ -299,10 +302,14 @@ async def yookassa(request: Request):
     order_id_p = query['id']
     from_id = int(query['merchant_customer_id'])
     uid = int(query['metadata']['gift'])
+    personal = int(query['metadata']['personal'])
 
     async with (await pool()).acquire() as conn:
         if not await conn.fetchval('update payments set success=1 where id=$1 returning 1', order_id):
             return JSONResponse(content='YES')
+        if personal:
+            await conn.execute('delete from prempromo where id=$1', personal)
+            await conn.execute('update premiumexpirenotified set date=0 where uid=$1', from_id)
 
     days = list(config.PREMIUM_COST.keys())[
         list(config.PREMIUM_COST.values()).index(int(query['metadata']['origcost']))] if not chat_id else 0

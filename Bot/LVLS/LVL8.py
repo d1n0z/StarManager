@@ -686,7 +686,7 @@ async def prempromocreate(message: Message):
     async with (await pool()).acquire() as conn:
         if await conn.fetchval('select exists(select 1 from prempromo where promo=$1)', data[1]):
             return await message.reply(messages.prempromocreate_alreadyexists(data[1]))
-        await conn.execute('insert into prempromo (promo, val, start, "end") values ($1, $2, $3, $4)',
+        await conn.execute('insert into prempromo (promo, val, start, "end", uid) values ($1, $2, $3, $4, null)',
                            data[1], int(data[2]), time.time(), (date.timestamp() + 86399))
     await message.reply(messages.prempromocreate(data[1], data[2], date))
 

@@ -1,6 +1,7 @@
 import asyncio
 import os
 import random
+import string
 import subprocess
 import time
 import traceback
@@ -10,13 +11,14 @@ import aiocron
 import yadisk
 from loguru import logger
 
+import keyboard
 import messages
 from Bot.tgbot import tgbot
 from Bot.utils import sendMessage, chunks, punish, getUserName, beautifyNumber, deleteMessages, generateHardProblem, \
     generateMediumProblem, generateEasyProblem
-from config.config import DATABASE, PASSWORD, USER, TG_CHAT_ID, DAILY_TO, api, TG_BACKUP_THREAD_ID, PHOTO_NOT_FOUND, \
-    YANDEX_TOKEN, COMMANDS, vk_api_session, GROUP_ID, PATH, implicitapi, STATUSCHECKER_TO, STATUSCHECKER_CMD, DEV_TGID, \
-    MATHGIVEAWAYS_TO
+from config.config import (DATABASE, PASSWORD, USER, TG_CHAT_ID, DAILY_TO, api, TG_BACKUP_THREAD_ID, PHOTO_NOT_FOUND,
+                           YANDEX_TOKEN, COMMANDS, vk_api_session, GROUP_ID, PATH, implicitapi, STATUSCHECKER_TO,
+                           STATUSCHECKER_CMD, DEV_TGID, MATHGIVEAWAYS_TO)
 from db import smallpool as pool
 
 
@@ -144,6 +146,29 @@ async def everyminute():
             await conn.execute('delete from speccommandscooldown where time<$1', time.time() - 10)
             await conn.execute('update xp set xp=0 where xp<0')
             await conn.execute('delete from premium where time<$1', time.time())
+            for uid, cmid in await conn.fetch(
+                    'select uid, cmid from premiumexpirenotified where date<$1', time.time() - 86400 * 2):
+                try:
+                    await api.messages.delete(group_id=GROUP_ID, delete_for_all=True, peer_id=uid, cmids=cmid)
+                except:
+                    pass
+            await conn.execute('delete from premiumexpirenotified where date<$1', time.time() - 86400 * 2)
+            for uid in await conn.fetch(
+                    'select uid from premium where time<$1 and time>$2 and uid != ALL($3)', time.time() + 86400 * 3,
+                    time.time() + 86400 * 2, [i[0] for i in await conn.fetch('select uid from premiumexpirenotified')]):
+                uid = uid[0]
+                promo = None
+                while not promo or await conn.fetchval('select exists(select 1 from prempromo where promo=$1)', promo):
+                    promo = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8))
+                exp = datetime.fromtimestamp(time.time() + 86400 * 2)
+                await conn.execute('insert into prempromo (promo, val, start, "end", uid) values ($1, $2, $3, $4, $5)',
+                                   promo, 25, time.time(), exp.replace(hour=0, minute=0).timestamp(), uid)
+                cmid = (await sendMessage(
+                    uid, messages.premium_expire(uid, await getUserName(uid), exp.strftime('%d.%m.%Y / 00:00')),
+                    keyboard.premium_expire(promo)))[0].conversation_message_id
+                await conn.execute('insert into premiumexpirenotified (uid, date, cmid) values ($1, $2, $3)',
+                                   uid, time.time(), cmid)
+
             unique = []
             for cp in await conn.fetch('select uid, chat_id from captcha where exptime<$1', time.time()):
                 try:

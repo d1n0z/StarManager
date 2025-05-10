@@ -862,3 +862,10 @@ def bindlist(uid, group, page, count):
         kb.add(Callback('⏩', {"cmd": "bindlist", "page": page + 1, "group": group, "uid": uid}))
 
     return kb.get_json()
+
+
+def premium_expire(promo):
+    kb = Keyboard(inline=True)
+    kb.add(OpenLink(label='✅ Продлить подписку', link=f'https://star-manager.ru/payment?promo={promo}'),
+           KeyboardButtonColor.POSITIVE)
+    return kb.get_json()

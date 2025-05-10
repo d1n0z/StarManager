@@ -2357,3 +2357,7 @@ def math_problem(math, level, xp):
 
 def math_winner(uid, name, nick, ans, xp, math):
     return get('math_winner', id=uid, n=nick or name, math=math.replace('?', ans), xp=xp)
+
+
+def premium_expire(uid, n, end):
+    return get('premium_expire', end=end, uid=uid, n=n)

@@ -888,7 +888,7 @@ def beautifyNumber(n):
 
 def generateEasyProblem():
     a, op, b = random.randint(10, 99), random.choice(['+', '-']), random.randint(10, 99)
-    return f"{a} {op} {b} = ?", (a + b) if op == '+'else (a - b)
+    return f"{a} {op} {b} = ?", (a + b) if op == '+' else (a - b)
 
 
 def generateMediumProblem():

@@ -425,6 +425,18 @@
             chat: { code: null, valid: false, discount: null, error: null }
         };
 
+        window.addEventListener('DOMContentLoaded', function () {
+          const urlParams = new URLSearchParams(window.location.search);
+          const promo = urlParams.get('promo');
+          if (promo) {
+            const promoInput = document.getElementById('promo-sub');
+            if (promoInput) {
+              promoInput.value = promo;
+              debouncedValidatePromo(promoInput)
+            }
+          }
+        });
+
         // Debounce function to limit API calls
         function debounce(func, wait) {
             let timeout;

@@ -794,10 +794,21 @@ class PremPromo(Model):
     val = IntegerField()
     start = BigIntegerField()
     end = BigIntegerField()
+    uid = IntegerField(null=True)  # personal
 
     class Meta:
         database = dbhandle
         table_name = f'prempromo'
+
+
+class PremiumExpireNotified(Model):
+    date = BigIntegerField()
+    uid = IntegerField()
+    cmid = IntegerField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'premiumexpirenotified'
 
 
 class PaymentHistory(Model):
