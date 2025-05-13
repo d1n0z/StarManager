@@ -11,7 +11,7 @@ import messages
 from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserName, getUserNickname, isChatAdmin, \
     getUserAccessLevel, kickUser, getUserPremium, getUserMute, setChatMute, getUserBan, getUserWarns, whoiscached, \
-    scanURLMalware, scanURLRedirect, scanURLShortened
+    scanURLMalware, scanURLRedirect, scanURLShortened, messagereply
 from config.config import api
 from db import pool
 
@@ -24,20 +24,20 @@ async def kick(message: Message):
     uid = message.from_id
     id = await getIDFromMessage(message.text, message.reply_message)
     if id == 0:
-        return await message.reply(disable_mentions=1, message=messages.kick_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.kick_hint())
     if id == uid:
-        return await message.reply(disable_mentions=1, message=messages.kick_myself())
+        return await messagereply(message, disable_mentions=1, message=messages.kick_myself())
 
     if await isChatAdmin(id, chat_id):
-        return await message.reply(disable_mentions=1, message=messages.kick_access(
+        return await messagereply(message, disable_mentions=1, message=messages.kick_access(
             id, await getUserName(id), await getUserNickname(id, chat_id)))
 
     uacc = await getUserAccessLevel(uid, chat_id)
     if await getUserAccessLevel(id, chat_id) >= uacc:
-        return await message.reply(disable_mentions=1, message=messages.kick_higher())
+        return await messagereply(message, disable_mentions=1, message=messages.kick_higher())
 
     kick_cause = ' '.join(message.text.split()[1 + (not message.reply_message):])
-    await message.reply(disable_mentions=1, message=messages.kick(
+    await messagereply(message, disable_mentions=1, message=messages.kick(
         await getUserName(uid), await getUserNickname(uid, chat_id), uid, await getUserName(id),
         await getUserNickname(id, chat_id), id, kick_cause if kick_cause else 'Причина не указана') if await kickUser(
         id, chat_id) else messages.kick_error())
@@ -48,14 +48,14 @@ async def mkick(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     if not await getUserPremium(uid):
-        return await message.reply(disable_mentions=1, message=messages.no_prem())
+        return await messagereply(message, disable_mentions=1, message=messages.no_prem())
 
     ids = []
     for i in message.text.split()[1:]:
         if id := await getIDFromMessage(i, None, 1):
             ids.append(id)
     if not ids:
-        return await message.reply(disable_mentions=1, message=messages.mkick_error())
+        return await messagereply(message, disable_mentions=1, message=messages.mkick_error())
 
     names = await api.users.get(user_ids=ids)
     u_acc = await getUserAccessLevel(uid, chat_id)
@@ -68,10 +68,10 @@ async def mkick(message: Message):
         msg += f'➖ [id{id}|{ch_nickname if ch_nickname else f"{names[ind].first_name} {names[ind].last_name}"}]\n'
         kick_res_count += 1
     if kick_res_count > 0:
-        return await message.reply(
-            disable_mentions=1, message=f'💬 Пользователь [id{uid}|{await getUserName(uid)}] исключил '
-                                        f'следующих пользователей из данной беседы:\n' + msg)
-    await message.reply(disable_mentions=1, message=messages.mkick_no_kick())
+        return await messagereply(message, disable_mentions=1,
+                                  message=f'💬 Пользователь [id{uid}|{await getUserName(uid)}] исключил '
+                                          f'следующих пользователей из данной беседы:\n' + msg)
+    await messagereply(message, disable_mentions=1, message=messages.mkick_no_kick())
 
 
 @bl.chat_message(SearchCMD('mute'))
@@ -81,26 +81,26 @@ async def mute(message: Message):
     data = message.text.split()
     id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
-        return await message.reply(disable_mentions=1, message=messages.mute_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.mute_hint())
     if id < 0:
-        return await message.reply(disable_mentions=1, message=messages.id_group())
+        return await messagereply(message, disable_mentions=1, message=messages.id_group())
     if id == uid:
-        return await message.reply(disable_mentions=1, message=messages.mute_myself())
+        return await messagereply(message, disable_mentions=1, message=messages.mute_myself())
 
     try:
         if (mute_time := int(data[1 + (not message.reply_message)])) < 1:
             raise Exception
     except:
-        return await message.reply(disable_mentions=1, message=messages.mute_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.mute_hint())
 
     if mute_time == id:
-        return await message.reply(disable_mentions=1, message=messages.mute_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.mute_hint())
 
     if await getUserAccessLevel(id, chat_id) >= await getUserAccessLevel(uid, chat_id):
-        return await message.reply(disable_mentions=1, message=messages.mute_higher())
+        return await messagereply(message, disable_mentions=1, message=messages.mute_higher())
 
     if (ch_mute := await getUserMute(id, chat_id)) >= time.time():
-        return await message.reply(disable_mentions=1, message=messages.already_muted(
+        return await messagereply(message, disable_mentions=1, message=messages.already_muted(
             await getUserName(id), await getUserNickname(id, chat_id), id, ch_mute))
 
     mute_date = datetime.now().strftime('%Y.%m.%d %H:%M:%S')
@@ -140,7 +140,7 @@ async def mute(message: Message):
                 f"{mute_times}", f"{mute_causes}", f"{mute_names}", f"{mute_dates}")
 
     await setChatMute(id, chat_id, mute_time)
-    await message.reply(disable_mentions=1, message=messages.mute(
+    await messagereply(message, disable_mentions=1, message=messages.mute(
         u_name, await getUserNickname(uid, chat_id), uid, await getUserName(id), await getUserNickname(id, chat_id),
         id, mute_cause, mute_time // 60), keyboard=keyboard.punish_unpunish(
         uid, id, 'mute', message.conversation_message_id))
@@ -153,13 +153,13 @@ async def warn(message: Message):
     data = message.text.split()
     id = await getIDFromMessage(message.text, message.reply_message)
     if not id or (len(data) < 2 and message.reply_message is None):
-        return await message.reply(disable_mentions=1, message=messages.warn_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.warn_hint())
     if id < 0:
-        return await message.reply(disable_mentions=1, message=messages.id_group())
+        return await messagereply(message, disable_mentions=1, message=messages.id_group())
     if id == uid:
-        return await message.reply(disable_mentions=1, message=messages.warn_myself())
+        return await messagereply(message, disable_mentions=1, message=messages.warn_myself())
     if await getUserAccessLevel(id, chat_id) >= await getUserAccessLevel(uid, chat_id):
-        return await message.reply(disable_mentions=1, message=messages.warn_higher())
+        return await messagereply(message, disable_mentions=1, message=messages.warn_higher())
 
     async with (await pool()).acquire() as conn:
         res = await conn.fetchrow('select warns, last_warns_times, last_warns_causes, last_warns_names, '
@@ -200,7 +200,7 @@ async def warn(message: Message):
                 'insert into warn (uid, chat_id, warns, last_warns_times, last_warns_causes, last_warns_names, '
                 'last_warns_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)',
                 id, chat_id, warns, f"{warn_times}", f"{warn_causes}", f"{warn_names}", f"{warn_dates}")
-    await message.reply(disable_mentions=1, message=msg, keyboard=keyboard.punish_unpunish(
+    await messagereply(message, disable_mentions=1, message=msg, keyboard=keyboard.punish_unpunish(
         uid, id, 'warn', message.conversation_message_id))
 
 
@@ -216,7 +216,7 @@ async def clear(message: Message):
     # if (len(data) < 2 and not deleting) or (len(data) == 2 and not data[1].isdigit()) or (
     #         len(data) == 3 and not (id := await getIDFromMessage(message.text, None,) and not data[2].isdigit())):
     if not deleting:
-        return await message.reply(disable_mentions=1, message=messages.clear_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.clear_hint())
     deleting = [
         i for i in deleting if await getUserAccessLevel(i[0], chat_id) <= await getUserAccessLevel(uid, chat_id)]
     if deleting:
@@ -224,19 +224,19 @@ async def clear(message: Message):
             deleted = await api.messages.delete(
                 peer_id=message.peer_id, cmids=[mid for _, mid in deleting], delete_for_all=True)
             if all(True if i.error and 'admin message' in i.error.description else False for i in deleted):
-                return await message.reply(disable_mentions=1, message=messages.clear_admin())
+                return await messagereply(message, disable_mentions=1, message=messages.clear_admin())
             if all(True if i.error else False for i in deleted):
-                return await message.reply(disable_mentions=1, message=messages.clear_old())
+                return await messagereply(message, disable_mentions=1, message=messages.clear_old())
             deleted = [i.conversation_message_id for i in deleted if i.error]
             deleting = [i[0] for i in deleting if i[1] not in deleted]
         except VKAPIError[15]:
-            await message.reply(disable_mentions=1, message=messages.clear_admin())
+            await messagereply(message, disable_mentions=1, message=messages.clear_admin())
         except VKAPIError:
-            await message.reply(disable_mentions=1, message=messages.clear_old())
+            await messagereply(message, disable_mentions=1, message=messages.clear_old())
         else:
-            await message.reply(disable_mentions=1, message=await messages.clear(deleting, uid, chat_id))
+            await messagereply(message, disable_mentions=1, message=await messages.clear(deleting, uid, chat_id))
     else:
-        await message.reply(disable_mentions=1, message=messages.clear_higher())
+        await messagereply(message, disable_mentions=1, message=messages.clear_higher())
 
 
 @bl.chat_message(SearchCMD('snick'))
@@ -246,18 +246,18 @@ async def snick(message: Message):
     data = message.text.split()
     id = await getIDFromMessage(message.text, message.reply_message)
     if not id or len(data) <= 1:
-        return await message.reply(disable_mentions=1, message=messages.snick_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.snick_hint())
     if id < 0:
-        return await message.reply(disable_mentions=1, message=messages.id_group())
+        return await messagereply(message, disable_mentions=1, message=messages.id_group())
 
     nickname = ' '.join(data[1 + (not message.reply_message):])
     if len(nickname) <= 0:
-        return await message.reply(disable_mentions=1, message=messages.snick_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.snick_hint())
     if len(nickname) >= 46 or '[' in nickname or ']' in nickname:
-        return await message.reply(disable_mentions=1, message=messages.snick_too_long_nickname())
+        return await messagereply(message, disable_mentions=1, message=messages.snick_too_long_nickname())
 
     if await getUserAccessLevel(id, chat_id) > await getUserAccessLevel(uid, chat_id):
-        return await message.reply(disable_mentions=1, message=messages.snick_higher())
+        return await messagereply(message, disable_mentions=1, message=messages.snick_higher())
 
     oldnickname = await getUserNickname(id, chat_id)
     async with (await pool()).acquire() as conn:
@@ -266,7 +266,7 @@ async def snick(message: Message):
             await conn.execute(
                 'insert into nickname (uid, chat_id, nickname) VALUES ($1, $2, $3)', id, chat_id, nickname)
 
-    await message.reply(disable_mentions=1, message=messages.snick(
+    await messagereply(message, disable_mentions=1, message=messages.snick(
         uid, await getUserName(uid), await getUserNickname(uid, chat_id), id, await getUserName(id),
         oldnickname, nickname))
 
@@ -277,18 +277,18 @@ async def rnick(message: Message):
     uid = message.from_id
     id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
-        return await message.reply(disable_mentions=1, message=messages.snick_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.snick_hint())
     if id < 0:
-        return await message.reply(disable_mentions=1, message=messages.id_group())
+        return await messagereply(message, disable_mentions=1, message=messages.id_group())
 
     if await getUserAccessLevel(id, chat_id) > await getUserAccessLevel(uid, chat_id):
-        return await message.reply(disable_mentions=1, message=messages.rnick_higher())
+        return await messagereply(message, disable_mentions=1, message=messages.rnick_higher())
     if not (ch_nickname := await getUserNickname(id, chat_id)):
-        return await message.reply(disable_mentions=1, message=messages.rnick_user_has_no_nick())
+        return await messagereply(message, disable_mentions=1, message=messages.rnick_user_has_no_nick())
 
     async with (await pool()).acquire() as conn:
         await conn.execute('delete from nickname where chat_id=$1 and uid=$2', chat_id, id)
-    await message.reply(disable_mentions=1, message=messages.rnick(
+    await messagereply(message, disable_mentions=1, message=messages.rnick(
         uid, await getUserName(uid), await getUserNickname(uid, chat_id), id, await getUserName(id), ch_nickname))
 
 
@@ -301,7 +301,7 @@ async def nlist(message: Message):
                 await api.messages.get_conversation_members(peer_id=message.peer_id)).items])
     count = len(res)
     res = res[:30]
-    await message.reply(disable_mentions=1, message=messages.nlist(
+    await messagereply(message, disable_mentions=1, message=messages.nlist(
         res, await api.users.get(user_ids=[i[0] for i in res])), keyboard=keyboard.nlist(message.from_id, 0, count))
 
 
@@ -310,7 +310,7 @@ async def getnick(message: Message):
     chat_id = message.peer_id - 2000000000
     data = message.text.split()
     if len(data) <= 1:
-        return await message.reply(disable_mentions=1, message=messages.getnick_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.getnick_hint())
     query = ' '.join(data[1:])
     async with (await pool()).acquire() as conn:
         res = await conn.fetch(
@@ -319,8 +319,8 @@ async def getnick(message: Message):
                 await api.messages.get_conversation_members(peer_id=message.peer_id)).items],
             '%%' + query.lower() + '%%')
     if not res:
-        return await message.reply(disable_mentions=1, message=messages.getnick_no_result(query))
-    await message.reply(disable_mentions=1, message=await messages.getnick(res, query))
+        return await messagereply(message, disable_mentions=1, message=messages.getnick_no_result(query))
+    await messagereply(message, disable_mentions=1, message=await messages.getnick(res, query))
 
 
 @bl.chat_message(SearchCMD('staff'))
@@ -330,7 +330,7 @@ async def staff(message: Message):
         res = await conn.fetch(
             'select uid, access_level from accesslvl where chat_id=$1 and uid>0 and access_level>0 and '
             'access_level<8 order by access_level desc', chat_id)
-    await message.reply(disable_mentions=1, message=await messages.staff(
+    await messagereply(message, disable_mentions=1, message=await messages.staff(
         res, await api.users.get(user_ids=[i[0] for i in res if i[0] > 0]), chat_id))
 
 
@@ -347,7 +347,7 @@ async def olist(message: Message):
             else:
                 online_mobile = False
             members_online[f'[id{i.id}|{i.first_name} {i.last_name}]'] = online_mobile
-    await message.reply(disable_mentions=1, message=messages.olist(members_online))
+    await messagereply(message, disable_mentions=1, message=messages.olist(members_online))
 
 
 @bl.chat_message(SearchCMD('check'))
@@ -355,23 +355,23 @@ async def check(message: Message):
     chat_id = message.peer_id - 2000000000
     id = await getIDFromMessage(message.text, message.reply_message)
     if not id:
-        return await message.reply(disable_mentions=1, message=messages.check_help())
+        return await messagereply(message, disable_mentions=1, message=messages.check_help())
     if id < 0:
-        return await message.reply(disable_mentions=1, message=messages.id_group())
+        return await messagereply(message, disable_mentions=1, message=messages.id_group())
 
     ban = await getUserBan(id, chat_id) - time.time()
     mute = await getUserMute(id, chat_id) - time.time()
     msg = messages.check(id, await getUserName(id), await getUserNickname(id, chat_id),
                          ban if ban > 0 else 0, await getUserWarns(id, chat_id), mute if mute > 0 else 0)
     kb = keyboard.check(message.from_id, id)
-    await message.reply(disable_mentions=1, message=msg, keyboard=kb)
+    await messagereply(message, disable_mentions=1, message=msg, keyboard=kb)
 
 
 @bl.chat_message(SearchCMD('scan'))
 async def scan(message: Message):
     data = message.text.split()
     if len(data) < 2 and not message.reply_message:
-        return await message.reply(disable_mentions=1, message=messages.scan_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.scan_hint())
     links = set()
     for i in (message.reply_message.text.split() + data[1:]) if message.reply_message else data[1:]:
         for y in i.split('/'):
@@ -379,8 +379,8 @@ async def scan(message: Message):
                 continue
             links.add(i if '://' in i else 'https://' + i)
     if not links:
-        return await message.reply(disable_mentions=1, message=messages.scan_hint())
-    await message.reply(disable_mentions=1, message=''.join([messages.scan(
+        return await messagereply(message, disable_mentions=1, message=messages.scan_hint())
+    await messagereply(message, disable_mentions=1, message=''.join([messages.scan(
         i, scanURLMalware(i), scanURLRedirect(i), scanURLShortened(i)) + '\n\n' for i in links]))
 
 
@@ -392,5 +392,5 @@ async def invited(message: Message):
     async with (await pool()).acquire() as conn:
         invites = await conn.fetchval(
             'select count(*) as c from refferal where from_id=$1 and chat_id=$2', id, message.chat_id)
-    await message.reply(disable_mentions=1, message=messages.invites(
+    await messagereply(message, disable_mentions=1, message=messages.invites(
         id, await getUserName(id), await getUserNickname(id, message.chat_id), invites))

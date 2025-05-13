@@ -20,6 +20,7 @@ from memoization import cached
 from multicolorcaptcha import CaptchaGenerator
 from nudenet import NudeDetector
 from vkbottle import PhotoMessageUploader
+from vkbottle.bot import Message
 from vkbottle.tools.mini_types.bot.foreign_message import ForeignMessageMin
 from vkbottle_types.objects import MessagesMessage, MessagesMessageAttachmentType, MessagesSendUserIdsResponseItem
 
@@ -118,13 +119,22 @@ async def sendMessageEventAnswer(event_id: Any, user_id: int, peer_id: int, even
     return True
 
 
-async def sendMessage(peer_ids: int | Iterable[int], msg: str | None = None, kbd: str | None = None,
-                      photo: str | None = None) -> list[MessagesSendUserIdsResponseItem] | int | bool:
+async def sendMessage(
+        peer_ids: int | Iterable[int], msg: str | None = None, kbd: str | None = None,
+        photo: str | None = None, disable_mentions: int = 1) -> list[MessagesSendUserIdsResponseItem] | int | bool:
     try:
-        return await api.messages.send(random_id=0, peer_ids=peer_ids, message=msg,
-                                       keyboard=kbd, attachment=photo, disable_mentions=1)
+        msgs = await api.messages.send(random_id=0, peer_ids=peer_ids, message=msg, keyboard=kbd, attachment=photo,
+                                       disable_mentions=disable_mentions)
     except:
         return False
+    if isinstance(peer_ids, int) and peer_ids > 2000000000 and (await getChatSettings(
+            (chatid := peer_ids - 2000000000)))['main']['autodelete']:
+        async with (await pool()).acquire() as conn:
+            val = await conn.fetchval("select value from settings where setting='autodelete' and chat_id=$1", chatid)
+            if val:
+                await conn.execute('insert into todelete (peerid, cmid, delete_at) values ($1, $2, $3)',
+                                   msgs[0].peer_id, msgs[0].conversation_message_id, time.time() + val)
+    return msgs
 
 
 async def editMessage(msg: str, peer_id: int, cmid: int, kb=None, attachment=None) -> bool:
@@ -911,3 +921,15 @@ def generateHardProblem():
         return f"({a}X * {x} = {c * x}) → X = ?", x
     else:
         return f"({c * x}X / {x} = {c}) → X = ?", x
+
+
+async def messagereply(
+        message: Message, *args, **kwargs) -> MessagesSendUserIdsResponseItem | MessagesSendUserIdsResponseItem:
+    msg = await message.reply(*args, **kwargs)
+    if msg.peer_id > 2000000000 and (await getChatSettings((chatid := msg.peer_id - 2000000000)))['main']['autodelete']:
+        async with (await pool()).acquire() as conn:
+            val = await conn.fetchval("select value from settings where setting='autodelete' and chat_id=$1", chatid)
+            if val:
+                await conn.execute('insert into todelete (peerid, cmid, delete_at) values ($1, $2, $3)',
+                                   msg.peer_id, msg.conversation_message_id, time.time() + val)
+    return msg

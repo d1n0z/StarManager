@@ -838,5 +838,15 @@ class MathGiveaway(Model):
         table_name = f'mathgiveaway'
 
 
+class ToDelete(Model):
+    peerid = IntegerField()
+    cmid = IntegerField()
+    delete_at = BigIntegerField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'todelete'
+
+
 if __name__ == '__main__':
     dbhandle.create_tables(Model.__subclasses__())

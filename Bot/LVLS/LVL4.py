@@ -9,7 +9,7 @@ import messages
 from Bot.checkers import haveAccess
 from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserAccessLevel, getUserName, getUserNickname, kickUser, getUserBan, \
-    setChatMute, getUserWarns, getgpool, editMessage
+    setChatMute, getUserWarns, getgpool, editMessage, sendMessage, messagereply
 from config.config import api
 from db import pool
 
@@ -23,11 +23,11 @@ async def gkick(message: Message):
     data = message.text.split()
     id = await getIDFromMessage(message.text, message.reply_message)
     if id == uid:
-        return await message.reply(disable_mentions=1, message=messages.kick_myself())
+        return await messagereply(message, disable_mentions=1, message=messages.kick_myself())
     if (len(data) == 1 and message.reply_message is None) or not id:
-        return await message.reply(disable_mentions=1, message=messages.gkick_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.gkick_hint())
     if id < 0:
-        return await message.reply(disable_mentions=1, message=messages.id_group())
+        return await messagereply(message, disable_mentions=1, message=messages.id_group())
 
     data = message.text.split()
     if message.reply_message is None:
@@ -38,12 +38,12 @@ async def gkick(message: Message):
         kick_cause = 'Причина не указана'
 
     if not (chats := await getgpool(chat_id)):
-        return await message.reply(disable_mentions=1, message=messages.chat_unbound())
+        return await messagereply(message, disable_mentions=1, message=messages.chat_unbound())
 
     ch_name = await getUserName(id)
     u_name = await getUserName(uid)
     ch_nickname = await getUserNickname(id, chat_id)
-    edit = await message.reply(disable_mentions=1, message=messages.gkick_start(
+    edit = await messagereply(message, disable_mentions=1, message=messages.gkick_start(
         uid, u_name, await getUserNickname(uid, chat_id), id, ch_name, ch_nickname, len(chats)))
     success = 0
     for chat_id in chats:
@@ -52,7 +52,7 @@ async def gkick(message: Message):
             continue
         if await kickUser(id, chat_id):
             try:
-                await api.messages.send(disable_mentions=1, random_id=0, chat_id=chat_id, message=messages.kick(
+                await sendMessage(peer_ids=chat_id + 2000000000, msg=messages.kick(
                     u_name, await getUserNickname(uid, chat_id), uid, ch_name, await getUserNickname(id, chat_id), id,
                     kick_cause))
             except:
@@ -70,11 +70,11 @@ async def gban(message: Message):
     data = message.text.split()
     id = await getIDFromMessage(message.text, message.reply_message)
     if id == uid:
-        return await message.reply(disable_mentions=1, message=messages.ban_myself())
+        return await messagereply(message, disable_mentions=1, message=messages.ban_myself())
     if (len(data) == 1 and message.reply_message is None) or not id:
-        return await message.reply(disable_mentions=1, message=messages.gban_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.gban_hint())
     if id < 0:
-        return await message.reply(disable_mentions=1, message=messages.id_group())
+        return await messagereply(message, disable_mentions=1, message=messages.id_group())
 
     if message.reply_message is None:
         if len(data) == 2:
@@ -85,7 +85,7 @@ async def gban(message: Message):
                 ban_time = int(data[2]) * 86400
                 if ban_time > 86400 * 3650:
                     msg = messages.ban_maxtime()
-                    await message.reply(disable_mentions=1, message=msg)
+                    await messagereply(message, disable_mentions=1, message=msg)
                     return
                 ban_cause = None if len(data) == 3 else ' '.join(data[3:])
             else:
@@ -100,22 +100,22 @@ async def gban(message: Message):
                 ban_time = int(data[1]) * 86400
                 if ban_time > 86400 * 3650:
                     msg = messages.ban_maxtime()
-                    await message.reply(disable_mentions=1, message=msg)
+                    await messagereply(message, disable_mentions=1, message=msg)
                     return
                 ban_cause = None if len(data) == 2 else ' '.join(data[2:])
             else:
                 ban_time = 365 * 86400
                 ban_cause = ' '.join(data[1:])
     if ban_time <= 0:
-        return await message.reply(disable_mentions=1, message=messages.gban_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.gban_hint())
 
     if not (chats := await getgpool(chat_id)):
-        return await message.reply(disable_mentions=1, message=messages.chat_unbound())
+        return await messagereply(message, disable_mentions=1, message=messages.chat_unbound())
 
     u_name = await getUserName(uid)
     ch_name = await getUserName(id)
     ch_nick = await getUserNickname(id, chat_id)
-    edit = await message.reply(disable_mentions=1, message=messages.gban_start(
+    edit = await messagereply(message, disable_mentions=1, message=messages.gban_start(
         uid, u_name, await getUserNickname(uid, chat_id), id, ch_name, ch_nick, len(chats)))
     success = 0
     for chat_id in chats:
@@ -154,9 +154,9 @@ async def gban(message: Message):
                     f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}")
 
         if await kickUser(id, chat_id):
-            await api.messages.send(disable_mentions=1, random_id=0, message=messages.ban(
+            await sendMessage(msg=messages.ban(
                 uid, u_name, await getUserNickname(uid, chat_id), id, ch_name, await getUserNickname(id, chat_id),
-                ban_cause, ban_time // 86400), chat_id=chat_id)
+                ban_cause, ban_time // 86400), peer_ids=chat_id + 2000000000)
         success += 1
 
     await editMessage(peer_id=edit.peer_id, cmid=edit.conversation_message_id,
@@ -170,18 +170,18 @@ async def gunban(message: Message):
     data = message.text.split()
     id = await getIDFromMessage(message.text, message.reply_message)
     if id == uid:
-        return await message.reply(disable_mentions=1, message=messages.unban_myself())
+        return await messagereply(message, disable_mentions=1, message=messages.unban_myself())
     if (len(data) == 1 and message.reply_message is None) or not id:
-        return await message.reply(disable_mentions=1, message=messages.gunban_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.gunban_hint())
     if id < 0:
-        return await message.reply(disable_mentions=1, message=messages.id_group())
+        return await messagereply(message, disable_mentions=1, message=messages.id_group())
 
     if not (chats := await getgpool(chat_id)):
-        return await message.reply(disable_mentions=1, message=messages.chat_unbound())
+        return await messagereply(message, disable_mentions=1, message=messages.chat_unbound())
 
     name = await getUserName(id)
     nick = await getUserNickname(id, chat_id)
-    edit = await message.reply(disable_mentions=1, message=messages.gunban_start(
+    edit = await messagereply(message, disable_mentions=1, message=messages.gunban_start(
         uid, await getUserName(uid), await getUserNickname(uid, chat_id), id, name, nick, len(chats)))
     success = 0
     for chat_id in chats:
@@ -206,11 +206,11 @@ async def gmute(message: Message):
     data = message.text.split()
     id = await getIDFromMessage(message.text, message.reply_message)
     if id == uid:
-        return await message.reply(disable_mentions=1, message=messages.mute_myself())
+        return await messagereply(message, disable_mentions=1, message=messages.mute_myself())
     if (len(data) == 1 and message.reply_message is None) or not id:
-        return await message.reply(disable_mentions=1, message=messages.gmute_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.gmute_hint())
     if id < 0:
-        return await message.reply(disable_mentions=1, message=messages.id_group())
+        return await messagereply(message, disable_mentions=1, message=messages.id_group())
 
     try:
         if message.reply_message is None:
@@ -220,7 +220,7 @@ async def gmute(message: Message):
         if mute_time <= 0:
             raise
     except:
-        return await message.reply(disable_mentions=1, message=messages.gmute_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.gmute_hint())
 
     if message.reply_message is None:
         mute_cause = ' '.join(data[3:])
@@ -228,12 +228,12 @@ async def gmute(message: Message):
         mute_cause = ' '.join(data[2:])
 
     if not (chats := await getgpool(chat_id)):
-        return await message.reply(disable_mentions=1, message=messages.chat_unbound())
+        return await messagereply(message, disable_mentions=1, message=messages.chat_unbound())
 
     u_name = await getUserName(uid)
     ch_name = await getUserName(id)
     ch_nick = await getUserNickname(uid, chat_id)
-    edit = await message.reply(disable_mentions=1, message=messages.gmute_start(
+    edit = await messagereply(message, disable_mentions=1, message=messages.gmute_start(
         uid, u_name, await getUserNickname(uid, chat_id), id, ch_name, ch_nick, len(chats)))
     success = 0
     for chat_id in chats:
@@ -275,7 +275,7 @@ async def gmute(message: Message):
                     f"{mute_times}", f"{mute_causes}", f"{mute_names}", f"{mute_dates}")
 
         await setChatMute(id, chat_id, mute_time)
-        await api.messages.send(disable_mentions=1, random_id=0, chat_id=chat_id, message=messages.mute(
+        await sendMessage(peer_ids=chat_id + 2000000000, msg=messages.mute(
             u_name, await getUserNickname(uid, chat_id), uid, ch_name, await getUserNickname(id, chat_id), id,
             mute_cause, int(mute_time / 60)))
         success += 1
@@ -291,19 +291,19 @@ async def gunmute(message: Message):
     data = message.text.split()
     id = await getIDFromMessage(message.text, message.reply_message)
     if id == uid:
-        return await message.reply(disable_mentions=1, message=messages.unmute_myself())
+        return await messagereply(message, disable_mentions=1, message=messages.unmute_myself())
     if (len(data) == 1 and message.reply_message is None) or not id:
-        return await message.reply(disable_mentions=1, message=messages.gunmute_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.gunmute_hint())
     if id < 0:
-        return await message.reply(disable_mentions=1, message=messages.id_group())
+        return await messagereply(message, disable_mentions=1, message=messages.id_group())
 
     if not (chats := await getgpool(chat_id)):
-        return await message.reply(disable_mentions=1, message=messages.chat_unbound())
+        return await messagereply(message, disable_mentions=1, message=messages.chat_unbound())
 
     u_name = await getUserName(uid)
     ch_name = await getUserName(id)
     ch_nick = await getUserNickname(id, chat_id)
-    edit = await message.reply(disable_mentions=1, message=messages.gunmute_start(
+    edit = await messagereply(message, disable_mentions=1, message=messages.gunmute_start(
         uid, u_name, await getUserNickname(uid, chat_id), id, ch_name, ch_nick, len(chats)))
     success = 0
     for chat_id in chats:
@@ -316,7 +316,7 @@ async def gunmute(message: Message):
                     'update mute set mute = 0 where chat_id=$1 and uid=$2 returning 1', chat_id, id):
                 continue
         await setChatMute(id, chat_id, 0)
-        await api.messages.send(disable_mentions=1, random_id=0, chat_id=chat_id, message=messages.unmute(
+        await sendMessage(peer_ids=chat_id + 2000000000, msg=messages.unmute(
             u_name, await getUserNickname(uid, chat_id), uid, ch_name, await getUserNickname(id, chat_id), id))
         success += 1
     await editMessage(peer_id=edit.peer_id, cmid=edit.conversation_message_id,
@@ -330,14 +330,14 @@ async def gwarn(message: Message):
     data = message.text.split()
     id = await getIDFromMessage(message.text, message.reply_message)
     if id == uid:
-        return await message.reply(disable_mentions=1, message=messages.warn_myself())
+        return await messagereply(message, disable_mentions=1, message=messages.warn_myself())
     if (len(data) == 1 and message.reply_message is None) or not id:
-        return await message.reply(disable_mentions=1, message=messages.gwarn_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.gwarn_hint())
     if id < 0:
-        return await message.reply(disable_mentions=1, message=messages.id_group())
+        return await messagereply(message, disable_mentions=1, message=messages.id_group())
 
     if not (chats := await getgpool(chat_id)):
-        return await message.reply(disable_mentions=1, message=messages.chat_unbound())
+        return await messagereply(message, disable_mentions=1, message=messages.chat_unbound())
 
     if message.reply_message is None:
         warn_cause = ' '.join(data[2:])
@@ -348,7 +348,7 @@ async def gwarn(message: Message):
     ch_name = await getUserName(id)
     ch_nick = await getUserNickname(id, chat_id)
     msg = messages.gwarn_start(uid, u_name, await getUserNickname(uid, chat_id), id, ch_name, ch_nick, len(chats))
-    edit = await message.reply(disable_mentions=1, message=msg)
+    edit = await messagereply(message, disable_mentions=1, message=msg)
     success = 0
     for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
@@ -397,7 +397,7 @@ async def gwarn(message: Message):
                     'last_warns_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)', id, chat_id, warns,
                     f"{warn_times}", f"{warn_causes}", f"{warn_names}", f"{warn_dates}")
 
-        await api.messages.send(disable_mentions=1, random_id=0, message=msg, chat_id=chat_id)
+        await sendMessage(msg=msg, peer_ids=chat_id + 2000000000)
         success += 1
 
     await editMessage(peer_id=edit.peer_id, cmid=edit.conversation_message_id,
@@ -411,19 +411,19 @@ async def gunwarn(message: Message):
     data = message.text.split()
     id = await getIDFromMessage(message.text, message.reply_message)
     if id == uid:
-        return await message.reply(disable_mentions=1, message=messages.unwarn_myself())
+        return await messagereply(message, disable_mentions=1, message=messages.unwarn_myself())
     if (len(data) == 1 and message.reply_message is None) or not id:
-        return await message.reply(disable_mentions=1, message=messages.gunwarn_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.gunwarn_hint())
     if id < 0:
-        return await message.reply(disable_mentions=1, message=messages.id_group())
+        return await messagereply(message, disable_mentions=1, message=messages.id_group())
 
     if not (chats := await getgpool(chat_id)):
-        return await message.reply(disable_mentions=1, message=messages.chat_unbound())
+        return await messagereply(message, disable_mentions=1, message=messages.chat_unbound())
 
     u_name = await getUserName(uid)
     ch_name = await getUserName(id)
     ch_nick = await getUserNickname(id, chat_id)
-    edit = await message.reply(disable_mentions=1, message=messages.gunwarn_start(
+    edit = await messagereply(message, disable_mentions=1, message=messages.gunwarn_start(
         uid, u_name, await getUserNickname(uid, chat_id), id, ch_name, ch_nick, len(chats)))
     success = 0
     for chat_id in chats:
@@ -437,7 +437,7 @@ async def gunwarn(message: Message):
             if not await conn.fetchval('update warn set warns = $1 where chat_id=$2 and uid=$3 returning 1',
                                        ch_warns - 1, chat_id, id):
                 continue
-        await api.messages.send(disable_mentions=1, random_id=0, chat_id=chat_id, message=messages.unwarn(
+        await sendMessage(peer_ids=chat_id + 2000000000, msg=messages.unwarn(
             u_name, await getUserNickname(uid, chat_id), uid, ch_name, await getUserNickname(id, chat_id), id))
         success += 1
 
@@ -452,23 +452,23 @@ async def gsnick(message: Message):
     data = message.text.split()
     id = await getIDFromMessage(message.text, message.reply_message)
     if (len(data) == 1 and message.reply_message is None) or not id:
-        return await message.reply(disable_mentions=1, message=messages.gsnick_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.gsnick_hint())
     if id < 0:
-        return await message.reply(disable_mentions=1, message=messages.id_group())
+        return await messagereply(message, disable_mentions=1, message=messages.id_group())
 
     if message.reply_message is None:
         nickname = ' '.join(data[2:])
     else:
         nickname = ' '.join(data[1:])
     if len(nickname) > 46 or '[' in nickname or ']' in nickname:
-        return await message.reply(disable_mentions=1, message=messages.snick_too_long_nickname())
+        return await messagereply(message, disable_mentions=1, message=messages.snick_too_long_nickname())
     if not (chats := await getgpool(chat_id)):
-        return await message.reply(disable_mentions=1, message=messages.chat_unbound())
+        return await messagereply(message, disable_mentions=1, message=messages.chat_unbound())
 
     u_name = await getUserName(uid)
     ch_name = await getUserName(id)
     ch_nick = await getUserNickname(id, chat_id)
-    edit = await message.reply(disable_mentions=1, message=messages.gsnick_start(
+    edit = await messagereply(message, disable_mentions=1, message=messages.gsnick_start(
         uid, u_name, await getUserNickname(uid, chat_id), id, ch_name, ch_nick, len(chats)))
     success = 0
     for chat_id in chats:
@@ -483,7 +483,7 @@ async def gsnick(message: Message):
                 await conn.execute(
                     'insert into nickname (uid, chat_id, nickname) values ($1, $2, $3)', id, chat_id, nickname)
 
-        await api.messages.send(disable_mentions=1, random_id=0, chat_id=chat_id, message=messages.snick(
+        await sendMessage(peer_ids=chat_id + 2000000000, msg=messages.snick(
             uid, u_name, await getUserNickname(uid, chat_id), id, ch_name, await getUserNickname(id, chat_id),
             nickname))
         success += 1
@@ -499,17 +499,17 @@ async def grnick(message: Message):
     data = message.text.split()
     id = await getIDFromMessage(message.text, message.reply_message)
     if (len(data) == 1 and message.reply_message is None) or not id:
-        return await message.reply(disable_mentions=1, message=messages.grnick_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.grnick_hint())
     if id < 0:
-        return await message.reply(disable_mentions=1, message=messages.id_group())
+        return await messagereply(message, disable_mentions=1, message=messages.id_group())
 
     if not (chats := await getgpool(chat_id)):
-        return await message.reply(disable_mentions=1, message=messages.chat_unbound())
+        return await messagereply(message, disable_mentions=1, message=messages.chat_unbound())
 
     u_name = await getUserName(uid)
     ch_name = await getUserName(id)
     ch_nick = await getUserNickname(id, chat_id)
-    edit = await message.reply(disable_mentions=1, message=messages.grnick_start(
+    edit = await messagereply(message, disable_mentions=1, message=messages.grnick_start(
         uid, u_name, await getUserNickname(uid, chat_id), id, ch_name, ch_nick, len(chats)))
     success = 0
     for chat_id in chats:
@@ -519,7 +519,7 @@ async def grnick(message: Message):
                 ch_nickname is None):
             continue
         try:
-            await api.messages.send(disable_mentions=1, random_id=0, chat_id=chat_id, message=messages.rnick(
+            await sendMessage(peer_ids=chat_id + 2000000000, msg=messages.rnick(
                 uid, u_name, await getUserNickname(uid, chat_id), id, ch_name, ch_nickname))
             async with (await pool()).acquire() as conn:
                 await conn.execute('delete from nickname where chat_id=$1 and uid=$2', chat_id, id)
@@ -537,15 +537,15 @@ async def gzov(message: Message):
     uid = message.from_id
     data = message.text.split()
     if len(data) <= 1:
-        return await message.reply(disable_mentions=1, message=messages.gzov_hint())
+        return await messagereply(message, disable_mentions=1, message=messages.gzov_hint())
 
     if not (chats := await getgpool(chat_id)):
-        return await message.reply(disable_mentions=1, message=messages.chat_unbound())
+        return await messagereply(message, disable_mentions=1, message=messages.chat_unbound())
 
     u_name = await getUserName(uid)
     u_nick = await getUserNickname(uid, chat_id)
     msg = messages.gzov_start(uid, u_name, u_nick, len(chats))
-    edit = await message.reply(disable_mentions=1, message=msg)
+    edit = await messagereply(message, disable_mentions=1, message=msg)
     success = 0
     cause = ' '.join(data[1:])
     for chat_id in chats:
@@ -553,8 +553,8 @@ async def gzov(message: Message):
         if not await haveAccess('gzov', chat_id, u_acc):
             continue
         members = (await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)).items
-        await api.messages.send(random_id=0, chat_id=chat_id, message=messages.zov(
-            uid, u_name, await getUserNickname(uid, chat_id), cause, members))
+        await sendMessage(peer_ids=chat_id + 2000000000, msg=messages.zov(
+            uid, u_name, await getUserNickname(uid, chat_id), cause, members), disable_mentions=0)
         success += 1
 
     await editMessage(peer_id=edit.peer_id, cmid=edit.conversation_message_id,

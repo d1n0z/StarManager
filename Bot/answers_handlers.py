@@ -109,7 +109,32 @@ async def queue_handler(event: MessageNew):
             await sendMessage(chat_id + 2000000000, messages.notification(*notif), keyboard.notification(
                 uid, notif[5], notif[0]))
     elif queue[3].startswith('settings_'):
-        if queue[3] == 'settings_change_countable':
+        if queue[3] == 'settings_change_countable' and additional['setting'] == 'autodelete':
+            setting = additional['setting']
+            category = additional['category']
+            cmid = additional['cmid']
+            text = event.object.message.text
+            kb = keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True)
+            if not (matches := re.findall(r'(\d+)\s*([hm])', text)):
+                await editMessage(messages.settings_autodelete_input_error(),
+                                  event.object.message.peer_id, cmid, kb)
+                return
+            itime = 0
+            for val, u in matches:
+                if u == 'h':
+                    itime += int(val) * 3600
+                elif u == 'm':
+                    itime += int(val) * 60
+            if itime > 86400 or itime < 300:
+                await editMessage(messages.settings_autodelete_input_error(),
+                                  event.object.message.peer_id, cmid, kb)
+                return
+            async with (await pool()).acquire() as conn:
+                await conn.execute('update settings set value = $1 where chat_id=$2 and setting=$3',
+                                   itime, chat_id, setting)
+            await editMessage(messages.settings_change_autodelete_done(itime),
+                              event.object.message.peer_id, cmid, kb)
+        elif queue[3] == 'settings_change_countable':
             setting = additional['setting']
             category = additional['category']
             cmid = additional['cmid']

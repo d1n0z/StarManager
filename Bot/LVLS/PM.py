@@ -130,8 +130,7 @@ async def report(message: GroupTypes.MessageNew):
         await conn.execute('insert into reports (uid, id, time) VALUES ($1, $2, $3)', uid, repid, time.time())
 
     photos = ','.join(photos) or None
-    await api.messages.send(disable_mentions=1, chat_id=REPORT_TO, random_id=0, message=messages.report(
+    await sendMessage(peer_ids=REPORT_TO + 2000000000, msg=messages.report(
         uid, await getUserName(uid), ' '.join(data[1:]), repid, chat_id, await getChatName(chat_id)),
-                            keyboard=keyboard.report(uid, repid, chat_id, ' '.join(data[1:]), photos),
-                            attachment=photos)
+                      kbd=keyboard.report(uid, repid, chat_id, ' '.join(data[1:]), photos), photo=photos)
     await sendMessage(message.peer_id, messages.report_sent(repid))

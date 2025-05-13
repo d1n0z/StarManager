@@ -143,6 +143,9 @@ def settings(uid):
                                       "setting": 'welcome'}))
     kb.add(Callback('🔢 Каптча', {"uid": uid, "cmd": "change_setting", "category": 'main',
                                  "setting": 'captcha'}))
+    kb.row()
+    kb.add(Callback('🗑️ Автоудаление', {"uid": uid, "cmd": "change_setting", "category": 'main',
+                                        "setting": 'autodelete'}))
     # if uid in DEVS:
     #     kb.add(Callback('⭐️ Star protect', {"uid": uid, "cmd": "settings", "category": 'protect'}))
 

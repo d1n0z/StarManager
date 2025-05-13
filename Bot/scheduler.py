@@ -186,6 +186,9 @@ async def everyminute():
                     await sendMessage(DAILY_TO + 2000000000, f'e from everyminute:\n' + traceback.format_exc())
             await conn.execute('delete from captcha where exptime<$1', time.time())
             await conn.execute('delete from prempromo where "end"<$1', time.time())
+            for i in await conn.fetch('select peerid, cmid from todelete where delete_at<$1', time.time()):
+                await deleteMessages(i[1], i[0] - 2000000000)
+            await conn.execute('delete from todelete where delete_at<$1', time.time())
     except:
         traceback.print_exc()
         await sendMessage(DAILY_TO + 2000000000, f'e from schedule everyminute:\n' + traceback.format_exc())

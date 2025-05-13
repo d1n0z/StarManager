@@ -1083,10 +1083,17 @@ def settings_change_countable(chat_id, setting, pos, value, value2, pos2, punish
         return get(f'settings_change_countable_{setting}', status="Включено" if pos else "Выключено",
                    status2="Да" if pos2 else "Нет",
                    value='Установлено' if pos and w is not None and (w[0] or w[1]) else '❌')
+    elif setting == 'autodelete':
+        return get(f'settings_change_countable_{setting}', status="Включено" if pos else "Выключено",
+                   time=f'{pointHours(value)} {pointMinutes(value % 3600)}' if value else '❌')
 
 
 def settings_change_countable_digit_error():
     return get(f'settings_change_countable_digit_error')
+
+
+def settings_autodelete_input_error():
+    return get(f'settings_autodelete_input_error')
 
 
 def settings_change_countable_format_error():
@@ -1122,6 +1129,11 @@ def settings_set_punishment_input(punishment):
 
 def settings_change_countable_done(setting, data):
     return get(f'settings_change_countable_done_{setting}', data=data)
+
+
+def settings_change_autodelete_done(itime):
+    return get(f'settings_change_countable_done_autodelete',
+               hours=pointHours(itime), minutes=pointMinutes(int(itime % 3600)))
 
 
 def settings_set_punishment_countable(action, count):

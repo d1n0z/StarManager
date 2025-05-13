@@ -203,6 +203,7 @@ def SETTINGS():
             "nightmode": 0,
             "welcome": 0,
             "captcha": 0,
+            "autodelete": 0,
         },
         "entertaining": {
             "allowDuel": 1,
@@ -246,6 +247,7 @@ SETTINGS_POSITIONS = {
         "nightmode": ["Выкл.", "Вкл."],
         "welcome": ["Выкл.", "Вкл."],
         "captcha": ["Выкл.", "Вкл."],
+        "autodelete": ["Выкл.", "Вкл."],
     },
     "entertaining": {
         "allowDuel": ["Выкл.", "Вкл."],
@@ -261,25 +263,26 @@ SETTINGS_POSITIONS = {
     },
     "protect": {
         "enable": ["Выкл.", "Вкл."],
-    }
+    },
 }
 SETTINGS_COUNTABLE = [
     "messagesPerMinute", "maximumCharsInMessage", "disallowLinks", "disallowNSFW", "nightmode", "welcome", "captcha",
+    "autodelete",
 ]
 SETTINGS_COUNTABLE_MULTIPLE_ARGUMENTS = [
     "nightmode", "welcome"
 ]
 SETTINGS_COUNTABLE_NO_PUNISHMENT = [
-    "nightmode", "welcome"
+    "nightmode", "welcome", "autodelete"
 ]
 SETTINGS_COUNTABLE_NO_CATEGORY = [
-    "nightmode", "welcome", "captcha"
+    "nightmode", "welcome", "captcha", "autodelete"
 ]
 SETTINGS_COUNTABLE_PUNISHMENT_NO_DELETE_MESSAGE = [
     "messagesPerMinute", "captcha"
 ]
 SETTINGS_COUNTABLE_SPECIAL_LIMITS = {
-    "captcha": range(1, 61)
+    "captcha": range(1, 61), "autodelete": range(300, 86400)
 }
 SETTINGS_DEFAULTS = {
     "captcha": {"pos": 0, "value": 10, "punishment": "kick"},
@@ -320,6 +323,10 @@ SETTINGS_COUNTABLE_CHANGEMENU = {
     "disallowNSFW": [
         {"action": "turn", "button": ["Включить", "Выключить"]},
         {"action": "setPunishment", "button": "Наказание"},
+    ],
+    "autodelete": [
+        {"action": "turn", "button": ["Включить", "Выключить"]},
+        {"action": "set", "button": "Время"},
     ],
 }
 SETTINGS_COUNTABLE_CHANGEPUNISHMENTMESSAGE = {

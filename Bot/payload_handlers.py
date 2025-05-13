@@ -38,7 +38,7 @@ async def join(message: MessageEvent):
         try:
             members = (await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)).items
         except:
-            return await api.messages.send(random_id=0, message=messages.notadmin(), chat_id=chat_id)
+            return await sendMessage(message.peer_id, messages.notadmin())
 
         bp = message.user_id
         if (bp not in [i.member_id for i in members if i.is_admin or i.is_owner] and
@@ -808,8 +808,8 @@ async def kick_nonick(message: MessageEvent):
     for i in (await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)).items:
         if i.member_id not in res and i.member_id > 0:
             kicked += await kickUser(i.member_id, chat_id)
-    await api.messages.send(random_id=0, message=messages.kickmenu_kick_nonick(
-        uid, await getUserName(uid), await getUserNickname(uid, chat_id), kicked), chat_id=chat_id)
+    await sendMessage(msg=messages.kickmenu_kick_nonick(
+        uid, await getUserName(uid), await getUserNickname(uid, chat_id), kicked), peer_ids=chat_id + 2000000000)
 
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['kick_nick']))
@@ -822,8 +822,8 @@ async def kick_nick(message: MessageEvent):
                                      'nickname is not null', chat_id, uid)
     for i in nicknamed:
         kicked += await kickUser(i[0], chat_id)
-    await api.messages.send(random_id=0, message=messages.kickmenu_kick_nick(
-        uid, await getUserName(uid), await getUserNickname(uid, chat_id), kicked), chat_id=chat_id)
+    await sendMessage(msg=messages.kickmenu_kick_nick(
+        uid, await getUserName(uid), await getUserNickname(uid, chat_id), kicked), peer_ids=chat_id + 2000000000)
 
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['kick_banned']))
@@ -837,8 +837,8 @@ async def kick_banned(message: MessageEvent):
     for i in lst:
         if i.deactivated:
             kicked += await kickUser(i.id, chat_id)
-    await api.messages.send(random_id=0, message=messages.kickmenu_kick_banned(
-        uid, await getUserName(uid), await getUserNickname(uid, chat_id), kicked), chat_id=chat_id)
+    await sendMessage(msg=messages.kickmenu_kick_banned(
+        uid, await getUserName(uid), await getUserNickname(uid, chat_id), kicked), peer_ids=chat_id + 2000000000)
 
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['notif']))

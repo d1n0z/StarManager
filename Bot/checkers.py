@@ -4,7 +4,7 @@ from cache.async_ttl import AsyncTTL
 
 import messages
 from Bot.utils import getUserAccessLevel, getUserPremium, getUserLastMessage, getUserMute, getChatSettings, \
-    deleteMessages, getUserPrefixes, getSilence, getSilenceAllowed
+    deleteMessages, getUserPrefixes, getSilence, getSilenceAllowed, messagereply
 from config.config import COMMANDS, api, PREFIX, DEVS, MAIN_DEVS, LVL_BANNED_COMMANDS, PM_COMMANDS
 from db import pool
 
@@ -94,11 +94,11 @@ async def checkCMD(message, chat_id, fixing=False, accesstoalldevs=False, return
             pass
         else:
             if (cmd in PM_COMMANDS or text.replace(prefix, '', 1) in PM_COMMANDS) and message.peer_id >= 2000000000:
-                await message.reply(messages.pmcmd())
+                await messagereply(message, messages.pmcmd())
             return False
 
     if fixing and uid not in (DEVS if accesstoalldevs else MAIN_DEVS):
-        await message.reply(disable_mentions=1, message=messages.inprogress())
+        await messagereply(message, disable_mentions=1, message=messages.inprogress())
         return False
 
     u_acc = await getUserAccessLevel(uid, chat_id)
@@ -111,7 +111,7 @@ async def checkCMD(message, chat_id, fixing=False, accesstoalldevs=False, return
         return False
 
     if cmd in LVL_BANNED_COMMANDS and await getULvlBanned(uid):
-        await message.reply(messages.lvlbanned())
+        await messagereply(message, messages.lvlbanned())
         return False
 
     settings = await getChatSettings(chat_id)
