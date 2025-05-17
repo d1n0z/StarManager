@@ -1513,3 +1513,53 @@ async def bindlist(message: MessageEvent):
     res = res[page * 15:page * 15 + 15]
     await editMessage(messages.bindlist(group, [(i[0], await getChatName(i[0])) for i in res]), message.object.peer_id,
                       message.conversation_message_id, keyboard.bindlist(message.user_id, group, page, count))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(
+    ['filter_punishments', 'filter_punishments_set']))
+async def filterpunishments(message: MessageEvent):
+    chat_id = message.peer_id - 2000000000
+    async with (await pool()).acquire() as conn:
+        if message.payload['cmd'].endswith('_set'):
+            pnt = message.payload['set']
+            if not await conn.fetchval(
+                    'update filtersettings set punishment=$1 where chat_id=$2 returning 1', pnt, chat_id):
+                await conn.execute('insert into filtersettings (chat_id, punishment) values ($1, $2)', chat_id, pnt)
+        else:
+            pnt = await conn.fetchval('select punishment from filtersettings where chat_id=$1', chat_id) or 0
+    await editMessage(messages.filter_punishments(pnt), message.object.peer_id,
+                      message.conversation_message_id, keyboard.filter_punishments(message.user_id, pnt))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['filter_list']))
+async def filterlist(message: MessageEvent):
+    page, chat_id = message.payload.get('page', 0), message.peer_id - 2000000000
+    async with (await pool()).acquire() as conn:
+        filters = (await conn.fetch(
+            'select chat_id, owner_id, filter from filters where (chat_id=$1 or (owner_id=$2 and exists('
+            'select 1 from gpool where uid=$2 and chat_id=$1))) and filter not in ('
+            'select filter from filterexceptions where owner_id=$2 and chat_id=$1)',
+            chat_id, await conn.fetchval('select uid from accesslvl where chat_id=$1 and access_level>=7 order by '
+                                         'access_level, uid', chat_id) or message.user_id))
+    await editMessage(messages.filter_list(filters[25 * page:25 * page + 25], page), message.object.peer_id,
+                      message.conversation_message_id, keyboard.filter_list(message.user_id, page, len(filters)))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['filteradd']))
+async def filteradd(message: MessageEvent):
+    async with (await pool()).acquire() as conn:
+        await conn.execute(
+            'update filters set chat_id=null, owner_id=$1 where id=$2', await conn.fetchval(
+                'select uid from accesslvl where chat_id=$1 and access_level>=7 order by '
+                'access_level, uid', message.peer_id - 2000000000) or message.user_id, message.payload['fid'])
+    await editMessage(message.payload['msg'], message.object.peer_id, message.conversation_message_id)
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['filterdel']))
+async def filterdel(message: MessageEvent):
+    async with (await pool()).acquire() as conn:
+        filter = await conn.fetchval('delete from filters where id=$1 returning filter', message.payload['fid'])
+        await conn.execute('delete from filterexceptions where owner_id=$1 and filter=$2', await conn.fetchval(
+            'select uid from accesslvl where chat_id=$1 and access_level>=7 order by '
+            'access_level, uid', message.peer_id - 2000000000) or message.user_id, filter)
+    await editMessage(message.payload['msg'], message.object.peer_id, message.conversation_message_id)

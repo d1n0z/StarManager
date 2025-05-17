@@ -11,7 +11,7 @@ import messages
 from Bot.rules import SearchCMD
 from Bot.utils import getIDFromMessage, getUserName, getUserNickname, isChatAdmin, \
     getUserAccessLevel, kickUser, getUserPremium, getUserMute, setChatMute, getUserBan, getUserWarns, whoiscached, \
-    scanURLMalware, scanURLRedirect, scanURLShortened, messagereply
+    scanURLMalware, scanURLRedirect, scanURLShortened, messagereply, deleteMessages
 from config.config import api
 from db import pool
 
@@ -221,8 +221,8 @@ async def clear(message: Message):
         i for i in deleting if await getUserAccessLevel(i[0], chat_id) <= await getUserAccessLevel(uid, chat_id)]
     if deleting:
         try:
-            deleted = await api.messages.delete(
-                peer_id=message.peer_id, cmids=[mid for _, mid in deleting], delete_for_all=True)
+            deleted = await deleteMessages(
+                chat_id=chat_id, cmids=[mid for _, mid in deleting])
             if all(True if i.error and 'admin message' in i.error.description else False for i in deleted):
                 return await messagereply(message, disable_mentions=1, message=messages.clear_admin())
             if all(True if i.error else False for i in deleted):

@@ -160,111 +160,56 @@ async def mygroups(message: Message):
     await messagereply(message, disable_mentions=1, message=msg)
 
 
-@bl.chat_message(SearchCMD('addfilter'))
-async def addfilter(message: Message):
+@bl.chat_message(SearchCMD('filteradd'))
+async def filteradd(message: Message):
     chat_id = message.peer_id - 2000000000
     data = message.text.lower().split()
     if len(data) <= 1:
-        return await messagereply(message, disable_mentions=1, message=messages.addfilter_hint())
-    addfilter = ' '.join(data[1:])
+        return await messagereply(message, disable_mentions=1, message=messages.filteradd_hint())
+    word = ' '.join(data[1:])
     uid = message.from_id
-    u_name = await getUserName(uid)
     async with (await pool()).acquire() as conn:
-        if not await conn.fetchval(
-                'select exists(select 1 from filters where chat_id=$1 and filter=$2)', chat_id, addfilter):
-            await conn.execute('insert into filters (chat_id, filter) values ($1, $2)', chat_id, addfilter)
-    await messagereply(message, disable_mentions=1, message=messages.addfilter(
-        uid, u_name, await getUserNickname(uid, chat_id)))
+        if await conn.fetchval('select exists(select 1 from filterexceptions where owner_id=$1 and chat_id=$2 and '
+                               'filter=$3)', uid, chat_id, word):
+            await conn.execute('delete from filterexceptions where owner_id=$1 and chat_id=$2 and filter=$3',
+                               uid, chat_id, word)
+            id = None
+        elif await conn.fetchval('select exists(select 1 from filters where (chat_id=$1 or (owner_id=$2 and exists('
+                                 'select 1 from gpool where uid=$2 and chat_id=$1))) and filter=$3)',
+                                 chat_id, uid, word):
+            return await messagereply(message, disable_mentions=1, message=messages.filteradd_dup(word))
+        else:
+            id = await conn.fetchval('insert into filters (chat_id, filter) values ($1, $2) returning id', chat_id, word)
+    msg = messages.filteradd(uid, await getUserName(uid), await getUserNickname(uid, chat_id), word)
+    await messagereply(message, disable_mentions=1, message=msg,
+                       keyboard=keyboard.filteradd(uid, id, msg) if id else None)
 
 
-@bl.chat_message(SearchCMD('delfilter'))
-async def delfilter(message: Message):
+@bl.chat_message(SearchCMD('filterdel'))
+async def filterdel(message: Message):
     chat_id = message.peer_id - 2000000000
     data = message.text.lower().split()
     if len(data) <= 1:
-        return await messagereply(message, disable_mentions=1, message=messages.delfilter_hint())
-    delfilter = ' '.join(data[1:])
+        return await messagereply(message, disable_mentions=1, message=messages.filterdel_hint())
+    word = ' '.join(data[1:])
+    uid, fid = message.from_id, None
     async with (await pool()).acquire() as conn:
-        if not await conn.fetchval(
-                'delete from filters where chat_id=$1 and filter=$2 returning 1', chat_id, delfilter):
-            return await messagereply(message, disable_mentions=1, message=messages.delfilter_no_filter())
-    uid = message.from_id
-    await messagereply(message, disable_mentions=1, message=messages.delfilter(
-        uid, await getUserName(uid), await getUserNickname(uid, chat_id)))
+        if fid := await conn.fetchval('select id from filters where owner_id=$1 and filter=$2 and exists('
+                                      'select 1 from gpool where uid=$1 and chat_id=$3)', uid, word, chat_id):
+            await conn.execute(
+                'insert into filterexceptions (owner_id, chat_id, filter) values ($1, $2, $3)', uid, chat_id, word)
+        elif not await conn.fetchval(
+                'delete from filters where chat_id=$1 and filter=$2 returning 1', chat_id, word):
+            return await messagereply(message, disable_mentions=1, message=messages.filterdel_not_found(word))
+    msg = messages.filterdel(uid, await getUserName(uid), await getUserNickname(uid, chat_id), word)
+    await messagereply(
+        message, disable_mentions=1, message=msg, keyboard=keyboard.filterdel(uid, fid, msg) if fid else None)
 
 
-@bl.chat_message(SearchCMD('filterlist'))
-async def filterlist(message: Message):
-    chat_id = message.peer_id - 2000000000
-    async with (await pool()).acquire() as conn:
-        filters = await conn.fetch('select filter from filters where chat_id=$1', chat_id)
-    if len(filters) == 0:
-        return await messagereply(
-            message, disable_mentions=1,
-            message='⚠ В данной беседе отсутствуют запрещённые слова, вы можете добавить используя /addfilter')
-    msg = f'🟣 Список запрещенных слов (Всего : {len(filters)})\n\n➖ Полный список : '
-    for ind, item in enumerate(filters):
-        msg += f'{item[0]} '
-        if ind + 1 != len(filters):
-            msg += ', '
-    await messagereply(message, disable_mentions=1, message=msg)
-
-
-@bl.chat_message(SearchCMD('gaddfilter'))
-async def gaddfilter(message: Message):
-    chat_id = message.peer_id - 2000000000
-    data = message.text.lower().split()
-    if len(data) <= 1:
-        return await messagereply(message, disable_mentions=1, message=messages.gaddfilter_hint())
-
-    if not (chats := await getgpool(chat_id)):
-        return await messagereply(message, disable_mentions=1, message=messages.chat_unbound())
-
-    uid = message.from_id
-    if len(chats) == 0:
-        return await messagereply(message, disable_mentions=1, message=messages.chat_unbound())
-    edit = await messagereply(message, disable_mentions=1, message=messages.gaddfilter_start(
-        uid, await getUserName(uid), await getUserNickname(uid, chat_id), len(chats)))
-    addfilter = ' '.join(data[1:])
-    success = 0
-    for chat_id in chats:
-        u_acc = await getUserAccessLevel(uid, chat_id)
-        if not await haveAccess('gaddfilter', chat_id, u_acc):
-            continue
-        async with (await pool()).acquire() as conn:
-            if not await conn.fetchval(
-                    'select exists(select 1 from filters where chat_id=$1 and filter=$2)', chat_id, addfilter):
-                await conn.execute('insert into filters (chat_id, filter) values ($1, $2)', chat_id, addfilter)
-        success += 1
-    await editMessage(messages.gaddfilter(
-        uid, await getUserName(uid), len(chats), success), edit.peer_id, edit.conversation_message_id)
-
-
-@bl.chat_message(SearchCMD('gdelfilter'))
-async def gdelfilter(message: Message):
-    chat_id = message.peer_id - 2000000000
-    data = message.text.lower().split()
-    if len(data) <= 1:
-        return await messagereply(message, disable_mentions=1, message=messages.gdelfilter_hint())
-    if not (chats := await getgpool(chat_id)):
-        return await messagereply(message, disable_mentions=1, message=messages.chat_unbound())
-
-    uid = message.from_id
-    if len(chats) == 0:
-        return await messagereply(message, disable_mentions=1, message=messages.chat_unbound())
-    edit = await messagereply(message, disable_mentions=1, message=messages.gdelfilter_start(
-        uid, await getUserName(uid), await getUserNickname(uid, chat_id), len(chats)))
-    delfilter = ' '.join(data[1:])
-    success = 0
-    for chat_id in chats:
-        u_acc = await getUserAccessLevel(uid, chat_id)
-        if not await haveAccess('grnick', chat_id, u_acc):
-            continue
-        async with (await pool()).acquire() as conn:
-            await conn.execute('delete from filters where chat_id=$1 and filter=$2', chat_id, delfilter)
-        success += 1
-    await editMessage(peer_id=edit.peer_id, cmid=edit.message_id,
-                      msg=messages.gdelfilter(uid, await getUserName(uid), len(chats), success))
+@bl.chat_message(SearchCMD('filter'))
+async def filter(message: Message):
+    await messagereply(
+        message, disable_mentions=1, message=messages.filter(), keyboard=keyboard.filter(message.from_id))
 
 
 @bl.chat_message(SearchCMD('editlevel'))

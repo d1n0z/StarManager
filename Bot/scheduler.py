@@ -149,7 +149,7 @@ async def everyminute():
             for uid, cmid in await conn.fetch(
                     'select uid, cmid from premiumexpirenotified where date<$1', time.time() - 86400 * 2):
                 try:
-                    await api.messages.delete(group_id=GROUP_ID, delete_for_all=True, peer_id=uid, cmids=cmid)
+                    await deleteMessages(cmid, uid)
                 except:
                     pass
             await conn.execute('delete from premiumexpirenotified where date<$1', time.time() - 86400 * 2)

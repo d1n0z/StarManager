@@ -4,6 +4,8 @@ from config.config import (SETTINGS_POSITIONS, SETTINGS_COUNTABLE_CHANGEMENU, SE
                            SETTINGS_COUNTABLE_NO_CATEGORY, SETTINGS_COUNTABLE_PUNISHMENT_NO_DELETE_MESSAGE,
                            PREMMENU_TURN, LEAGUE, CONTACT_ADMIN)
 
+# TODO: create keyboard and payload classes(rework payload<->handler sistem)
+
 
 def join(chid):
     kb = Keyboard(inline=True)
@@ -871,4 +873,53 @@ def premium_expire(promo):
     kb = Keyboard(inline=True)
     kb.add(OpenLink(label='✅ Продлить подписку', link=f'https://star-manager.ru/payment?promo={promo}'),
            KeyboardButtonColor.POSITIVE)
+    return kb.get_json()
+
+
+def filter(uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('Наказания', {"cmd": "filter_punishments", "uid": uid}))
+    kb.add(Callback('Список запрещённых слов', {"cmd": "filter_list", "uid": uid}))
+
+    return kb.get_json()
+
+
+def filter_punishments(uid, pnt):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('Удалить сообщение', {"cmd": "filter_punishments_set", "uid": uid, "set": 0}),
+           KeyboardButtonColor.POSITIVE if pnt == 0 else KeyboardButtonColor.NEGATIVE)
+    kb.add(Callback('Замутить', {"cmd": "filter_punishments_set", "uid": uid, "set": 1}),
+           KeyboardButtonColor.POSITIVE if pnt == 1 else KeyboardButtonColor.NEGATIVE)
+    kb.add(Callback('Заблокировать', {"cmd": "filter_punishments_set", "uid": uid, "set": 2}),
+           KeyboardButtonColor.POSITIVE if pnt == 2 else KeyboardButtonColor.NEGATIVE)
+
+    return kb.get_json()
+
+
+def filter_list(uid, page, count):
+    kb = Keyboard(inline=True)
+
+    if page > 0:
+        kb.add(Callback('⏪', {"cmd": "filter_list", "page": page - 1, "uid": uid}))
+    if count > (25 * (page + 1)):
+        kb.add(Callback('⏩', {"cmd": "filter_list", "page": page + 1, "uid": uid}))
+
+    return kb.get_json()
+
+
+def filteradd(uid, id, msg):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('Добавить в связки', {"cmd": "filteradd", "fid": id, "msg": msg, "uid": uid}))
+
+    return kb.get_json()
+
+
+def filterdel(uid, id, msg):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('Удалить в связке', {"cmd": "filterdel", "fid": id, "msg": msg, "uid": uid}))
+
     return kb.get_json()

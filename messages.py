@@ -4,12 +4,14 @@ from datetime import datetime
 
 from memoization import cached
 
-from Bot.utils import getUserNickname, pointMinutes, pointDays, pointHours, pointWords, getUserName, getChatAccessName, \
-    getGroupName
+from Bot.utils import (getUserNickname, pointMinutes, pointDays, pointHours, pointWords, getUserName,
+                       getChatAccessName, getGroupName)
 from config.config import COMMANDS, LVL_NAMES, COMMANDS_DESC, SETTINGS_POSITIONS, \
     SETTINGS_COUNTABLE_CHANGEPUNISHMENTMESSAGE, SETTINGS_COUNTABLE_NO_PUNISHMENT, GOOGLE_THREATS, COMMANDS_PREMIUM
 from db import syncpool
 
+
+# TODO: clean
 
 @cached
 def get(key: str, **kwargs):
@@ -58,7 +60,9 @@ def help(page=0, cmds=COMMANDS):
 
 
 def helpdev():
-    return get('helpdev')
+    devcmds = [f'{COMMANDS_DESC[k] if k in COMMANDS_DESC else f"/{k} - Без описания."}'
+               for k, i in COMMANDS.items() if i == 8]
+    return get('helpdev', cmds='\n'.join(devcmds))
 
 
 def help_closed():
@@ -2373,3 +2377,48 @@ def math_winner(uid, name, nick, ans, xp, math):
 
 def premium_expire(uid, n, end):
     return get('premium_expire', end=end, uid=uid, n=n)
+
+
+def filter():
+    return get('filter')
+
+
+def filter_punishments(punishment):
+    return get('filter_punishments', p=('Удалять сообщение', 'Замутить', 'Заблокировать')[punishment])
+
+
+def filter_list(filters, page):
+    return get('filter_list', filters='\n'.join(
+        f'[{k + 1 + (page * 25)}]. {"📘" if i[1] else "📗"} | "{i[2]}"' for k, i in enumerate(filters)))
+
+
+def filteradd_hint():
+    return get('filteradd_hint')
+
+
+def filteradd(id, name, nick, word):
+    return get('filteradd', id=id, n=nick or name, word=word)
+
+
+def filteradd_dup(word):
+    return get('filteradd_dup', word=word)
+
+
+def filterdel_hint():
+    return get('filterdel_hint')
+
+
+def filterdel_not_found(word):
+    return get('filterdel_not_found', word=word)
+
+
+def filterdel(id, name, nick, word):
+    return get('filterdel', id=id, n=nick or name, word=word)
+
+
+def filterpunish_mute(uid, name, nick):
+    return get('filterpunish_mute', id=uid, n=nick or name)
+
+
+def filterpunish_ban(uid, name, nick):
+    return get('filterpunish_ban', id=uid, n=nick or name)

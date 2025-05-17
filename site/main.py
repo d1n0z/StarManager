@@ -328,7 +328,8 @@ async def yookassa(request: Request):
 6️⃣ Получатель: {f'<a href="https://vk.com/id{uid or from_id}">@id{uid or from_id}</a>' 
             if not chat_id else f"беседа {chat_id}"}
 7️⃣ Дата: <code>{datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}</code>
-8️⃣ Способ: <code>Юкасса</code>'''})
+8️⃣ Способ: <code>Юкасса</code>
+9️⃣ Код платежа: <code>{query["id"]}</code>'''})
 
     async with (await pool()).acquire() as conn:
         if chat_id == 0:

@@ -1,4 +1,5 @@
 import time
+from ast import literal_eval
 from datetime import datetime
 from typing import Any
 
@@ -14,7 +15,7 @@ from Bot.checkers import getUChatLimit
 from Bot.utils import getUserLastMessage, getUserAccessLevel, getUserMute, sendMessage, deleteMessages, \
     getChatSettings, kickUser, getUserName, getUserNickname, antispamChecker, punish, getUserBan, getUserBanInfo, \
     getUserPremium, getIDFromMessage, getUserPremmenuSetting, getChatName, getUserPrefixes, getSilence, \
-    getSilenceAllowed, addUserXP
+    getSilenceAllowed, addUserXP, setChatMute
 from config.config import PM_COMMANDS, ADMINS, MATHGIVEAWAYS_TO
 from db import pool
 
@@ -44,13 +45,91 @@ async def message_handle(event: MessageNew) -> Any:
     if uid in ADMINS:
         print(f'{uid}({chat_id}): {msg}')
 
+    filterdata, pnt = msg.lower().replace(' ', ''), -1
     async with (await pool()).acquire() as conn:
         await conn.execute('insert into allusers (uid) values ($1) on conflict (uid) do nothing', uid)
         await conn.execute('insert into allchats (chat_id) values ($1) on conflict (chat_id) do nothing', chat_id)
 
-        if await conn.fetchval('select exists(select 1 from filters where chat_id=$1 and filter=ANY($2))',
-                               chat_id, msg.lower().split()) and not await getUserAccessLevel(uid, chat_id):
-            return await deleteMessages(event.object.message.conversation_message_id, chat_id)
+        if any(i in filterdata for i in [
+            i[0] for i in await conn.fetch(
+                'select filter from filters where chat_id=$1 or (owner_id=$2 and exists('
+                'select 1 from gpool where uid=$2 and chat_id=$1) and filter not in ('
+                'select filter from filterexceptions where owner_id=$2 and chat_id=$1))', chat_id,
+                await conn.fetchval('select uid from accesslvl where chat_id=$1 and access_level>=7 order by '
+                                    'access_level, uid', chat_id) or uid)]
+               ) and not await getUserAccessLevel(uid, chat_id):
+            pnt = await conn.fetchval('select punishment from filtersettings where chat_id=$1', chat_id)
+    if pnt == -1:
+        pass
+    elif not pnt:
+        return await deleteMessages(event.object.message.conversation_message_id, chat_id)
+    elif pnt == 1:
+        mute_time = 315360000
+        async with (await pool()).acquire() as conn:
+            ms = await conn.fetchrow(
+                'select last_mutes_times, last_mutes_causes, last_mutes_names, last_mutes_dates '
+                'from mute where chat_id=$1 and uid=$2', chat_id, uid)
+        if ms is not None:
+            mute_times = literal_eval(ms[0])
+            mute_causes = literal_eval(ms[1])
+            mute_names = literal_eval(ms[2])
+            mute_dates = literal_eval(ms[3])
+        else:
+            mute_times, mute_causes, mute_names, mute_dates = [], [], [], []
+
+        mute_times.append(mute_time)
+        mute_causes.append('Фильтрация слов')
+        mute_names.append('[club222139436|Star Manager]')
+        mute_dates.append(datetime.now().strftime('%Y.%m.%d %H:%M:%S'))
+
+        async with (await pool()).acquire() as conn:
+            if not await conn.fetchval(
+                    'update mute set mute = $1, last_mutes_times = $2, last_mutes_causes = $3, last_mutes_names = $4, '
+                    'last_mutes_dates = $5 where chat_id=$6 and uid=$7 returning 1', time.time() + mute_time,
+                    f"{mute_times}", f"{mute_causes}", f"{mute_names}", f"{mute_dates}", chat_id, uid):
+                await conn.execute(
+                    'insert into mute (uid, chat_id, mute, last_mutes_times, last_mutes_causes, last_mutes_names, '
+                    'last_mutes_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)', uid, chat_id,
+                    time.time() + mute_time,
+                    f"{mute_times}", f"{mute_causes}", f"{mute_names}", f"{mute_dates}")
+
+        await setChatMute(uid, chat_id)
+        await deleteMessages(event.object.message.conversation_message_id, chat_id)
+        return await sendMessage(chat_id + 2000000000, messages.filterpunish_mute(
+            uid, await getUserName(uid), await getUserNickname(uid, chat_id)))
+    else:
+        ban_time = 315360000
+        async with (await pool()).acquire() as conn:
+            res = await conn.fetchrow(
+                'select last_bans_times, last_bans_causes, last_bans_names, last_bans_dates from ban where '
+                'chat_id=$1 and uid=$2', chat_id, uid)
+        if res is not None:
+            ban_times = literal_eval(res[0])
+            ban_causes = literal_eval(res[1])
+            ban_names = literal_eval(res[2])
+            ban_dates = literal_eval(res[3])
+        else:
+            ban_times, ban_causes, ban_names, ban_dates = [], [], [], []
+
+        ban_times.append(ban_time)
+        ban_causes.append('Фильтрация слов')
+        ban_names.append('[club222139436|Star Manager]')
+        ban_dates.append(datetime.now().strftime('%Y.%m.%d %H:%M:%S'))
+
+        async with (await pool()).acquire() as conn:
+            if not await conn.fetchval(
+                    'update ban set ban = $1, last_bans_times = $2, last_bans_causes = $3, last_bans_names = $4, '
+                    'last_bans_dates = $5 where chat_id=$6 and uid=$7 returning 1', time.time() + ban_time,
+                    f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}", chat_id, uid):
+                await conn.execute(
+                    'insert into ban (uid, chat_id, ban, last_bans_times, last_bans_causes, last_bans_names, '
+                    'last_bans_dates) values ($1, $2, $3, $4, $5, $6, $7)', uid, chat_id,
+                    time.time() + ban_time, f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}")
+
+        await deleteMessages(event.object.message.conversation_message_id, chat_id)
+        return await sendMessage(chat_id + 2000000000, messages.filterpunish_ban(
+            uid, await getUserName(uid), await getUserNickname(uid, chat_id)) + (
+            '\n❗ Пользователя не удалось кикнуть' if not await kickUser(uid, chat_id) else ''))
 
     data = event.object.message.text.split()
     if not any(event.object.message.text.startswith(i) for i in await getUserPrefixes(

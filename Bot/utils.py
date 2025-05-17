@@ -22,6 +22,7 @@ from nudenet import NudeDetector
 from vkbottle import PhotoMessageUploader
 from vkbottle.bot import Message
 from vkbottle.tools.mini_types.bot.foreign_message import ForeignMessageMin
+from vkbottle_types.codegen.objects import MessagesDeleteFullResponseItem
 from vkbottle_types.objects import MessagesMessage, MessagesMessageAttachmentType, MessagesSendUserIdsResponseItem
 
 from config.config import (api, vk_api_session, GROUP_ID, SETTINGS, PATH,
@@ -60,12 +61,12 @@ async def kickUser(uid: int, chat_id: int) -> bool:
     return True
 
 
-async def deleteMessages(cmids: int | Iterable[int], chat_id: int) -> bool:
+async def deleteMessages(cmids: int | Iterable[int], chat_id: int) -> bool | list[MessagesDeleteFullResponseItem]:
     try:
-        await api.messages.delete(group_id=GROUP_ID, delete_for_all=True, peer_id=chat_id + 2000000000, cmids=cmids)
+        return await api.messages.delete(
+            group_id=GROUP_ID, delete_for_all=True, peer_id=chat_id + 2000000000, cmids=cmids)
     except:
         return False
-    return True
 
 
 async def getIDFromMessage(message: str, reply: ForeignMessageMin | None, place: int = 2) -> int:
@@ -924,12 +925,18 @@ def generateHardProblem():
 
 
 async def messagereply(
-        message: Message, *args, **kwargs) -> MessagesSendUserIdsResponseItem | MessagesSendUserIdsResponseItem:
-    msg = await message.reply(*args, **kwargs)
-    if msg.peer_id > 2000000000 and (await getChatSettings((chatid := msg.peer_id - 2000000000)))['main']['autodelete']:
-        async with (await pool()).acquire() as conn:
-            val = await conn.fetchval("select value from settings where setting='autodelete' and chat_id=$1", chatid)
-            if val:
-                await conn.execute('insert into todelete (peerid, cmid, delete_at) values ($1, $2, $3)',
-                                   msg.peer_id, msg.conversation_message_id, time.time() + val)
-    return msg
+        protectedmessage: Message, *args, **kwargs
+) -> MessagesSendUserIdsResponseItem | MessagesSendUserIdsResponseItem:
+    try:
+        msg = await protectedmessage.reply(*args, **kwargs)
+        if msg.peer_id > 2000000000 and (await getChatSettings(
+                (chatid := msg.peer_id - 2000000000)))['main']['autodelete']:
+            async with (await pool()).acquire() as conn:
+                val = await conn.fetchval(
+                    "select value from settings where setting='autodelete' and chat_id=$1", chatid)
+                if val:
+                    await conn.execute('insert into todelete (peerid, cmid, delete_at) values ($1, $2, $3)',
+                                       msg.peer_id, msg.conversation_message_id, time.time() + val)
+        return msg
+    except:
+        pass

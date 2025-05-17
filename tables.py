@@ -3,6 +3,7 @@ from peewee import (PostgresqlDatabase, Model, IntegerField, BigIntegerField, Te
 from config.config import USER, PASSWORD, DATABASE, DATABASE_PORT, DATABASE_HOST
 
 dbhandle = PostgresqlDatabase(DATABASE, user=USER, password=PASSWORD, host=DATABASE_HOST, port=DATABASE_PORT)
+# TODO: remove default=0 where not needed
 
 
 class AccessLevel(Model):
@@ -117,12 +118,32 @@ class ChatGroups(Model):
 
 
 class Filters(Model):
-    chat_id = IntegerField(default=0, index=True)
-    filter = TextField(null=True)
+    chat_id = IntegerField(null=True)
+    owner_id = IntegerField(null=True)
+    filter = TextField()
 
     class Meta:
         database = dbhandle
         table_name = f'filters'
+
+
+class FilterExceptions(Model):
+    owner_id = IntegerField()
+    chat_id = IntegerField()
+    filter = TextField()
+
+    class Meta:
+        database = dbhandle
+        table_name = f'filterexceptions'
+
+
+class FilterSettings(Model):
+    chat_id = IntegerField(default=0, index=True)
+    punishment = IntegerField(default=0)
+
+    class Meta:
+        database = dbhandle
+        table_name = f'filtersettings'
 
 
 class CMDLevels(Model):
