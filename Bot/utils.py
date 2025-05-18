@@ -904,8 +904,8 @@ def generateEasyProblem():
 
 def generateMediumProblem():
     x = random.randint(1, 33)
-    a = random.randint(10, 99)
-    b = random.randint(10, 99)
+    a = random.randint(10, 499)
+    b = random.randint(10, 499)
     op = random.choice(['+', '-'])
     if op == '+':
         c = a * x + b
@@ -915,13 +915,16 @@ def generateMediumProblem():
 
 
 def generateHardProblem():
-    x = random.randint(1, 33)
-    a = random.randint(10, 99)
-    c = a * x
+    x = random.randint(12, 199)
     if random.randint(0, 1):
-        return f"({a}X * {x} = {c * x}) → X = ?", x
+        a, b = random.randint(100, 1000), random.randint(100, 1000)
+        return f"({a}X * {b} = {a * x * b}) → X = ?", x
     else:
-        return f"({c * x}X / {x} = {c}) → X = ?", x
+        a = random.randint(100, 1000)
+        b = random.randint(10, 1000)
+        while a % b != 0 or a == b:
+            b = random.randint(10, 1000)
+        return f"({a}X / {b} = {int(a * x / b)}) → X = ?", x
 
 
 async def messagereply(
