@@ -1254,8 +1254,11 @@ def giveowner(uid, unick, uname, id, nick, name):
     return get('giveowner', uid=uid, un=unick or uname, id=id, n=nick or name)
 
 
-def bonus(id, nick, name, xp):
-    return get('bonus', id=id, n=nick or name, xp=xp)
+def bonus(id, nick, name, xp, premium, streak):
+    maxxp = 2500 if premium else 1000
+    return get('bonus', id=id, n=nick or name, xp=xp, nextxp=min(maxxp, xp + (50 if premium else 25)),
+               maxxp=maxxp, s='' if not streak else f'Серия: {pointWords(streak, ("день", "дня", "дней"))} подряд! '
+               ) + ('' if premium else '\n✨ Премиум-пользователи получают до 2500 XP и бонус +50 в день. (/premium)')
 
 
 def bonus_time(id, nick, name, timeleft):

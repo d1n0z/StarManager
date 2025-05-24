@@ -140,7 +140,6 @@ async def everyminute():
     try:
         os.system(f'find {PATH}' + 'media/temp/ -mtime +1 -exec rm {} \;')  # noqa
         async with (await pool()).acquire() as conn:
-            await conn.fetch('select state, count(*) from pg_stat_activity group by state')
             await conn.execute('delete from cmdnames where not cmd=ANY($1)', list(COMMANDS.keys()))
             await conn.execute('delete from antispammessages where time<$1', time.time() - 60)
             await conn.execute('delete from speccommandscooldown where time<$1', time.time() - 10)
@@ -189,6 +188,13 @@ async def everyminute():
             for i in await conn.fetch('select peerid, cmid from todelete where delete_at<$1', time.time()):
                 await deleteMessages(i[1], i[0] - 2000000000)
             await conn.execute('delete from todelete where delete_at<$1', time.time())
+            for i in await conn.fetch('select id, uid, streak from bonus where time<$1', time.time() - 172800):
+                print(*i)
+                if not await conn.fetchval('select 1 from premium where uid=$1', i[1]):
+                    if i[2] >= 2:
+                        await conn.execute('update bonus set streak=streak - 2 where id=$1', i[0])
+                    else:
+                        await conn.execute('delete from bonus where id=$1', i[0])
     except:
         traceback.print_exc()
         await sendMessage(DAILY_TO + 2000000000, f'e from schedule everyminute:\n' + traceback.format_exc())

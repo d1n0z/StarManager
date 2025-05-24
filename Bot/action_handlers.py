@@ -71,6 +71,8 @@ async def action_handle(event: MessageNew) -> None:
     if await getUInfBanned(uid, None):
         await sendMessage(event.peer_id, messages.block_blockeduserinvite(
             uid, await getUserName(uid), await getUserNickname(uid, chat_id)))
+        await kickUser(uid, chat_id=chat_id)
+        return
 
     if id:
         async with (await pool()).acquire() as conn:

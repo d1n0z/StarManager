@@ -145,19 +145,21 @@ async def bonus(message: Message):
     name = await getUserName(uid)
 
     async with (await pool()).acquire() as conn:
-        lasttime = await conn.fetchval('select time from bonus where uid=$1', uid) or 0
-    if time.time() - lasttime < (reqtime := 28800 if await chatPremium(chat_id) else 86400):
+        lasttime, streak = await conn.fetchrow('select time, streak from bonus where uid=$1', uid) or (0, 0)
+    if time.time() - lasttime < 86400:
         return await messagereply(message, disable_mentions=1, message=messages.bonus_time(
-            uid, None, name, lasttime + reqtime - time.time()))
+            uid, None, name, lasttime + 86400 - time.time()))
 
     async with (await pool()).acquire() as conn:
-        if not await conn.fetchval('update bonus set time = $1 where uid=$2 returning 1', time.time(), uid):
-            await conn.execute('insert into bonus (uid, time) values ($1, $2)', uid, time.time())
+        if not await conn.fetchval(
+                'update bonus set time = $1, streak=streak+1 where uid=$2 returning 1', time.time(), uid):
+            await conn.execute('insert into bonus (uid, time, streak) values ($1, $2, 1)', uid, time.time())
 
-    addxp = random.randint(100, 180) if await getUserPremium(uid) else random.randint(20, 100)
+    prem = await getUserPremium(uid)
+    addxp = min(100 + (50 if prem else 25) * streak, 2500 if prem else 1000)
     await addUserXP(uid, addxp)
     await messagereply(message, disable_mentions=1, message=messages.bonus(
-        uid, await getUserNickname(uid, chat_id), name, addxp))
+        uid, await getUserNickname(uid, chat_id), name, addxp, prem, streak))
 
 
 @bl.chat_message(SearchCMD('prefix'))

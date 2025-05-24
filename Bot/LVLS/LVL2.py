@@ -107,7 +107,7 @@ async def setaccess(message: Message):
     ch_acc = await getUserAccessLevel(id, chat_id)
     if acc == ch_acc:
         return await messagereply(message, disable_mentions=1, message=messages.setacc_already_have_acc(
-            id, await getUserName(id), ch_acc))
+            id, await getUserName(id), await getUserNickname(id, chat_id)))
 
     u_acc = await getUserAccessLevel(uid, chat_id)
     if not (acc < u_acc or u_acc >= 8) and uid not in MAIN_DEVS:

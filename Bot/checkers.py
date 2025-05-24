@@ -48,7 +48,7 @@ async def getUserIgnore(uid, chat_id) -> bool:
 @AsyncTTL(maxsize=0)
 async def getUInfBanned(uid, chat_id) -> bool:
     async with (await pool()).acquire() as conn:
-        return await conn.fetchval("select exists(select 1 from infbanned where (uid=$1 and type='chat') or "
+        return await conn.fetchval("select exists(select 1 from blocked where (uid=$1 and type='chat') or "
                                    "(uid=$2 and type='user'))", chat_id, uid)
 
 

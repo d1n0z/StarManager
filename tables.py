@@ -176,6 +176,7 @@ class Premium(Model):
 class Bonus(Model):
     uid = IntegerField(default=0, unique=True, index=True)
     time = BigIntegerField(default=0)
+    streak = IntegerField(default=0)
 
     class Meta:
         database = dbhandle
