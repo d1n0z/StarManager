@@ -707,3 +707,12 @@ async def prempromolist(message: Message):
     async with (await pool()).acquire() as conn:
         promos = await conn.fetch('select promo, "end" from prempromo')
     await messagereply(message, messages.prempromolist(promos))
+
+
+@bl.chat_message(SearchCMD('bonuslist'))
+async def bonuslist(message: Message):
+    async with (await pool()).acquire() as conn:
+        users = await conn.fetch('select uid, streak from bonus order by streak desc limit 50')
+    await messagereply(message, '\n'.join([
+        f'{k + 1}. [id{i[0]}|{await getUserName(i[0])}] - Серия: {pointWords(i[1] + 1, ("день", "дня", "дней"))}'
+        for k, i in enumerate(users)]))
