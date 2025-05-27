@@ -2,6 +2,7 @@ import asyncio
 import os
 import statistics
 import time
+import traceback
 from datetime import datetime
 
 from vkbottle.bot import Message
@@ -115,18 +116,19 @@ async def msg(message: Message):
     k = 0
     async with (await pool()).acquire() as conn:
         chats = await conn.fetch('select chat_id from allchats')
+    print(len(chats))
     for i in chunks(chats, 2500):
         try:
-            k += len(i)
             code = ''
             for y in chunks(i, 100):
-                code += ('api.messages.send({"random_id": 0, "peer_ids": [' + ','.join(str(o[0]) for o in y) +
+                code += ('API.messages.send({"random_id": 0, "peer_ids": [' + ','.join(str(o[0]) for o in y) +
                          '], "message": "' + f"{msg}" + '"});')
             await api.execute(code=code)
+            k += len(i)
             print(f'sent {k}/{len(chats)}')
             await asyncio.sleep(1)
         except:
-            pass
+            traceback.print_exc()
     msg = f'done {k}/{len(chats)}'
     print(msg)
     await messagereply(message, msg)
@@ -303,14 +305,26 @@ async def block(message: Message):
     async with (await pool()).acquire() as conn:
         if not await conn.fetchval('select exists(select 1 from blocked where uid=$1 and type=$2)', id, data[1]):
             await conn.execute('insert into blocked (uid, type, reason) values ($1, $2, $3)', id, data[1], reason)
-            if data[1] == 'chat':
-                await sendMessage(id + 2000000000, messages.block_chatblocked(id, reason),
-                                  keyboard.block_chatblocked())
-                await api.messages.remove_chat_user(id, member_id=-GROUP_ID)
-            else:
+            if data[1] != 'chat':
                 await conn.execute('delete from xp where uid=$1', id)
                 await conn.execute('delete from premium where uid=$1', id)
-                await sendMessage(id, messages.block_userblocked(id, reason), keyboard.block_chatblocked())
+                chats = set(
+                    i[0] for i in await conn.fetch('select chat_id from userjoineddate where uid=$1', id)) or set()
+                chats.update(i[0] for i in await conn.fetch('select chat_id from accesslvl where uid=$1', id))
+                chats.update(i[0] for i in await conn.fetch('select chat_id from nickname where uid=$1', id))
+    if data[1] == 'chat':
+        await sendMessage(id + 2000000000, messages.block_chatblocked(id, reason),
+                          keyboard.block_chatblocked())
+        await api.messages.remove_chat_user(id, member_id=-GROUP_ID)
+    else:
+        await sendMessage(id, messages.block_userblocked(id, reason), keyboard.block_chatblocked())
+        for i in chunks(list(chats), 25):
+            try:
+                await api.execute(code=''.join([
+                    'API.messages.removeChatUser({' + f'"chat_id": {y}, "user_id": {id}' + '});' for y in i]))
+                await asyncio.sleep(1)
+            except:
+                traceback.print_exc()
     await messagereply(message, messages.block())
 
 
