@@ -322,6 +322,8 @@ def top(chat_id, uid):
     kb.row()
     kb.add(Callback('📊 Репутация', {"cmd": "top_rep", "chat_id": chat_id, "uid": uid}))
     kb.add(Callback('🔢 Примеры', {"cmd": "top_math", "chat_id": chat_id, "uid": uid}))
+    kb.row()
+    kb.add(Callback('🎁 Бонус', {"cmd": "top_bonus", "chat_id": chat_id, "uid": uid}))
 
     return kb.get_json()
 
@@ -412,6 +414,25 @@ def top_math(chat_id, uid):
     kb = Keyboard(inline=True)
 
     kb.add(Callback('◀ Назад', {"cmd": "top", "chat_id": chat_id, "uid": uid}))
+
+    return kb.get_json()
+
+
+def top_bonus(chat_id, uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('◀ Назад', {"cmd": "top", "chat_id": chat_id, "uid": uid}))
+    kb.add(Callback('🥨 В беседе', {"cmd": "top_bonus_in_chat", "chat_id": chat_id, "uid": uid}),
+           KeyboardButtonColor.SECONDARY)
+
+    return kb.get_json()
+
+
+def top_bonus_in_chat(chat_id, uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('◀ Назад', {"cmd": "top", "chat_id": chat_id, "uid": uid}))
+    kb.add(Callback('🥯 Общее', {"cmd": "top_bonus", "chat_id": chat_id, "uid": uid}))
 
     return kb.get_json()
 

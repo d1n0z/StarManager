@@ -764,6 +764,26 @@ async def top_math(message: MessageEvent):
         keyboard.top_math(peer_id - 2000000000, message.user_id))
 
 
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['top_bonus']))
+async def top_bonus(message: MessageEvent):
+    peer_id = message.object.peer_id
+    async with (await pool()).acquire() as conn:
+        top = await conn.fetch('select uid, streak from bonus order by streak desc limit 10')
+    await editMessage(await messages.top_bonus(top), peer_id, message.conversation_message_id,
+                      keyboard.top_bonus(peer_id - 2000000000, message.user_id))
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['top_bonus_in_chat']))
+async def top_bonus_in_chat(message: MessageEvent):
+    peer_id = message.object.peer_id
+    async with (await pool()).acquire() as conn:
+        top = await conn.fetch(
+            'select uid, streak from bonus where uid=ANY($1) order by streak desc limit 10',
+            [i.member_id for i in (await api.messages.get_conversation_members(peer_id=peer_id)).items])
+    await editMessage(await messages.top_bonus(top), peer_id, message.conversation_message_id,
+                      keyboard.top_bonus_in_chat(peer_id - 2000000000, message.user_id))
+
+
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['resetnick_accept']))
 async def resetnick_accept(message: MessageEvent):
     uid = message.user_id

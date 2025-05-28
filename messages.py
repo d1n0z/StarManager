@@ -1297,6 +1297,13 @@ async def top_math(top):
     return msg
 
 
+async def top_bonus(top):
+    msg = get('top_bonus')
+    for k, item in enumerate(top[:10]) if top else []:
+        msg += f'[{k + 1}]. [id{item[0]}|{await getUserName(item[0])}] - {item[1]} дней\n'
+    return msg
+
+
 def premmenu(settings, prem):
     msg = get('premmenu')
     c = 0
