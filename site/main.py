@@ -91,11 +91,19 @@ async def index(request: Request):
 
 
 @app.get("/payment", response_class=HTMLResponse)
-async def payment(request: Request):
+async def payment(request: Request, promo: str | None = None):
+    user = request.session.get("user")
+    if not user:
+        return RedirectResponse("/login")
+    if not promo:
+        async with (await pool()).acquire() as conn:
+            availpromo = await conn.fetchval('select promo from prempromo where uid=$1', user['id'])
+        if availpromo:
+            return RedirectResponse(f"/payment?promo={availpromo}")
     return templates.TemplateResponse(
         request=request,
         name="payment.html",
-        context={**config.data, "user": request.session.get("user")}
+        context={**config.data, "user": user}
     )
 
 
