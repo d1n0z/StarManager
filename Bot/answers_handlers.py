@@ -273,7 +273,7 @@ async def queue_handler(event: MessageNew):
         if queue[3] == 'premmenu_action_border_color':
             data = event.object.message.text
             rgb = data.replace(' ', '').split(',')
-            if len(rgb) == 3 and all(255 >= int(i) >= 0 for i in rgb):
+            if len(rgb) == 3 and all(255 >= int(i) >= 0 for i in rgb) and not data.startswith('#'):
                 color = ('(' + ','.join(rgb) + ')')
             elif re.search(r'^#[0-9a-fA-F]{6}$', data):
                 color = f'({",".join(str(i) for i in hex_to_rgb(data))})'

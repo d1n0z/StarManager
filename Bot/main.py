@@ -1,11 +1,11 @@
 from datetime import datetime
 
-import pydantic
-import vk_api.exceptions
-import vkbottle.api.response_validator
+# import pydantic
+# import vk_api.exceptions
+# import vkbottle.api.response_validator
 from loguru import logger
-from pydantic import v1
-from vkbottle import GroupEventType, GroupTypes, VKAPIError
+# from pydantic import v1
+from vkbottle import GroupEventType, GroupTypes  # VKAPIError
 from vkbottle.framework.labeler import BotLabeler
 
 from Bot.bot import bot
@@ -43,17 +43,17 @@ def run():
     async def like_add(event: GroupTypes.LikeAdd):
         await like_handle(event)
 
-    @bot.error_handler.register_error_handler(VKAPIError[7])
-    @bot.error_handler.register_error_handler(VKAPIError[917])
-    @bot.error_handler.register_error_handler(VKAPIError[100])
-    @bot.error_handler.register_error_handler(VKAPIError[6])
-    @bot.error_handler.register_error_handler(pydantic.ValidationError)
-    @bot.error_handler.register_error_handler(v1.ValidationError)
-    @bot.error_handler.register_error_handler(v1.error_wrappers.ValidationError)
-    @bot.error_handler.register_error_handler(vkbottle.api.response_validator.VKAPIErrorResponseValidator)
-    @bot.error_handler.register_error_handler(vk_api.exceptions.ApiError)
-    async def exception_handler(e: Exception):  # noqa
-        pass
+    # @bot.error_handler.register_error_handler(VKAPIError[7])
+    # @bot.error_handler.register_error_handler(VKAPIError[917])
+    # @bot.error_handler.register_error_handler(VKAPIError[100])
+    # @bot.error_handler.register_error_handler(VKAPIError[6])
+    # @bot.error_handler.register_error_handler(pydantic.ValidationError)
+    # @bot.error_handler.register_error_handler(v1.ValidationError)
+    # @bot.error_handler.register_error_handler(v1.error_wrappers.ValidationError)
+    # @bot.error_handler.register_error_handler(vkbottle.api.response_validator.VKAPIErrorResponseValidator)
+    # @bot.error_handler.register_error_handler(vk_api.exceptions.ApiError)
+    # async def exception_handler(e: Exception):  # noqa
+    #     pass
 
     bot.labeler.load(labeler)
     for i in LABELERS:

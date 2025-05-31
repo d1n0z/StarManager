@@ -285,10 +285,14 @@ async def szov(message: Message):
     for chat_id in chats:
         if not await haveAccess('szov', chat_id, await getUserAccessLevel(uid, chat_id)):
             continue
-        members = await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)
-        await sendMessage(peer_ids=chat_id + 2000000000, msg=messages.zov(
-            uid, name, await getUserNickname(uid, chat_id), text, members.items), disable_mentions=0)
-        success += 1
+        try:
+            members = await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)
+            if not await sendMessage(peer_ids=chat_id + 2000000000, msg=messages.zov(
+                    uid, name, await getUserNickname(uid, chat_id), text, members.items), disable_mentions=0):
+                raise Exception
+            success += 1
+        except:
+            pass
 
     await api.messages.edit(
         peer_id=edit.peer_id, conversation_message_id=edit.conversation_message_id,

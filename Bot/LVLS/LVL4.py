@@ -523,9 +523,9 @@ async def grnick(message: Message):
                 uid, u_name, await getUserNickname(uid, chat_id), id, ch_name, ch_nickname))
             async with (await pool()).acquire() as conn:
                 await conn.execute('delete from nickname where chat_id=$1 and uid=$2', chat_id, id)
+            success += 1
         except:
             pass
-        success += 1
 
     await editMessage(peer_id=edit.peer_id, cmid=edit.conversation_message_id,
                       msg=messages.grnick(id, ch_name, ch_nick, len(chats), success))
@@ -552,10 +552,14 @@ async def gzov(message: Message):
         u_acc = await getUserAccessLevel(uid, chat_id)
         if not await haveAccess('gzov', chat_id, u_acc):
             continue
-        members = (await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)).items
-        await sendMessage(peer_ids=chat_id + 2000000000, msg=messages.zov(
-            uid, u_name, await getUserNickname(uid, chat_id), cause, members), disable_mentions=0)
-        success += 1
+        try:
+            members = (await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)).items
+            if not await sendMessage(peer_ids=chat_id + 2000000000, msg=messages.zov(
+                    uid, u_name, await getUserNickname(uid, chat_id), cause, members), disable_mentions=0):
+                raise Exception
+            success += 1
+        except:
+            pass
 
     await editMessage(peer_id=edit.peer_id, cmid=edit.conversation_message_id,
                       msg=messages.gzov(uid, u_name, u_nick, len(chats), success))
