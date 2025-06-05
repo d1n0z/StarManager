@@ -14,7 +14,7 @@ from Bot.checkers import getUInfBanned
 from Bot.rules import SearchCMD
 from Bot.scheduler import backup
 from Bot.utils import getUserName, getIDFromMessage, getUserNickname, sendMessage, addUserXP, getChatName, \
-    setUserAccessLevel, pointWords, chunks, getURepBanned, messagereply
+    setUserAccessLevel, pointWords, chunks, getURepBanned, messagereply, kickUser
 from config.config import api, GROUP_ID, DEVS, PATH
 from db import pool
 
@@ -299,7 +299,7 @@ async def resetlvl(message: Message):
 async def block(message: Message):
     data = message.text.lower().split()
     id = await getIDFromMessage(message.text, message.reply_message, 3)
-    if len(data) < 3 or data[1] not in ['chat', 'user'] or not id:
+    if len(data) < 3 or data[1] not in ['chat', 'user'] or not id or id < 0:
         return await messagereply(message, messages.block_hint())
     reason = ' '.join(data[3:]) or None
     async with (await pool()).acquire() as conn:
@@ -312,19 +312,17 @@ async def block(message: Message):
                     i[0] for i in await conn.fetch('select chat_id from userjoineddate where uid=$1', id)) or set()
                 chats.update(i[0] for i in await conn.fetch('select chat_id from accesslvl where uid=$1', id))
                 chats.update(i[0] for i in await conn.fetch('select chat_id from nickname where uid=$1', id))
+                chats.update(i[0] for i in await conn.fetch('select chat_id from lastmessagedate where uid=$1', id))
     if data[1] == 'chat':
         await sendMessage(id + 2000000000, messages.block_chatblocked(id, reason),
                           keyboard.block_chatblocked())
         await api.messages.remove_chat_user(id, member_id=-GROUP_ID)
     else:
         await sendMessage(id, messages.block_userblocked(id, reason), keyboard.block_chatblocked())
-        for i in chunks(list(chats), 25):
-            try:
-                await api.execute(code=''.join([
-                    'API.messages.removeChatUser({' + f'"chat_id": {y}, "user_id": {id}' + '});' for y in i]))
-                await asyncio.sleep(1)
-            except:
-                traceback.print_exc()
+        for i in chats:
+            if await kickUser(id, i):
+                await sendMessage(i + 2000000000, messages.block_blockeduserinvite(id, await getUserName(id), reason))
+            await asyncio.sleep(0.3)
     await messagereply(message, messages.block())
 
 

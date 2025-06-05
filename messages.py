@@ -2297,8 +2297,8 @@ def block_userblocked(id, reason):
     return get('block_userblocked', id=id, reason=f'Комментарий: {reason}' if reason else '')
 
 
-def block_blockeduserinvite(id, name, nick):
-    return get('block_blockeduserinvite', id=id, n=nick or name)
+def block_blockeduserinvite(id, name, reason):
+    return get('block_blockeduserinvite', id=id, n=name, reason=f'Комментарий: {reason}' if reason else '')
 
 
 def block_chatunblocked(id):

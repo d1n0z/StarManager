@@ -38,8 +38,8 @@ async def action_handle(event: MessageNew) -> None:
 
     if uid == -GROUP_ID:
         async with (await pool()).acquire() as conn:
-            if reason := await conn.fetchval("select reason from blocked where uid=$1 and type='chat'", chat_id):
-                await sendMessage(event.peer_id, messages.block_chatblocked(id, reason),
+            if block := await conn.fetchrow("select reason from blocked where uid=$1 and type='chat'", chat_id):
+                await sendMessage(event.peer_id, messages.block_chatblocked(id, block[0]),
                                   keyboard.block_chatblocked())
                 await api.messages.remove_chat_user(id, user_id=-GROUP_ID)
                 return
@@ -68,11 +68,11 @@ async def action_handle(event: MessageNew) -> None:
             (await getUserBanInfo(uid, chat_id))['causes'][-1]))
         await kickUser(uid, chat_id=chat_id)
         return
-    if await getUInfBanned(uid, None):
-        await sendMessage(event.peer_id, messages.block_blockeduserinvite(
-            uid, await getUserName(uid), await getUserNickname(uid, chat_id)))
-        await kickUser(uid, chat_id=chat_id)
-        return
+    async with (await pool()).acquire() as conn:
+        if block := await conn.fetchrow("select reason from blocked where uid=$1 and type='user'", uid):
+            await sendMessage(event.peer_id, messages.block_blockeduserinvite(uid, await getUserName(uid), block[0]))
+            await kickUser(uid, chat_id=chat_id)
+            return
 
     if id:
         async with (await pool()).acquire() as conn:

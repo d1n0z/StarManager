@@ -189,7 +189,6 @@ async def everyminute():
                 await deleteMessages(i[1], i[0] - 2000000000)
             await conn.execute('delete from todelete where delete_at<$1', time.time())
             for i in await conn.fetch('select id, uid, streak from bonus where time<$1', time.time() - 172800):
-                print(*i)
                 if not await conn.fetchval('select 1 from premium where uid=$1', i[1]):
                     if i[2] >= 2:
                         await conn.execute('update bonus set streak=streak - 2 where id=$1', i[0])
