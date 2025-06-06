@@ -38,7 +38,8 @@ async def join(message: MessageEvent):
         try:
             members = (await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)).items
         except:
-            return await sendMessage(message.peer_id, messages.notadmin())
+            await sendMessage(message.peer_id, messages.notadmin())
+            return
 
         bp = message.user_id
         if (bp not in [i.member_id for i in members if i.is_admin or i.is_owner] and
@@ -85,12 +86,14 @@ async def join(message: MessageEvent):
             except:
                 pass
 
-        return await editMessage(messages.start(), peer_id, message.conversation_message_id)
+        await editMessage(messages.start(), peer_id, message.conversation_message_id)
+        return
     elif cmd == 'rejoin' and payload['activate']:
         if (await getUserAccessLevel(uid, chat_id) >= 7 or
                 uid in [i.member_id for i in (await api.messages.get_conversation_members(
                     peer_id=peer_id)).items if i.is_admin or i.is_owner]):
-            return await editMessage(messages.rejoin_activate(), peer_id, message.conversation_message_id)
+            await editMessage(messages.rejoin_activate(), peer_id, message.conversation_message_id)
+            return
 
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['duel'], answer=False, checksender=False))
@@ -108,9 +111,11 @@ async def duel(message: MessageEvent):
     xp = await getUserXP(id)
     uxp = await getUserXP(uid)
     if xp < duelxp:
-        return await message.show_snackbar("У вас недостаточно XP")
+        await message.show_snackbar("У вас недостаточно XP")
+        return
     if uxp < duelxp:
-        return await message.show_snackbar("У вашего соперника недостаточно XP")
+        await message.show_snackbar("У вашего соперника недостаточно XP")
+        return
 
     rid = (id, uid)[int.from_bytes(os.urandom(1)) % 2]
     if rid == id:
@@ -186,7 +191,8 @@ async def premmenu_turn(message: MessageEvent):
     uid = message.user_id
     payload = message.payload
     if payload['setting'] == 'tagnotif' and not (await isMessagesFromGroupAllowed(uid)):
-        return await editMessage(messages.tagnotiferror(), message.peer_id, message.conversation_message_id,)
+        await editMessage(messages.tagnotiferror(), message.peer_id, message.conversation_message_id,)
+        return
     async with (await pool()).acquire() as conn:
         if not await conn.fetchval('update premmenu set pos = $1 where uid=$2 and setting=$3 returning 1',
                                    int(not bool(payload['pos'])), uid, payload['setting']):
@@ -212,8 +218,9 @@ async def premmenu_action(message: MessageEvent):
     if deleted:
         prem = await getUserPremium(uid)
         settings = await getUserPremmenuSettings(uid)
-        return await editMessage(messages.premmenu(settings, prem), peer_id, message.conversation_message_id,
-                                 keyboard.premmenu(uid, settings, prem))
+        await editMessage(messages.premmenu(settings, prem), peer_id, message.conversation_message_id,
+                          keyboard.premmenu(uid, settings, prem))
+        return
     await editMessage(messages.premmenu_action(setting), peer_id, message.conversation_message_id)
 
 
@@ -233,12 +240,14 @@ async def settings(message: MessageEvent):
 
     if payload['cmd'] == 'settings':
         settings = (await getChatSettings(chat_id))[category]
-        return await editMessage(messages.settings_category(category, settings), peer_id,
-                                 message.conversation_message_id, keyboard.settings_category(uid, category, settings))
+        await editMessage(messages.settings_category(category, settings), peer_id,
+                          message.conversation_message_id, keyboard.settings_category(uid, category, settings))
+        return
     setting = payload['setting']
     if setting in SETTINGS_PREMIUM and not await getUserPremium(uid):
-        return await editMessage(messages.no_prem(), peer_id, message.conversation_message_id,
-                                 keyboard.settings_goto(uid))
+        await editMessage(messages.no_prem(), peer_id, message.conversation_message_id,
+                          keyboard.settings_goto(uid))
+        return
     settings = await getChatSettings(chat_id)
     altsettings = await getChatAltSettings(chat_id)
     if setting not in SETTINGS_COUNTABLE:
@@ -247,13 +256,14 @@ async def settings(message: MessageEvent):
         else:
             altsettings[category][setting] = not altsettings[category][setting]
         await turnChatSetting(chat_id, category, setting)
-        return await editMessage(
+        await editMessage(
             messages.settings_category(category, settings[category]), peer_id,
             message.conversation_message_id, keyboard.settings_category(uid, category, settings[category]))
+        return
     async with (await pool()).acquire() as conn:
         chatsetting = await conn.fetchrow('select "value", value2, punishment from settings where chat_id=$1 and '
                                           'setting=$2', chat_id, setting)
-    return await editMessage(messages.settings_change_countable(
+    await editMessage(messages.settings_change_countable(
         chat_id, setting, settings[category][setting], None if chatsetting is None else chatsetting[0],
         None if chatsetting is None else chatsetting[1], altsettings[category][setting] if (
                 category in altsettings and setting in altsettings[category]) else None,
@@ -288,38 +298,44 @@ async def settings_change_countable(message: MessageEvent):
         async with (await pool()).acquire() as conn:
             chatsetting = await conn.fetchrow('select "value", value2, punishment, pos, pos2 from settings where '
                                               'chat_id=$1 and setting=$2', chat_id, setting)
-        return await editMessage(messages.settings_change_countable(
+        await editMessage(messages.settings_change_countable(
             chat_id, setting, settings[category][setting], None if chatsetting is None else chatsetting[0],
             None if chatsetting is None else chatsetting[1], altsettings[category][setting] if (
                     category in altsettings and setting in altsettings[category]) else None,
             None if chatsetting is None else chatsetting[2]), peer_id, message.conversation_message_id,
             keyboard.settings_change_countable(uid, category, setting, settings, altsettings))
+        return
     if action == 'set':
         if setting == 'welcome':
             async with (await pool()).acquire() as conn:
                 w = await conn.fetchrow('select msg, photo, url from welcome where chat_id=$1', chat_id)
             if w:
-                return await editMessage(messages.settings_countable_action(action, setting, w[0], w[1], w[2]), peer_id,
-                                         message.conversation_message_id,
-                                         keyboard.settings_set_welcome(uid, w[0], w[1], w[2]))
-            return await editMessage(messages.settings_countable_action(action, setting), peer_id,
-                                     message.conversation_message_id,
-                                     keyboard.settings_set_welcome(uid, None, None, None))
+                await editMessage(
+                    messages.settings_countable_action(action, setting, w[0], w[1], w[2]), peer_id,
+                    message.conversation_message_id, keyboard.settings_set_welcome(uid, w[0], w[1], w[2]))
+                return
+            await editMessage(
+                messages.settings_countable_action(action, setting), peer_id,
+                message.conversation_message_id, keyboard.settings_set_welcome(uid, None, None, None))
+            return
         async with (await pool()).acquire() as conn:
             await conn.execute(
                 'insert into typequeue (chat_id, uid, type, additional) values ($1, $2, $3, $4)',
                 chat_id, uid, 'settings_change_countable',
                 '{' + f'"setting": "{setting}", "category": "{category}", "cmid": '
                       f'"{message.conversation_message_id}"' + '}')
-        return await editMessage(messages.settings_countable_action(action, setting), peer_id,
-                                 message.conversation_message_id)
+        await editMessage(messages.settings_countable_action(action, setting), peer_id,
+                          message.conversation_message_id)
+        return
     elif action == 'setPunishment':
-        return await editMessage(messages.settings_choose_punishment(), peer_id, message.conversation_message_id,
-                                 keyboard.settings_set_punishment(uid, category, setting))
+        await editMessage(messages.settings_choose_punishment(), peer_id, message.conversation_message_id,
+                          keyboard.settings_set_punishment(uid, category, setting))
+        return
     elif action == 'setWhitelist' or action == 'setBlacklist':
-        return await editMessage(messages.settings_setlist(setting, action[3:-4]), peer_id,
-                                 message.conversation_message_id,
-                                 keyboard.settings_setlist(uid, category, setting, action[3:-4]))
+        await editMessage(
+            messages.settings_setlist(setting, action[3:-4]), peer_id,
+            message.conversation_message_id, keyboard.settings_setlist(uid, category, setting, action[3:-4]))
+        return
 
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['settings_set_punishment']))
@@ -333,25 +349,28 @@ async def settings_set_punishment(message: MessageEvent):
     setting = payload['setting']
 
     if setting in SETTINGS_PREMIUM and not await getUserPremium(uid):
-        return await editMessage(messages.no_prem(), peer_id, message.conversation_message_id,
-                                 keyboard.settings_goto(uid))
+        await editMessage(messages.no_prem(), peer_id, message.conversation_message_id,
+                          keyboard.settings_goto(uid))
+        return
     if action in ['deletemessage', 'kick']:
         async with (await pool()).acquire() as conn:
             await conn.execute(
                 'update settings set punishment = $1 where chat_id=$2 and setting=$3', action, chat_id, setting)
-        return await editMessage(messages.settings_set_punishment(action), peer_id, message.conversation_message_id,
-                                 keyboard.settings_change_countable(
-                                     uid, category, setting, await getChatSettings(chat_id),
-                                     await getChatAltSettings(chat_id), True))
+        await editMessage(
+            messages.settings_set_punishment(action), peer_id, message.conversation_message_id,
+            keyboard.settings_change_countable(
+                uid, category, setting, await getChatSettings(chat_id), await getChatAltSettings(chat_id), True))
+        return
     async with (await pool()).acquire() as conn:
         await conn.execute('insert into typequeue (chat_id, uid, type, additional) values ($1, $2, $3, $4)',
                            chat_id, uid, 'settings_set_punishment', '{' +
                            f'"setting": "{setting}", "action": "{action}", "category": "{category}", '
                            f'"cmid": "{message.conversation_message_id}"' + '}')
-    return await editMessage(messages.settings_set_punishment_input(action), peer_id, message.conversation_message_id,
-                             keyboard.settings_change_countable(
-                                 uid, category, setting, await getChatSettings(chat_id),
-                                 await getChatAltSettings(chat_id), True))
+    await editMessage(
+        messages.settings_set_punishment_input(action), peer_id, message.conversation_message_id,
+        keyboard.settings_change_countable(uid, category, setting, await getChatSettings(chat_id),
+                                           await getChatAltSettings(chat_id), True))
+    return
 
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['settings_exceptionlist']))
@@ -362,8 +381,9 @@ async def settings_exceptionlist(message: MessageEvent):
     setting = payload['setting']
 
     if setting in SETTINGS_PREMIUM and not await getUserPremium(uid):
-        return await editMessage(messages.no_prem(), peer_id, message.conversation_message_id,
-                                 keyboard.settings_goto(uid))
+        await editMessage(
+            messages.no_prem(), peer_id, message.conversation_message_id, keyboard.settings_goto(uid))
+        return
     if setting == 'disallowLinks':
         async with (await pool()).acquire() as conn:
             lst = await conn.fetch('select url from antispamurlexceptions where chat_id=$1', peer_id - 2000000000)
@@ -380,8 +400,9 @@ async def settings_listaction(message: MessageEvent):
     action = payload['action']
 
     if setting in SETTINGS_PREMIUM and not await getUserPremium(uid):
-        return await editMessage(messages.no_prem(), peer_id, message.conversation_message_id,
-                                 keyboard.settings_goto(uid))
+        await editMessage(messages.no_prem(), peer_id, message.conversation_message_id,
+                          keyboard.settings_goto(uid))
+        return
 
     async with (await pool()).acquire() as conn:
         await conn.execute('insert into typequeue (chat_id, uid, type, additional) values ($1, $2, $3, $4)',
@@ -554,7 +575,8 @@ async def punishlist_delall(message: MessageEvent):
     chat_id = peer_id - 2000000000
 
     if await getUserAccessLevel(uid, chat_id) < 6:
-        return await message.show_snackbar('❌ Для данной функции требуется 6 уровень доступа')
+        await message.show_snackbar('❌ Для данной функции требуется 6 уровень доступа')
+        return
     await sendMessageEventAnswer(message.event_id, uid, peer_id)
 
     async with (await pool()).acquire() as conn:
@@ -1206,11 +1228,13 @@ async def prefix_(message: MessageEvent):
     chat_id = peer_id - 2000000000
 
     if not await getUserPremium(uid):
-        return await editMessage(messages.no_prem(), peer_id, message.conversation_message_id)
+        await editMessage(messages.no_prem(), peer_id, message.conversation_message_id)
+        return
     async with (await pool()).acquire() as conn:
         if cmd == 'prefix_add' and await conn.fetchval('select count(*) as c from prefix where uid=$1', uid) > 2:
-            return await editMessage(
+            await editMessage(
                 messages.addprefix_max(), peer_id, message.conversation_message_id, keyboard.prefix_back(uid))
+            return
         if cmd in ('prefix_add', 'prefix_del'):
             await conn.execute('insert into typequeue (chat_id, uid, type, additional) values ($1, $2, $3, $4)',
                                chat_id, uid, cmd, '{"cmid": ' + str(message.conversation_message_id) + '}')
@@ -1345,8 +1369,8 @@ async def antitag_list(message: MessageEvent):
 async def import_(message: MessageEvent):
     importchatid = message.payload['importchatid']
     if await getUserAccessLevel(message.user_id, importchatid) < 7:
-        return await editMessage(
-            messages.import_notowner(), message.object.peer_id, message.conversation_message_id)
+        await editMessage(messages.import_notowner(), message.object.peer_id, message.conversation_message_id)
+        return
     await editMessage(messages.import_(importchatid, await getChatName(importchatid)),
                       message.object.peer_id, message.conversation_message_id,
                       keyboard.import_(message.user_id, importchatid))

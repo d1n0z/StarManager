@@ -33,14 +33,14 @@ async def add_msg_counter(chat_id, uid, audio=False, sticker=False) -> bool:
 
     if audio:
         addxp = 20
-        try:
-            await tgbot.send_message(chat_id=TG_CHAT_ID, message_thread_id=TG_AUDIO_THREAD_ID,
-                                     text=f'{chat_id} | {await getChatName(chat_id)} | '
-                                          f'<a href="vk.com/id{uid}">{await getUserName(uid)}</a> | '
-                                          f'{datetime.now().strftime("%H:%M:%S")}',
-                                     disable_web_page_preview=True, parse_mode='HTML')
-        except:
-            pass
+        # try:
+        #     await tgbot.send_message(chat_id=TG_CHAT_ID, message_thread_id=TG_AUDIO_THREAD_ID,
+        #                              text=f'{chat_id} | {await getChatName(chat_id)} | '
+        #                                   f'<a href="vk.com/id{uid}">{await getUserName(uid)}</a> | '
+        #                                   f'{datetime.now().strftime("%H:%M:%S")}',
+        #                              disable_web_page_preview=True, parse_mode='HTML')
+        # except:
+        #     pass
     elif sticker:
         addxp = 5
     else:

@@ -17,9 +17,9 @@ from Bot.utils import (getIDFromMessage, getUserName, getRegDate, kickUser, getU
                        getUserPremium, uploadImage, addUserXP, isChatAdmin, getUserWarns, getUserMessages,
                        setUserAccessLevel, getChatSettings, deleteMessages,
                        speccommandscheck, getUserPremmenuSettings, getUserPremmenuSetting, chatPremium, getUserLeague,
-                       getUserLVL, getUserRep, getRepTop, getChatAccessName, messagereply)
+                       getUserLVL, getUserRep, getRepTop, getChatAccessName, messagereply, pointWords)
 from config.config import (api, LVL_NAMES, PATH, COMMANDS, TG_CHAT_ID, TG_TRANSFER_THREAD_ID,
-                           CMDLEAGUES, DEVS)
+                           CMDLEAGUES, DEVS, TG_BONUS_THREAD_ID)
 from db import pool
 from media.stats.stats_img import createStatsImage
 
@@ -160,6 +160,15 @@ async def bonus(message: Message):
     await addUserXP(uid, addxp)
     await messagereply(message, disable_mentions=1, message=messages.bonus(
         uid, await getUserNickname(uid, chat_id), name, addxp, prem, streak))
+
+    try:
+        await tgbot.send_message(
+            chat_id=TG_CHAT_ID, message_thread_id=TG_BONUS_THREAD_ID,
+            text=f'{uid} | <a href="vk.com/id{uid}">{await getUserName(uid)}</a> | '
+                 f'Серия: {pointWords(streak + 1, ("день", "дня", "дней"))}',
+            disable_web_page_preview=True, parse_mode='HTML')
+    except:
+        pass
 
 
 @bl.chat_message(SearchCMD('prefix'))

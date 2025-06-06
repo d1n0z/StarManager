@@ -3,7 +3,6 @@ import time
 import traceback
 
 from loguru import logger
-from whois.whois import logger as whoislogger
 
 from Bot import main as vkbot
 from config.config import DATABASE, PATH, vk_api_session, DAILY_TO
@@ -14,7 +13,6 @@ from load_messages import load
 
 
 def main(retry=0):
-    whoislogger.disabled = True
     logger.remove()
     logger.add(sys.stderr, level='INFO')
 
