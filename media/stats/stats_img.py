@@ -76,7 +76,6 @@ async def createStatsImage(warns, messages, uid, access_level, nickname, reg_dat
     img = Image.alpha_composite(img, new)
     draw = ImageDraw.Draw(img)
 
-    # draw.text((390, 284.5), f'#{top}', font=font, fill=(255, 255, 255), anchor='ma')
     draw.text((775, 285), f'{xp}', font=font, fill=(255, 255, 255), anchor='ma')
     lvlfont = ImageFont.truetype(f'{PATH}media/fonts/statsimg_font_bold.ttf', 35 if userlvl < 100 else 30)
     fontsmall = ImageFont.truetype(f'{PATH}media/fonts/statsimg_font_bold.ttf', 17)
@@ -146,13 +145,10 @@ async def createStatsImage(warns, messages, uid, access_level, nickname, reg_dat
     lvl = Image.open(f'{PATH}media/stats/icon/dot.png')
     img.paste(lvl, mask=lvl)
 
-    # leagueborder = Image.open(f'{PATH}media/stats/leagues/{league}.png')
-    # img.paste(leagueborder, mask=leagueborder)
     draw.text((663, 158), f'{userlvl}', font=lvlfont, fill=(63, 63, 63), anchor='ma')
 
     draw.rectangle(((360, 250), (415, 270)), (38, 38, 38))
     draw.text(xy=(392, 249), text='ЛИГА', font=fontsmall, fill=(255, 255, 255), anchor='ma')
-    # draw.text((392, 288), LEAGUE[league], font=fontmedium, fill=(255, 255, 255), anchor='ma')
     draw.text((392, 284.5), LEAGUE[league - 1], font=font, fill=(255, 255, 255), anchor='ma')
 
     draw.rectangle(((100, 390), (220, 410)), (29, 29, 29))
