@@ -416,14 +416,6 @@ async def msgscount(message: Message):
                                f'{msgsminute} сообщений за эту минуту')
 
 
-@bl.chat_message(SearchCMD('mwaverage'))
-async def mwaverage(message: Message):
-    async with (await pool()).acquire() as conn:
-        mwst = await conn.fetch('select timestart, timeend from middlewaresstatistics where timeend is not null')
-    average = statistics.mean([i[1].timestamp() - i[0].timestamp() for i in mwst])
-    await messagereply(message, disable_mentions=1, message=f'Среднее время работы мидлвари - {average} секунд')
-
-
 @bl.chat_message(SearchCMD('getlink'))
 async def getlink(message: Message):
     data = message.text.lower().split()

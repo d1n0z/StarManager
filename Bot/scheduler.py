@@ -128,7 +128,6 @@ async def reboot():
             await conn.execute('insert into reboots (chat_id, time, sended) VALUES ($1, $2, false)',
                                DAILY_TO + 2000000000, time.time())
             await conn.execute('delete from messagesstatistics')
-            await conn.execute('delete from middlewaresstatistics')
         await (await pool()).close()
         os.system('sudo reboot')
     except Exception as e:
