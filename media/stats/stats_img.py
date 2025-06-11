@@ -45,7 +45,7 @@ async def createStatsImage(warns, messages, uid, access_level, nickname, reg_dat
     if color:
         try:
             color = literal_eval(color)
-        except:
+        except Exception as _:
             color = False
     if not color:
         if access_level == 1:
