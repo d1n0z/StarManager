@@ -2,11 +2,12 @@ import logging
 import sys
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from routes import router
 from starlette.middleware.sessions import SessionMiddleware
 
-from routes import router
-sys.path.append('../')
+sys.path.append("../")
 from config import config
 
 logger = logging.getLogger(__name__)
@@ -16,3 +17,8 @@ app.add_middleware(SessionMiddleware, secret_key=config.VK_APP_SECRET)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.include_router(router)
+
+
+@router.exception_handler(404)
+async def notfound(*_, **__):
+    return RedirectResponse("/")

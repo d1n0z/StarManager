@@ -6,13 +6,12 @@ from datetime import datetime
 import httpx
 import models
 import pydantic
+from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.responses import JSONResponse
 from yookassa import Configuration, Payment
-
-from authlib.integrations.starlette_client import OAuth
 
 sys.path.append("../")
 from config import config
@@ -35,11 +34,6 @@ oauth.register(
         "token_endpoint_auth_method": "client_secret_post",
     },
 )
-
-
-@router.exception_handler(404)
-async def notfound(*_, **__):
-    return RedirectResponse("/")
 
 
 @router.get("/", response_class=HTMLResponse)

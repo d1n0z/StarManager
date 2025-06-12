@@ -13,7 +13,6 @@ class Subscription(BaseModel):
     chat_id: Optional[int] = Field(None, ge=1, le=2147483647)
 
 
-
 class User(BaseModel):
     id: int
     first_name: str
