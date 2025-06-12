@@ -19,6 +19,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(router)
 
 
-@router.exception_handler(404)
+@app.exception_handler(404)
 async def notfound(*_, **__):
     return RedirectResponse("/")
