@@ -2357,14 +2357,14 @@ def check_warn(
 def check_history_ban(id, name, nickname, dates, names, times, causes):
     msg = get("check_history_ban", id=id, n=nickname or name)
     for k in range(len(times)):
-        msg += f"★ {dates[k]} | {names[k]} | {pointDays(times[k])} | {causes[k]}\n"
+        msg += f"★ {dates[k]} | {names[k]} | {pointDays(times[k]) if times[k] < 3650 else 'Навсегда'} | {causes[k]}\n"
     return msg
 
 
 def check_history_mute(id, name, nickname, dates, names, times, causes):
     msg = get("check_history_mute", id=id, n=nickname or name)
     for k in range(len(times)):
-        msg += f"★ {dates[k]} | {names[k]} | {pointMinutes(times[k])} | {causes[k]}\n"
+        msg += f"★ {dates[k]} | {names[k]} | {pointMinutes(times[k]) if times[k] < 44600 else 'Навсегда'} | {causes[k]}\n"
     return msg
 
 
@@ -2502,9 +2502,13 @@ def deanon(id, from_id, name, nickname, time):
 
 
 def antispam_punishment(
-    uid, name, nick, setting, punishment, violation_count, time=None
+    uid, name, nick, setting, punishment, violation_count, time=0
 ):
     if setting in SETTINGS_POSITIONS["antispam"]:
+        if punishment == 'mute':
+            time = {f" {time} минут" if time < 44600 else "всегда"}
+        elif punishment == 'ban':
+            time = {f" {time} дней" if time < 3650 else "всегда"}
         return get(
             f"antispam_punishment_{punishment}",
             uid=uid,

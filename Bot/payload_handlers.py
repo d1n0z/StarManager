@@ -235,7 +235,7 @@ async def settings_menu(message: MessageEvent):
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['settings_menu_antispam']))
 async def settings_menu_antispam(message: MessageEvent):
-    punishments = {"warn": "предупреждение", "kick": "исключение", "mute": "ограничение", "ban": "блокировка"}
+    punishments = {"warn": "предупреждение", "kick": "исключение", "mute": "ограничение", "ban": "блокировка", "deletemessage": "нет"}
     payload = message.payload
     async with (await pool()).acquire() as conn:
         settings = {
