@@ -51,7 +51,7 @@ def main(retry=0):
     except KeyboardInterrupt:
         logger.info('bye-bye')
         return
-    except:
+    except Exception:
         vk_api_session.method('messages.send', {
             'chat_id': DAILY_TO,
             'message': f'Unexpected exception caught in VkBot.run():\n{traceback.format_exc()}',

@@ -262,6 +262,8 @@ def SETTINGS():
             "maximumCharsInMessage": 0,
             "disallowLinks": 0,
             "disallowNSFW": 0,
+            "vkLinks": 0,
+            "forwardeds": 0,
         },
         "protect": {
             "enable": 0
@@ -277,6 +279,10 @@ def SETTINGS_ALT():
         "entertaining": {
         },
         "antispam": {
+            "messagesPerMinute": 1,
+            "maximumCharsInMessage": 1,
+            "vkLinks": 1,
+            "forwardeds": 1,
         },
         "protect": {
         }
@@ -306,14 +312,16 @@ SETTINGS_POSITIONS = {
         "maximumCharsInMessage": ["Выкл.", "Вкл."],
         "disallowLinks": ["Выкл.", "Вкл."],
         "disallowNSFW": ["Выкл.", "Вкл."],
+        "vkLinks": ["Выкл.", "Вкл."],
+        "forwardeds": ["Выкл.", "Вкл."],
     },
     "protect": {
         "enable": ["Выкл.", "Вкл."],
     },
 }
 SETTINGS_COUNTABLE = [
-    "messagesPerMinute", "maximumCharsInMessage", "disallowLinks", "disallowNSFW", "nightmode", "welcome", "captcha",
-    "autodelete",
+    "messagesPerMinute", "maximumCharsInMessage", "disallowLinks", "disallowNSFW", "vkLinks", "forwardeds", 
+    "nightmode", "welcome", "captcha", "autodelete",
 ]
 SETTINGS_COUNTABLE_MULTIPLE_ARGUMENTS = [
     "nightmode", "welcome"
@@ -341,6 +349,7 @@ SETTINGS_COUNTABLE_CHANGEMENU = {
         {"action": "turn", "button": ["Включить", "Выключить"]},
         {"action": "set", "button": "Количество"},
         {"action": "setPunishment", "button": "Наказание"},
+        {"action": "turnalt", "button": ["Удаление сообщения", "Удаление сообщения"]},
     ],
     "captcha": [
         {"action": "turn", "button": ["Включить", "Выключить"]},
@@ -360,6 +369,7 @@ SETTINGS_COUNTABLE_CHANGEMENU = {
         {"action": "turn", "button": ["Включить", "Выключить"]},
         {"action": "set", "button": "Количество"},
         {"action": "setPunishment", "button": "Наказание"},
+        {"action": "turnalt", "button": ["Удаление сообщения", "Удаление сообщения"]},
     ],
     "disallowLinks": [
         {"action": "turn", "button": ["Включить", "Выключить"]},
@@ -370,14 +380,38 @@ SETTINGS_COUNTABLE_CHANGEMENU = {
         {"action": "turn", "button": ["Включить", "Выключить"]},
         {"action": "setPunishment", "button": "Наказание"},
     ],
+    "vkLinks": [
+        {"action": "turn", "button": ["Включить", "Выключить"]},
+        {"action": "setPunishment", "button": "Наказание"},
+        {"action": "turnalt", "button": ["Удаление сообщения", "Удаление сообщения"]},
+        {"action": "setWhitelist", "button": "Исключения"},
+    ],
+    "forwardeds": [
+        {"action": "turn", "button": ["Включить", "Выключить"]},
+        {"action": "setPreset", "button": "Типы"},
+        {"action": "setPunishment", "button": "Наказание"},
+        {"action": "turnalt", "button": ["Удаление сообщения", "Удаление сообщения"]},
+        {"action": "setWhitelist", "button": "Исключения"},
+    ],
     "autodelete": [
         {"action": "turn", "button": ["Включить", "Выключить"]},
         {"action": "set", "button": "Время"},
     ],
 }
-SETTINGS_COUNTABLE_CHANGEPUNISHMENTMESSAGE = {
-    "mute": "мут на {count} минут",
-    "ban": "бан на {count} дней",
+SETTINGS_PRESET_BUTTONS = {
+    "forwardeds": [
+        {"value": 0, "name": "Все", "action": "setValue"},
+        {"value": 1, "name": "Пользователи", "action": "setValue"},
+        {"value": 2, "name": "Сообщества", "action": "setValue"},
+    ],
+}
+SETTINGS_ALT_TO_DELETE = ["messagesPerMinute", "maximumCharsInMessage", "vkLinks", "forwardeds",]
+SETTINGS_SUBCATS = {
+    "messagesPerMinute": "msgs",
+    "maximumCharsInMessage": "msgs",
+    "disallowLinks": "spam",
+    "vkLinks": "spam",
+    "forwardeds": "spam",
 }
 
 PREMMENU_DEFAULT = {"clear_by_fire": True, "border_color": None, "tagnotif": False}

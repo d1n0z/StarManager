@@ -16,7 +16,7 @@ from Bot.utils import getUserLastMessage, getUserAccessLevel, getUserMute, sendM
     getChatSettings, kickUser, getUserName, getUserNickname, antispamChecker, punish, getUserBan, getUserBanInfo, \
     getUserPremium, getIDFromMessage, getUserPremmenuSetting, getChatName, getUserPrefixes, getSilence, \
     getSilenceAllowed, addUserXP, setChatMute
-from config.config import PM_COMMANDS, ADMINS, MATHGIVEAWAYS_TO
+from config.config import PM_COMMANDS, ADMINS, MATHGIVEAWAYS_TO, SETTINGS_ALT_TO_DELETE, SETTINGS_ALT
 from db import pool
 
 
@@ -213,13 +213,16 @@ async def message_handle(event: MessageNew) -> Any:
     if uacc < 5 and (setting := await antispamChecker(chat_id, uid, event.object.message, settings)):
         async with (await pool()).acquire() as conn:
             setting = await conn.fetchrow(
-                'select id, setting, "value" from settings where chat_id=$1 and setting=$2', chat_id, setting)
+                'select id, setting, "value", pos2 from settings where chat_id=$1 and setting=$2', chat_id, setting)
         if punishment := await punish(uid, chat_id, setting[0]):
-            await deleteMessages(event.object.message.conversation_message_id, chat_id)
             if punishment != 'del':
                 await sendMessage(chat_id + 2000000000, messages.antispam_punishment(
                     uid, await getUserName(uid), await getUserNickname(uid, chat_id), setting[1], punishment[0],
                     setting[2], punishment[1] if len(punishment) > 1 else None))
+        if (setting[1] in SETTINGS_ALT_TO_DELETE and (
+                setting[3] or (setting[3] is None and SETTINGS_ALT()['antispam'][setting[1]])
+                )) or (setting[1] not in SETTINGS_ALT_TO_DELETE and punishment):
+            await deleteMessages(event.object.message.conversation_message_id, chat_id)
 
     if chat_id == MATHGIVEAWAYS_TO and msg.replace('-', '').isdigit():
         async with (await pool()).acquire() as conn:

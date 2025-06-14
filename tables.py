@@ -861,5 +861,23 @@ class ToDelete(Model):
         table_name = 'todelete'
 
 
+class VkLinksExceptions(Model):
+    chat_id = IntegerField(index=True)
+    url = TextField()
+
+    class Meta:
+        database = dbhandle
+        table_name = 'vklinksexceptions'
+
+
+class ForwardedsExceptions(Model):
+    chat_id = IntegerField(index=True)
+    exc_id = IntegerField()
+
+    class Meta:
+        database = dbhandle
+        table_name = 'forwardedsexceptions'
+
+
 if __name__ == '__main__':
     dbhandle.create_tables(Model.__subclasses__())

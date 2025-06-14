@@ -11,7 +11,7 @@ from vkbottle_types.objects import MessagesMessageAttachmentType
 import keyboard
 import messages
 from Bot.utils import (getUserName, getChatName, sendMessage, editMessage, uploadImage, deleteMessages,
-                       getUserNickname, hex_to_rgb, whoiscachedurl)
+                       getUserNickname, hex_to_rgb, whoiscachedurl, getIDFromMessage)
 from config.config import REPORT_TO, SETTINGS_COUNTABLE_MULTIPLE_ARGUMENTS, PATH, SETTINGS_COUNTABLE_SPECIAL_LIMITS
 from db import pool
 
@@ -114,10 +114,10 @@ async def queue_handler(event: MessageNew):
             category = additional['category']
             cmid = additional['cmid']
             text = event.object.message.text
-            kb = keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True)
             if not (matches := re.findall(r'(\d+)\s*([hm])', text)):
-                await editMessage(messages.settings_autodelete_input_error(),
-                                  event.object.message.peer_id, cmid, kb)
+                await editMessage(
+                    messages.settings_autodelete_input_error(), event.object.message.peer_id, cmid,
+                    keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True))
                 return
             itime = 0
             for val, u in matches:
@@ -126,14 +126,15 @@ async def queue_handler(event: MessageNew):
                 elif u == 'm':
                     itime += int(val) * 60
             if itime > 86400 or itime < 300:
-                await editMessage(messages.settings_autodelete_input_error(),
-                                  event.object.message.peer_id, cmid, kb)
+                await editMessage(messages.settings_autodelete_input_error(), event.object.message.peer_id, cmid,
+                                  keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True))
                 return
             async with (await pool()).acquire() as conn:
                 await conn.execute('update settings set value = $1 where chat_id=$2 and setting=$3',
                                    itime, chat_id, setting)
-            await editMessage(messages.settings_change_autodelete_done(itime),
-                              event.object.message.peer_id, cmid, kb)
+            await editMessage(
+                messages.settings_change_autodelete_done(itime), event.object.message.peer_id, cmid,
+                keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True))
         elif queue[3] == 'settings_change_countable':
             setting = additional['setting']
             category = additional['category']
@@ -183,20 +184,24 @@ async def queue_handler(event: MessageNew):
             text = event.object.message.text
             category = additional['category']
             kb = keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True)
-            if not text.isdigit() or int(text) <= 0 or int(text) >= 10000:
+            if not text.isdigit() or int(text) < 0 or int(text) >= 10000:
                 await editMessage(messages.settings_change_countable_digit_error(), event.object.message.peer_id, cmid,
                                   kb)
                 return
             action = additional['action']
+            pnshtime = int(text) if text != '0' else (3650 if action == 'ban' else 1000000)
             async with (await pool()).acquire() as conn:
                 await conn.execute('update settings set punishment = $1 where chat_id=$2 and setting=$3',
-                                   f'{action}|{text}', chat_id, setting)
-            await editMessage(messages.settings_set_punishment_countable(action, int(text)),
+                                   f'{action}|{pnshtime}', chat_id, setting)
+            await editMessage(messages.settings_set_punishment(action, int(pnshtime)),
                               event.object.message.peer_id, cmid, kb)
         elif queue[3].startswith('settings_set_welcome_'):
+            async with (await pool()).acquire() as conn:
+                welcome = await conn.fetchrow('select msg, url, photo from welcome where chat_id=$1', chat_id)
             if queue[3] == 'settings_set_welcome_text':
                 if not event.object.message.text:
-                    return await sendMessage(chat_id + 2000000000, messages.get(queue[3] + '_no_text'))
+                    return await sendMessage(chat_id + 2000000000, messages.get(queue[3] + '_no_text'),
+                                             keyboard.settings_change_countable(uid, 'main', 'welcome', onlybackbutton=True))
                 async with (await pool()).acquire() as conn:
                     if not await conn.fetchval('update welcome set msg = $1 where chat_id=$2 returning 1',
                                                event.object.message.text, chat_id):
@@ -205,7 +210,8 @@ async def queue_handler(event: MessageNew):
             elif queue[3] == 'settings_set_welcome_photo':
                 if (len(event.object.message.attachments) == 0 or
                         event.object.message.attachments[0].type != MessagesMessageAttachmentType.PHOTO):
-                    return await sendMessage(chat_id + 2000000000, messages.get(queue[3] + '_not_photo'))
+                    return await sendMessage(chat_id + 2000000000, messages.get(queue[3] + '_not_photo'),
+                                             keyboard.settings_change_countable(uid, 'main', 'welcome', onlybackbutton=True))
                 r = requests.get(event.object.message.attachments[0].photo.sizes[-1].url)
                 with open(f'{PATH}media/temp/{uid}welcome.jpg', "wb") as f:
                     f.write(r.content)
@@ -215,18 +221,20 @@ async def queue_handler(event: MessageNew):
                                                photo, chat_id):
                         await conn.execute('insert into welcome (chat_id, photo) values ($1, $2)', chat_id, photo)
             elif queue[3] == 'settings_set_welcome_url':
-                async with (await pool()).acquire() as conn:
-                    welcome = await conn.fetchrow('select msg, url from welcome where chat_id=$1', chat_id)
                 if welcome and not welcome[0] and not welcome[1]:
-                    return await sendMessage(chat_id + 2000000000, messages.get(queue[3] + '_empty_text_url'))
+                    return await sendMessage(chat_id + 2000000000, messages.get(queue[3] + '_empty_text_url'),
+                                             keyboard.settings_change_countable(uid, 'main', 'welcome', onlybackbutton=True))
                 if len(' '.join(event.object.message.text.split()[1:])) > 40:
-                    return await sendMessage(chat_id + 2000000000, messages.get(queue[3] + '_limit_text'))
+                    return await sendMessage(chat_id + 2000000000, messages.get(queue[3] + '_limit_text'),
+                                             keyboard.settings_change_countable(uid, 'main', 'welcome', onlybackbutton=True))
                 if (len(' '.join(event.object.message.text.split()[1:])) == 0 or
                         event.object.message.text.count('\n') > 0):
-                    return await sendMessage(chat_id + 2000000000, messages.settings_change_countable_format_error())
+                    return await sendMessage(chat_id + 2000000000, messages.settings_change_countable_format_error(),
+                                             keyboard.settings_change_countable(uid, 'main', 'welcome', onlybackbutton=True))
                 text = event.object.message.text.split()
                 if len(text) < 2:
-                    return await sendMessage(chat_id + 2000000000, messages.settings_change_countable_format_error())
+                    return await sendMessage(chat_id + 2000000000, messages.settings_change_countable_format_error(),
+                                             keyboard.settings_change_countable(uid, 'main', 'welcome', onlybackbutton=True))
                 try:
                     if not whoiscachedurl(text[-1]):
                         raise Exception
@@ -241,6 +249,7 @@ async def queue_handler(event: MessageNew):
                               keyboard.settings_change_countable(uid, "main", "welcome", onlybackbutton=True))
         elif queue[3] == 'settings_listaction':
             setting = additional['setting']
+            category = additional['category']
             # type = additional['type']
             if setting == 'disallowLinks':
                 action = additional['action']
@@ -249,9 +258,9 @@ async def queue_handler(event: MessageNew):
                     try:
                         if not whoiscachedurl(url):
                             raise
-                    except:
-                        return await sendMessage(chat_id + 2000000000,
-                                                 messages.settings_change_countable_format_error())
+                    except Exception:
+                        return await sendMessage(chat_id + 2000000000, messages.settings_change_countable_format_error(),
+                                                 keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True))
                     async with (await pool()).acquire() as conn:
                         if not await conn.fetchval('select exists(select 1 from antispamurlexceptions where '
                                                    'chat_id=$1 and url=$2)', chat_id, url):
@@ -264,11 +273,67 @@ async def queue_handler(event: MessageNew):
                                 'delete from antispammurlexceptions where chat_id=$1 and url=$2 returning 1',
                                 chat_id, url):
                             return await sendMessage(
-                                chat_id + 2000000000, messages.settings_change_countable_format_error())
+                                chat_id + 2000000000, messages.settings_change_countable_format_error(),
+                                keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True))
                 else:
-                    raise
+                    raise Exception
                 await sendMessage(chat_id + 2000000000, messages.settings_listaction_done(setting, action, url),
-                                  keyboard.settings_change_countable(uid, 'antispam', onlybackbutton=True))
+                                  keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True))
+            if setting == 'vkLinks':
+                action = additional['action']
+                if action == 'add':
+                    url = event.object.message.text
+                    url = url[url.find('vk.'):]
+                    try:
+                        if 'vk.' not in url or not whoiscachedurl(url):
+                            raise Exception
+                    except Exception:
+                        return await sendMessage(chat_id + 2000000000, messages.settings_change_countable_format_error(),
+                                                 keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True))
+                    async with (await pool()).acquire() as conn:
+                        if not await conn.fetchval('select exists(select 1 from vklinksexceptions where '
+                                                   'chat_id=$1 and url=$2)', chat_id, url):
+                            await conn.execute('insert into vklinksexceptions (chat_id, url) values ($1, $2)',
+                                               chat_id, url)
+                elif action == 'remove':
+                    url = event.object.message.text
+                    url = url[url.find('vk.'):]
+                    async with (await pool()).acquire() as conn:
+                        if not await conn.fetchval(
+                                'delete from vklinksexceptions where chat_id=$1 and url=$2 returning 1',
+                                chat_id, url):
+                            return await sendMessage(
+                                chat_id + 2000000000, messages.settings_change_countable_format_error(),
+                                keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True))
+                else:
+                    raise Exception
+                await sendMessage(chat_id + 2000000000, messages.settings_listaction_done(setting, action, url),
+                                  keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True))
+            if setting == 'forwardeds':
+                action = additional['action']
+                if action == 'add':
+                    exc_id = await getIDFromMessage(event.object.message.text, event.object.message.reply_message, place=1)
+                    if not exc_id:
+                        return await sendMessage(chat_id + 2000000000, messages.settings_change_countable_format_error(),
+                                                 keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True))
+                    async with (await pool()).acquire() as conn:
+                        if not await conn.fetchval('select exists(select 1 from forwardedsexceptions where '
+                                                   'chat_id=$1 and exc_id=$2)', chat_id, exc_id):
+                            await conn.execute('insert into forwardedsexceptions (chat_id, exc_id) values ($1, $2)',
+                                               chat_id, exc_id)
+                elif action == 'remove':
+                    exc_id = await getIDFromMessage(event.object.message.text, event.object.message.reply_message, place=1)
+                    async with (await pool()).acquire() as conn:
+                        if not await conn.fetchval(
+                                'delete from forwardedsexceptions where chat_id=$1 and exc_id=$2 returning 1',
+                                chat_id, exc_id):
+                            return await sendMessage(
+                                chat_id + 2000000000, messages.settings_change_countable_format_error(),
+                                keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True))
+                else:
+                    raise Exception
+                await sendMessage(chat_id + 2000000000, messages.settings_listaction_done(setting, action, exc_id),
+                                  keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True))
     elif queue[3].startswith('premmenu_action_'):
         if queue[3] == 'premmenu_action_border_color':
             data = event.object.message.text
@@ -278,7 +343,8 @@ async def queue_handler(event: MessageNew):
             elif re.search(r'^#[0-9a-fA-F]{6}$', data):
                 color = f'({",".join(str(i) for i in hex_to_rgb(data))})'
             else:
-                return await sendMessage(chat_id + 2000000000, messages.settings_change_countable_format_error())
+                return await sendMessage(chat_id + 2000000000, messages.settings_change_countable_format_error(),
+                                         keyboard.settings_change_countable(uid, category, setting, onlybackbutton=True))
             async with (await pool()).acquire() as conn:
                 if not await conn.fetchval('update premmenu set value = $1 where uid=$2 and setting=$3 returning 1',
                                            color, uid, 'border_color'):

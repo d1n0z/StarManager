@@ -1,6 +1,8 @@
 .idea
+.vscode
 .__pycache__
 *.pyc
 venv
 
 /config/config*.ini
+/media/temp/*

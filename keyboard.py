@@ -2,7 +2,7 @@ from vkbottle import Keyboard, Callback, OpenLink, KeyboardButtonColor
 
 from config.config import (SETTINGS_POSITIONS, SETTINGS_COUNTABLE_CHANGEMENU, SETTINGS_COUNTABLE,
                            SETTINGS_COUNTABLE_NO_CATEGORY, SETTINGS_COUNTABLE_PUNISHMENT_NO_DELETE_MESSAGE,
-                           PREMMENU_TURN, LEAGUE, CONTACT_ADMIN)
+                           PREMMENU_TURN, LEAGUE, CONTACT_ADMIN, SETTINGS_PRESET_BUTTONS, SETTINGS_SUBCATS)
 
 # TODO: create keyboard and payload classes(rework payload<->handler sistem)
 
@@ -173,7 +173,47 @@ def settings_goto(uid):
     return kb.get_json()
 
 
+def settings_antispam(uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('💬 Сообщения', {"uid": uid, "cmd": "settings_menu_antispam", "setting": "msgs"}))
+    kb.add(Callback('⛔️ Спам-фильтр', {"uid": uid, "cmd": "settings_menu_antispam", "setting": "spam"}))
+    kb.row()
+    kb.add(Callback('🔞 NSFW', {"uid": uid, "cmd": "change_setting", "category": 'antispam', "setting": 'disallowNSFW'}))
+    kb.add(Callback('Назад', {"uid": uid, "cmd": "settings_menu"}))
+
+    return kb.get_json()
+
+
+def settings_antispam_msgs(uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('Сообщений в минуту', {"uid": uid, "cmd": "change_setting", "category": 'antispam', "setting": 'messagesPerMinute'}))
+    kb.row()
+    kb.add(Callback('Длина сообщений', {"uid": uid, "cmd": "change_setting", "category": 'antispam', "setting": 'maximumCharsInMessage'}))
+    kb.row()
+    kb.add(Callback('Назад', {"uid": uid, "cmd": "settings", "category": "antispam"}))
+
+    return kb.get_json()
+
+
+def settings_antispam_spam(uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback('Ссылки на ВК', {"uid": uid, "cmd": "change_setting", "category": 'antispam', "setting": 'vkLinks'}))
+    kb.row()
+    kb.add(Callback('Пересылки', {"uid": uid, "cmd": "change_setting", "category": 'antispam', "setting": 'forwardeds'}))
+    kb.row()
+    kb.add(Callback('Ссылки', {"uid": uid, "cmd": "change_setting", "category": 'antispam', "setting": 'disallowLinks'}))
+    kb.row()
+    kb.add(Callback('Назад', {"uid": uid, "cmd": "settings", "category": "antispam"}))
+
+    return kb.get_json()
+
+
 def settings_category(uid, category, settings):
+    if category == 'antispam':
+        return settings_antispam(uid)
     kb = Keyboard(inline=True)
     c = 1
     for k, i in settings.items():
@@ -203,10 +243,15 @@ def settings_category(uid, category, settings):
 
 def settings_change_countable(uid, category, setting=None, settings=None, altsettings=None, onlybackbutton=False):
     kb = Keyboard(inline=True)
-    if setting not in SETTINGS_COUNTABLE_NO_CATEGORY:
+    if setting in SETTINGS_SUBCATS and setting:
+        kb.add(Callback('Назад', {"uid": uid, "cmd": f"settings_menu_{category}", "setting": SETTINGS_SUBCATS[setting]}))
+    elif setting not in SETTINGS_COUNTABLE_NO_CATEGORY:
         kb.add(Callback('Назад', {"uid": uid, "cmd": "settings", "category": category}))
     else:
-        kb.add(Callback('Назад', {"uid": uid, "cmd": "settings_menu"}))
+        if onlybackbutton:
+            kb.add(Callback('Назад', {"uid": uid, "cmd": "change_setting", "category": category, "setting": setting}))
+        else:
+            kb.add(Callback('Назад', {"uid": uid, "cmd": "settings_menu"}))
     if onlybackbutton:
         return kb.get_json()
 
@@ -221,7 +266,7 @@ def settings_change_countable(uid, category, setting=None, settings=None, altset
                                ["Включить", "Выключить"], ["Выключить", "Включить"]):
                 color = KeyboardButtonColor.NEGATIVE if settings[category][setting] else KeyboardButtonColor.POSITIVE
             elif i['action'] == 'turnalt':
-                color = KeyboardButtonColor.NEGATIVE if altsettings[category][setting] else KeyboardButtonColor.POSITIVE
+                color = KeyboardButtonColor.POSITIVE if altsettings[category][setting] else KeyboardButtonColor.NEGATIVE
             else:
                 raise Exception
         if settings[category][setting] or (i['button'] in (
@@ -237,11 +282,18 @@ def settings_change_countable(uid, category, setting=None, settings=None, altset
 
 def settings_set_punishment(uid, category, setting):
     kb = Keyboard(inline=True)
-    kb.add(Callback('Назад', {"uid": uid, "cmd": "settings", "category": category}), KeyboardButtonColor.NEGATIVE)
+    kb.add(Callback('Назад', {"uid": uid, "cmd": "change_setting", "category": category, "setting": setting}), KeyboardButtonColor.NEGATIVE)
     kb.row()
-    if setting not in SETTINGS_COUNTABLE_PUNISHMENT_NO_DELETE_MESSAGE:
+    if setting not in SETTINGS_COUNTABLE_PUNISHMENT_NO_DELETE_MESSAGE and category != 'antispam':
         kb.add(Callback('Удалить сообщение', {"uid": uid, "cmd": "settings_set_punishment",
                                               "action": 'deletemessage', "category": category, "setting": setting}))
+        kb.row()
+    kb.add(Callback('Без наказания', {"uid": uid, "cmd": "settings_set_punishment",
+                                      "action": '', "category": category, "setting": setting}))
+    if category == 'antispam':
+        kb.row()
+        kb.add(Callback('Предупреждение', {"uid": uid, "cmd": "settings_set_punishment",
+                                        "action": 'warn', "category": category, "setting": setting}))
     kb.add(Callback('Замутить', {"uid": uid, "cmd": "settings_set_punishment",
                                  "action": 'mute', "category": category, "setting": setting}))
     kb.row()
@@ -253,18 +305,38 @@ def settings_set_punishment(uid, category, setting):
     return kb.get_json()
 
 
+def settings_set_preset(uid, category, setting, data):
+    kb = Keyboard(inline=True)
+
+    if setting == 'forwardeds':
+        def color(item):
+            return KeyboardButtonColor.POSITIVE if (data or 0) == item['value'] else None
+    else:
+        def color(*_, **__):
+            return None
+
+    kb.add(Callback('Назад', {"uid": uid, "cmd": "change_setting", "category": category, "setting": setting}), KeyboardButtonColor.NEGATIVE)
+    kb.row()
+    for i in SETTINGS_PRESET_BUTTONS[setting]:
+        kb.add(Callback(i['name'], {
+            "uid": uid, "cmd": "settings_set_preset", "action": i["action"], "category": category, "setting": setting, "data": i
+            }), color(i))
+        kb.row()
+
+    return kb.get_json()
+
+
 def settings_setlist(uid, category, setting, type):
     kb = Keyboard(inline=True)
 
-    if setting == 'disallowLinks':
-        kb.add(Callback('Список исключений', {"uid": uid, "cmd": "settings_exceptionlist", "setting": setting}))
-        kb.row()
-        kb.add(Callback('Добавить', {"uid": uid, "cmd": "settings_listaction", "setting": setting,
-                                     "type": type, "action": "add"}))
-        kb.add(Callback('Удалить', {"uid": uid, "cmd": "settings_listaction", "setting": setting,
-                                    "type": type, "action": "remove"}))
-        kb.row()
-        kb.add(Callback('Назад', {"uid": uid, "cmd": "settings", "category": category}), KeyboardButtonColor.NEGATIVE)
+    kb.add(Callback('Список исключений', {"uid": uid, "cmd": "settings_exceptionlist", "setting": setting}))
+    kb.row()
+    kb.add(Callback('Добавить', {"uid": uid, "cmd": "settings_listaction", "setting": setting,
+                                 "type": type, "action": "add", "category": category}))
+    kb.add(Callback('Удалить', {"uid": uid, "cmd": "settings_listaction", "setting": setting,
+                                "type": type, "action": "remove", "category": category}))
+    kb.row()
+    kb.add(Callback('Назад', {"uid": uid, "cmd": "change_setting", "category": category, "setting": setting}), KeyboardButtonColor.NEGATIVE)
 
     return kb.get_json()
 
@@ -272,7 +344,7 @@ def settings_setlist(uid, category, setting, type):
 def settings_set_welcome(uid, text, img, url):
     kb = Keyboard(inline=True)
 
-    kb.add(Callback('Назад', {"uid": uid, "cmd": "settings_menu"}))
+    kb.add(Callback('Назад', {"uid": uid, "cmd": "change_setting", "category": "main", "setting": "welcome"}))
     kb.add(Callback('Установить текст', {"uid": uid, "cmd": "settings_set_welcome_text"}))
     kb.row()
     kb.add(Callback('Изображение', {"uid": uid, "cmd": "settings_set_welcome_photo"}))

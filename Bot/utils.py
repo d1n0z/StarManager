@@ -4,9 +4,10 @@ import os
 import random
 import tempfile
 import time
+import traceback
 from ast import literal_eval
 from datetime import date, datetime
-from typing import Iterable, Any
+from typing import Any, Iterable
 from urllib.parse import urlparse
 
 import dns.resolver
@@ -23,11 +24,29 @@ from vkbottle import PhotoMessageUploader
 from vkbottle.bot import Message
 from vkbottle.tools.mini_types.bot.foreign_message import ForeignMessageMin
 from vkbottle_types.codegen.objects import MessagesDeleteFullResponseItem
-from vkbottle_types.objects import MessagesMessage, MessagesMessageAttachmentType, MessagesSendUserIdsResponseItem
+from vkbottle_types.objects import (
+    MessagesMessage,
+    MessagesMessageAttachmentType,
+    MessagesSendUserIdsResponseItem,
+)
 
-from config.config import (api, vk_api_session, GROUP_ID, SETTINGS, PATH,
-                           NSFW_CATEGORIES, SETTINGS_ALT, SETTINGS_DEFAULTS, PREMMENU_DEFAULT, PREMMENU_TURN,
-                           LEAGUE_LVL, IMPORTSETTINGS_DEFAULT, GOOGLE_TOKEN, PREFIX)
+from config.config import (
+    GOOGLE_TOKEN,
+    GROUP_ID,
+    IMPORTSETTINGS_DEFAULT,
+    LEAGUE_LVL,
+    NSFW_CATEGORIES,
+    PATH,
+    PREFIX,
+    PREMMENU_DEFAULT,
+    PREMMENU_TURN,
+    SETTINGS,
+    SETTINGS_ALT,
+    SETTINGS_POSITIONS,
+    SETTINGS_DEFAULTS,
+    api,
+    vk_api_session,
+)
 from db import pool
 
 _hiddenalbumuid = None
@@ -79,35 +98,45 @@ async def getIDFromMessage(message: str, reply: ForeignMessageMin | None, place:
     :return: The user's id
     """
     data = message.split()
+    if len(data) < place and not reply:
+        return 0
+    if reply is not None:
+        return reply.from_id
     try:
-        if len(data) < place and not reply:
-            return 0
-        if reply is not None:
-            return reply.from_id
-        try:
-            if data[place - 1].count('[id') != 0:
-                id = data[place - 1][data[place - 1].find('[id') + 3:data[place - 1].find('|')]
-            elif data[place - 1].count('[club') != 0:
-                id = '-' + data[place - 1][data[place - 1].find('[club') + 5:data[place - 1].find('|')]
-            elif data[place - 1].count('vk.') != 0:
-                id = data[place - 1][data[place - 1].find('vk.'):]
-                id = id[id.find('/') + 1:]
+        if data[place - 1].count('[id') != 0:
+            return int(data[place - 1][data[place - 1].find('[id') + 3:data[place - 1].find('|')])
+        elif data[place - 1].count('[club') != 0:
+            return -abs(int(data[place - 1][data[place - 1].find('[club') + 5:data[place - 1].find('|')]))
+        elif data[place - 1].count('vk.') != 0:
+            id = data[place - 1][data[place - 1].find('vk.'):]
+            id = id[id.find('/') + 1:]
+            if 'club' in id or 'public' in id:
                 try:
-                    id = await api.users.get(user_ids=id)
-                    id = id[0].id
-                except:
-                    id = int(id)
-            elif data[place - 1].isdigit():
-                id = data[place - 1]
-            elif data[place - 1].count('@id') != 0:
-                id = data[place - 1][data[place - 1].find('@id') + 3:]
+                    gid = (await api.groups.get_by_id(group_ids=id)).groups
+                except Exception:
+                    return -abs(int(id.replace('club', '').replace('public', '')))
+                return -abs(gid[0].id) if gid else 0
             else:
-                return 0
-        except IndexError:
-            return 0
-
-        return int(id)
-    except:
+                try:
+                    uid = await api.users.get(user_ids=id)
+                    if not uid or not uid:
+                        raise Exception
+                    return uid[0].id
+                except Exception:
+                    try:
+                        gid = await api.groups.get_by_id(group_ids=id)
+                        if not gid or not gid.groups:
+                            raise Exception
+                        return -abs(gid.groups[0].id)
+                    except Exception:
+                        return int(id.replace('id', ''))
+        elif data[place - 1].isdigit() or (data[place - 1][1:].isdigit() and data[place - 1][0] == '-'):
+            return int(data[place - 1])
+        elif data[place - 1].count('@id') != 0:
+            return int(data[place - 1][data[place - 1].find('@id') + 3:])
+        return 0
+    except Exception:
+        traceback.print_exc()
         return 0
 
 
@@ -165,7 +194,7 @@ async def getGroupName(group_id: int) -> str:
     async with (await pool()).acquire() as conn:
         if name := await conn.fetchval('select name from groupnames where group_id=$1', -abs(group_id)):
             return name
-        name = await api.groups.get_by_id(group_ids=abs(group_id))
+        name = await api.groups.get_by_id(group_id=abs(group_id))
         name = name.groups[0].name
         await conn.execute('insert into groupnames (group_id, name) values ($1, $2)', -abs(group_id), name)
         return name
@@ -208,13 +237,14 @@ async def setChatMute(uid: int | Iterable[int], chat_id: int, mute_time: int | f
     try:
         if mute_time is None or mute_time > 0:
             payload = {'peer_id': chat_id + 2000000000, 'member_ids': uid, 'action': 'ro'}
-            if mute_time is not None:
+            if mute_time is not None and mute_time < 2676000:
                 payload['for'] = int(mute_time)
             return vk_api_session.method('messages.changeConversationMemberRestrictions', payload)
         else:
             return vk_api_session.method('messages.changeConversationMemberRestrictions',
                                          {'peer_id': chat_id + 2000000000, 'member_ids': uid, 'action': 'rw'})
     except:
+        traceback.print_exc()
         return
 
 
@@ -447,11 +477,17 @@ async def getChatSettings(chat_id):
 
 
 @AsyncTTL(time_to_live=5, maxsize=0)
+async def getChatSettingValue(chat_id, setting):
+    async with (await pool()).acquire() as conn:
+        return await conn.fetchval('select value from settings where chat_id=$1 and setting=$2', chat_id, setting)
+
+
+@AsyncTTL(time_to_live=5, maxsize=0)
 async def getChatAltSettings(chat_id):
     chatsettings = SETTINGS_ALT()
     async with (await pool()).acquire() as conn:
         for cat, settings in chatsettings.items():
-            for setting, pos in settings.items():
+            for setting, _ in settings.items():
                 chatsetting = await conn.fetchval(
                     'select pos2 from settings where chat_id=$1 and setting=$2', chat_id, setting)
                 if chatsetting is None:
@@ -463,10 +499,13 @@ async def getChatAltSettings(chat_id):
 async def turnChatSetting(chat_id, category, setting, alt=False):
     defaults = SETTINGS_DEFAULTS[setting] if setting in SETTINGS_DEFAULTS else {'pos': SETTINGS()[category][setting]}
     async with (await pool()).acquire() as conn:
-        if not await conn.fetchval('update settings set ' + ('pos2=not pos2' if alt else 'pos=not pos') +
-                                   ' where chat_id=$1 and setting=$2 returning 1', chat_id, setting):
-            await conn.execute('insert into settings (chat_id, setting, ' + ('pos2' if alt else 'pos') +
-                               ') values ($1, $2, $3)', chat_id, setting, not defaults['pos'])
+        if not await conn.fetchval(
+            'update settings set ' + (
+                f'pos2 = NOT COALESCE(pos2, {str(bool(SETTINGS_ALT()[category][setting]))})' if alt else 'pos=not pos'
+                ) + ' where chat_id=$1 and setting=$2 returning 1', chat_id, setting):
+            await conn.execute(
+                'insert into settings (chat_id, setting, ' + (
+                    'pos2' if alt else 'pos') + ') values ($1, $2, $3)', chat_id, setting, not defaults['pos'])
 
 
 async def setUserAccessLevel(uid, chat_id, access_level):
@@ -563,7 +602,7 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings):
         async with (await pool()).acquire() as conn:
             for i in data:
                 for y in i.split('/'):
-                    if not whoiscached(y) or y in ['vk.com', 'vk.ru']:
+                    if '.' not in y or y in ['vk.com', 'vk.ru'] or not whoiscached(y) :
                         continue
                     if not await conn.fetchval('select exists(select 1 from antispamurlexceptions where chat_id=$1'
                                                ' and url=$2)', chat_id, y.replace('https://', '').replace('/', '')):
@@ -585,6 +624,31 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings):
             isNSFW = await NSFWDetector(filename)
             if isNSFW:
                 return 'disallowNSFW'
+    if settings['antispam']['vkLinks']:
+        data = message.text.split()
+        async with (await pool()).acquire() as conn:
+            for i in data:
+                if not any(domain in i for domain in ('vk.com', 'vk.ru')):
+                    continue
+                if not await conn.fetchval('select exists(select 1 from vklinksexceptions where chat_id=$1'
+                                           ' and url=$2)', chat_id, i[i.find('vk.'):]):
+                    return 'vkLinks'
+    if settings['antispam']['forwardeds'] and (message.fwd_messages or message.attachments):
+        msgs = [message]
+        stack = message.fwd_messages.copy()
+        while stack:
+            msg = stack.pop()
+            msgs.append(msg)
+            if hasattr(msg, 'fwd_messages') and msg.fwd_messages:
+                stack.extend(msg.fwd_messages)
+        async with (await pool()).acquire() as conn:
+            for i in msgs:
+                for atchmnt in i.attachments:
+                    if not atchmnt.wall:
+                        continue
+                    if not await conn.fetchval('select exists(select 1 from forwardedsexceptions where chat_id=$1 and exc_id=$2)', 
+                                               chat_id, atchmnt.wall.owner_id):
+                        return 'forwardeds'
     return False
 
 
@@ -679,16 +743,22 @@ async def generateCaptcha(uid, chat_id, exp):
 
 async def punish(uid, chat_id, setting_id):
     async with (await pool()).acquire() as conn:
-        setting = await conn.fetchval('select punishment from settings where id=$1', setting_id)
+        setting, name = await conn.fetchrow('select punishment, setting from settings where id=$1', setting_id)
     if setting is None:
         return False
-    punishment = setting.split('|')
+    punishment = list(setting.split('|'))
     if punishment[0] == 'deletemessage':
         return 'del'
     if punishment[0] == 'kick':
         await kickUser(uid, chat_id)
         return punishment
-    elif punishment[0] == 'mute':
+    
+    if name in SETTINGS_POSITIONS['antispam']:
+        cause = 'Анти-спам (#AS' + str(list(SETTINGS_POSITIONS["antispam"].keys()).index(name) + 1) + ')'
+    else:
+        cause = 'Нарушение правил беседы.'
+
+    if punishment[0] == 'mute':
         async with (await pool()).acquire() as conn:
             ms = await conn.fetchrow(
                 'select last_mutes_times, last_mutes_causes, last_mutes_names, last_mutes_dates from mute where '
@@ -704,8 +774,8 @@ async def punish(uid, chat_id, setting_id):
         mute_date = datetime.now().strftime('%Y.%m.%d %H:%M:%S')
         mute_time = int(punishment[1]) * 60
         mute_times.append(mute_time)
-        mute_causes.append('Нарушение правил беседы')
-        mute_names.append(f'[club222139436|Star Manager]')
+        mute_causes.append(cause)
+        mute_names.append(f'[club{-GROUP_ID}|Star Manager]')
         mute_dates.append(mute_date)
 
         async with (await pool()).acquire() as conn:
@@ -735,11 +805,10 @@ async def punish(uid, chat_id, setting_id):
         else:
             ban_times, ban_causes, ban_names, ban_dates = [], [], [], []
 
-        ban_cause = 'Нарушение правил беседы'
         ban_time = int(punishment[1]) * 86400
         ban_times.append(ban_time)
-        ban_causes.append(ban_cause)
-        ban_names.append(f'[club222139436|Star Manager]')
+        ban_causes.append(cause)
+        ban_names.append(f'[club{-GROUP_ID}|Star Manager]')
         ban_dates.append(ban_date)
 
         async with (await pool()).acquire() as conn:
@@ -754,6 +823,38 @@ async def punish(uid, chat_id, setting_id):
                     f"{ban_times}", f"{ban_causes}", f"{ban_names}", f"{ban_dates}")
 
         await kickUser(uid, chat_id)
+        return punishment
+    elif punishment[0] == 'warn':
+        async with (await pool()).acquire() as conn:
+            res = await conn.fetchrow('select warns, last_warns_times, last_warns_causes, last_warns_names, '
+                                      'last_warns_dates from warn where chat_id=$1 and uid=$2', chat_id, uid)
+        if res is not None:
+            warns = res[0] + 1
+            warn_times = literal_eval(res[1])
+            warn_causes = literal_eval(res[2])
+            warn_names = literal_eval(res[3])
+            warn_dates = literal_eval(res[4])
+        else:
+            warns = 1
+            warn_times, warn_causes, warn_names, warn_dates = [], [], [], []
+        warn_times.append(0)
+        warn_causes.append(cause)
+        warn_names.append(f'[club{-GROUP_ID}|Star Manager]')
+        warn_dates.append(datetime.now().strftime('%Y.%m.%d %H:%M:%S'))
+
+        if warns >= 3:
+            warns = 0
+            await kickUser(uid, chat_id)
+
+        async with (await pool()).acquire() as conn:
+            if not await conn.fetchval(
+                    'update warn set warns = $1, last_warns_times = $2, last_warns_causes = $3, last_warns_names = $4, '
+                    'last_warns_dates = $5 where chat_id=$6 and uid=$7 returning 1',
+                    warns, f"{warn_times}", f"{warn_causes}", f"{warn_names}", f"{warn_dates}", chat_id, uid):
+                await conn.execute(
+                    'insert into warn (uid, chat_id, warns, last_warns_times, last_warns_causes, last_warns_names, '
+                    'last_warns_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                    uid, chat_id, warns, f"{warn_times}", f"{warn_causes}", f"{warn_names}", f"{warn_dates}")
         return punishment
     return False
 
