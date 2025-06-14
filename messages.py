@@ -2506,9 +2506,9 @@ def antispam_punishment(
 ):
     if setting in SETTINGS_POSITIONS["antispam"]:
         if punishment == 'mute':
-            time = {f" {time} минут" if int(time) < 44600 else "всегда"}
+            time = f" {time} минут" if int(time) < 44600 else "всегда"
         elif punishment == 'ban':
-            time = {f" {time} дней" if int(time) < 3650 else "всегда"}
+            time = f" {time} дней" if int(time) < 3650 else "всегда"
         return get(
             f"antispam_punishment_{punishment}",
             uid=uid,
