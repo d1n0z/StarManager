@@ -1515,12 +1515,12 @@ async def import_start(message: MessageEvent):
     settings = await utils.getImportSettings(message.user_id, importchatid)
     async with (await pool()).acquire() as conn:
         if settings['sys']:
-            if t := await conn.fetchrow(
+            if i := await conn.fetchrow(
                     'select activated, allowed from silencemode where chat_id=$1', importchatid):
                 if not await conn.fetchval('update silencemode set activated = $1, allowed = $2 where chat_id=$3 '
-                                           'returning 1', *t, chatid):
+                                           'returning 1', *i, chatid):
                     await conn.execute(
-                        'insert into silencemode (chat_id, activated, allowed) values ($1, $2, $3)', chatid, *t)
+                        'insert into silencemode (chat_id, activated, allowed) values ($1, $2, $3)', chatid, *i)
             for i in await conn.fetch('select filter from filters where chat_id=$1', importchatid):
                 if not await conn.fetchval(
                         'select exists(select 1 from filters where chat_id=$1 and filter=$2)', chatid, *i):
@@ -1540,12 +1540,12 @@ async def import_start(message: MessageEvent):
                     await conn.execute(
                         'insert into settings (chat_id, setting, pos, value, punishment, value2, pos2) '
                         'values ($1, $2, $3, $4, $5, $6, $7)', chatid, *i)
-            if t := await conn.fetchrow(
+            if i := await conn.fetchrow(
                     'select msg, url, photo, button_label from welcome where chat_id=$1', importchatid):
                 if not await conn.fetchval('update welcome set msg = $1, url = $2, photo = $3, button_label = $4 '
-                                           'where chat_id=$5 returning 1', *t, chatid):
+                                           'where chat_id=$5 returning 1', *i, chatid):
                     await conn.execute('insert into welcome (chat_id, msg, url, photo, button_label) values '
-                                       '($1, $2, $3, $4, $5)', chatid, *t)
+                                       '($1, $2, $3, $4, $5)', chatid, *i)
             for i in await conn.fetch('select lvl, name from accessnames where chat_id=$1', importchatid):
                 if not await conn.fetchval('update accessnames set name = $1 where chat_id=$2 and lvl=$3 '
                                            'returning 1', i[1], chatid, i[0]):
@@ -1555,10 +1555,10 @@ async def import_start(message: MessageEvent):
                 if not await conn.fetchrow('select exists(select 1 from ignore where chat_id=$1 and uid=$2)',
                                            chatid, *i):
                     await conn.execute('insert into ignore (chat_id, uid) values ($1, $2)', chatid, *i)
-            if t := await conn.fetchrow('select time from chatlimit where chat_id=$1', importchatid):
+            if i := await conn.fetchrow('select time from chatlimit where chat_id=$1', importchatid):
                 if not await conn.fetchval(
                         'update chatlimit set time = $1 where chat_id=$2 returning 1', *i, chatid):
-                    await conn.execute('insert into chatlimit (chat_id, time) values ($1, $2)', chatid, *t)
+                    await conn.execute('insert into chatlimit (chat_id, time) values ($1, $2)', chatid, *i)
             for i in await conn.fetch('select tag, every, status, time, description, text, name from notifications '
                                       'where chat_id=$1', importchatid):
                 if not await conn.fetchval('update notifications set tag = $1, every = $2, status = $3, time = $4, '
