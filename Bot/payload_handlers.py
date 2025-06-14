@@ -1571,6 +1571,16 @@ async def import_start(message: MessageEvent):
                                            'url=$2)', chatid, *i):
                     await conn.execute(
                         'insert into antispamurlexceptions (chat_id, url) values ($1, $2)', chatid, *i)
+            for i in await conn.fetch('select url from vklinksexceptions where chat_id=$1', importchatid):
+                if not await conn.fetchrow('select exists(select 1 from vklinksexceptions where chat_id=$1 and '
+                                           'url=$2)', chatid, *i):
+                    await conn.execute(
+                        'insert into vklinksexceptions (chat_id, url) values ($1, $2)', chatid, *i)
+            for i in await conn.fetch('select exc_id from forwardedsexceptions where chat_id=$1', importchatid):
+                if not await conn.fetchrow('select exists(select 1 from forwardedsexceptions where chat_id=$1 and '
+                                           'exc_id=$2)', chatid, *i):
+                    await conn.execute(
+                        'insert into forwardedsexceptions (chat_id, exc_id) values ($1, $2)', chatid, *i)
             for i in await conn.fetch('select uid from antitag where chat_id=$1', importchatid):
                 if not await conn.fetchrow('select exists(select 1 from antitag where chat_id=$1 and uid=$2)',
                                            chatid, *i):
