@@ -1552,7 +1552,7 @@ async def import_start(message: MessageEvent):
                     await conn.execute(
                         'insert into accessnames (chat_id, lvl, name) values ($1, $2, $3)', chatid, *i)
             for i in await conn.fetch('select uid from ignore where chat_id=$1', importchatid):
-                if not await conn.fetchrow('select exists(select 1 from ignore where chat_id=$1 and uid=$2)',
+                if not await conn.fetchval('select exists(select 1 from ignore where chat_id=$1 and uid=$2)',
                                            chatid, *i):
                     await conn.execute('insert into ignore (chat_id, uid) values ($1, $2)', chatid, *i)
             if i := await conn.fetchrow('select time from chatlimit where chat_id=$1', importchatid):
@@ -1567,22 +1567,22 @@ async def import_start(message: MessageEvent):
                     await conn.execute('insert into notifications (chat_id, tag, every, status, time, description, '
                                        'text, name) values ($1, $2, $3, $4, $5, $6, $7, $8)', chatid, *i)
             for i in await conn.fetch('select url from antispamurlexceptions where chat_id=$1', importchatid):
-                if not await conn.fetchrow('select exists(select 1 from antispamurlexceptions where chat_id=$1 and '
+                if not await conn.fetchval('select exists(select 1 from antispamurlexceptions where chat_id=$1 and '
                                            'url=$2)', chatid, *i):
                     await conn.execute(
                         'insert into antispamurlexceptions (chat_id, url) values ($1, $2)', chatid, *i)
             for i in await conn.fetch('select url from vklinksexceptions where chat_id=$1', importchatid):
-                if not await conn.fetchrow('select exists(select 1 from vklinksexceptions where chat_id=$1 and '
+                if not await conn.fetchval('select exists(select 1 from vklinksexceptions where chat_id=$1 and '
                                            'url=$2)', chatid, *i):
                     await conn.execute(
                         'insert into vklinksexceptions (chat_id, url) values ($1, $2)', chatid, *i)
             for i in await conn.fetch('select exc_id from forwardedsexceptions where chat_id=$1', importchatid):
-                if not await conn.fetchrow('select exists(select 1 from forwardedsexceptions where chat_id=$1 and '
+                if not await conn.fetchval('select exists(select 1 from forwardedsexceptions where chat_id=$1 and '
                                            'exc_id=$2)', chatid, *i):
                     await conn.execute(
                         'insert into forwardedsexceptions (chat_id, exc_id) values ($1, $2)', chatid, *i)
             for i in await conn.fetch('select uid from antitag where chat_id=$1', importchatid):
-                if not await conn.fetchrow('select exists(select 1 from antitag where chat_id=$1 and uid=$2)',
+                if not await conn.fetchval('select exists(select 1 from antitag where chat_id=$1 and uid=$2)',
                                            chatid, *i):
                     await conn.execute('insert into antitag (chat_id, uid) values ($1, $2)', chatid, *i)
             for i in await conn.fetch('select uid, sys, acc, nicks, punishes, binds from importsettings where '
