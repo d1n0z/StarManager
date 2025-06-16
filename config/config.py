@@ -483,6 +483,7 @@ PREMIUM_COST = {30: 99, 90: 249, 180: 499}
 data = {
     'email': config['SOCIALS']['email'],
     'vk': config['SOCIALS']['vk'],
+    'vk_contact': config['SOCIALS']['vk'].replace('.com', '.me'),
     'vk_preminfo': config['SOCIALS']['vk_preminfo'],
     'tg': config['SOCIALS']['tg'],
     'high': f'{PREMIUM_COST[180]}',

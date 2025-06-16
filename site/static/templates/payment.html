@@ -23,6 +23,7 @@
             align-items: center;
             position: relative;
             overflow: hidden;
+            padding-bottom: 120px;
         }
 
         .stars {
@@ -331,82 +332,184 @@
                 margin-bottom: 10px;
             }
         }
+        
+        .footer-below {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            padding: 17px;
+            box-sizing: border-box;
+            background: #161B22;
+            border-top: 1px solid #30363D;
+            color: #8B949E;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .footer-links {
+            margin-top: 8px;
+            font-size: 13px;
+        }
+
+        .footer-links a {
+            color: #58A6FF;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .footer-links a:hover {
+            color: #79B8FF;
+        }
+
+        .footer-links a:not(:last-child)::after {
+            content: " | ";
+            color: #8B949E;
+            margin: 0 5px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track-piece {
+            background-color: #0D1117;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: #21262D;
+            border-radius: 4px;
+            transition: background-color 0.3s ease;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: #30363D;
+        }
     </style>
 </head>
 <body>
     <div class="stars" id="stars"></div>
-    <div class="container">
-        <h1>Выберите план</h1>
-        <div class="tabs">
-            <button class="tab active" onclick="showTab('subscription')">Premium подписка</button>
-            <button class="tab" onclick="showTab('chat')">Premium чат</button>
-        </div>
+    <div class="wrapper">
+        <div class="container">
+            <h1>Выберите план</h1>
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('subscription')">Premium подписка</button>
+                <button class="tab" onclick="showTab('chat')">Premium чат</button>
+            </div>
 
-        <div id="subscription" class="tab-content">
-            <div class="form-group">
-                <label>Срок подписки</label>
-                <select id="duration" onchange="updatePrice()">
-                    <option value="30">30 дней - {{ low }} ₽</option>
-                    <option value="90">90 дней - {{ medium }} ₽</option>
-                    <option value="180">180 дней - {{ high }} ₽</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label class="checkbox">
-                    <input type="checkbox" id="gift" onchange="toggleGift()">
-                    <span class="checkbox-custom"></span>
-                    <span class="checkbox-label">Подарок другу</span>
-                </label>
-                <input type="text" id="gift-input" placeholder="Ссылка на ВК или ID пользователя" oninput="validateForm()">
-            </div>
-            <div class="form-group">
-                <label>Промокод</label>
-                <input type="text" id="promo-sub" placeholder="Введите промокод" oninput="debouncedValidatePromo(this)">
-            </div>
-            <div class="form-group">
-                <label>Метод оплаты</label>
-                <div class="payment-methods">
-                    <div class="payment-option">
-                        <input type="radio" id="yukassa" name="payment" value="yukassa" checked>
-                        <label for="yukassa">ЮKassa (карты)</label>
+            <div id="subscription" class="tab-content">
+                <div class="form-group">
+                    <label>Срок подписки</label>
+                    <select id="duration" onchange="updatePrice()">
+                        <option value="30">30 дней - {{ low }} ₽</option>
+                        <option value="90">90 дней - {{ medium }} ₽</option>
+                        <option value="180">180 дней - {{ high }} ₽</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox">
+                        <input type="checkbox" id="gift" onchange="toggleGift()">
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-label">Подарок другу</span>
+                    </label>
+                    <input type="text" id="gift-input" placeholder="Ссылка на ВК или ID пользователя" oninput="validateForm()">
+                </div>
+                <div class="form-group">
+                    <label>Промокод</label>
+                    <input type="text" id="promo-sub" placeholder="Введите промокод" oninput="debouncedValidatePromo(this)">
+                </div>
+                <div class="form-group">
+                    <label>Метод оплаты</label>
+                    <div class="payment-methods">
+                        <div class="payment-option">
+                            <input type="radio" id="yukassa" name="payment" value="yukassa" checked>
+                            <label for="yukassa">ЮKassa (карты)</label>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="price" id="sub-price">
-                <span class="original-price" id="sub-original-price">{{ low }} ₽</span>
-                <span class="discounted-price" id="sub-discounted-price" style="display: none;"></span>
-            </div>
-        </div>
-
-        <div id="chat" class="tab-content" style="display: none;">
-            <div class="form-group">
-                <label>ID чата</label>
-                <input type="text" id="chat-id" placeholder="Введите ID чата" oninput="validateForm()">
-            </div>
-            <div class="form-group">
-                <label>Промокод</label>
-                <input type="text" id="promo-chat" placeholder="Введите промокод" oninput="debouncedValidatePromo(this)">
-            </div>
-            <div class="form-group">
-                <label>Метод оплаты</label>
-                <div class="payment-methods">
-                    <div class="payment-option">
-                        <input type="radio" id="yukassa-chat" name="payment-chat" value="yukassa" checked>
-                        <label for="yukassa-chat">ЮKassa (карты)</label>
-                    </div>
+                <div class="price" id="sub-price">
+                    <span class="original-price" id="sub-original-price">{{ low }} ₽</span>
+                    <span class="discounted-price" id="sub-discounted-price" style="display: none;"></span>
                 </div>
             </div>
-            <div class="price" id="chat-price">
-                <span class="original-price" id="chat-original-price">199 ₽</span>
-                <span class="discounted-price" id="chat-discounted-price" style="display: none;"></span>
-            </div>
-        </div>
 
-        <div class="error-message" id="error-message"></div>
-        <button class="buy-btn" id="buy-btn" onclick="generatePaymentLink()">Купить</button>
+            <div id="chat" class="tab-content" style="display: none;">
+                <div class="form-group">
+                    <label>ID чата</label>
+                    <input type="text" id="chat-id" placeholder="Введите ID чата" oninput="validateForm()">
+                </div>
+                <div class="form-group">
+                    <label>Промокод</label>
+                    <input type="text" id="promo-chat" placeholder="Введите промокод" oninput="debouncedValidatePromo(this)">
+                </div>
+                <div class="form-group">
+                    <label>Метод оплаты</label>
+                    <div class="payment-methods">
+                        <div class="payment-option">
+                            <input type="radio" id="yukassa-chat" name="payment-chat" value="yukassa" checked>
+                            <label for="yukassa-chat">ЮKassa (карты)</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="price" id="chat-price">
+                    <span class="original-price" id="chat-original-price">199 ₽</span>
+                    <span class="discounted-price" id="chat-discounted-price" style="display: none;"></span>
+                </div>
+            </div>
+
+            <div class="error-message" id="error-message"></div>
+            <button class="buy-btn" id="buy-btn" onclick="generatePaymentLink()">Купить</button>
+        </div>
     </div>
-
+    <footer class="footer-below">
+        <div class="footer-content">
+            <p>&copy; <span id="current-year"></span> Star Manager</p>
+            <div class="footer-links">
+                <a href="/static/docs/offer.pdf">Offer Agreement</a>
+                <a href="/static/docs/privacy.pdf">Privacy Policy</a>
+                <a href="/static/docs/taxreg.pdf">Tax Registration Certificate</a>
+                <a href="mailto:{{ email }}" onclick="copyEmail(event)">Email</a>
+            </div>
+        </div>
+    </footer>
+    <div id="email-tooltip" style="
+    position: absolute;
+    background: #21262D;
+    color: #58A6FF;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    border: 1px solid #30363D;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    z-index: 10;
+">Email Copied!</div>
     <script>
+        function copyEmail(event) {
+            event.preventDefault();
+            const email = "{{ email }}"; // замените на свой
+
+            navigator.clipboard.writeText(email).then(() => {
+                const tooltip = document.getElementById('email-tooltip');
+                const x = event.pageX;
+                const y = event.pageY;
+
+                tooltip.style.left = (x - tooltip.offsetWidth / 2) + 'px';
+                tooltip.style.top = (y - 40) + 'px'; // 40px выше клика
+                tooltip.style.opacity = 1;
+
+                clearTimeout(window.emailTooltipTimeout);
+                window.emailTooltipTimeout = setTimeout(() => {
+                    tooltip.style.opacity = 0;
+                }, 1500);
+            });
+        }
+        const currentYear = new Date().getFullYear();
+        const yearElement = document.getElementById('current-year');
+        if (yearElement) {
+            yearElement.textContent = currentYear;
+        }
+
         const prices = { 30: {{ low }}, 90: {{ medium }}, 180: {{ high }} };
         const chatBasePrice = 199;
         const starsContainer = document.getElementById('stars');

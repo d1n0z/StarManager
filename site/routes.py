@@ -45,6 +45,15 @@ async def index(request: Request):
     )
 
 
+@router.get("/contact", response_class=HTMLResponse)
+async def contact(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="contact.html",
+        context={**config.data, "user": request.session.get("user")},
+    )
+
+
 @router.get("/payment", response_class=HTMLResponse)
 async def payment(request: Request, promo: str | None = None):
     user = request.session.get("user")

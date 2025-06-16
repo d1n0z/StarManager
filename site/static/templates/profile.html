@@ -20,6 +20,7 @@
             position: relative;
             overflow-x: hidden;
             padding: 20px;
+            padding-bottom: 120px;
         }
 
         .stars {
@@ -52,6 +53,7 @@
             max-width: 800px;
             margin: 0 auto;
             padding: 40px 0;
+            padding-bottom: 178px;
         }
 
         .profile-header {
@@ -213,6 +215,59 @@
                 padding: 6px 12px;
             }
         }
+        
+        .footer-below {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 17px;
+            box-sizing: border-box;
+            background: #161B22;
+            border-top: 1px solid #30363D;
+            color: #8B949E;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .footer-links {
+            margin-top: 8px;
+            font-size: 13px;
+        }
+
+        .footer-links a {
+            color: #58A6FF;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .footer-links a:hover {
+            color: #79B8FF;
+        }
+
+        .footer-links a:not(:last-child)::after {
+            content: " | ";
+            color: #8B949E;
+            margin: 0 5px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track-piece {
+            background-color: #0D1117;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: #21262D;
+            border-radius: 4px;
+            transition: background-color 0.3s ease;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: #30363D;
+        }
     </style>
 </head>
 <body>
@@ -249,7 +304,7 @@
                 </div>
             </div>
         </div>
-        <div id="history" class="tab-content">
+        <div id="history" class="tab-content" style="min-height: 360px;">
             <div class="history-list">
                 {% for item in paymenthistory %}
                 <div class="history-item">
@@ -262,8 +317,56 @@
             </div>
         </div>
     </div>
-
+    <footer class="footer-below">
+        <div class="footer-content">
+            <p>&copy; <span id="current-year"></span> Star Manager</p>
+            <div class="footer-links">
+                <a href="/static/docs/offer.pdf">Offer Agreement</a>
+                <a href="/static/docs/privacy.pdf">Privacy Policy</a>
+                <a href="/static/docs/taxreg.pdf">Tax Registration Certificate</a>
+                <a href="mailto:{{ email }}" onclick="copyEmail(event)">Email</a>
+            </div>
+        </div>
+    </footer>
+    <div id="email-tooltip" style="
+    position: absolute;
+    background: #21262D;
+    color: #58A6FF;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    border: 1px solid #30363D;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    z-index: 10;
+">Email Copied!</div>
     <script>
+        function copyEmail(event) {
+            event.preventDefault();
+            const email = "{{ email }}"; // замените на свой
+
+            navigator.clipboard.writeText(email).then(() => {
+                const tooltip = document.getElementById('email-tooltip');
+                const x = event.pageX;
+                const y = event.pageY;
+
+                tooltip.style.left = (x - tooltip.offsetWidth / 2) + 'px';
+                tooltip.style.top = (y - 40) + 'px'; // 40px выше клика
+                tooltip.style.opacity = 1;
+
+                clearTimeout(window.emailTooltipTimeout);
+                window.emailTooltipTimeout = setTimeout(() => {
+                    tooltip.style.opacity = 0;
+                }, 1500);
+            });
+        }
+        const currentYear = new Date().getFullYear();
+        const yearElement = document.getElementById('current-year');
+        if (yearElement) {
+            yearElement.textContent = currentYear;
+        }
+
         const starsContainer = document.getElementById('stars');
         for (let i = 0; i < 50; i++) {
             const star = document.createElement('div');
