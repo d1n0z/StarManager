@@ -19,7 +19,7 @@ from Bot.utils import sendMessage, chunks, punish, getUserName, beautifyNumber, 
 from config.config import (DATABASE, PASSWORD, USER, TG_CHAT_ID, DAILY_TO, api, TG_BACKUP_THREAD_ID, PHOTO_NOT_FOUND,
                            YANDEX_TOKEN, COMMANDS, vk_api_session, GROUP_ID, PATH, implicitapi, STATUSCHECKER_TO,
                            STATUSCHECKER_CMD, DEV_TGID, MATHGIVEAWAYS_TO)
-from db import smallpool as pool
+from db import schedulerpool as pool
 
 
 async def backup() -> None:
