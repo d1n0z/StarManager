@@ -4,7 +4,7 @@ from config.config import (SETTINGS_POSITIONS, SETTINGS_COUNTABLE_CHANGEMENU, SE
                            SETTINGS_COUNTABLE_NO_CATEGORY, SETTINGS_COUNTABLE_PUNISHMENT_NO_DELETE_MESSAGE,
                            PREMMENU_TURN, LEAGUE, CONTACT_ADMIN, SETTINGS_PRESET_BUTTONS, SETTINGS_SUBCATS)
 
-# TODO: create keyboard and payload classes(rework payload<->handler sistem)
+NUMOJIS = ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
 
 
 def join(chid):
@@ -229,7 +229,7 @@ def settings_category(uid, category, settings):
         if k in SETTINGS_COUNTABLE:
             name = 'Настроить'
             color = KeyboardButtonColor.PRIMARY
-        name = f'[{c}]. ' + name
+        name = f'{NUMOJIS[c]} ' + name
         kb.add(Callback(name, {"uid": uid, "cmd": "change_setting", "category": category, "setting": k}), color)
         if c % 2 == 0:
             kb.row()
