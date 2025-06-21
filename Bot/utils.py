@@ -10,6 +10,7 @@ from datetime import date, datetime
 from typing import Any, Iterable
 from urllib.parse import urlparse
 
+from Bot import managers
 import dns.resolver
 import pysafebrowsing
 import requests
@@ -586,8 +587,7 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings):
             setting = await conn.fetchrow("select \"value\" from settings where chat_id=$1 and "
                                           "setting='messagesPerMinute'", chat_id)
             if setting is not None and setting[0] is not None:
-                if await conn.fetchval('select count(*) as c from antispammessages where chat_id=$1 and '
-                                       'from_id=$2', chat_id, uid) >= setting[0]:
+                if managers.antispam.get_count(chat_id, uid) >= setting[0]:
                     return 'messagesPerMinute'
     if settings['antispam']['maximumCharsInMessage']:
         async with (await pool()).acquire() as conn:

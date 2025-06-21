@@ -569,17 +569,6 @@ class AnonMessages(Model):
         table_name = 'anonmessages'
 
 
-class AntispamMessages(Model):
-    cmid = IntegerField(default=0)
-    chat_id = IntegerField()
-    from_id = IntegerField()
-    time = BigIntegerField()
-
-    class Meta:
-        database = dbhandle
-        table_name = 'antispammessages'
-
-
 class AntispamURLExceptions(Model):
     chat_id = IntegerField()
     url = TextField()

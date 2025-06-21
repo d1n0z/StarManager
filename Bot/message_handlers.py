@@ -8,6 +8,7 @@ from vkbottle_types.objects import MessagesMessageAttachmentType
 
 import keyboard
 import messages
+from Bot import managers
 from Bot.action_handlers import action_handle
 from Bot.add_msg_count import add_msg_counter
 from Bot.answers_handlers import answer_handler
@@ -202,13 +203,8 @@ async def message_handle(event: MessageNew) -> Any:
 
     if settings['antispam']['messagesPerMinute']:
         async with (await pool()).acquire() as conn:
-            if (setting := await conn.fetchval(
-                'select "value" from settings where chat_id=$1 and setting=\'messagesPerMinute\'', chat_id)
-                ) and await conn.fetchval('select count(*) as c from antispammessages where chat_id=$1 and from_id=$2',
-                                          chat_id, uid) < setting:
-                await conn.execute(
-                    'insert into antispammessages (cmid, chat_id, from_id, time) values ($1, $2, $3, $4)',
-                    event.object.message.conversation_message_id, chat_id, uid, event.object.message.date)
+            if await conn.fetchval('select "value" from settings where chat_id=$1 and setting=\'messagesPerMinute\'', chat_id):
+                managers.antispam.add_message(chat_id, uid, event.object.message.date)
 
     if uacc < 5 and (setting := await antispamChecker(chat_id, uid, event.object.message, settings)):
         async with (await pool()).acquire() as conn:
