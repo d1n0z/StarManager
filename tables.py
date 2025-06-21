@@ -339,16 +339,6 @@ class Referral(Model):
         table_name = 'refferal'
 
 
-class LastFiveCommands(Model):
-    uid = IntegerField(default=0, unique=True, index=True)
-    cmds = TextField(null=True)
-    cmd_time = TextField(null=True)
-
-    class Meta:
-        database = dbhandle
-        table_name = 'lastfivecommands'
-
-
 class GlobalWarns(Model):
     uid = IntegerField(default=0, unique=True, index=True)
     warns = IntegerField(default=0)
