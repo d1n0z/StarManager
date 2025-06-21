@@ -53,6 +53,7 @@ async def backup() -> None:
 async def updateInfo():
     try:
         async with (await pool()).acquire() as conn:
+            await conn.execute('delete from speccommandscooldown where time<$1', time.time() - 10)
             alluserscount = beautifyNumber(await conn.fetchval('select count(*) from allusers'))
             allchatscount = beautifyNumber(await conn.fetchval('select count(*) from allchats'))
             await implicitapi.status.set(
@@ -114,7 +115,7 @@ async def updateInfo():
                         await conn.execute('insert into publicchatssettings (chat_id, link, photo, name, members, '
                                            'last_update) values ($1, $2, $3, $4, $5, $6)', i[0], link, photo,
                                            vkchat['title'], vkchat['members_count'], time.time())
-                except:
+                except Exception:
                     await conn.execute('update publicchats set isopen=false where chat_id=$1', i[0])
                 await asyncio.sleep(0.2)
     except Exception as e:
@@ -135,20 +136,14 @@ async def reboot():
         await sendMessage(DAILY_TO + 2000000000, f'e from schedule reboot:\n{e}')
 
 
-async def everyminute():
+async def every10min():
     try:
-        os.system(f'find {PATH}' + 'media/temp/ -mtime +1 -exec rm {} \;')  # noqa
         async with (await pool()).acquire() as conn:
-            await conn.execute('delete from cmdnames where not cmd=ANY($1)', list(COMMANDS.keys()))
-            await conn.execute('delete from antispammessages where time<$1', time.time() - 60)
-            await conn.execute('delete from speccommandscooldown where time<$1', time.time() - 10)
-            await conn.execute('update xp set xp=0 where xp<0')
-            await conn.execute('delete from premium where time<$1', time.time())
             for uid, cmid in await conn.fetch(
                     'select uid, cmid from premiumexpirenotified where date<$1', time.time() - 86400 * 2):
                 try:
                     await deleteMessages(cmid, uid)
-                except:
+                except Exception:
                     pass
             await conn.execute('delete from premiumexpirenotified where date<$1', time.time() - 86400 * 2)
             for uid in await conn.fetch(
@@ -166,6 +161,23 @@ async def everyminute():
                     keyboard.premium_expire(promo)))[0].conversation_message_id
                 await conn.execute('insert into premiumexpirenotified (uid, date, cmid) values ($1, $2, $3)',
                                    uid, time.time(), cmid)
+            for i in await conn.fetch('select id, uid, streak from bonus where time<$1', time.time() - 172800):
+                if not await conn.fetchval('select 1 from premium where uid=$1', i[1]):
+                    if i[2] >= 2:
+                        await conn.execute('update bonus set streak=streak - 2 where id=$1', i[0])
+                    else:
+                        await conn.execute('delete from bonus where id=$1', i[0])
+    except Exception:
+        traceback.print_exc()
+        await sendMessage(DAILY_TO + 2000000000, 'e from schedule everyhour:\n' + traceback.format_exc())
+
+
+async def everyminute():
+    try:
+        os.system(f'find {PATH}' + 'media/temp/ -mtime +1 -exec rm {} \;')  # noqa
+        async with (await pool()).acquire() as conn:
+            # await conn.execute('update xp set xp=0 where xp<0')  # i think it's not needed now
+            await conn.execute('delete from premium where time<$1', time.time())
 
             unique = []
             for cp in await conn.fetch('select uid, chat_id from captcha where exptime<$1', time.time()):
@@ -180,20 +192,14 @@ async def everyminute():
                         await punish(cp[0], cp[1], s[0])
                         await sendMessage(
                             cp[1] + 2000000000, messages.captcha_punish(cp[0], await getUserName(cp[0]), s[1]))
-                except:
-                    await sendMessage(DAILY_TO + 2000000000, f'e from everyminute:\n' + traceback.format_exc())
+                except Exception:
+                    await sendMessage(DAILY_TO + 2000000000, 'e from everyminute:\n' + traceback.format_exc())
             await conn.execute('delete from captcha where exptime<$1', time.time())
             await conn.execute('delete from prempromo where "end"<$1', time.time())
             for i in await conn.fetch('select peerid, cmid from todelete where delete_at<$1', time.time()):
                 await deleteMessages(i[1], i[0] - 2000000000)
             await conn.execute('delete from todelete where delete_at<$1', time.time())
-            for i in await conn.fetch('select id, uid, streak from bonus where time<$1', time.time() - 172800):
-                if not await conn.fetchval('select 1 from premium where uid=$1', i[1]):
-                    if i[2] >= 2:
-                        await conn.execute('update bonus set streak=streak - 2 where id=$1', i[0])
-                    else:
-                        await conn.execute('delete from bonus where id=$1', i[0])
-    except:
+    except Exception:
         traceback.print_exc()
         await sendMessage(DAILY_TO + 2000000000, f'e from schedule everyminute:\n' + traceback.format_exc())
 
@@ -314,8 +320,9 @@ async def run():
     aiocron.crontab('*/1 * * * *', func=run_notifications, loop=loop)
     aiocron.crontab('*/1 * * * *', func=run_nightmode_notifications, loop=loop)
     aiocron.crontab('*/1 * * * *', func=everyminute, loop=loop)
+    aiocron.crontab('*/10 * * * *', func=every10min, loop=loop)
     aiocron.crontab('0 6/12 * * *', func=backup, loop=loop)
     aiocron.crontab('0 1/3 * * *', func=updateInfo, loop=loop)
-    # aiocron.crontab('*/15 * * * *', func=botstatuschecker, loop=loop)
+    # aiocron.crontab('*/15 * * * *', func=botstatuschecker, loop=loop)  # not needed anymore, but who knows
     aiocron.crontab('*/15 * * * *', func=mathgiveaway, loop=loop)
-    # aiocron.crontab('50 23 * * *', func=reboot, loop=loop)
+    # aiocron.crontab('50 23 * * *', func=reboot, loop=loop)  # i guess not needed for now
