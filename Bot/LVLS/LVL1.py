@@ -234,7 +234,7 @@ async def clear(message: Message):
         except VKAPIError:
             await messagereply(message, disable_mentions=1, message=messages.clear_old())
         else:
-            await messagereply(message, disable_mentions=1, message=await messages.clear(deleting, uid, chat_id))
+            await messagereply(message, disable_mentions=1, message=await messages.clear(deleting, uid, chat_id), keyboard=keyboard.deletemessages(uid, [message.conversation_message_id]))
     else:
         await messagereply(message, disable_mentions=1, message=messages.clear_higher())
 
