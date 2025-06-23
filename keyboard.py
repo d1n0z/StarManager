@@ -1021,7 +1021,7 @@ def filterdel(uid, id, msg):
 
 
 def deletemessages_add(kb, uid, msgs: list):
-    kb.add(Callback('Очистить', {"cmd": "deletemessages", "msgs": ','.join(msgs), "uid": uid}), KeyboardButtonColor.POSITIVE)
+    kb.add(Callback('Очистить', {"cmd": "deletemessages", "msgs": ','.join([str(i) for i msgs]), "uid": uid}), KeyboardButtonColor.POSITIVE)
 
 
 def deletemessages(uid, msgs: list):
