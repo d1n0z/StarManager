@@ -170,7 +170,7 @@ async def unban(message: Message):
         await conn.execute('update ban set ban = 0 where chat_id=$1 and uid=$2', chat_id, id)
     await messagereply(message, disable_mentions=1, message=messages.unban(
         await getUserName(uid), await getUserNickname(uid, chat_id), uid, await getUserName(id),
-        await getUserNickname(id, chat_id), id))
+        await getUserNickname(id, chat_id), id), keyboard=keyboard.deletemessages(uid, [message.conversation_message_id]))
 
 
 @bl.chat_message(SearchCMD('banlist'))

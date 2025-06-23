@@ -51,7 +51,6 @@ async def action_handle(event: MessageNew) -> None:
                 await conn.execute('insert into allchats (chat_id) values ($1)', chat_id)
                 await sendMessage(event.peer_id, messages.join(), keyboard.join(chat_id))
                 return
-            await conn.execute('delete from leavedchats where chat_id=$1', chat_id)
         await sendMessage(event.peer_id, messages.rejoin(), keyboard.rejoin(chat_id))
         return
 

@@ -1728,3 +1728,8 @@ async def filterdel(message: MessageEvent):
             'select uid from accesslvl where chat_id=$1 and access_level>=7 order by '
             'access_level, uid', message.peer_id - 2000000000) or message.user_id, filter)
     await utils.editMessage(message.payload['msg'], message.object.peer_id, message.conversation_message_id)
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['deletemessages']))
+async def deletemessages(message: MessageEvent):
+    await utils.deleteMessages(message.payload['msgs'] + [message.conversation_message_id])

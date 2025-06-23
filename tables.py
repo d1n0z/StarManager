@@ -401,24 +401,6 @@ class Blocked(Model):
         table_name = 'blocked'
 
 
-class LeavedChats(Model):
-    chat_id = IntegerField(default=0, unique=True, index=True)
-    time = BigIntegerField(default=0)
-
-    class Meta:
-        database = dbhandle
-        table_name = 'leavedchats'
-
-
-class CompletedRewards(Model):
-    uid = IntegerField(default=0, index=True)
-    type = IntegerField(default=0)
-
-    class Meta:
-        database = dbhandle
-        table_name = 'completedrewards'
-
-
 class Notifs(Model):
     chat_id = IntegerField(default=0, index=True)
     tag = IntegerField(default=0)
@@ -517,19 +499,6 @@ class TransferHistory(Model):
     class Meta:
         database = dbhandle
         table_name = 'transferhistory'
-
-
-class MessagesHistory(Model):  # unused
-    cmid = IntegerField(default=0, index=True)
-    id = IntegerField(default=0)
-    chat_id = IntegerField()
-    from_id = IntegerField()
-    text = TextField()
-    time = BigIntegerField()
-
-    class Meta:
-        database = dbhandle
-        table_name = 'messageshistory'
 
 
 class LvlBanned(Model):
@@ -786,7 +755,7 @@ class PremPromo(Model):
     val = IntegerField()
     start = BigIntegerField()
     end = BigIntegerField()
-    uid = IntegerField(null=True)  # personal
+    uid = IntegerField(null=True)  # assigned to
 
     class Meta:
         database = dbhandle

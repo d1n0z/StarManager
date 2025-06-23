@@ -37,7 +37,7 @@ async def unmute(message: Message):
     await setChatMute(id, chat_id, 0)
     await messagereply(message, disable_mentions=1, message=messages.unmute(
         await getUserName(uid), await getUserNickname(uid, chat_id), uid, await getUserName(id),
-        await getUserNickname(id, chat_id), id))
+        await getUserNickname(id, chat_id), id), keyboard=keyboard.deletemessages(uid, [message.conversation_message_id]))
 
 
 @bl.chat_message(SearchCMD('mutelist'))
@@ -73,7 +73,7 @@ async def unwarn(message: Message):
                 id, await getUserName(id), await getUserNickname(id, chat_id)))
     await messagereply(message, disable_mentions=1, message=messages.unwarn(
         await getUserName(uid), await getUserNickname(uid, chat_id), uid, await getUserName(id),
-        await getUserNickname(id, chat_id), id))
+        await getUserNickname(id, chat_id), id), keyboard=keyboard.deletemessages(uid, [message.conversation_message_id]))
 
 
 @bl.chat_message(SearchCMD('warnlist'))

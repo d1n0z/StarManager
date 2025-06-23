@@ -837,6 +837,8 @@ def punish_unpunish(uid, id, punish, cmid):
         return None
 
     kb.add(Callback(name, {"cmd": f"un{punish}", "uid": uid, "id": id, "cmid": cmid}))
+    kb.row()
+    deletemessages_add(kb, uid, [cmid])
 
     return kb.get_json()
 
@@ -1014,5 +1016,17 @@ def filterdel(uid, id, msg):
     kb = Keyboard(inline=True)
 
     kb.add(Callback('Удалить в связке', {"cmd": "filterdel", "fid": id, "msg": msg, "uid": uid}))
+
+    return kb.get_json()
+
+
+def deletemessages_add(kb, uid, msgs: list):
+    kb.add(Callback('Очистить', {"cmd": "deletemessages", "msgs": ','.join(msgs), "uid": uid}), KeyboardButtonColor.POSITIVE)
+
+
+def deletemessages(uid, msgs: list):
+    kb = Keyboard(inline=True)
+
+    deletemessages_add(kb, uid, msgs)
 
     return kb.get_json()
