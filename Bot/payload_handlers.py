@@ -1310,21 +1310,21 @@ async def unpunish(message: MessageEvent):
                 return
         await utils.setChatMute(id, chat_id, 0)
         await utils.editMessage(messages.unmute(uname, unickname, uid, name, nickname, id), peer_id,
-                          message.conversation_message_id)
+                          message.conversation_message_id, keyboard.deletemessages(uid, [message.conversation_message_id]))
     elif cmd == 'unwarn':
         async with (await pool()).acquire() as conn:
             if not await conn.fetchval('update warn set warns=warns-1 where chat_id=$1 and uid=$2 and warns>0 and '
                                        'warns<3 returning 1', chat_id, id):
                 return
         await utils.editMessage(messages.unwarn(uname, unickname, uid, name, nickname, id), peer_id,
-                          message.conversation_message_id)
+                          message.conversation_message_id, keyboard.deletemessages(uid, [message.conversation_message_id]))
     elif cmd == 'unban':
         async with (await pool()).acquire() as conn:
             if not await conn.fetchval('update ban set ban=0 where chat_id=$1 and uid=$2 and ban>$3 returning 1',
                                        chat_id, id, time.time()):
                 return
         await utils.editMessage(messages.unban(uname, unickname, uid, name, nickname, id), peer_id,
-                          message.conversation_message_id)
+                          message.conversation_message_id, keyboard.deletemessages(uid, [message.conversation_message_id]))
     else:
         return
     await utils.deleteMessages(cmid, chat_id)
