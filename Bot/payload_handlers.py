@@ -1732,4 +1732,4 @@ async def filterdel(message: MessageEvent):
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(['deletemessages']))
 async def deletemessages(message: MessageEvent):
-    await utils.deleteMessages(message.payload['msgs'] + [message.conversation_message_id])
+    await utils.deleteMessages(message.payload['msgs'] + [message.conversation_message_id], message.peer_id - 2000000000)
