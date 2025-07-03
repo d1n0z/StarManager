@@ -31,7 +31,7 @@ def run_bot(max_retries: int = 0, retry_delay: int = 30):
             send_error_notification()
             return
             
-        logger.info(f"Retrying in {retry_delay} seconds...")
+        logger.warning(f"Retrying in {retry_delay} seconds...")
         time.sleep(retry_delay)
 
 
