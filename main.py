@@ -50,7 +50,6 @@ def main(retry=0):
             raise
         except Exception as e:
             print(e)
-            os.system("tmux kill-session -t botscheduler")
         logger.warning("ERROR! Retarting the bot in 30 seconds...")
         time.sleep(30)
         main(retry + 1)
