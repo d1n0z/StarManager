@@ -47,16 +47,14 @@ def main(retry=0):
         try:
             vkbot.run()
         except KeyboardInterrupt:
-            raise
+            logger.info("bye-bye")
+            return
         except Exception as e:
             print(e)
             os.system("tmux kill-session -t botscheduler")
         logger.warning("ERROR! Retarting the bot in 30 seconds...")
         time.sleep(30)
         main(retry + 1)
-    except KeyboardInterrupt:
-        logger.info("bye-bye")
-        return
     except Exception:
         vk_api_session.method(
             "messages.send",
