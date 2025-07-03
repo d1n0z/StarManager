@@ -11,7 +11,46 @@ from load_messages import load
 from tables import Model, dbhandle
 
 
-def main(retry=0):
+def run_bot(max_retries: int = 0, retry_delay: int = 30):
+    attempt = 0
+    
+    while (attempt < max_retries) or not max_retries:
+        try:
+            vkbot.run()
+        
+        except KeyboardInterrupt:
+            logger.info("Bot stopped by user (KeyboardInterrupt). Exiting...")
+            return
+        
+        except Exception:
+            logger.exception(f"Error in bot execution (attempt {attempt}{f'/{max_retries}' if max_retries else ''}):")
+        attempt += 1
+        
+        if attempt == max_retries:
+            logger.error("Max retries reached. Sending error notification and exiting...")
+            send_error_notification()
+            return
+            
+        logger.info(f"Retrying in {retry_delay} seconds...")
+        time.sleep(retry_delay)
+
+
+def send_error_notification() -> None:
+    try:
+        vk_api_session.method(
+            "messages.send",
+            {
+                "chat_id": DAILY_TO,
+                "message": f"Unexpected exception caught in VkBot.run():\n{traceback.format_exc()}",
+                "random_id": 0,
+            },
+        )
+    except Exception as notify_error:
+        logger.error(f"Failed to send error notification: {notify_error}")
+    logger.exception("Full traceback of the error:")
+
+
+def main():
     def vkbottle_filter(record):
         message = record["message"]
         return "API error(s) in response wasn't handled" not in message
@@ -43,30 +82,7 @@ def main(retry=0):
     )
 
     logger.info("Loading...")
-    try:
-        try:
-            vkbot.run()
-        except KeyboardInterrupt:
-            raise
-        except Exception as e:
-            print(e)
-        logger.warning("ERROR! Retarting the bot in 30 seconds...")
-        time.sleep(30)
-        main(retry + 1)
-    except KeyboardInterrupt:
-        logger.info("bye-bye")
-        return
-    except Exception:
-        vk_api_session.method(
-            "messages.send",
-            {
-                "chat_id": DAILY_TO,
-                "message": f"Unexpected exception caught in VkBot.run():\n{traceback.format_exc()}",
-                "random_id": 0,
-            },
-        )
-        logger.exception(traceback.format_exc())
-        return
+    run_bot()
 
 
 if __name__ == "__main__":
