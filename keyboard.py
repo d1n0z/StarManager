@@ -1640,7 +1640,7 @@ def punish_unpunish(uid, id, punish, cmid):
     return kb.get_json()
 
 
-def urlbutton(url, name, color):
+def urlbutton(url, name, color=None):
     if not url:
         return
     kb = Keyboard(inline=True)
