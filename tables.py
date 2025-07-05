@@ -827,5 +827,15 @@ class ForwardedsExceptions(Model):
         table_name = 'forwardedsexceptions'
 
 
+class RewardsCollected(Model):
+    uid = IntegerField(unique=True)
+    date = BigIntegerField()
+    deactivated = BooleanField(default=False)
+
+    class Meta:
+        database = dbhandle
+        table_name = 'rewardscollected'
+
+
 if __name__ == '__main__':
     dbhandle.create_tables(Model.__subclasses__())

@@ -4,6 +4,7 @@ import time
 import traceback
 from datetime import datetime
 
+from vkbottle import KeyboardButtonColor
 from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 
@@ -18,7 +19,7 @@ from Bot.utils import (getIDFromMessage, getUserName, getRegDate, kickUser, getU
                        setUserAccessLevel, getChatSettings, deleteMessages,
                        speccommandscheck, getUserPremmenuSettings, getUserPremmenuSetting, chatPremium, getUserLeague,
                        getUserLVL, getUserRep, getRepTop, getChatAccessName, messagereply, pointWords)
-from config.config import (api, LVL_NAMES, PATH, COMMANDS, TG_CHAT_ID, TG_TRANSFER_THREAD_ID,
+from config.config import (GROUP_ID, api, LVL_NAMES, PATH, COMMANDS, TG_CHAT_ID, TG_TRANSFER_THREAD_ID,
                            CMDLEAGUES, DEVS, TG_BONUS_THREAD_ID)
 from db import pool
 from media.stats.stats_img import createStatsImage
@@ -91,8 +92,10 @@ async def stats(message: Message):
     if id < 0:
         return await messagereply(message, disable_mentions=1, message=messages.id_group())
 
-    acc = await getUserAccessLevel(message.from_id, chat_id)
-    if acc < 1 and not await getUserPremium(message.from_id):
+    async with (await pool()).acquire() as conn:
+        rewards = await conn.fetchval('select exists(select 1 from rewardscollected where uid=$1 and deactivated=false)', message.from_id)
+        acc = await conn.fetchval('select access_level from accesslvl where chat_id=$1 and uid=$2', chat_id, message.from_id) or 0
+    if acc < 1 and not await getUserPremium(message.from_id) and not rewards:
         id = message.from_id
     else:
         acc = await getUserAccessLevel(id, chat_id)
@@ -461,3 +464,31 @@ async def short(message: Message):
     await messagereply(message, disable_mentions=1, message=messages.short(
         shortened.short_url, (await api.utils.get_short_link(
             f'https://vk.com/cc?act=stats&key={shortened.key}')).short_url))
+
+
+@bl.chat_message(SearchCMD('rewards'))
+async def rewards(message: Message):
+    uid = message.from_id
+    if not await api.groups.is_member(group_id=GROUP_ID, user_id=uid):
+        return await messagereply(
+            message, disable_mentions=1, keyboard=keyboard.urlbutton(f'https://vk.com/club{GROUP_ID}', 'Подписаться', KeyboardButtonColor.POSITIVE),
+            message=messages.rewards_unsubbed(uid, await getUserName(uid), await getUserNickname(uid, message.chat_id)))
+    async with (await pool()).acquire() as conn:
+        collected = await conn.fetchrow('select deactivated, date from rewardscollected where uid=$1', uid)
+        if collected:
+            if collected[0]:
+                await conn.fetchrow('update rewardscollected set deactivated=false where uid=$1', uid)
+                return await messagereply(
+                    message, disable_mentions=1, 
+                            message=messages.rewards_activated(uid, await getUserName(uid), await getUserNickname(uid, message.chat_id),
+                                                               collected[1], 7))
+            return await messagereply(
+                message, disable_mentions=1,
+                message=messages.rewards_collected(uid, await getUserName(uid), await getUserNickname(uid, message.chat_id),
+                                                   datetime.fromtimestamp(collected[1]).strftime('%d.%m.%Y')))
+        await conn.execute('insert into rewardscollected (uid, date, deactivated) values ($1, $2, false)', uid, int(time.time()))
+    await addUserXP(uid, 10000)
+    await messagereply(
+        message, disable_mentions=1, 
+        message=messages.rewards(uid, await getUserName(uid), await getUserNickname(uid, message.chat_id),
+                                 time.time(), 7, 10000))

@@ -167,6 +167,12 @@ async def every10min():
                         await conn.execute('update bonus set streak=streak - 2 where id=$1', i[0])
                     else:
                         await conn.execute('delete from bonus where id=$1', i[0])
+            for i in chunks(await conn.fetch('select uid from rewardscollected where deactivated=false'), 499):
+                try:
+                    users = await api.groups.is_member(group_id=GROUP_ID, user_ids=[y[0] for y in i])
+                    await conn.execute('update rewardscollected set deactivated=true where uid=ANY($1)', [i.user_id for i in users if not i.member])
+                except:
+                    pass
     except Exception:
         traceback.print_exc()
         await sendMessage(DAILY_TO + 2000000000, 'e from schedule everyhour:\n' + traceback.format_exc())

@@ -27,8 +27,6 @@ from config.config import (
 )
 from db import syncpool
 
-# TODO: clean
-
 
 @cached
 def get(key: str, **kwargs):
@@ -3068,3 +3066,21 @@ def filterpunish_mute(uid, name, nick):
 
 def filterpunish_ban(uid, name, nick):
     return get("filterpunish_ban", id=uid, n=nick or name)
+
+
+def rewards_unsubbed(uid, name, nick):
+    return get("rewards_unsubbed", id=uid, n=nick or name)
+
+
+def rewards_collected(uid, name, nick, date):
+    return get("rewards_collected", id=uid, n=nick or name, date=date)
+
+
+def rewards_activated(uid, name, nick, timestamp, days):
+    return get("rewards_activated", id=uid, n=nick or name, date_start=datetime.fromtimestamp(timestamp).strftime('%d.%m.%Y'),
+               date_end=datetime.fromtimestamp(timestamp + (86400 * days)).strftime('%d.%m.%Y'), days=days - int((time.time() - timestamp) / 86400))
+
+
+def rewards(uid, name, nick, timestamp, days, xp):
+    return get("rewards", id=uid, n=nick or name, date_start=datetime.fromtimestamp(timestamp).strftime('%d.%m.%Y'),
+               date_end=datetime.fromtimestamp(timestamp + (86400 * days)).strftime('%d.%m.%Y'), days=days, xp=xp)

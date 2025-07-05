@@ -30,6 +30,7 @@ async def add_msg_counter(chat_id, uid, audio=False, sticker=False) -> bool:
             await conn.execute(
                 f'insert into xp (uid, xp, lm, lvm, lsm, league, lvl) values ($1, 0, $2, $2, $2, 1, 1)',
                 uid, time.time())
+        rewards = await conn.fetchval('select date from rewardscollected where uid=$1 and deactivated=false', uid)
 
     if audio:
         addxp = 20
@@ -49,6 +50,8 @@ async def add_msg_counter(chat_id, uid, audio=False, sticker=False) -> bool:
         addxp *= 1.5
     if await chatPremium(chat_id):
         addxp *= 1.5
+    if rewards and time.time() - rewards <= 86400 * 7:
+        addxp *= 2
 
     await addUserXP(uid, addxp, checklvlbanned=False)
     return True

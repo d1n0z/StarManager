@@ -5,8 +5,6 @@ from vk_api import vk_api
 from vkbottle import API
 from configparser import ConfigParser
 
-# TODO: clean
-
 
 config = ConfigParser()
 config.read(f'{__file__.replace("config.py", "")}config{"" if platform.system() == "Linux" else "2"}.ini')
@@ -29,6 +27,7 @@ COMMANDS = {
     "start": 0, "help": 0, "id": 0, "stats": 0, "top": 0, "q": 0, "premium": 0, "bonus": 0, "transfer": 0,
     "duel": 0, "cmd": 0, "premmenu": 0, "test": 0, "getdev": 0, "anon": 0, "chatid": 0, "prefix": 0,
     "deanon": 0, "chats": 0, "catalog": 0, "guess": 0, "promo": 0, "rep": 0, "report": 0, "short": 0,
+    "rewards": 0,
 
     "kick": 1, "mute": 1, "warn": 1, "clear": 1, "staff": 1, "olist": 1, "getnick": 1, "snick": 1, "rnick": 1,
     "nlist": 1, "check": 1, "mkick": 1, "scan": 1, "invited": 1,
