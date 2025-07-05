@@ -56,7 +56,7 @@ COMMANDS = {
     "lvlban": 8, "lvlbanlist": 8, "msgscount": 8, "msgsaverage": 8, "mwaverage": 8,
     "chatsstats": 8, "setprem": 8, "delprem": 8, "premlist": 8, "repban": 8, "repunban": 8, "repbanlist": 8,
     "linked": 8, "cmdstats": 8, "promocreate": 8, "promodel": 8, "promolist": 8, "blocklist": 8, "allowinvite": 8,
-    "prempromocreate": 8, "prempromodel": 8, "prempromolist": 8, "bonuslist": 8,
+    "prempromocreate": 8, "prempromodel": 8, "prempromolist": 8, "bonuslist": 8, "rewardscount": 8,
 }
 PM_COMMANDS = [
     "anon", "deanon", "code", "report"
