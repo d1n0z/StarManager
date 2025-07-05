@@ -720,3 +720,10 @@ async def bonuslist(message: Message):
     await messagereply(message, '\n'.join([
         f'{k + 1}. [id{i[0]}|{await getUserName(i[0])}] - Серия: {pointWords(i[1] + 1, ("день", "дня", "дней"))}'
         for k, i in enumerate(users)]))
+
+
+@bl.chat_message(SearchCMD('rewardscount'))
+async def rewardscount(message: Message):
+    async with (await pool()).acquire() as conn:
+        users = await conn.fetch('select deactivated from rewardscollected')
+    await messagereply(message, f'Число пользователей, активировавших /rewards: {len(users)}. Из них отписалось: {len([i for i in users if i[0]])}')
