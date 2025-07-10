@@ -473,7 +473,7 @@ async def gsnick(message: Message):
     success = 0
     for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
-        if u_acc <= await getUserAccessLevel(id, chat_id) or not await haveAccess('gsnick', chat_id, u_acc):
+        if (u_acc < await getUserAccessLevel(id, chat_id) and uid != id) or not await haveAccess('gsnick', chat_id, u_acc):
             continue
 
         async with (await pool()).acquire() as conn:
@@ -515,7 +515,7 @@ async def grnick(message: Message):
     for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
         ch_nickname = await getUserNickname(id, chat_id)
-        if (u_acc <= await getUserAccessLevel(id, chat_id) or not await haveAccess('grnick', chat_id, u_acc) or
+        if ((u_acc < await getUserAccessLevel(id, chat_id) and uid != id) or not await haveAccess('grnick', chat_id, u_acc) or
                 ch_nickname is None):
             continue
         try:

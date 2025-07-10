@@ -213,7 +213,7 @@ async def ssnick(message: Message):
     success = 0
     for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
-        if not await haveAccess('ssnick', chat_id, u_acc) or await getUserAccessLevel(id, chat_id) > u_acc:
+        if not await haveAccess('ssnick', chat_id, u_acc) or (u_acc < await getUserAccessLevel(id, chat_id) and uid != id):
             continue
         async with (await pool()).acquire() as conn:
             ch_nick = await conn.fetchval('select nickname from nickname where chat_id=$1 and uid=$2', chat_id, id)
@@ -252,7 +252,7 @@ async def srnick(message: Message):
     success = 0
     for chat_id in chats:
         u_acc = await getUserAccessLevel(uid, chat_id)
-        if not await haveAccess('srnick', chat_id, u_acc) or await getUserAccessLevel(id, chat_id) > u_acc:
+        if not await haveAccess('srnick', chat_id, u_acc) or (u_acc < await getUserAccessLevel(id, chat_id) and uid != id):
             continue
         async with (await pool()).acquire() as conn:
             if await conn.fetchval('delete from nickname where chat_id=$1 and uid=$2 returning 1', chat_id, id):
