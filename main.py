@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 import os
 import sys
 import time
@@ -9,6 +10,10 @@ from Bot import main as vkbot
 from config.config import DAILY_TO, DATABASE, PATH, vk_api_session
 from load_messages import load
 from tables import Model, dbhandle
+
+argparser = ArgumentParser()
+argparser.add_argument('-ns', '--no-scheduler', action='store_true')
+argparser.add_argument('-ntg', '--no-telegram', action='store_true')
 
 
 def run_bot(max_retries: int = 0, retry_delay: int = 30):
@@ -51,6 +56,7 @@ def send_error_notification() -> None:
 
 
 def main():
+    args = argparser.parse_args()
     def vkbottle_filter(record):
         message = record["message"]
         return "API error(s) in response wasn't handled" not in message
@@ -67,19 +73,25 @@ def main():
     logger.info("Loading messages...")
     load()
 
-    logger.info("Starting scheduler...")
-    os.system("tmux kill-session -t botscheduler")
-    os.system(
-        f"tmux new -s botscheduler -d && tmux send-keys -t botscheduler 'cd {PATH}' ENTER "
-        f"'. {PATH + 'venv/bin/activate'}' ENTER 'python3.11 runscheduler.py' ENTER"
-    )
+    if args.no_scheduler:
+        logger.info("Skipping scheduler.")
+    else:
+        logger.info("Starting scheduler...")
+        os.system("tmux kill-session -t botscheduler")
+        os.system(
+            f"tmux new -s botscheduler -d && tmux send-keys -t botscheduler 'cd {PATH}' ENTER "
+            f"'. {PATH + 'venv/bin/activate'}' ENTER 'python3.11 runscheduler.py' ENTER"
+        )
 
-    logger.info("Starting Telegram bot...")
-    os.system("tmux kill-session -t bottg")
-    os.system(
-        f"tmux new -s bottg -d && tmux send-keys -t bottg 'cd {PATH}' ENTER "
-        f"'. {PATH + 'venv/bin/activate'}' ENTER 'python3.11 runtg.py' ENTER"
-    )
+    if args.no_telegram:
+        logger.info("Skipping Telegram bot.")
+    else:
+        logger.info("Starting Telegram bot...")
+        os.system("tmux kill-session -t bottg")
+        os.system(
+            f"tmux new -s bottg -d && tmux send-keys -t bottg 'cd {PATH}' ENTER "
+            f"'. {PATH + 'venv/bin/activate'}' ENTER 'python3.11 runtg.py' ENTER"
+        )
 
     logger.info("Loading...")
     run_bot()
