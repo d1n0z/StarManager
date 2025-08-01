@@ -11,6 +11,6 @@ class CommandMiddleware(BaseMiddleware[Message]):
         try:
             cmd = await checkCMD(self.event, self.event.chat_id, returncmd=True)
             self.event.out = cmd  # god forgive me
-        except:
+        except Exception:
             traceback.print_exc()
             raise

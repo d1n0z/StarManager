@@ -16,11 +16,15 @@ from db import syncpool
 def run():
     labeler = BotLabeler()
 
-    @labeler.raw_event(GroupEventType.MESSAGE_REACTION_EVENT, dataclass=GroupTypes.MessageReactionEvent)
+    @labeler.raw_event(
+        GroupEventType.MESSAGE_REACTION_EVENT, dataclass=GroupTypes.MessageReactionEvent
+    )
     async def reaction(event: GroupTypes.MessageReactionEvent):
         await reaction_handle(event)
 
-    @labeler.raw_event(GroupEventType.MESSAGE_NEW, dataclass=GroupTypes.MessageNew, blocking=False)
+    @labeler.raw_event(
+        GroupEventType.MESSAGE_NEW, dataclass=GroupTypes.MessageNew, blocking=False
+    )
     async def new_message(event: GroupTypes.MessageNew):
         await message_handle(event)
 
@@ -39,18 +43,23 @@ def run():
 
     with syncpool().connection() as conn:
         with conn.cursor() as c:
-            rsl = c.execute('select id, chat_id from reboots where sended=false').fetchall()
+            rsl = c.execute(
+                "select id, chat_id from reboots where sended=false"
+            ).fetchall()
             for i in rsl:
                 try:
-                    vk_api_session.method('messages.send', {
-                        'chat_id': i[1],
-                        'message': '💚 Перезагрузка выполнена!',
-                        'random_id': 0
-                    })
-                except:
+                    vk_api_session.method(
+                        "messages.send",
+                        {
+                            "chat_id": i[1],
+                            "message": "💚 Перезагрузка выполнена!",
+                            "random_id": 0,
+                        },
+                    )
+                except Exception:
                     pass
-                c.execute('update reboots set sended=true where id=%s', (i[0],))
+                c.execute("update reboots set sended=true where id=%s", (i[0],))
             conn.commit()
 
-    logger.info('Loaded. Starting the bot...')
+    logger.info("Loaded. Starting the bot...")
     bot.run_forever()

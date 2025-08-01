@@ -74,7 +74,7 @@ def help(page=0, cmds=COMMANDS):
         for k, i in cmds.items():
             try:
                 descs[int(i)].append(COMMANDS_DESC[k])
-            except:
+            except Exception:
                 pass
         return (
             get(f"help_page{page}")
@@ -406,15 +406,15 @@ def nnlist(members, page=0):
                 continue
             msg += f"{k + 1}. [id{i.id}|{i.first_name} {i.last_name}]\n"
             k += 1
-        except:
+        except Exception:
             pass
     return msg
 
 
 async def staff(res, names, chat_id):
     emoji = {"1": "☀", "2": "🔥", "3": "🔥", "4": "🔥", "5": "✨", "6": "⚡", "7": "⭐"}
-    msg, admins, users = get("staff"), set(), {}
-    for ind, item in enumerate(res):
+    msg, users = get("staff"), {}
+    for item in res:
         if f"{item[1]}" not in users:
             users[f"{item[1]}"] = []
         users[f"{item[1]}"].append(
@@ -1396,26 +1396,36 @@ async def settings_category(category, settings, chat_id):
 def settings_change_countable(
     chat_id, setting, pos, value, value2, pos2, punishment=None
 ):
-    if setting in SETTINGS_ALT_TO_DELETE or setting not in SETTINGS_COUNTABLE_NO_PUNISHMENT:
+    if (
+        setting in SETTINGS_ALT_TO_DELETE
+        or setting not in SETTINGS_COUNTABLE_NO_PUNISHMENT
+    ):
         if punishment == "deletemessage":
             punishment = "удаление сообщения"
         elif punishment == "kick":
             punishment = "исключение"
         elif punishment and punishment.startswith("mute"):
-            pnshtime = int(punishment.split('|')[-1])
-            punishment = 'мут на' + (f" {pnshtime} минут" if pnshtime < 44600 else "всегда")
+            pnshtime = int(punishment.split("|")[-1])
+            punishment = "мут на" + (
+                f" {pnshtime} минут" if pnshtime < 44600 else "всегда"
+            )
         elif punishment and punishment.startswith("ban"):
-            pnshtime = int(punishment.split('|')[-1])
-            punishment = 'блокировка на' + (f" {pnshtime} дней" if pnshtime < 3650 else "всегда")
-        elif punishment == 'warn':
+            pnshtime = int(punishment.split("|")[-1])
+            punishment = "блокировка на" + (
+                f" {pnshtime} дней" if pnshtime < 3650 else "всегда"
+            )
+        elif punishment == "warn":
             punishment = "предупреждение"
         else:
             punishment = "без наказания"
 
     if setting in SETTINGS_ALT_TO_DELETE:
-        return get(f'settings_change_countable_{setting}',
+        return get(
+            f"settings_change_countable_{setting}",
             status="Включено" if pos else "Выключено",
-            count=(0 if not value else value) if setting != 'forwardeds' else (["все", "пользователи", "сообщества"][value or 0]),
+            count=(0 if not value else value)
+            if setting != "forwardeds"
+            else (["все", "пользователи", "сообщества"][value or 0]),
             punishment=punishment,
             deletemsg="Включено" if pos2 else "Выключено",
         )
@@ -1453,7 +1463,7 @@ def settings_change_countable(
 
 
 def settings_set_preset(category, setting):
-    return get(f'settings_set_preset_{category}_{setting}')
+    return get(f"settings_set_preset_{category}_{setting}")
 
 
 def settings_change_countable_digit_error():
@@ -1465,11 +1475,11 @@ def settings_autodelete_input_error():
 
 
 def settings_change_countable_format_error():
-    return get(f"settings_change_countable_format_error")
+    return get("settings_change_countable_format_error")
 
 
 def settings_choose_punishment():
-    return get(f"settings_choose_punishment")
+    return get("settings_choose_punishment")
 
 
 def settings_countable_action(action, setting, text=None, image=None, url=None):
@@ -1487,11 +1497,19 @@ def settings_set_punishment(punishment, time=None):
     if punishment == "deletemessage":
         punishment = "применили удаление сообщения в качестве наказания"
     elif punishment == "mute":
-        punishment = "применили мут на" + (f" {time} минут" if time < 44600 else "всегда") + " в качестве наказания"
+        punishment = (
+            "применили мут на"
+            + (f" {time} минут" if time < 44600 else "всегда")
+            + " в качестве наказания"
+        )
     elif punishment == "kick":
         punishment = "применили исключение в качестве наказания"
     elif punishment == "ban":
-        punishment = "применили блокировку на" + (f" {time} дней" if time < 3650 else "всегда") + " в качестве наказания"
+        punishment = (
+            "применили блокировку на"
+            + (f" {time} дней" if time < 3650 else "всегда")
+            + " в качестве наказания"
+        )
     elif punishment == "warn":
         punishment = "применили предупреждение в качестве наказания"
     elif punishment == "":
@@ -1692,7 +1710,7 @@ async def top_lvls(top, chattop):
     msg = get("top_lvls")
     for k, i in enumerate(top.items()):
         msg += f"[{k + 1}]. [id{i[0]}|{await getUserName(i[0])}] - {i[1]} уровень\n"
-    msg += f"\n🥨 В беседе:\n"
+    msg += "\n🥨 В беседе:\n"
     for k, i in enumerate(chattop.items()):
         msg += f"[{k + 1}]. [id{i[0]}|{await getUserName(i[0])}] - {i[1]} уровень\n"
     return msg
@@ -1917,8 +1935,8 @@ def cmd_hint():
     return get("cmd_hint")
 
 
-def cmd_prem(l):
-    return get("cmd_prem", l=l)
+def cmd_prem(lr):
+    return get("cmd_prem", lr=lr)
 
 
 def cmd_set(uid, name, nick, cmd, changed):
@@ -2499,13 +2517,11 @@ def deanon(id, from_id, name, nickname, time):
     )
 
 
-def antispam_punishment(
-    uid, name, nick, setting, punishment, violation_count, time=0
-):
+def antispam_punishment(uid, name, nick, setting, punishment, violation_count, time=0):
     if setting in SETTINGS_POSITIONS["antispam"]:
-        if punishment == 'mute':
+        if punishment == "mute":
             time = f" {time} минут" if int(time) < 44600 else "всегда"
-        elif punishment == 'ban':
+        elif punishment == "ban":
             time = f" {time} дней" if int(time) < 3650 else "всегда"
         return get(
             f"antispam_punishment_{punishment}",
@@ -2532,9 +2548,9 @@ def nightmode_end():
     return get("nightmode_end")
 
 
-def speccommandscooldown(time):
+def commandcooldown(time):
     return get(
-        "speccommandscooldown", time=pointWords(time, ["секунду", "секунды", "секунд"])
+        "commandcooldown", time=pointWords(time, ["секунду", "секунды", "секунд"])
     )
 
 
@@ -3077,10 +3093,27 @@ def rewards_collected(uid, name, nick, date):
 
 
 def rewards_activated(uid, name, nick, timestamp, days):
-    return get("rewards_activated", id=uid, n=nick or name, date_start=datetime.fromtimestamp(timestamp).strftime('%d.%m.%Y'),
-               date_end=datetime.fromtimestamp(timestamp + (86400 * days)).strftime('%d.%m.%Y'), days=days - int((time.time() - timestamp) / 86400))
+    return get(
+        "rewards_activated",
+        id=uid,
+        n=nick or name,
+        date_start=datetime.fromtimestamp(timestamp).strftime("%d.%m.%Y"),
+        date_end=datetime.fromtimestamp(timestamp + (86400 * days)).strftime(
+            "%d.%m.%Y"
+        ),
+        days=days - int((time.time() - timestamp) / 86400),
+    )
 
 
 def rewards(uid, name, nick, timestamp, days, xp):
-    return get("rewards", id=uid, n=nick or name, date_start=datetime.fromtimestamp(timestamp).strftime('%d.%m.%Y'),
-               date_end=datetime.fromtimestamp(timestamp + (86400 * days)).strftime('%d.%m.%Y'), days=days, xp=xp)
+    return get(
+        "rewards",
+        id=uid,
+        n=nick or name,
+        date_start=datetime.fromtimestamp(timestamp).strftime("%d.%m.%Y"),
+        date_end=datetime.fromtimestamp(timestamp + (86400 * days)).strftime(
+            "%d.%m.%Y"
+        ),
+        days=days,
+        xp=xp,
+    )

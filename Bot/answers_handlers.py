@@ -137,7 +137,7 @@ async def queue_handler(event: MessageNew):
                             chat_id + 2000000000,
                             messages.notification_changing_time_error(),
                         )
-                except:
+                except Exception:
                     return await sendMessage(
                         chat_id + 2000000000,
                         messages.notification_changing_time_error(),
@@ -160,7 +160,7 @@ async def queue_handler(event: MessageNew):
                             chat_id + 2000000000,
                             messages.notification_changing_time_error(),
                         )
-                except:
+                except Exception:
                     return await sendMessage(
                         chat_id + 2000000000,
                         messages.notification_changing_time_error(),
@@ -179,7 +179,7 @@ async def queue_handler(event: MessageNew):
                             chat_id + 2000000000,
                             messages.notification_changing_time_error(),
                         )
-                except:
+                except Exception:
                     return await sendMessage(
                         chat_id + 2000000000,
                         messages.notification_changing_time_error(),
@@ -304,7 +304,7 @@ async def queue_handler(event: MessageNew):
                             end = end.replace(day=2)
                         if start.timestamp() >= end.timestamp():
                             raise
-                    except:
+                    except Exception:
                         traceback.print_exc()
                         await editMessage(
                             messages.settings_change_countable_format_error(),
@@ -460,7 +460,7 @@ async def queue_handler(event: MessageNew):
                 try:
                     if not whoiscachedurl(text[-1]):
                         raise Exception
-                except:
+                except Exception:
                     return await sendMessage(
                         chat_id + 2000000000, messages.get(queue[3] + "_no_url")
                     )
