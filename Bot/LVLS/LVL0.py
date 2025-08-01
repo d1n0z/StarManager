@@ -17,7 +17,7 @@ from Bot.utils import (getIDFromMessage, getUserName, getRegDate, kickUser, getU
                        getUserLastMessage, getUserMute, getUserBan, getUserXP, getUserNeededXP,
                        getUserPremium, uploadImage, addUserXP, isChatAdmin, getUserWarns, getUserMessages,
                        setUserAccessLevel, getChatSettings, deleteMessages,
-                       speccommandscheck, getUserPremmenuSettings, getUserPremmenuSetting, chatPremium, getUserLeague,
+                       getUserPremmenuSettings, getUserPremmenuSetting, chatPremium, getUserLeague,
                        getUserLVL, getUserRep, getRepTop, getChatAccessName, messagereply, pointWords)
 from config.config import (GROUP_ID, api, LVL_NAMES, PATH, COMMANDS, TG_CHAT_ID, TG_TRANSFER_THREAD_ID,
                            CMDLEAGUES, DEVS, TG_BONUS_THREAD_ID)
@@ -81,9 +81,6 @@ async def top(message: Message):
 @bl.chat_message(SearchCMD('stats'))
 async def stats(message: Message):
     chat_id = message.peer_id - 2000000000
-    if st := await speccommandscheck(message.from_id, 'stats', 15):
-        return await messagereply(message, disable_mentions=1, message=messages.speccommandscooldown(
-            int(15 - (time.time() - st) + 1)))
 
     id = await getIDFromMessage(message.text, message.reply_message)
     reply = await messagereply(message, messages.stats_loading(), disable_mentions=1)
@@ -249,9 +246,6 @@ async def premmenu(message: Message):
 @bl.chat_message(SearchCMD('duel'))
 async def duel(message: Message):
     chat_id = message.peer_id - 2000000000
-    if st := await speccommandscheck(message.from_id, 'duel', 15):
-        return await messagereply(message, disable_mentions=1, message=messages.speccommandscooldown(
-            int(15 - (time.time() - st) + 1)))
 
     if not (await getChatSettings(chat_id))['entertaining']['allowDuel']:
         return await messagereply(message, disable_mentions=1, message=messages.duel_not_allowed())
@@ -281,9 +275,6 @@ async def transfer(message: Message):
     chat_id = message.chat_id
     if not (await getChatSettings(chat_id))['entertaining']['allowTransfer']:
         return await messagereply(message, messages.transfer_not_allowed())
-    if st := await speccommandscheck(message.from_id, 'transfer', 10):
-        return await messagereply(message, disable_mentions=1, message=messages.speccommandscooldown(
-            int(10 - (time.time() - st) + 1)))
     uid = message.from_id
 
     id = await getIDFromMessage(message.text, message.reply_message)
@@ -373,9 +364,6 @@ async def chats(message: Message):
 
 @bl.chat_message(SearchCMD('guess'))
 async def guess(message: Message):
-    if st := await speccommandscheck(message.from_id, 'guess', 10):
-        return await messagereply(
-            message, disable_mentions=1, message=messages.speccommandscooldown(int(10 - (time.time() - st) + 1)))
     if not (await getChatSettings(message.chat_id))['entertaining']['allowGuess']:
         return await messagereply(message, disable_mentions=1, message=messages.guess_not_allowed())
     data = message.text.split()

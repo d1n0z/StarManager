@@ -1,27 +1,37 @@
 import platform
 from ast import literal_eval
+from configparser import ConfigParser
 
 from vk_api import vk_api
 from vkbottle import API
-from configparser import ConfigParser
-
 
 config = ConfigParser()
-config.read(f'{__file__.replace("config.py", "")}config{"" if platform.system() == "Linux" else "2"}.ini')
+config.read(
+    f"{__file__.replace('config.py', '')}config{'' if platform.system() == 'Linux' else '2'}.ini"
+)
 # remove this weird path, use your own
 
-PATH = config['SERVICE']['PATH']
+PATH = config["SERVICE"]["PATH"]
 
-VK_TOKEN_GROUP = config['VK']['VK_TOKEN_GROUP']
-VK_TOKEN_IMPLICIT_FLOW = config['VK']['VK_TOKEN_IMPLICIT_FLOW']
-VK_SERVICE_TOKEN = config['VK']['VK_SERVICE_TOKEN']
-GROUP_ID = abs(int(config['VK']['GROUP_ID']))
-VK_APP_ID = config['VK']['VK_APP_ID']
-VK_APP_SECRET = config['VK']['VK_APP_SECRET']
+VK_TOKEN_GROUP = config["VK"]["VK_TOKEN_GROUP"]
+VK_TOKEN_IMPLICIT_FLOW = config["VK"]["VK_TOKEN_IMPLICIT_FLOW"]
+VK_SERVICE_TOKEN = config["VK"]["VK_SERVICE_TOKEN"]
+GROUP_ID = abs(int(config["VK"]["GROUP_ID"]))
+VK_APP_ID = config["VK"]["VK_APP_ID"]
+VK_APP_SECRET = config["VK"]["VK_APP_SECRET"]
 
 
-LVL_NAMES = ["Обычный Пользователь", "Смотрящий", "Модератор", "Старший Модератор", "Администратор",
-             "Спец администратор", "Руководитель", "Владелец", "DEV"]
+LVL_NAMES = [
+    "Обычный Пользователь",
+    "Смотрящий",
+    "Модератор",
+    "Старший Модератор",
+    "Администратор",
+    "Спец администратор",
+    "Руководитель",
+    "Владелец",
+    "DEV",
+]
 
 COMMANDS = {
     "start": 0, "help": 0, "id": 0, "stats": 0, "top": 0, "q": 0, "premium": 0, "bonus": 0, "transfer": 0,
@@ -58,9 +68,7 @@ COMMANDS = {
     "linked": 8, "cmdstats": 8, "promocreate": 8, "promodel": 8, "promolist": 8, "blocklist": 8, "allowinvite": 8,
     "prempromocreate": 8, "prempromodel": 8, "prempromolist": 8, "bonuslist": 8, "rewardscount": 8,
 }
-PM_COMMANDS = [
-    "anon", "deanon", "code", "report"
-]
+PM_COMMANDS = ["anon", "deanon", "code", "report"]
 COMMANDS_DESC = {
     "kick": "/kick - Исключить пользователя.",
     "mute": "/mute - Заблокировать чат пользователю.",
@@ -158,83 +166,101 @@ COMMANDS_DESC = {
     "rep": "/rep - Изменить репутацию пользователя.",
     "invited": "/invited - Количество приглашенных участников.",
     "bindlist": "/bindlist - Список привязанных к указанной группе бесед.",
-    "botinfo": '/botinfo - Информация по боту(не работает).',
-    "msg": '/msg - отправить сообщения во все беседы.',
-    "blacklist": '/blacklist - Список пользователей в черном списке.',
-    "addblack": '/addblack - Добавить пользователя в черный список.',
-    "delblack": '/delblack - Удалить пользователя из черного списка.',
-    "setstatus": '/setstatus - Установить Premium-подписку.',
-    "delstatus": '/delstatus - Убрать Premium-подписку.',
-    "statuslist": '/statuslist - Список пользователей с Premium-подпиской.',
-    "cmdcount": '/cmdcount - Статистика команд.',
-    "block": '/block - Заблокировать пользователя.',
-    "unblock": '/unblock - Разблокировать пользователя.',
-    "getlink": '/getlink - Получить ссылку-приглашение в беседу.',
-    "backup": '/backup - Сделать бэкап.',
-    "reboot": '/reboot - Перезагрузить бота.',
-    "sudo": '/sudo - Отправить sudo-команду на сервер.',
-    "givexp": '/givexp - Выдать опыт пользователю.',
-    "resetlvl": '/resetlvl - Сбросить прогресс(опыт, уровень и лигу) пользователя.',
-    "getuserchats": '/getuserchats - Список бесед пользователя.',
-    "helpdev": '/helpdev - Информация по dev-командам.',
-    "getchats": '/getchats - Список бесед.',
-    "gettransferhistory": '/gettransferhistory - Логи /transfer.',
-    "gettransferhistoryto": '/gettransferhistoryto - Логи /transfer пользователю.',
-    "gettransferhistoryfrom": '/gettransferhistoryfrom - Логи /transfer от пользователя.',
-    "lvlban": '/lvlban - Заблокировать прогресс пользователя.',
-    "lvlunban": '/lvlunban - Разблокировать прогресс пользователя.',
-    "lvlbanlist": '/lvlbanlist - Список пользователей с заблокированным прогрессом.',
-    "msgscount": '/msgscount - Статистика сообщений.',
-    "msgsaverage": '/msgsaverage - Статистика message_handle.',
-    "mwaverage": '/mwaverage - Статистика mw.',
-    "chatsstats": '/chatsstats - Статистика чатов с включенной капчей и ночного режима.',
-    "setprem": '/setprem - Установить Premium-статус беседы.',
-    "delprem": '/delprem - Убрать Premium-статус беседы.',
-    "premlist": '/premlist - Список бесед с Premium-статусом.',
-    "repban": '/repban - Заблокировать отправку репортов пользователю.',
-    "repunban": '/repunban - Разблокировать отправку репортов пользователю.',
-    "repbanlist": '/repbanlist - Список пользователей с заблокированной отправкой репортов.',
-    "linked": '/linked - Список пользователей, привязавших Telegram.',
-    "cmdstats": '/cmdstats - Количество использований команды.',
-    "promocreate": '/promocreate - Создать промокод.',
-    "promodel": '/promodel - Удалить промокод.',
-    "promolist": '/promolist - Список промокодов.',
-    "blocklist": '/blocklist - Список заблокированных пользователей.',
-    "allowinvite": '/allowinvite - Разрешить/запретить бонусы реферальной системы в чате.',
-    "prempromocreate": '/prempromocreate - Создать промокод на сайте.',
-    "prempromodel": '/prempromodel - Удалить промокод на сайте.',
-    "prempromolist": '/prempromolist - Список промокодов на сайте.',
-    "bonuslist": '/bonuslist - Статистика команды /bonus.',
+    "botinfo": "/botinfo - Информация по боту(не работает).",
+    "msg": "/msg - отправить сообщения во все беседы.",
+    "blacklist": "/blacklist - Список пользователей в черном списке.",
+    "addblack": "/addblack - Добавить пользователя в черный список.",
+    "delblack": "/delblack - Удалить пользователя из черного списка.",
+    "setstatus": "/setstatus - Установить Premium-подписку.",
+    "delstatus": "/delstatus - Убрать Premium-подписку.",
+    "statuslist": "/statuslist - Список пользователей с Premium-подпиской.",
+    "cmdcount": "/cmdcount - Статистика команд.",
+    "block": "/block - Заблокировать пользователя.",
+    "unblock": "/unblock - Разблокировать пользователя.",
+    "getlink": "/getlink - Получить ссылку-приглашение в беседу.",
+    "backup": "/backup - Сделать бэкап.",
+    "reboot": "/reboot - Перезагрузить бота.",
+    "sudo": "/sudo - Отправить sudo-команду на сервер.",
+    "givexp": "/givexp - Выдать опыт пользователю.",
+    "resetlvl": "/resetlvl - Сбросить прогресс(опыт, уровень и лигу) пользователя.",
+    "getuserchats": "/getuserchats - Список бесед пользователя.",
+    "helpdev": "/helpdev - Информация по dev-командам.",
+    "getchats": "/getchats - Список бесед.",
+    "gettransferhistory": "/gettransferhistory - Логи /transfer.",
+    "gettransferhistoryto": "/gettransferhistoryto - Логи /transfer пользователю.",
+    "gettransferhistoryfrom": "/gettransferhistoryfrom - Логи /transfer от пользователя.",
+    "lvlban": "/lvlban - Заблокировать прогресс пользователя.",
+    "lvlunban": "/lvlunban - Разблокировать прогресс пользователя.",
+    "lvlbanlist": "/lvlbanlist - Список пользователей с заблокированным прогрессом.",
+    "msgscount": "/msgscount - Статистика сообщений.",
+    "msgsaverage": "/msgsaverage - Статистика message_handle.",
+    "mwaverage": "/mwaverage - Статистика mw.",
+    "chatsstats": "/chatsstats - Статистика чатов с включенной капчей и ночного режима.",
+    "setprem": "/setprem - Установить Premium-статус беседы.",
+    "delprem": "/delprem - Убрать Premium-статус беседы.",
+    "premlist": "/premlist - Список бесед с Premium-статусом.",
+    "repban": "/repban - Заблокировать отправку репортов пользователю.",
+    "repunban": "/repunban - Разблокировать отправку репортов пользователю.",
+    "repbanlist": "/repbanlist - Список пользователей с заблокированной отправкой репортов.",
+    "linked": "/linked - Список пользователей, привязавших Telegram.",
+    "cmdstats": "/cmdstats - Количество использований команды.",
+    "promocreate": "/promocreate - Создать промокод.",
+    "promodel": "/promodel - Удалить промокод.",
+    "promolist": "/promolist - Список промокодов.",
+    "blocklist": "/blocklist - Список заблокированных пользователей.",
+    "allowinvite": "/allowinvite - Разрешить/запретить бонусы реферальной системы в чате.",
+    "prempromocreate": "/prempromocreate - Создать промокод на сайте.",
+    "prempromodel": "/prempromodel - Удалить промокод на сайте.",
+    "prempromolist": "/prempromolist - Список промокодов на сайте.",
+    "bonuslist": "/bonuslist - Статистика команды /bonus.",
 }
-COMMANDS_PREMIUM = ['premmenu', 'mkick', 'ignore', 'unignore', 'ignorelist', 'chatlimit', 'editlevel', 'levelname',
-                    'resetlevel', 'anon', 'deanon', 'prefix']
+COMMANDS_PREMIUM = [
+    "premmenu",
+    "mkick",
+    "ignore",
+    "unignore",
+    "ignorelist",
+    "chatlimit",
+    "editlevel",
+    "levelname",
+    "resetlevel",
+    "anon",
+    "deanon",
+    "prefix",
+]
+COMMANDS_COOLDOWN = {
+    "guess": 10,
+    "transfer": 10,
+    "duel": 15,
+    "stats": 15,
+}
 
 # chat ids
-DAILY_TO = int(config['SERVICE']['DAILY_TO'])
-REPORT_TO = int(config['SERVICE']['REPORT_TO'])
-STATUSCHECKER_TO = int(config['SERVICE']['STATUSCHECKER_TO'])
-STATUSCHECKER_CMD = '/duel'
-MATHGIVEAWAYS_TO = int(config['SERVICE']['MATHGIVEAWAYS_TO'])
+DAILY_TO = int(config["SERVICE"]["DAILY_TO"])
+REPORT_TO = int(config["SERVICE"]["REPORT_TO"])
+STATUSCHECKER_TO = int(config["SERVICE"]["STATUSCHECKER_TO"])
+STATUSCHECKER_CMD = "/duel"
+MATHGIVEAWAYS_TO = int(config["SERVICE"]["MATHGIVEAWAYS_TO"])
 
-PHOTO_NOT_FOUND = config['SERVICE']['PHOTO_NOT_FOUND']
+PHOTO_NOT_FOUND = config["SERVICE"]["PHOTO_NOT_FOUND"]
 
 REPORT_CD = 300  # cooldown in seconds
 
-DEV_TGID = literal_eval(config['SERVICE']['DEV_TGID'])
-DEVS = literal_eval(config['SERVICE']['DEVS'])
-ADMINS = literal_eval(config['SERVICE']['ADMINS'])
-MAIN_DEVS = literal_eval(config['SERVICE']['MAIN_DEVS'])
+DEV_TGID = literal_eval(config["SERVICE"]["DEV_TGID"])
+DEVS = literal_eval(config["SERVICE"]["DEVS"])
+ADMINS = literal_eval(config["SERVICE"]["ADMINS"])
+MAIN_DEVS = literal_eval(config["SERVICE"]["MAIN_DEVS"])
 
 PREFIX = ["/", "!", ".", "+"]
 
-LVL_BANNED_COMMANDS = ['bonus', 'transfer', 'duel', 'guess', 'promo']
+LVL_BANNED_COMMANDS = ["bonus", "transfer", "duel", "guess", "promo"]
 
 LEAGUE_LVL = [0, 200, 400, 600, 800, 999]
-LEAGUE = ['Бронза', 'Серебро', 'Золото', 'Платина', 'Алмаз', 'Легенда']
+LEAGUE = ["Бронза", "Серебро", "Золото", "Платина", "Алмаз", "Легенда"]
 CREATEGROUPLEAGUES = [6, 7, 8, 9, 9, 9]
 CMDLEAGUES = [10, 12, 15, 19, 19, 19]
 
-CONTACT_ADMIN = 'https://vk.com/andrey_mala'
+CONTACT_ADMIN = "https://vk.com/andrey_mala"
 
 
 def SETTINGS():
@@ -264,9 +290,7 @@ def SETTINGS():
             "vkLinks": 0,
             "forwardeds": 0,
         },
-        "protect": {
-            "enable": 0
-        }
+        "protect": {"enable": 0},
     }
 
 
@@ -275,16 +299,14 @@ def SETTINGS_ALT():
         "main": {
             "welcome": 0,
         },
-        "entertaining": {
-        },
+        "entertaining": {},
         "antispam": {
             "messagesPerMinute": 1,
             "maximumCharsInMessage": 1,
             "vkLinks": 1,
             "forwardeds": 1,
         },
-        "protect": {
-        }
+        "protect": {},
     }
 
 
@@ -319,23 +341,24 @@ SETTINGS_POSITIONS = {
     },
 }
 SETTINGS_COUNTABLE = [
-    "messagesPerMinute", "maximumCharsInMessage", "disallowLinks", "disallowNSFW", "vkLinks", "forwardeds", 
-    "nightmode", "welcome", "captcha", "autodelete",
+    "messagesPerMinute",
+    "maximumCharsInMessage",
+    "disallowLinks",
+    "disallowNSFW",
+    "vkLinks",
+    "forwardeds",
+    "nightmode",
+    "welcome",
+    "captcha",
+    "autodelete",
 ]
-SETTINGS_COUNTABLE_MULTIPLE_ARGUMENTS = [
-    "nightmode", "welcome"
-]
-SETTINGS_COUNTABLE_NO_PUNISHMENT = [
-    "nightmode", "welcome", "autodelete"
-]
-SETTINGS_COUNTABLE_NO_CATEGORY = [
-    "nightmode", "welcome", "captcha", "autodelete"
-]
-SETTINGS_COUNTABLE_PUNISHMENT_NO_DELETE_MESSAGE = [
-    "messagesPerMinute", "captcha"
-]
+SETTINGS_COUNTABLE_MULTIPLE_ARGUMENTS = ["nightmode", "welcome"]
+SETTINGS_COUNTABLE_NO_PUNISHMENT = ["nightmode", "welcome", "autodelete"]
+SETTINGS_COUNTABLE_NO_CATEGORY = ["nightmode", "welcome", "captcha", "autodelete"]
+SETTINGS_COUNTABLE_PUNISHMENT_NO_DELETE_MESSAGE = ["messagesPerMinute", "captcha"]
 SETTINGS_COUNTABLE_SPECIAL_LIMITS = {
-    "captcha": range(1, 61), "autodelete": range(300, 86400)
+    "captcha": range(1, 61),
+    "autodelete": range(300, 86400),
 }
 SETTINGS_DEFAULTS = {
     "captcha": {"pos": 0, "value": 10, "punishment": "kick"},
@@ -404,7 +427,12 @@ SETTINGS_PRESET_BUTTONS = {
         {"value": 2, "name": "Сообщества", "action": "setValue"},
     ],
 }
-SETTINGS_ALT_TO_DELETE = ["messagesPerMinute", "maximumCharsInMessage", "vkLinks", "forwardeds",]
+SETTINGS_ALT_TO_DELETE = [
+    "messagesPerMinute",
+    "maximumCharsInMessage",
+    "vkLinks",
+    "forwardeds",
+]
 SETTINGS_SUBCATS = {
     "messagesPerMinute": "msgs",
     "maximumCharsInMessage": "msgs",
@@ -417,9 +445,9 @@ PREMMENU_DEFAULT = {"clear_by_fire": True, "border_color": None, "tagnotif": Fal
 PREMMENU_TURN = ["clear_by_fire", "tagnotif"]
 
 FARM_CD = 7200  # in seconds
-FARM_POST_ID = int(config['SERVICE']['FARM_POST_ID'])
+FARM_POST_ID = int(config["SERVICE"]["FARM_POST_ID"])
 
-PREMIUM_BONUS_POST_ID = int(config['SERVICE']['PREMIUM_BONUS_POST_ID'])
+PREMIUM_BONUS_POST_ID = int(config["SERVICE"]["PREMIUM_BONUS_POST_ID"])
 PREMIUM_BONUS_DAYS = 5
 
 NSFW_CATEGORIES = [
@@ -431,62 +459,64 @@ NSFW_CATEGORIES = [
 ]
 
 IMPORTSETTINGS_DEFAULT = {
-    'sys': True,
-    'acc': True,
-    'nicks': True,
-    'punishes': True,
-    'binds': False
+    "sys": True,
+    "acc": True,
+    "nicks": True,
+    "punishes": True,
+    "binds": False,
 }
 
 api = API(VK_TOKEN_GROUP)
 implicitapi = API(VK_TOKEN_IMPLICIT_FLOW)
-vk_api_session = vk_api.VkApi(token=VK_TOKEN_GROUP, api_version='5.199')
-service_vk_api_session = vk_api.VkApi(token=VK_SERVICE_TOKEN, api_version='5.199')
+vk_api_session = vk_api.VkApi(token=VK_TOKEN_GROUP, api_version="5.199")
+service_vk_api_session = vk_api.VkApi(token=VK_SERVICE_TOKEN, api_version="5.199")
 
-USER = config['DATABASE']['USER']
-PASSWORD = config['DATABASE']['PASSWORD']
-DATABASE = config['DATABASE']['DATABASE']
-DATABASE_HOST = config['DATABASE']['DATABASE_HOST']
-DATABASE_PORT = config['DATABASE']['DATABASE_PORT']
-DATABASE_STR = f'postgresql://{USER}:{PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE}'
+USER = config["DATABASE"]["USER"]
+PASSWORD = config["DATABASE"]["PASSWORD"]
+DATABASE = config["DATABASE"]["DATABASE"]
+DATABASE_HOST = config["DATABASE"]["DATABASE_HOST"]
+DATABASE_PORT = config["DATABASE"]["DATABASE_PORT"]
+DATABASE_STR = (
+    f"postgresql://{USER}:{PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE}"
+)
 
-TG_TOKEN = config['TELEGRAM']['TG_TOKEN']
-TG_BOT_USERNAME = config['TELEGRAM']['TG_BOT_USERNAME']
-TG_CHAT_ID = config['TELEGRAM']['TG_CHAT_ID']
-TG_BACKUP_THREAD_ID = config['TELEGRAM']['TG_BACKUP_THREAD_ID']
-TG_PREMIUM_THREAD_ID = config['TELEGRAM']['TG_PREMIUM_THREAD_ID']
-TG_NEWCHAT_THREAD_ID = config['TELEGRAM']['TG_NEWCHAT_THREAD_ID']
-TG_TRANSFER_THREAD_ID = config['TELEGRAM']['TG_TRANSFER_THREAD_ID']
-TG_AUDIO_THREAD_ID = config['TELEGRAM']['TG_AUDIO_THREAD_ID']
-TG_BONUS_THREAD_ID = config['TELEGRAM']['TG_BONUS_THREAD_ID']
-TG_PUBLIC_CHAT_ID = config['TELEGRAM']['TG_PUBLIC_CHAT_ID']
-TG_PUBLIC_GIVEAWAY_THREAD_ID = config['TELEGRAM']['TG_PUBLIC_GIVEAWAY_THREAD_ID']
-TG_API_HASH = config['TELEGRAM']['TG_API_HASH']
-TG_API_ID = config['TELEGRAM']['TG_API_ID']
+TG_TOKEN = config["TELEGRAM"]["TG_TOKEN"]
+TG_BOT_USERNAME = config["TELEGRAM"]["TG_BOT_USERNAME"]
+TG_CHAT_ID = config["TELEGRAM"]["TG_CHAT_ID"]
+TG_BACKUP_THREAD_ID = config["TELEGRAM"]["TG_BACKUP_THREAD_ID"]
+TG_PREMIUM_THREAD_ID = config["TELEGRAM"]["TG_PREMIUM_THREAD_ID"]
+TG_NEWCHAT_THREAD_ID = config["TELEGRAM"]["TG_NEWCHAT_THREAD_ID"]
+TG_TRANSFER_THREAD_ID = config["TELEGRAM"]["TG_TRANSFER_THREAD_ID"]
+TG_AUDIO_THREAD_ID = config["TELEGRAM"]["TG_AUDIO_THREAD_ID"]
+TG_BONUS_THREAD_ID = config["TELEGRAM"]["TG_BONUS_THREAD_ID"]
+TG_PUBLIC_CHAT_ID = config["TELEGRAM"]["TG_PUBLIC_CHAT_ID"]
+TG_PUBLIC_GIVEAWAY_THREAD_ID = config["TELEGRAM"]["TG_PUBLIC_GIVEAWAY_THREAD_ID"]
+TG_API_HASH = config["TELEGRAM"]["TG_API_HASH"]
+TG_API_ID = config["TELEGRAM"]["TG_API_ID"]
 
-YOOKASSA_MERCHANT_ID = int(config['YOOKASSA']['YOOKASSA_MERCHANT_ID'])
-YOOKASSA_TOKEN = config['YOOKASSA']['YOOKASSA_TOKEN']
+YOOKASSA_MERCHANT_ID = int(config["YOOKASSA"]["YOOKASSA_MERCHANT_ID"])
+YOOKASSA_TOKEN = config["YOOKASSA"]["YOOKASSA_TOKEN"]
 
-YANDEX_TOKEN = config['YANDEX']['TOKEN']
+YANDEX_TOKEN = config["YANDEX"]["TOKEN"]
 
-GOOGLE_TOKEN = config['GOOGLE']['TOKEN']
+GOOGLE_TOKEN = config["GOOGLE"]["TOKEN"]
 GOOGLE_THREATS = {
-    "MALWARE": 'вредоносное ПО',
-    "SOCIAL_ENGINEERING": 'социальная инженерия',
-    "THREAT_TYPE_UNSPECIFIED": 'тип угрозы не указан',
-    "UNWANTED_SOFTWARE": 'нежелательное ПО',
-    "POTENTIALLY_HARMFUL_APPLICATION": 'потенциально вредоносное приложение'
+    "MALWARE": "вредоносное ПО",
+    "SOCIAL_ENGINEERING": "социальная инженерия",
+    "THREAT_TYPE_UNSPECIFIED": "тип угрозы не указан",
+    "UNWANTED_SOFTWARE": "нежелательное ПО",
+    "POTENTIALLY_HARMFUL_APPLICATION": "потенциально вредоносное приложение",
 }
 
 PREMIUM_COST = {30: 99, 90: 249, 180: 499}
 data = {
-    'email': config['SOCIALS']['email'],
-    'vk': config['SOCIALS']['vk'],
-    'vk_contact': config['SOCIALS']['vk'].replace('.com', '.me'),
-    'vk_preminfo': config['SOCIALS']['vk_preminfo'],
-    'tg': config['SOCIALS']['tg'],
-    'high': f'{PREMIUM_COST[180]}',
-    'medium': f'{PREMIUM_COST[90]}',
-    'low': f'{PREMIUM_COST[30]}',
-    'premiumchat': '199'
+    "email": config["SOCIALS"]["email"],
+    "vk": config["SOCIALS"]["vk"],
+    "vk_contact": config["SOCIALS"]["vk"].replace(".com", ".me"),
+    "vk_preminfo": config["SOCIALS"]["vk_preminfo"],
+    "tg": config["SOCIALS"]["tg"],
+    "high": f"{PREMIUM_COST[180]}",
+    "medium": f"{PREMIUM_COST[90]}",
+    "low": f"{PREMIUM_COST[30]}",
+    "premiumchat": "199",
 }

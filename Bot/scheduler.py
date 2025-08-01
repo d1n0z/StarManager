@@ -53,7 +53,6 @@ async def backup() -> None:
 async def updateInfo():
     try:
         async with (await pool()).acquire() as conn:
-            await conn.execute('delete from speccommandscooldown where time<$1', time.time() - 10)
             alluserscount = beautifyNumber(await conn.fetchval('select count(*) from allusers'))
             allchatscount = beautifyNumber(await conn.fetchval('select count(*) from allchats'))
             await implicitapi.status.set(

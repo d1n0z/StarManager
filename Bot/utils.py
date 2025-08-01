@@ -652,16 +652,12 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings):
     return False
 
 
-async def speccommandscheck(uid: int, cmd: str, cd: int) -> int | bool:
-    # if uid in DEVS:
-    #     return False
-    async with (await pool()).acquire() as conn:
-        if s := await conn.fetchval('select time from speccommandscooldown where uid=$1 and time>$2 and cmd=$3',
-                                    uid, time.time() - cd, cmd):
-            return s
-        await conn.execute(
-            'insert into speccommandscooldown (time, uid, cmd) values ($1, $2, $3)', time.time(), uid, cmd)
-    return False
+async def speccommandscheck(uid: int, cmd: str, cd: int) -> int:
+    if (last_command := managers.commands_cooldown.get_user_time(uid, cmd)) > time.time() - cd:
+        return last_command
+    
+    managers.commands_cooldown.set(uid, cmd)
+    return 0
 
 
 @cached

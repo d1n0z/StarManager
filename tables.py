@@ -537,16 +537,6 @@ class AntispamURLExceptions(Model):
         table_name = 'antispamurlexceptions'
 
 
-class SpecCommandsCooldown(Model):
-    uid = IntegerField()
-    time = BigIntegerField()
-    cmd = TextField()
-
-    class Meta:
-        database = dbhandle
-        table_name = 'speccommandscooldown'
-
-
 class CommandsStatistics(Model):
     cmd = TextField()
     timestart = DateTimeField(null=True)
