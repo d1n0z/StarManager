@@ -1,6 +1,8 @@
 from vkbottle import Keyboard, Callback, OpenLink, KeyboardButtonColor
 
 from config.config import (
+    GROUP_ID,
+    PREMIUM_COST,
     SETTINGS_POSITIONS,
     SETTINGS_COUNTABLE_CHANGEMENU,
     SETTINGS_COUNTABLE,
@@ -1037,17 +1039,53 @@ def premmenu(uid, settings, prem):
 def premmenu_back(uid):
     kb = Keyboard(inline=True)
 
-    kb.add(Callback(f"Назад", {"uid": uid, "cmd": "premmenu"}))
+    kb.add(Callback("Назад", {"uid": uid, "cmd": "premmenu"}))
 
     return kb.get_json()
 
 
-def pm_market():
+def market():
     kb = Keyboard(inline=True)
 
     kb.add(
         OpenLink(label="Купить", link="https://star-manager.ru"),
         KeyboardButtonColor.POSITIVE,
+    )
+    kb.add(
+        OpenLink(label="Купить через бота", link=f"https://vk.com/im?sel=-{GROUP_ID}"),
+        KeyboardButtonColor.POSITIVE,
+    )
+
+    return kb.get_json()
+
+
+def buy(uid):
+    kb = Keyboard(inline=True)
+
+    for i in PREMIUM_COST.keys():
+        kb.add(Callback(f"{i} д.", {"cmd": "buy", "uid": uid, "days": i}))
+
+    return kb.get_json()
+
+
+def buy_order(url):
+    kb = Keyboard(inline=True)
+
+    kb.add(OpenLink(label="Оплатить", link=url), KeyboardButtonColor.POSITIVE)
+
+    return kb.get_json()
+
+
+def pm_market(uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(
+        OpenLink(label="Купить", link="https://star-manager.ru"),
+        KeyboardButtonColor.POSITIVE,
+    )
+    kb.add(
+        Callback("Купить через бота", {"cmd": "market", "uid": uid}),
+        KeyboardButtonColor.SECONDARY,
     )
 
     return kb.get_json()
@@ -1203,7 +1241,7 @@ def notif_list(uid, notifs, page=1):
         ppgg += 1
         kb.add(
             Callback(
-                f"<<",
+                "<<",
                 payload={"cmd": "notif", "page": page - 1, "uid": uid, "sender": uid},
             )
         )
@@ -1212,7 +1250,7 @@ def notif_list(uid, notifs, page=1):
     if len(notifs) > 8 * page:
         kb.add(
             Callback(
-                f">>",
+                ">>",
                 payload={"cmd": "notif", "page": page + 1, "uid": uid, "sender": uid},
             )
         )
@@ -1313,7 +1351,7 @@ def notification_Callback(uid, name):
 
     kb.add(
         Callback(
-            f"Назад", {"cmd": "notif_select", "sender": uid, "uid": uid, "name": name}
+            "Назад", {"cmd": "notif_select", "sender": uid, "uid": uid, "name": name}
         ),
         KeyboardButtonColor.NEGATIVE,
     )
@@ -1326,7 +1364,7 @@ def notification_time(uid, name):
 
     kb.add(
         Callback(
-            f"Назад", {"cmd": "notif_select", "sender": uid, "uid": uid, "name": name}
+            "Назад", {"cmd": "notif_select", "sender": uid, "uid": uid, "name": name}
         ),
         KeyboardButtonColor.NEGATIVE,
     )
@@ -1379,7 +1417,7 @@ def notification_tag(uid, name):
 
     kb.add(
         Callback(
-            f"Назад", {"cmd": "notif_select", "sender": uid, "uid": uid, "name": name}
+            "Назад", {"cmd": "notif_select", "sender": uid, "uid": uid, "name": name}
         ),
         KeyboardButtonColor.NEGATIVE,
     )

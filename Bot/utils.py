@@ -10,7 +10,6 @@ from datetime import date, datetime
 from typing import Any, Iterable
 from urllib.parse import urlparse
 
-from Bot import managers
 import dns.resolver
 import pysafebrowsing
 import requests
@@ -30,7 +29,11 @@ from vkbottle_types.objects import (
     MessagesMessageAttachmentType,
     MessagesSendUserIdsResponseItem,
 )
+from yookassa import Configuration, Payment
+from yookassa.payment import PaymentResponse
 
+from Bot import managers
+from config import config
 from config.config import (
     COMMANDS_COOLDOWN,
     GOOGLE_TOKEN,
@@ -44,8 +47,10 @@ from config.config import (
     PREMMENU_TURN,
     SETTINGS,
     SETTINGS_ALT,
-    SETTINGS_POSITIONS,
     SETTINGS_DEFAULTS,
+    SETTINGS_POSITIONS,
+    YOOKASSA_MERCHANT_ID,
+    YOOKASSA_TOKEN,
     api,
     vk_api_session,
 )
@@ -1463,3 +1468,69 @@ async def messagereply(
         return msg
     except Exception:
         pass
+
+
+async def create_payment(
+    cost,
+    first_name,
+    last_name,
+    origcost,
+    from_id,
+    to_id,
+    promoexists=False,
+    promo=None,
+    chat_id=None,
+    email=None,
+    delete_message_cmid=None,
+) -> PaymentResponse:
+    async with (await pool()).acquire() as conn:
+        order_id = await conn.fetchval(
+            "select id from payments order by id desc limit 1"
+        )
+        order_id = 1 if order_id is None else (order_id + 1)
+        await conn.execute(
+            "insert into payments (id, uid, success) values ($1, $2, $3)",
+            order_id,
+            to_id,
+            0,
+        )
+    payment = {
+        "amount": {"value": str(cost) + ".00", "currency": "RUB"},
+        "receipt": {
+            "customer": {
+                "full_name": f"{last_name} {first_name}",
+                "email": config.data["email"],
+            },
+            "items": [
+                {
+                    "description": "Premium-статус"
+                    if origcost != config.data["premiumchat"]
+                    else "Premium-беседа",
+                    "amount": {"value": str(cost) + ".00", "currency": "RUB"},
+                    "vat_code": 1,
+                    "quantity": 1,
+                }
+            ],
+        },
+        "metadata": {
+            "pid": order_id,
+            "chat_id": 0 if origcost != config.data["premiumchat"] else chat_id,
+            "origcost": origcost,
+            "personal": promo[2] if promoexists and promo[1] else 0,
+            "gift": 0 if to_id == from_id else to_id,
+        },
+        "merchant_customer_id": from_id,
+        "confirmation": {
+            "type": "redirect",
+            "locale": "ru_RU",
+            "return_url": "https://vk.com/star_manager",
+        },
+    }
+    if email:
+        payment["receipt"]["customer"]["email"] = email
+        payment["receipt"]["email"] = email
+    if delete_message_cmid:
+        payment["metadata"]["del_cmid"] = delete_message_cmid
+    Configuration.account_id = YOOKASSA_MERCHANT_ID
+    Configuration.secret_key = YOOKASSA_TOKEN
+    return Payment.create(payment)

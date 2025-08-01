@@ -68,7 +68,7 @@ COMMANDS = {
     "linked": 8, "cmdstats": 8, "promocreate": 8, "promodel": 8, "promolist": 8, "blocklist": 8, "allowinvite": 8,
     "prempromocreate": 8, "prempromodel": 8, "prempromolist": 8, "bonuslist": 8, "rewardscount": 8,
 }
-PM_COMMANDS = ["anon", "deanon", "code", "report"]
+PM_COMMANDS = ["anon", "deanon", "code", "report", "premium"]
 COMMANDS_DESC = {
     "kick": "/kick - Исключить пользователя.",
     "mute": "/mute - Заблокировать чат пользователю.",

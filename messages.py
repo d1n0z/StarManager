@@ -1580,14 +1580,6 @@ def q_fail(uid, name, nick):
     return get("q_fail", uid=uid, n=nick or name)
 
 
-def premium():
-    return get("premium")
-
-
-def premium_sent(uid, name, nickname):
-    return get("premium_sent", uid=uid, n=nickname or name)
-
-
 def chat(
     uid,
     uname,
@@ -1907,6 +1899,18 @@ def chatlimit(id, name, nick, t, postfix, lpos):
 
 def pm():
     return get("pm")
+
+
+def market():
+    return get("market")
+
+
+def buy():
+    return get("buy")
+
+
+def buy_order(order_id, uid, name, days, cost, url):
+    return get("buy_order", oid=order_id, id=uid, n=name, days=days, cost=cost, url=url)
 
 
 def pm_market():

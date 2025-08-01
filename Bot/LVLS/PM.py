@@ -11,18 +11,18 @@ import keyboard
 import messages
 from Bot.rules import SearchPMCMD
 from Bot.utils import (
+    getChatName,
+    getChatSettings,
+    getURepBanned,
     getUserName,
     getUserNickname,
     getUserPremium,
-    getChatName,
-    sendMessage,
     isChatMember,
-    getChatSettings,
-    whoiscached,
-    getURepBanned,
+    sendMessage,
     uploadImage,
+    whoiscached,
 )
-from config.config import api, GROUP_ID, REPORT_CD, REPORT_TO, DEVS, PATH
+from config.config import DEVS, GROUP_ID, PATH, REPORT_CD, REPORT_TO, api
 from db import pool
 
 bl = BotLabeler()
@@ -218,3 +218,17 @@ async def report(message: GroupTypes.MessageNew):
         photo=photos,
     )
     await sendMessage(message.peer_id, messages.report_sent(repid))
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_NEW,
+    GroupTypes.MessageNew,
+    SearchPMCMD("premium"),
+    blocking=False,
+)
+async def premium(message: GroupTypes.MessageNew):
+    await sendMessage(
+        peer_ids=message.object.message.peer_id,
+        msg=messages.pm_market(),
+        kbd=keyboard.pm_market(message.object.message.from_id),
+    )

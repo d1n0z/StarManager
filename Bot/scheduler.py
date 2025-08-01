@@ -35,7 +35,6 @@ from config.config import (
     TG_BACKUP_THREAD_ID,
     PHOTO_NOT_FOUND,
     YANDEX_TOKEN,
-    COMMANDS,
     vk_api_session,
     GROUP_ID,
     PATH,
@@ -364,7 +363,7 @@ async def everyminute():
         traceback.print_exc()
         await sendMessage(
             DAILY_TO + 2000000000,
-            f"e from schedule everyminute:\n" + traceback.format_exc(),
+            "e from schedule everyminute:\n" + traceback.format_exc(),
         )
 
 
@@ -445,7 +444,7 @@ async def run_notifications():
         traceback.print_exc()
         await sendMessage(
             DAILY_TO + 2000000000,
-            f"e from schedule run_notifications:\n" + traceback.format_exc(),
+            "e from schedule run_notifications:\n" + traceback.format_exc(),
         )
 
 
@@ -478,7 +477,7 @@ async def run_nightmode_notifications():
         traceback.print_exc()
         await sendMessage(
             DAILY_TO + 2000000000,
-            f"e from schedule run_nightmode_notifications:\n" + traceback.format_exc(),
+            "e from schedule run_nightmode_notifications:\n" + traceback.format_exc(),
         )
 
 
@@ -500,7 +499,7 @@ async def botstatuschecker():
         traceback.print_exc()
         await sendMessage(
             DAILY_TO + 2000000000,
-            f"e from schedule botstatuschecker:\n" + traceback.format_exc(),
+            "e from schedule botstatuschecker:\n" + traceback.format_exc(),
         )
 
 
@@ -547,7 +546,7 @@ async def mathgiveaway():
         traceback.print_exc()
         await sendMessage(
             DAILY_TO + 2000000000,
-            f"e from schedule mathgiveaway:\n" + traceback.format_exc(),
+            "e from schedule mathgiveaway:\n" + traceback.format_exc(),
         )
 
 

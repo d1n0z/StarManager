@@ -121,8 +121,8 @@ async def premium(message: Message):
     await messagereply(
         message,
         disable_mentions=1,
-        message=messages.pm_market(),
-        keyboard=keyboard.pm_market(),
+        message=messages.market(),
+        keyboard=keyboard.market(),
     )
 
 

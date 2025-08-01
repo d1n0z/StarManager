@@ -14,6 +14,7 @@ from starlette.responses import JSONResponse
 from yookassa import Configuration, Payment
 
 sys.path.append("../")
+from Bot import utils
 from config import config
 from db import smallpool as pool
 
@@ -298,61 +299,26 @@ async def create_payment(request: Request):
             )
 
     async with (await pool()).acquire() as conn:
-        oid = await conn.fetchval("select id from payments order by id desc limit 1")
-        oid = 1 if oid is None else (oid + 1)
-        await conn.execute(
-            "insert into payments (id, uid, success) values ($1, $2, $3)",
-            oid,
-            user.id,
-            0,
-        )
         if data.promo:
             promo = await conn.fetchrow(
                 "select val, uid, id from prempromo where promo=$1", data.promo
             )
             cost = int(int(cost) * ((100 - promo[0]) / 100)) + 1
 
-    payment = {
-        "amount": {"value": str(cost) + ".00", "currency": "RUB"},
-        "receipt": {
-            "customer": {
-                "full_name": f"{user.last_name} {user.first_name}",
-                "email": config.data["email"],
-            },
-            "items": [
-                {
-                    "description": "Premium-статус"
-                    if origcost != config.data["premiumchat"]
-                    else "Premium-беседа",
-                    "amount": {"value": str(cost) + ".00", "currency": "RUB"},
-                    "vat_code": 1,
-                    "quantity": 1,
-                }
-            ],
-        },
-        "metadata": {
-            "pid": oid,
-            "chat_id": 0 if origcost != config.data["premiumchat"] else data.chat_id,
-            "origcost": origcost,
-            "personal": promo[2] if data.promo and promo[1] else 0,
-            "gift": 0 if user.id == ouid else user.id,
-        },
-        "merchant_customer_id": ouid,
-        "confirmation": {
-            "type": "redirect",
-            "locale": "ru_RU",
-            "return_url": "https://vk.com/star_manager",
-        },
-    }
-    if user.email:
-        payment["receipt"]["customer"]["email"] = user.email
-        payment["receipt"]["email"] = user.email
-    Configuration.account_id = config.YOOKASSA_MERCHANT_ID
-    Configuration.secret_key = config.YOOKASSA_TOKEN
-    p = Payment.create(payment)
-
+    payment = await utils.create_payment(
+        cost,
+        user.first_name,
+        user.last_name,
+        origcost,
+        ouid,
+        user.id,
+        data.promo,
+        promo,
+        data.chat_id,
+        user.email,
+    )
     return JSONResponse(
-        content={"valid": True, "payment_url": p.confirmation.confirmation_url}
+        content={"valid": True, "payment_url": payment.confirmation.confirmation_url}
     )
 
 
@@ -472,6 +438,17 @@ async def yookassa(request: Request):
         await config.api.messages.send(user_id=uid or from_id, message=msg, random_id=0)
     except Exception:
         pass
+
+    if del_cmid := query["metadata"].get("del_cmid"):
+        try:
+            await config.api.messages.delete(
+                group_id=config.GROUP_ID,
+                delete_for_all=True,
+                peer_id=uid or from_id,
+                cmids=del_cmid,
+            )
+        except Exception:
+            pass
 
     if chat_id:
         comment = f"Для беседы id{chat_id}"
