@@ -1051,6 +1051,7 @@ def market():
         OpenLink(label="Купить", link="https://star-manager.ru"),
         KeyboardButtonColor.POSITIVE,
     )
+    kb.row()
     kb.add(
         OpenLink(label="Купить через бота", link=f"https://vk.com/im?sel=-{GROUP_ID}"),
         KeyboardButtonColor.POSITIVE,
@@ -1083,6 +1084,7 @@ def pm_market(uid):
         OpenLink(label="Купить", link="https://star-manager.ru"),
         KeyboardButtonColor.POSITIVE,
     )
+    kb.row()
     kb.add(
         Callback("Купить через бота", {"cmd": "market", "uid": uid}),
         KeyboardButtonColor.SECONDARY,
