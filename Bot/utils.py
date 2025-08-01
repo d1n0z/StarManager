@@ -32,6 +32,7 @@ from vkbottle_types.objects import (
 )
 
 from config.config import (
+    COMMANDS_COOLDOWN,
     GOOGLE_TOKEN,
     GROUP_ID,
     IMPORTSETTINGS_DEFAULT,
@@ -923,14 +924,16 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings):
     return False
 
 
-async def command_cooldown_check(uid: int, cmd: str, cd: int) -> int:
+async def command_cooldown_check(uid: int, cmd: str):
+    if not (cd := COMMANDS_COOLDOWN.get(cmd, 0)):
+        return None
     if (
         last_command := managers.commands_cooldown.get_user_time(uid, cmd)
     ) > time.time() - cd:
         return last_command
 
     managers.commands_cooldown.set(uid, cmd)
-    return 0
+    return None
 
 
 @cached

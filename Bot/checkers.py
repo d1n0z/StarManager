@@ -145,14 +145,15 @@ async def checkCMD(
         await messagereply(message, disable_mentions=1, message=messages.inprogress())
         return False
 
-    if st := await command_cooldown_check(message.from_id, cmd, COMMANDS_COOLDOWN[cmd]):
-        return await messagereply(
+    if st := await command_cooldown_check(message.from_id, cmd):
+        await messagereply(
             message,
             disable_mentions=1,
             message=messages.commandcooldown(
                 int(COMMANDS_COOLDOWN[cmd] - (time.time() - st) + 1)
             ),
         )
+        return False
 
     u_acc = await getUserAccessLevel(uid, chat_id)
     u_prem = await getUserPremium(uid)
