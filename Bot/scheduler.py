@@ -240,7 +240,8 @@ async def every10min(conn):
                 "SELECT EXISTS(SELECT 1 FROM prempromo WHERE promo = $1)", promo
             ):
                 promo = "".join(
-                    random.choice(string.ascii_letters + string.digits) for _ in range(8)
+                    random.choice(string.ascii_letters + string.digits)
+                    for _ in range(8)
                 )
             exp = datetime.fromtimestamp(now + 86400 * 2)
             await conn.execute(
@@ -279,7 +280,7 @@ async def every10min(conn):
                     ),
                     updated AS (
                         UPDATE bonus
-                        SET streak = streak - 2
+                        SET streak = streak - 2, time = $2
                         WHERE id IN (SELECT id FROM affected WHERE streak >= 2)
                         RETURNING id
                     )
@@ -287,11 +288,14 @@ async def every10min(conn):
                     WHERE id IN (SELECT id FROM affected WHERE streak < 2);
                     """,
             now - 172800,
+            now - 86400,
         )
 
     async with conn.transaction():
         for chunk in chunks(
-            await conn.fetch("SELECT uid FROM rewardscollected WHERE deactivated = false"),
+            await conn.fetch(
+                "SELECT uid FROM rewardscollected WHERE deactivated = false"
+            ),
             499,
         ):
             try:
@@ -346,7 +350,10 @@ async def everyminute(conn):
         )
         if todelete:
             await asyncio.gather(
-                *(deleteMessages(cmid, peerid - 2000000000) for peerid, cmid in todelete)
+                *(
+                    deleteMessages(cmid, peerid - 2000000000)
+                    for peerid, cmid in todelete
+                )
             )
             await conn.execute("DELETE FROM todelete WHERE delete_at < $1", now)
 
