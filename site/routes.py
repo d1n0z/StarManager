@@ -297,13 +297,15 @@ async def create_payment(request: Request):
                 status_code=400,
                 detail="Вам нужно быть участником беседы, чтобы приобрести для неё Premium-статус.",
             )
-
-    async with (await pool()).acquire() as conn:
-        if data.promo:
+    
+    if data.promo:
+        async with (await pool()).acquire() as conn:
             promo = await conn.fetchrow(
                 "select val, uid, id from prempromo where promo=$1", data.promo
             )
             cost = int(int(cost) * ((100 - promo[0]) / 100)) + 1
+    else:
+        promo = None
 
     payment = await utils.create_payment(
         cost,
