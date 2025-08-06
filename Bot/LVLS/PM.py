@@ -232,3 +232,17 @@ async def premium(message: GroupTypes.MessageNew):
         msg=messages.pm_market(),
         kbd=keyboard.pm_market(message.object.message.from_id),
     )
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_NEW,
+    GroupTypes.MessageNew,
+    SearchPMCMD("shop"),
+    blocking=False,
+)
+async def shop(message: GroupTypes.MessageNew):
+    await sendMessage(
+        peer_ids=message.object.message.peer_id,
+        msg=messages.shop(),
+        kbd=keyboard.shop(message.from_id)
+    )

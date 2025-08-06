@@ -1,5 +1,5 @@
 import json
-import os
+import secrets
 import time
 from ast import literal_eval
 from datetime import datetime
@@ -21,6 +21,7 @@ from config.config import (
     PREMMENU_DEFAULT,
     SETTINGS_COUNTABLE,
     SETTINGS_PREMIUM,
+    SHOP_LOTS,
     TG_CHAT_ID,
     TG_NEWCHAT_THREAD_ID,
     api,
@@ -28,6 +29,11 @@ from config.config import (
 from db import pool
 
 bl = BotLabeler()
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["_"]))
+async def empty(message: MessageEvent):
+    pass
 
 
 @bl.raw_event(
@@ -147,35 +153,35 @@ async def duel(message: MessageEvent):
     payload = message.payload
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
-    duelxp = int(payload["xp"])
+    duelcoins = int(payload["coins"])
     id = int(message.user_id)
     uid = int(payload["uid"])
 
     if id == uid or await getULvlBanned(id):
         return
 
-    xp = await utils.getUserXP(id)
-    uxp = await utils.getUserXP(uid)
-    if xp < duelxp:
+    coins = await utils.getUserCoins(id)
+    ucoins = await utils.getUserCoins(uid)
+    if coins < duelcoins:
         await message.show_snackbar("У вас недостаточно XP")
         return
-    if uxp < duelxp:
+    if ucoins < duelcoins:
         await message.show_snackbar("У вашего соперника недостаточно XP")
         return
 
-    rid = (id, uid)[int.from_bytes(os.urandom(1)) % 2]
-    if rid == id:
-        loseid, winid = uid, id
-    else:
-        loseid, winid = id, uid
+    i = secrets.randbelow(2)
+    winid, loseid = (id, uid) if i else (uid, id)
 
-    xtw = duelxp
-    u_premium = await utils.getUserPremium(winid)
-    if not u_premium:
-        xtw = int(xtw / 100 * 90)
+    duel_coins_com = duelcoins
+    has_comission = not (
+        await utils.getUserPremium(winid)
+        or (await utils.getUserShopBonuses(uid))[1] > time.time()
+    )
+    if has_comission:
+        duel_coins_com = int(duelcoins / 100 * 90)
 
-    await utils.addUserXP(loseid, -duelxp)
-    await utils.addUserXP(winid, xtw)
+    await utils.addUserCoins(loseid, -duelcoins)
+    await utils.addUserCoins(winid, duel_coins_com)
     async with (await pool()).acquire() as conn:
         if not await conn.fetchval(
             "update duelwins set wins=wins+1 where uid=$1 returning 1", winid
@@ -189,8 +195,8 @@ async def duel(message: MessageEvent):
             loseid,
             await utils.getUserName(loseid),
             await utils.getUserNickname(loseid, chat_id),
-            xtw,
-            u_premium,
+            duel_coins_com,
+            has_comission,
         ),
         peer_id,
         message.conversation_message_id,
@@ -1580,6 +1586,44 @@ async def top_bonus_in_chat(message: MessageEvent):
         peer_id,
         message.conversation_message_id,
         keyboard.top_bonus_in_chat(peer_id - 2000000000, message.user_id),
+    )
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["top_coins"])
+)
+async def top_coins(message: MessageEvent):
+    peer_id = message.object.peer_id
+    async with (await pool()).acquire() as conn:
+        top = await conn.fetch("select uid, coins from xp order by coins desc limit 10")
+    await utils.editMessage(
+        await messages.top_coins(top),
+        peer_id,
+        message.conversation_message_id,
+        keyboard.top_coins(peer_id - 2000000000, message.user_id),
+    )
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["top_coins_in_chat"])
+)
+async def top_coins_in_chat(message: MessageEvent):
+    peer_id = message.object.peer_id
+    async with (await pool()).acquire() as conn:
+        top = await conn.fetch(
+            "select uid, coins from xp where uid=ANY($1) order by coins desc limit 10",
+            [
+                i.member_id
+                for i in (
+                    await api.messages.get_conversation_members(peer_id=peer_id)
+                ).items
+            ],
+        )
+    await utils.editMessage(
+        await messages.top_coins(top),
+        peer_id,
+        message.conversation_message_id,
+        keyboard.top_coins_in_chat(peer_id - 2000000000, message.user_id),
     )
 
 
@@ -3216,11 +3260,12 @@ async def buy(message: MessageEvent):
     uid = message.user_id
     days = message.payload["days"]
     cost = PREMIUM_COST[days]
-    name = await utils.getUserName(uid)
+    name = (await utils.getUserName(uid)).split()
 
     payment = await utils.create_payment(
         cost,
-        *name.split()[::-1],
+        name[-1],
+        name[0],
         cost,
         uid,
         uid,
@@ -3240,4 +3285,153 @@ async def buy(message: MessageEvent):
         message.object.peer_id,
         message.conversation_message_id,
         keyboard.buy_order(payment.confirmation.confirmation_url),
+    )
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["shop_xp"]))
+async def shop_xp(message: MessageEvent):
+    async with (await pool()).acquire() as conn:
+        limit = await conn.fetchval(
+            "select limits from shop where uid=$1", message.user_id
+        )
+    limit = literal_eval(limit) if limit else [0, 0, 0, 0, 0]
+
+    await utils.editMessage(
+        messages.shop_xp(await utils.getUserCoins(message.user_id), limit),
+        message.object.peer_id,
+        message.conversation_message_id,
+        keyboard.shop_xp(message.user_id, limit),
+    )
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["shop"]))
+async def shop(message: MessageEvent):
+    await utils.editMessage(
+        messages.shop(),
+        message.object.peer_id,
+        message.conversation_message_id,
+        keyboard.shop(message.user_id),
+    )
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["shop_bonuses"])
+)
+async def shop_bonuses(message: MessageEvent):
+    async with (await pool()).acquire() as conn:
+        activated_bonuses = await conn.fetchrow(
+            "select exp_2x, no_comission from shop where uid=$1", message.user_id
+        )
+    activated_bonuses = (
+        [i if i > time.time() else 0 for i in activated_bonuses]
+        if activated_bonuses
+        else [0, 0]
+    )
+
+    await utils.editMessage(
+        messages.shop_bonuses(await utils.getUserCoins(message.user_id)),
+        message.object.peer_id,
+        message.conversation_message_id,
+        keyboard.shop_bonuses(message.user_id, activated_bonuses),
+    )
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_EVENT,
+    MessageEvent,
+    SearchPayloadCMD(["shop_buy"], answer=False),
+)
+async def shop_buy(message: MessageEvent):
+    category = message.payload.get("category")
+    option = message.payload.get("option")
+    lot = SHOP_LOTS[category][option]
+    cost = lot["cost"]
+
+    if await utils.getUserCoins(message.user_id) < cost:
+        await message.show_snackbar(
+            "🔴 Недостаточно монеток для покупки данного товара."
+        )
+        return
+
+    if category == "xp":
+        lot_limit = lot["limit"]
+        async with (await pool()).acquire() as conn:
+            limit_row = await conn.fetchval(
+                "select limits from shop where uid=$1", message.user_id
+            )
+            limit = literal_eval(limit_row) if limit_row else [0, 0, 0, 0, 0]
+            limit_key = list(SHOP_LOTS["xp"].keys()).index(option)
+            if limit[limit_key] >= lot_limit:
+                await message.show_snackbar(
+                    "🔴 Вы превысили суточный лимит покупки данного товара."
+                )
+                return
+            limit[limit_key] += 1
+            if limit_row:
+                await conn.execute(
+                    "update shop set limits=$1 where uid=$2", f"{limit}", message.user_id
+                )
+            else:
+                await conn.execute(
+                    "insert into shop (uid, limits, exp_2x, no_comission) values ($1, $2, 0, 0)", message.user_id, f"{limit}"
+                )
+        lot_name = f"{option} опыта"
+        await utils.addUserCoins(message.user_id, -cost)
+        await utils.addUserXP(message.user_id, option)
+
+        await utils.editMessage(
+            messages.shop_xp(await utils.getUserCoins(message.user_id), limit),
+            message.object.peer_id,
+            message.conversation_message_id,
+            keyboard.shop_xp(message.user_id, limit),
+        )
+    elif category == "bonuses":
+        bonus_type = lot["type"]
+        active_until = int(time.time()) + lot["active_for"]
+        if bonus_type == "xp_booster":
+            check_sql = "select exp_2x from shop where uid=$1"
+            buy_sql = "update shop set exp_2x=$1 where uid=$2"
+            buy_insert_sql = "insert into shop (uid, limits, exp_2x, no_comission) values ($1, '[0, 0, 0, 0, 0]', $2, 0)"
+            activated_key = 0
+        elif bonus_type == "comission_removal":
+            check_sql = "select no_comission from shop where uid=$1"
+            buy_sql = "update shop set no_comission=$1 where uid=$2"
+            buy_insert_sql = "insert into shop (uid, limits, exp_2x, no_comission) values ($1, '[0, 0, 0, 0, 0]', 0, $2)"
+            activated_key = 1
+        else:
+            raise Exception('type not in ("xp_booster", "comission_removal")')
+
+        await utils.addUserCoins(message.user_id, -cost)
+        async with (await pool()).acquire() as conn:
+            activated_bonuses = await conn.fetchrow(
+                "select exp_2x, no_comission from shop where uid=$1", message.user_id
+            )
+            if activated_bonuses:
+                if await conn.fetchval(check_sql, message.user_id) > time.time():
+                    await message.show_snackbar("🔴 У вас уже есть этот бонус.")
+                    return
+                await conn.execute(buy_sql, active_until, message.user_id)
+            else:
+                await conn.execute(buy_insert_sql, message.user_id, active_until)
+
+        activated_bonuses = (
+            [i if i > time.time() else 0 for i in activated_bonuses]
+            if activated_bonuses
+            else [0, 0]
+        )
+        activated_bonuses[activated_key] = active_until
+        lot_name = lot["name"]
+
+        await utils.editMessage(
+            messages.shop_bonuses(await utils.getUserCoins(message.user_id)),
+            message.object.peer_id,
+            message.conversation_message_id,
+            keyboard.shop_bonuses(message.user_id, activated_bonuses),
+        )
+    else:
+        raise Exception('category not in ("xp", "bonus")')
+
+    await utils.sendMessage(
+        message.peer_id,
+        f'🛍 [id{message.user_id}|{await utils.getUserName(message.user_id)}] успешно купил "{lot_name}" за {cost} монеток',
     )

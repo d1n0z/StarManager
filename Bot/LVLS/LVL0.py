@@ -14,9 +14,11 @@ from Bot.checkers import getULvlBanned
 from Bot.rules import SearchCMD
 from Bot.tgbot import tgbot
 from Bot.utils import (
+    addUserCoins,
     getIDFromMessage,
     getUserName,
     getRegDate,
+    getUserShopBonuses,
     kickUser,
     getUserNickname,
     getUserAccessLevel,
@@ -24,6 +26,7 @@ from Bot.utils import (
     getUserMute,
     getUserBan,
     getUserXP,
+    getUserCoins,
     getUserNeededXP,
     getUserPremium,
     uploadImage,
@@ -202,7 +205,7 @@ async def stats(message: Message):
                     id,
                     await getUserAccessLevel(id, chat_id),
                     await getUserNickname(id, chat_id),
-                    await getRegDate(id, "%d.%m.%Y", "Неизвестно"),
+                    await getUserCoins(id),
                     last_message,
                     await getUserPremium(id),
                     min(xp, 99999999),
@@ -460,15 +463,15 @@ async def duel(message: Message):
 
     data = message.text.split()
     try:
-        xp = int(data[1])
+        coins = int(data[1])
     except Exception:
         return await messagereply(
             message, disable_mentions=1, message=messages.duel_hint()
         )
 
-    if xp < 50 or xp > 500:
+    if coins < 10 or coins > 500:
         return await messagereply(
-            message, disable_mentions=1, message=messages.duel_xp_minimum()
+            message, disable_mentions=1, message=messages.duel_coins_minimum()
         )
     if len(data) != 2:
         return await messagereply(
@@ -476,11 +479,11 @@ async def duel(message: Message):
         )
 
     uid = message.from_id
-    if await getUserXP(uid) < xp:
+    if await getUserCoins(uid) < coins:
         return await messagereply(
             message,
             disable_mentions=1,
-            message=messages.duel_uxp_not_enough(
+            message=messages.duel_ucoins_not_enough(
                 uid, await getUserName(uid), await getUserNickname(uid, chat_id)
             ),
         )
@@ -489,9 +492,9 @@ async def duel(message: Message):
         message,
         disable_mentions=1,
         message=messages.duel(
-            uid, await getUserName(uid), await getUserNickname(uid, chat_id), xp
+            uid, await getUserName(uid), await getUserNickname(uid, chat_id), coins
         ),
-        keyboard=keyboard.duel(uid, xp),
+        keyboard=keyboard.duel(uid, coins),
     )
 
 
@@ -528,19 +531,19 @@ async def transfer(message: Message):
         )
 
     try:
-        txp = int(message.text.split()[-1])
+        tcoins = int(message.text.split()[-1])
     except Exception:
         return await messagereply(
             message, disable_mentions=1, message=messages.transfer_hint()
         )
 
     u_prem = await getUserPremium(uid)
-    if (txp > 1500 and not u_prem) or (txp > 3000 and u_prem) or txp < 50:
+    if (tcoins > 500 and not u_prem) or (tcoins > 1000 and u_prem) or tcoins < 50:
         return await messagereply(
             message, disable_mentions=1, message=messages.transfer_wrong_number()
         )
 
-    if await getUserXP(uid) < txp:
+    if await getUserCoins(uid) < tcoins:
         return await messagereply(
             message,
             disable_mentions=1,
@@ -565,19 +568,20 @@ async def transfer(message: Message):
             message, disable_mentions=1, message=messages.transfer_limit(u_prem)
         )
 
-    if u_prem:
-        ftxp = txp
-        com = 0
-    else:
+    has_comission = not (u_prem or (await getUserShopBonuses(uid))[1] > time.time())
+    if has_comission:
         if await chatPremium(chat_id):
-            ftxp = int(txp / 100 * 97.5)
+            comtcoins = int(tcoins / 100 * 97.5)
             com = 2.5
         else:
-            ftxp = int(txp / 100 * 95)
+            comtcoins = int(tcoins / 100 * 95)
             com = 5
+    else:
+        comtcoins = tcoins
+        com = 0
 
-    await addUserXP(uid, -txp)
-    await addUserXP(id, ftxp)
+    await addUserCoins(uid, -tcoins)
+    await addUserCoins(id, comtcoins)
     uname = await getUserName(uid)
     name = await getUserName(id)
     async with (await pool()).acquire() as conn:
@@ -587,15 +591,15 @@ async def transfer(message: Message):
             id,
             uid,
             time.time(),
-            ftxp,
-            u_prem,
+            comtcoins,
+            com,
         )
     try:
         await tgbot.send_message(
             chat_id=TG_CHAT_ID,
             message_thread_id=TG_TRANSFER_THREAD_ID,
             text=f'{chat_id} | <a href="vk.com/id{uid}">{uname}</a> | '
-            f'<a href="vk.com/id{id}">{name}</a> | {ftxp} | К: {com} | '
+            f'<a href="vk.com/id{id}">{name}</a> | {comtcoins} | К: {com}% | '
             f"{datetime.now().strftime('%H:%M:%S')}",
             disable_web_page_preview=True,
             parse_mode="HTML",
@@ -605,7 +609,7 @@ async def transfer(message: Message):
     await messagereply(
         message,
         disable_mentions=1,
-        message=messages.transfer(uid, uname, id, name, ftxp, com),
+        message=messages.transfer(uid, uname, id, name, comtcoins, com),
     )
 
 
@@ -656,23 +660,24 @@ async def guess(message: Message):
         )
     if int(data[1]) < 10 or int(data[1]) > 500:
         return await messagereply(
-            message, disable_mentions=1, message=messages.guess_xp_minimum()
+            message, disable_mentions=1, message=messages.guess_coins_minimum()
         )
-    if await getUserXP(message.from_id) < int(data[1]):
+    if await getUserCoins(message.from_id) < int(data[1]):
         return await messagereply(
-            message, disable_mentions=1, message=messages.guess_notenoughxp()
+            message, disable_mentions=1, message=messages.guess_notenoughcoins()
         )
     if int(data[2]) != (num := random.randint(1, 5)):
-        await addUserXP(message.from_id, -int(data[1]))
+        await addUserCoins(message.from_id, -int(data[1]))
         return await messagereply(
             message, disable_mentions=1, message=messages.guess_lose(data[1], num)
         )
     bet = int(data[1]) * 2.5
-    if not (prem := await getUserPremium(message.from_id)):
+    has_comission = not (await getUserPremium(message.from_id) or (await getUserShopBonuses(message.from_id))[1] > time.time())
+    if has_comission:
         bet = bet / 100 * 90
-    await addUserXP(message.from_id, bet)
+    await addUserCoins(message.from_id, bet)
     await messagereply(
-        message, disable_mentions=1, message=messages.guess_win(int(bet), data[2], prem)
+        message, disable_mentions=1, message=messages.guess_win(int(bet), data[2], has_comission)
     )
 
 
@@ -900,4 +905,14 @@ async def rewards(message: Message):
             7,
             10000,
         ),
+    )
+
+
+@bl.chat_message(SearchCMD("shop"))
+async def shop(message: Message):
+    await messagereply(
+        message,
+        disable_mentions=1,
+        message=messages.shop(),
+        keyboard=keyboard.shop(message.from_id)
     )

@@ -1,18 +1,19 @@
-from vkbottle import Keyboard, Callback, OpenLink, KeyboardButtonColor
+from vkbottle import Callback, Keyboard, KeyboardButtonColor, OpenLink
 
 from config.config import (
+    CONTACT_ADMIN,
     GROUP_ID,
+    LEAGUE,
     PREMIUM_COST,
-    SETTINGS_POSITIONS,
-    SETTINGS_COUNTABLE_CHANGEMENU,
+    PREMMENU_TURN,
     SETTINGS_COUNTABLE,
+    SETTINGS_COUNTABLE_CHANGEMENU,
     SETTINGS_COUNTABLE_NO_CATEGORY,
     SETTINGS_COUNTABLE_PUNISHMENT_NO_DELETE_MESSAGE,
-    PREMMENU_TURN,
-    LEAGUE,
-    CONTACT_ADMIN,
+    SETTINGS_POSITIONS,
     SETTINGS_PRESET_BUTTONS,
     SETTINGS_SUBCATS,
+    SHOP_LOTS,
 )
 
 NUMOJIS = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
@@ -851,6 +852,7 @@ def top(chat_id, uid):
     kb.add(Callback("🔢 Примеры", {"cmd": "top_math", "chat_id": chat_id, "uid": uid}))
     kb.row()
     kb.add(Callback("🎁 Бонус", {"cmd": "top_bonus", "chat_id": chat_id, "uid": uid}))
+    kb.add(Callback("🪙 Монетки", {"cmd": "top_coins", "chat_id": chat_id, "uid": uid}))
 
     return kb.get_json()
 
@@ -1006,6 +1008,29 @@ def top_bonus_in_chat(chat_id, uid):
     return kb.get_json()
 
 
+def top_coins(chat_id, uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback("◀ Назад", {"cmd": "top", "chat_id": chat_id, "uid": uid}))
+    kb.add(
+        Callback(
+            "🥨 В беседе", {"cmd": "top_coins_in_chat", "chat_id": chat_id, "uid": uid}
+        ),
+        KeyboardButtonColor.SECONDARY,
+    )
+
+    return kb.get_json()
+
+
+def top_coins_in_chat(chat_id, uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback("◀ Назад", {"cmd": "top", "chat_id": chat_id, "uid": uid}))
+    kb.add(Callback("🥯 Общее", {"cmd": "top_coins", "chat_id": chat_id, "uid": uid}))
+
+    return kb.get_json()
+
+
 def premmenu(uid, settings, prem):
     kb = Keyboard(inline=True)
 
@@ -1093,11 +1118,11 @@ def pm_market(uid):
     return kb.get_json()
 
 
-def duel(uid, xp):
+def duel(uid, coins):
     kb = Keyboard(inline=True)
 
     kb.add(
-        Callback("Сразиться", {"cmd": "duel", "uid": uid, "xp": xp}),
+        Callback("Сразиться", {"cmd": "duel", "uid": uid, "coins": coins}),
         KeyboardButtonColor.SECONDARY,
     )
 
@@ -1936,5 +1961,80 @@ def deletemessages(uid, msgs: list):
     kb = Keyboard(inline=True)
 
     deletemessages_add(kb, uid, msgs)
+
+    return kb.get_json()
+
+
+def shop(uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(Callback("Опыт", {"cmd": "shop_xp", "uid": uid}))
+    kb.add(Callback("Бонусы", {"cmd": "shop_bonuses", "uid": uid}))
+
+    return kb.get_json()
+
+
+def shop_xp(uid, limit):
+    kb = Keyboard(inline=True)
+
+    emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
+
+    for k, xp in enumerate(SHOP_LOTS["xp"].keys()):
+        kb.add(
+            Callback(
+                emojis[k],
+                {"cmd": "shop_buy", "uid": uid, "category": "xp", "option": xp},
+            ),
+            None
+            if limit[k] < SHOP_LOTS["xp"][xp]["limit"]
+            else KeyboardButtonColor.NEGATIVE,
+        )
+    kb.row()
+    kb.add(Callback("Назад", {"cmd": "shop", "uid": uid}))
+
+    return kb.get_json()
+
+
+def shop_bonuses(uid, activated_bonuses: list):
+    kb = Keyboard(inline=True)
+
+    kb.add(
+        Callback(
+            "1️⃣",
+            {
+                "cmd": "shop_buy",
+                "uid": uid,
+                "category": "bonuses",
+                "option": "Купить 2x опыта (3 дня)",
+            },
+        ),
+        None if not activated_bonuses[0] else KeyboardButtonColor.NEGATIVE,
+    )
+    kb.add(
+        Callback(
+            "2️⃣",
+            {
+                "cmd": "shop_buy",
+                "uid": uid,
+                "category": "bonuses",
+                "option": "Купить 2х опыта (7 дней)",
+            },
+        ),
+        None if not activated_bonuses[0] else KeyboardButtonColor.NEGATIVE,
+    )
+    kb.add(
+        Callback(
+            "3️⃣",
+            {
+                "cmd": "shop_buy",
+                "uid": uid,
+                "category": "bonuses",
+                "option": "Убрать комиссию (30 дней)",
+            },
+        ),
+        None if not activated_bonuses[1] else KeyboardButtonColor.NEGATIVE,
+    )
+    kb.row()
+    kb.add(Callback("Назад", {"cmd": "shop", "uid": uid}))
 
     return kb.get_json()

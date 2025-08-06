@@ -241,6 +241,8 @@ class UserJoinedDate(Model):
 class XP(Model):
     uid = IntegerField(default=0, unique=True, index=True)
     xp = FloatField(default=0)
+    coins = IntegerField(default=0)
+    coins_limit = IntegerField(default=0)
     lvl = IntegerField(default=1)
     league = IntegerField(default=1)
     lm = BigIntegerField(default=0)
@@ -825,6 +827,17 @@ class RewardsCollected(Model):
     class Meta:
         database = dbhandle
         table_name = 'rewardscollected'
+
+
+class Shop(Model):
+    uid = IntegerField(unique=True)
+    limits = TextField(default='[0, 0, 0, 0, 0]')
+    exp_2x = BigIntegerField(default=0)
+    no_comission = BigIntegerField(default=0)
+
+    class Meta:
+        database = dbhandle
+        table_name = 'shop'
 
 
 if __name__ == '__main__':

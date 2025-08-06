@@ -1493,13 +1493,13 @@ def settings_countable_action(action, setting, text=None, image=None, url=None):
     return get(f"settings_{action}_{setting}")
 
 
-def settings_set_punishment(punishment, time=None):
+def settings_set_punishment(punishment, p_time):
     if punishment == "deletemessage":
         punishment = "применили удаление сообщения в качестве наказания"
     elif punishment == "mute":
         punishment = (
             "применили мут на"
-            + (f" {time} минут" if time < 44600 else "всегда")
+            + (f" {p_time} минут" if p_time < 44600 else "всегда")
             + " в качестве наказания"
         )
     elif punishment == "kick":
@@ -1507,7 +1507,7 @@ def settings_set_punishment(punishment, time=None):
     elif punishment == "ban":
         punishment = (
             "применили блокировку на"
-            + (f" {time} дней" if time < 3650 else "всегда")
+            + (f" {p_time} дней" if p_time < 3650 else "всегда")
             + " в качестве наказания"
         )
     elif punishment == "warn":
@@ -1736,6 +1736,15 @@ async def top_bonus(top):
     for k, item in enumerate(top[:10]) if top else []:
         msg += (
             f"[{k + 1}]. [id{item[0]}|{await getUserName(item[0])}] - {item[1]} дней\n"
+        )
+    return msg
+
+
+async def top_coins(top):
+    msg = get("top_coins")
+    for k, item in enumerate(top[:10]) if top else []:
+        msg += (
+            f"[{k + 1}]. [id{item[0]}|{await getUserName(item[0])}] - {pointWords(item[1], ('монетка', 'монетки', 'монет'))}\n"
         )
     return msg
 
@@ -1996,27 +2005,27 @@ def duel_hint():
     return get("duel_hint")
 
 
-def duel_uxp_not_enough(uid, name, nick):
-    return get("duel_uxp_not_enough", uid=uid, n=nick or name)
+def duel_ucoins_not_enough(uid, name, nick):
+    return get("duel_ucoins_not_enough", uid=uid, n=nick or name)
 
 
-def duel_xp_minimum():
-    return get("duel_xp_minimum")
+def duel_coins_minimum():
+    return get("duel_coins_minimum")
 
 
-def duel(uid, name, nick, xp):
-    return get("duel", uid=uid, n=nick or name, xp=xp)
+def duel(uid, name, nick, coins):
+    return get("duel", uid=uid, n=nick or name, coins=coins)
 
 
-def duel_res(uid, uname, unick, id, name, nick, xp, prem, com=10):
+def duel_res(uid, uname, unick, id, name, nick, coins, has_comission, com=10):
     return get(
         "duel_res",
         uid=uid,
         un=unick or uname,
         id=id,
         n=nick or name,
-        xp=xp,
-        com="" if prem else f" с учётом комиссии {com}%",
+        coins=coins,
+        com="" if not has_comission else f" с учётом комиссии {com}%",
     )
 
 
@@ -2204,12 +2213,12 @@ def transfer_community():
     return get("transfer_community")
 
 
-def transfer(uid, uname, id, name, xp, com):
+def transfer(uid, uname, id, name, coins, com):
     return get(
         "transfer",
         uid=uid,
         uname=uname,
-        xp=xp,
+        coins=coins,
         id=id,
         name=name,
         com="" if com == 0 else f" с учётом комиссии {com}%",
@@ -2269,6 +2278,10 @@ def like_premium_bonus(days):
 
 def givexp(uid, dev_name, id, u_name, xp):
     return get("givexp", uid=uid, dev_name=dev_name, xp=xp, id=id, u_name=u_name)
+
+
+def givecoins(uid, dev_name, id, u_name, coins):
+    return get("givecoins", uid=uid, dev_name=dev_name, coins=coins, id=id, u_name=u_name)
 
 
 def inprogress():
@@ -2651,21 +2664,21 @@ def guess_hint():
     return get("guess_hint")
 
 
-def guess_notenoughxp():
-    return get("guess_notenoughxp")
+def guess_notenoughcoins():
+    return get("guess_notenoughcoins")
 
 
 def guess_not_allowed():
     return get("guess_not_allowed")
 
 
-def guess_xp_minimum():
-    return get("guess_xp_minimum")
+def guess_coins_minimum():
+    return get("guess_coins_minimum")
 
 
-def guess_win(bet, num, prem):
+def guess_win(bet, num, has_comission):
     return get(
-        "guess_win", bet=bet, num=num, com="" if prem else " с учётом комиссии в 10%"
+        "guess_win", bet=bet, num=num, com="" if not has_comission else " с учётом комиссии в 10%"
     )
 
 
@@ -3121,3 +3134,15 @@ def rewards(uid, name, nick, timestamp, days, xp):
         days=days,
         xp=xp,
     )
+
+
+def shop():
+    return get("shop")
+
+
+def shop_xp(coins, limit):
+    return get("shop_xp", coins=coins, limit=limit)
+
+
+def shop_bonuses(coins):
+    return get("shop_bonuses", coins=coins)

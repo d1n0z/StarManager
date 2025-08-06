@@ -504,6 +504,10 @@ async def mathgiveaway(conn):
     )
 
 
+async def everyday(conn):
+    await conn.execute("UPDATE xp SET coins_limit=0")
+
+
 async def run():
     loop = asyncio.get_event_loop()
     asyncio.set_event_loop(loop)
@@ -536,3 +540,6 @@ async def run():
         "*/15 * * * *", func=lambda: with_lock("mathgiveaway", mathgiveaway), loop=loop
     )
     # aiocron.crontab("50 23 * * *", func=lambda: with_lock("reboot", reboot), loop=loop)
+    aiocron.crontab(
+        "0 0 * * *", func=lambda: with_lock("everyday", everyday), loop=loop
+    )

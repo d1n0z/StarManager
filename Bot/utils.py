@@ -227,8 +227,10 @@ async def sendMessage(
 
 
 async def editMessage(
-    msg: str, peer_id: int, cmid: int, kb=None, attachment=None
+    msg: str, peer_id: int, cmid: int | None, kb=None, attachment=None
 ) -> bool:
+    if not cmid:
+        return False
     try:
         return await api.messages.edit(
             peer_id=peer_id,
@@ -521,6 +523,11 @@ async def getUserXP(uid, none=0) -> int:
         return await conn.fetchval("select xp from xp where uid=$1", uid) or none
 
 
+async def getUserCoins(uid, none=0) -> int:
+    async with (await pool()).acquire() as conn:
+        return await conn.fetchval("select coins from xp where uid=$1", uid) or none
+
+
 async def getUserLeague(uid, none=1) -> int:
     async with (await pool()).acquire() as conn:
         return await conn.fetchval("select league from xp where uid=$1", uid) or none
@@ -664,6 +671,51 @@ async def addUserXP(uid, addxp, checklvlbanned=True):
                 addxp,
                 time.time(),
             )
+
+
+async def addUserCoins(
+    uid, addcoins, checklvlbanned=True, addlimit=False, bonus_peer_id=None
+) -> None:
+    async with (await pool()).acquire() as conn:
+        if checklvlbanned:
+            if await conn.fetchval(
+                "select exists(select 1 from lvlbanned where uid=$1)", uid
+            ) or await conn.fetchval(
+                "select exists(select 1 from blocked where uid=$1 and type='user')", uid
+            ):
+                return
+        
+        xp_row = await conn.fetchrow(
+            "select id, coins, coins_limit from xp where uid=$1", uid
+        )
+        if not xp_row:
+            return await conn.execute(
+                "insert into xp (uid, xp, coins, coins_limit, lm, lvm, lsm, league, lvl) values ($1, 0, $2, $3, $4, $4, $4, 1, 1)",
+                uid,
+                addcoins,
+                addcoins if addlimit else 0,
+                time.time(),
+            )
+        
+        u_limit = 1600 if await getUserPremium(uid) else 800
+        if addlimit and xp_row[2] > u_limit:
+            return
+
+        if addlimit and (xp_row[2] + addcoins > u_limit):
+            await sendMessage(
+                bonus_peer_id,
+                f"🎁 [id{uid}|{await getUserName(uid)}], вы получили +100 монеток за достижение дневного лимита в {u_limit} монеток.",
+            )
+            bonus_coins = 100
+        else:
+            bonus_coins = 0
+
+        await conn.execute(
+            "update xp set coins = $1, coins_limit = coins_limit + $2 where id=$3",
+            xp_row[1] + addcoins + bonus_coins,
+            addcoins if addlimit else 0,
+            xp_row[0],
+        )
 
 
 @AsyncTTL(time_to_live=120, maxsize=0)
@@ -1534,3 +1586,10 @@ async def create_payment(
     Configuration.account_id = YOOKASSA_MERCHANT_ID
     Configuration.secret_key = YOOKASSA_TOKEN
     return Payment.create(payment)
+
+
+async def getUserShopBonuses(uid):
+    async with (await pool()).acquire() as conn:
+        return (await conn.fetchrow(
+            "select exp_2x, no_comission from shop where uid=$1", uid
+        )) or [0, 0]

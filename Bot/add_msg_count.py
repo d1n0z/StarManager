@@ -1,10 +1,8 @@
+import secrets
 import time
-from datetime import datetime
 
 from Bot.checkers import getUInfBanned, getULvlBanned
-from Bot.tgbot import tgbot
-from Bot.utils import getUserPremium, addUserXP, getChatName, getUserName, chatPremium
-from config.config import TG_CHAT_ID, TG_AUDIO_THREAD_ID
+from Bot.utils import addUserCoins, addUserXP, chatPremium, getUserPremium, getUserShopBonuses
 from db import pool
 
 
@@ -51,7 +49,7 @@ async def add_msg_counter(chat_id, uid, audio=False, sticker=False) -> bool:
             )
         else:
             await conn.execute(
-                f"insert into xp (uid, xp, lm, lvm, lsm, league, lvl) values ($1, 0, $2, $2, $2, 1, 1)",
+                "insert into xp (uid, xp, lm, lvm, lsm, league, lvl) values ($1, 0, $2, $2, $2, 1, 1)",
                 uid,
                 time.time(),
             )
@@ -60,25 +58,22 @@ async def add_msg_counter(chat_id, uid, audio=False, sticker=False) -> bool:
         )
 
     if audio:
-        addxp = 20
-        # try:
-        #     await tgbot.send_message(chat_id=TG_CHAT_ID, message_thread_id=TG_AUDIO_THREAD_ID,
-        #                              text=f'{chat_id} | {await getChatName(chat_id)} | '
-        #                                   f'<a href="vk.com/id{uid}">{await getUserName(uid)}</a> | '
-        #                                   f'{datetime.now().strftime("%H:%M:%S")}',
-        #                              disable_web_page_preview=True, parse_mode='HTML')
-        # except Exception:
-        #     pass
+        addxp, addcoins = 20, 5
     elif sticker:
-        addxp = 5
+        addxp, addcoins = 5, 0
     else:
-        addxp = 10
+        addxp, addcoins = 10, 500
     if await getUserPremium(uid):
         addxp *= 1.5
     if await chatPremium(chat_id):
         addxp *= 1.5
     if rewards and time.time() - rewards <= 86400 * 7:
         addxp *= 2
+    if (await getUserShopBonuses(uid))[0] > time.time():
+        addxp *= 2
 
+    rannum = secrets.randbelow(100)
+    if addcoins and rannum < 40:
+        await addUserCoins(uid, addcoins, checklvlbanned=False, addlimit=True, bonus_peer_id=chat_id + 2000000000)
     await addUserXP(uid, addxp, checklvlbanned=False)
     return True

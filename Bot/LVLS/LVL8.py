@@ -14,6 +14,7 @@ from Bot.checkers import getUInfBanned
 from Bot.rules import SearchCMD
 from Bot.scheduler import backup
 from Bot.utils import (
+    addUserCoins,
     getUserName,
     getIDFromMessage,
     getUserNickname,
@@ -368,6 +369,22 @@ async def givexp(message: Message):
     await messagereply(
         message,
         messages.givexp(
+            uid, await getUserName(uid), id, await getUserName(id), data[2]
+        ),
+    )
+
+
+@bl.chat_message(SearchCMD("givecoins"))
+async def givecoins(message: Message):
+    uid = message.from_id
+    id = await getIDFromMessage(message.text, message.reply_message)
+    if not id:
+        return await messagereply(message, "🔶 Пользователь не найден")
+    data = message.text.split()
+    await addUserCoins(id, int(data[2]))
+    await messagereply(
+        message,
+        messages.givecoins(
             uid, await getUserName(uid), id, await getUserName(id), data[2]
         ),
     )
