@@ -586,8 +586,7 @@ async def transfer(message: Message):
     name = await getUserName(id)
     async with (await pool()).acquire() as conn:
         await conn.execute(
-            "insert into transferhistory (to_id, from_id, time, amount, com) VALUES ($1, $2, $3, $4,"
-            " $5)",
+            "insert into transferhistory (to_id, from_id, time, amount, com) VALUES ($1, $2, $3, $4, $5)",
             id,
             uid,
             time.time(),
