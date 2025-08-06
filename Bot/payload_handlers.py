@@ -1761,8 +1761,12 @@ async def kick_banned(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
     kicked = 0
-    lst = await api.messages.get_conversation_members(peer_id=peer_id)
-    lst = await api.users.get(user_ids=[i.member_id for i in lst.items])
+    lst = [i.member_id for i in (await api.messages.get_conversation_members(peer_id=peer_id)).items]
+    if len(lst) > 2900:
+        async with (await pool()).acquire() as conn:
+            lst = await conn.fetch('select uid from userjoineddate where chat_id=$1', chat_id)
+            lst = [i[0] for i in lst]
+    lst = await api.users.get(user_ids=lst)
     for i in lst:
         if i.deactivated:
             kicked += await utils.kickUser(i.id, chat_id)
