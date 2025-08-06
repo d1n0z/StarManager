@@ -24,6 +24,7 @@ from config.config import (
     SHOP_LOTS,
     TG_CHAT_ID,
     TG_NEWCHAT_THREAD_ID,
+    TG_TRANSFER_THREAD_ID,
     api,
 )
 from db import pool
@@ -3347,7 +3348,7 @@ async def shop_buy(message: MessageEvent):
     lot = SHOP_LOTS[category][option]
     cost = lot["cost"]
 
-    if await utils.getUserCoins(message.user_id) < cost:
+    if (user_coins := await utils.getUserCoins(message.user_id)) < cost:
         await message.show_snackbar(
             "🔴 Недостаточно монеток для покупки данного товара."
         )
@@ -3369,11 +3370,15 @@ async def shop_buy(message: MessageEvent):
             limit[limit_key] += 1
             if limit_row:
                 await conn.execute(
-                    "update shop set limits=$1 where uid=$2", f"{limit}", message.user_id
+                    "update shop set limits=$1 where uid=$2",
+                    f"{limit}",
+                    message.user_id,
                 )
             else:
                 await conn.execute(
-                    "insert into shop (uid, limits, exp_2x, no_comission) values ($1, $2, 0, 0)", message.user_id, f"{limit}"
+                    "insert into shop (uid, limits, exp_2x, no_comission) values ($1, $2, 0, 0)",
+                    message.user_id,
+                    f"{limit}",
                 )
         lot_name = f"{option} опыта"
         await utils.addUserCoins(message.user_id, -cost)
@@ -3431,7 +3436,20 @@ async def shop_buy(message: MessageEvent):
     else:
         raise Exception('category not in ("xp", "bonus")')
 
+    category = "Опыт" if category == "xp" else "Бонус"
+    user_name = await utils.getUserName(message.user_id)
+    try:
+        await tgbot.send_message(
+            chat_id=TG_CHAT_ID,
+            message_thread_id=TG_TRANSFER_THREAD_ID,
+            text=f'<a href="vk.com/id{message.user_id}">{user_name}</a> | {category} | {lot_name} | М: {user_coins} | П: {cost} | {datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}'
+            f"{datetime.now().strftime('%H:%M:%S')}",
+            disable_web_page_preview=True,
+            parse_mode="HTML",
+        )
+    except Exception:
+        pass
     await utils.sendMessage(
         message.peer_id,
-        f'🛍 [id{message.user_id}|{await utils.getUserName(message.user_id)}] успешно купил "{lot_name}" за {cost} монеток',
+        f'🛍 [id{message.user_id}|{user_name}] успешно купил "{lot_name}" за {cost} монеток',
     )
