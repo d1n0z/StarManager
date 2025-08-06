@@ -458,6 +458,7 @@ class AllChats(Model):
 
 class AllUsers(Model):
     uid = IntegerField(default=0, index=True, unique=True)
+    is_last_hidden_album = BooleanField(default=False)
 
     class Meta:
         database = dbhandle

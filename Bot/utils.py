@@ -245,7 +245,7 @@ async def editMessage(
 
 
 @AsyncTTL(time_to_live=300, maxsize=0)
-async def getChatName(chat_id: int = None) -> str:
+async def getChatName(chat_id: int) -> str:
     async with (await pool()).acquire() as conn:
         if name := await conn.fetchval(
             "select name from chatnames where chat_id=$1", chat_id
@@ -684,7 +684,7 @@ async def addUserCoins(
                 "select exists(select 1 from blocked where uid=$1 and type='user')", uid
             ):
                 return
-        
+
         xp_row = await conn.fetchrow(
             "select id, coins, coins_limit from xp where uid=$1", uid
         )
@@ -696,7 +696,7 @@ async def addUserCoins(
                 addcoins if addlimit else 0,
                 time.time(),
             )
-        
+
         u_limit = 1600 if await getUserPremium(uid) else 800
         if addlimit and xp_row[2] > u_limit:
             return
@@ -1351,25 +1351,51 @@ async def getHiddenAlbumUser():
     global _hiddenalbumuid
     if _hiddenalbumuid:
         return _hiddenalbumuid
+
     async with (await pool()).acquire() as conn:
-        userspool = await conn.fetch(
-            "select uid from allusers where not uid=ANY($1) and uid>0",
-            [
-                i[0]
-                for i in await conn.fetch(
-                    "select uid from hiddenalbumserverinternalerror"
-                )
-            ],
+        last_uid_row = await conn.fetchrow(
+            "select uid from allusers where is_last_hidden_album=true limit 1"
         )
-    for i in userspool:
+        if last_uid_row:
+            last_uid = last_uid_row["uid"]
+            if (
+                await api.messages.is_messages_from_group_allowed(
+                    group_id=GROUP_ID, user_id=last_uid
+                )
+            ).is_allowed:
+                _hiddenalbumuid = last_uid
+                return _hiddenalbumuid
+
+        await conn.execute(
+            "update allusers set is_last_hidden_album=false where is_last_hidden_album=true"
+        )
+
+        excluded = [
+            i[0]
+            for i in await conn.fetch("select uid from hiddenalbumserverinternalerror")
+        ]
+        userspool = await conn.fetch(
+            "select uid from allusers where not uid=ANY($1) and uid>0", excluded
+        )
+
+    for user in userspool:
+        uid = user[0]
         if (
             await api.messages.is_messages_from_group_allowed(
-                group_id=GROUP_ID, user_id=i[0]
+                group_id=GROUP_ID, user_id=uid
             )
         ).is_allowed:
-            _hiddenalbumuid = i[0]
+            _hiddenalbumuid = uid
+            async with (await pool()).acquire() as conn:
+                await conn.execute("update allusers set is_last_hidden_album=false")
+                await conn.execute(
+                    "update allusers set is_last_hidden_album=true where uid=$1", uid
+                )
             return _hiddenalbumuid
+
         await asyncio.sleep(0.51)
+
+    return None
 
 
 async def getImportSettings(uid, chat_id):
@@ -1590,6 +1616,8 @@ async def create_payment(
 
 async def getUserShopBonuses(uid):
     async with (await pool()).acquire() as conn:
-        return (await conn.fetchrow(
-            "select exp_2x, no_comission from shop where uid=$1", uid
-        )) or [0, 0]
+        return (
+            await conn.fetchrow(
+                "select exp_2x, no_comission from shop where uid=$1", uid
+            )
+        ) or [0, 0]
