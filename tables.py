@@ -667,7 +667,8 @@ class Promocodes(Model):
     code = TextField(unique=True, index=True)
     usage = IntegerField(null=True)
     date = IntegerField(null=True)
-    xp = IntegerField()
+    amnt = IntegerField()
+    type = TextField(default='xp')
 
     class Meta:
         database = dbhandle

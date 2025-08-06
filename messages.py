@@ -21,9 +21,9 @@ from config.config import (
     COMMANDS_PREMIUM,
     GOOGLE_THREATS,
     LVL_NAMES,
+    SETTINGS_ALT_TO_DELETE,
     SETTINGS_COUNTABLE_NO_PUNISHMENT,
     SETTINGS_POSITIONS,
-    SETTINGS_ALT_TO_DELETE,
 )
 from db import syncpool
 
@@ -32,11 +32,12 @@ from db import syncpool
 def get(key: str, **kwargs):
     with syncpool().connection() as conn:
         with conn.cursor() as c:
-            return (
-                c.execute("select text from botmessages where key=%s", (key,))
-                .fetchone()[0]
-                .format(**kwargs)
-            )
+            msg = c.execute(
+                "select text from botmessages where key=%s", (key,)
+            ).fetchone()
+    if msg is None:
+        raise Exception(f'unknown message key "{key}"')
+    return msg[0].format(**kwargs)
 
 
 def join():
@@ -1743,9 +1744,7 @@ async def top_bonus(top):
 async def top_coins(top):
     msg = get("top_coins")
     for k, item in enumerate(top[:10]) if top else []:
-        msg += (
-            f"[{k + 1}]. [id{item[0]}|{await getUserName(item[0])}] - {pointWords(item[1], ('монетка', 'монетки', 'монет'))}\n"
-        )
+        msg += f"[{k + 1}]. [id{item[0]}|{await getUserName(item[0])}] - {pointWords(item[1], ('монетка', 'монетки', 'монет'))}\n"
     return msg
 
 
@@ -2281,7 +2280,9 @@ def givexp(uid, dev_name, id, u_name, xp):
 
 
 def givecoins(uid, dev_name, id, u_name, coins):
-    return get("givecoins", uid=uid, dev_name=dev_name, coins=coins, id=id, u_name=u_name)
+    return get(
+        "givecoins", uid=uid, dev_name=dev_name, coins=coins, id=id, u_name=u_name
+    )
 
 
 def inprogress():
@@ -2678,7 +2679,10 @@ def guess_coins_minimum():
 
 def guess_win(bet, num, has_comission):
     return get(
-        "guess_win", bet=bet, num=num, com="" if not has_comission else " с учётом комиссии в 10%"
+        "guess_win",
+        bet=bet,
+        num=num,
+        com="" if not has_comission else " с учётом комиссии в 10%",
     )
 
 
@@ -2728,11 +2732,11 @@ def promocreate_alreadyexists(code):
     return get("promocreate_alreadyexists", code=code)
 
 
-def promocreate(code, xp, usage, date):
+def promocreate(code, amnt, usage, date, promo_type):
     return get(
         "promocreate",
         code=code,
-        xp=xp,
+        amnt=str(amnt) + (" опыта" if promo_type == "xp" else " монеток"),
         usage=f"\n🔘 Доступно использований: {usage}." if usage else "",
         date=f"\n🕒 Доступен до {date.strftime('%d.%m.%Y')}." if date else "",
     )
@@ -2770,8 +2774,14 @@ def promo_alreadyusedornotexists(uid, nick, name):
     return get("promo_alreadyusedornotexists", uid=uid, n=nick or name)
 
 
-def promo(uid, nick, name, code, xp):
-    return get("promo", uid=uid, n=nick or name, code=code, xp=xp)
+def promo(uid, nick, name, code, amnt, promo_type):
+    return get(
+        "promo",
+        uid=uid,
+        n=nick or name,
+        code=code,
+        amnt=str(amnt) + (" опыта" if promo_type == "xp" else " монеток"),
+    )
 
 
 def pmcmd():

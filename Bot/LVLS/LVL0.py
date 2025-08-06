@@ -690,7 +690,7 @@ async def promo(message: Message):
     uid = message.from_id
     async with (await pool()).acquire() as conn:
         code = await conn.fetchrow(
-            "select code, date, usage, xp from promocodes where code=$1", data[1]
+            "select code, date, usage, amnt, type from promocodes where code=$1", data[1]
         )
         if code and (
             code[1]
@@ -727,7 +727,10 @@ async def promo(message: Message):
         await conn.execute(
             "insert into promocodeuses (code, uid) values ($1, $2)", data[1], uid
         )
-    await addUserXP(uid, int(code[3]))
+    if code[4] == 'xp':
+        await addUserXP(uid, int(code[3]))
+    else:
+        await addUserCoins(uid, int(code[3]))
     await messagereply(
         message,
         disable_mentions=1,
@@ -737,6 +740,7 @@ async def promo(message: Message):
             await getUserName(uid),
             code[0],
             code[3],
+            code[4],
         ),
     )
 

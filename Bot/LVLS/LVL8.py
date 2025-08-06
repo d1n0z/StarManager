@@ -882,15 +882,15 @@ async def cmdstats(message: Message):
 @bl.chat_message(SearchCMD("promocreate"))
 async def promocreate(message: Message):
     data = message.text.split()
-    if len(data) not in (4, 5) or not data[2].isdigit():
+    if len(data) not in (5, 6) or not data[2].isdigit() or data[3] not in ('xp', 'coins'):
         return await messagereply(message, messages.promocreate_hint())
-    usage, date, xp = None, None, int(data[2])
+    usage, date, amnt, promo_type = None, None, int(data[2]), data[3]
     try:
-        if data[3].isdigit():
-            usage = int(data[3])
-            date = datetime.strptime(data[4], "%d.%m.%Y") if len(data) > 4 else None
+        if data[4].isdigit():
+            usage = int(data[4])
+            date = datetime.strptime(data[5], "%d.%m.%Y") if len(data) > 5 else None
         else:
-            date = datetime.strptime(data[3], "%d.%m.%Y")
+            date = datetime.strptime(data[4], "%d.%m.%Y")
     except ValueError:
         return await messagereply(message, messages.promocreate_hint())
     async with (await pool()).acquire() as conn:
@@ -901,13 +901,14 @@ async def promocreate(message: Message):
                 message, messages.promocreate_alreadyexists(data[1])
             )
         await conn.execute(
-            "insert into promocodes (code, usage, date, xp) values ($1, $2, $3, $4)",
+            "insert into promocodes (code, usage, date, amnt, type) values ($1, $2, $3, $4, $5)",
             data[1],
             usage,
             (date.timestamp() + 86399) if date else None,
-            xp,
+            amnt,
+            promo_type,
         )
-    await messagereply(message, messages.promocreate(data[1], xp, usage, date))
+    await messagereply(message, messages.promocreate(data[1], amnt, usage, date, promo_type))
 
 
 @bl.chat_message(SearchCMD("promodel"))
@@ -929,7 +930,7 @@ async def promolist(message: Message):
         promos = await conn.fetch(
             "select code from promocodeuses where code=ANY($1)",
             [i[0] for i in await conn.fetch("select code from promocodes")],
-        )
+        )  # ????????????????????????????????
     promos = [i[0] for i in promos]
     await messagereply(
         message, messages.promolist({k: promos.count(k) for k in set(promos)})
