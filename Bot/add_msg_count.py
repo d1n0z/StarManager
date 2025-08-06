@@ -62,7 +62,7 @@ async def add_msg_counter(chat_id, uid, audio=False, sticker=False) -> bool:
     elif sticker:
         addxp, addcoins = 5, 0
     else:
-        addxp, addcoins = 10, 500
+        addxp, addcoins = 10, 2
     if await getUserPremium(uid):
         addxp *= 1.5
     if await chatPremium(chat_id):
