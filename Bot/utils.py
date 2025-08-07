@@ -1357,7 +1357,7 @@ async def getHiddenAlbumUser():
             "select uid from allusers where is_last_hidden_album=true limit 1"
         )
         if last_uid_row:
-            last_uid = last_uid_row["uid"]
+            last_uid = last_uid_row[0]
             if (
                 await api.messages.is_messages_from_group_allowed(
                     group_id=GROUP_ID, user_id=last_uid

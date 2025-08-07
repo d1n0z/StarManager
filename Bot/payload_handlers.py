@@ -24,7 +24,7 @@ from config.config import (
     SHOP_LOTS,
     TG_CHAT_ID,
     TG_NEWCHAT_THREAD_ID,
-    TG_TRANSFER_THREAD_ID,
+    TG_SHOP_THREAD_ID,
     api,
 )
 from db import pool
@@ -3447,7 +3447,7 @@ async def shop_buy(message: MessageEvent):
     try:
         await tgbot.send_message(
             chat_id=TG_CHAT_ID,
-            message_thread_id=TG_TRANSFER_THREAD_ID,
+            message_thread_id=TG_SHOP_THREAD_ID,
             text=f'<a href="vk.com/id{message.user_id}">{user_name}</a> | {category} | {lot_name} | М: {user_coins} | П: {cost} | {datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}',
             disable_web_page_preview=True,
             parse_mode="HTML",
