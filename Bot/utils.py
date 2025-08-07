@@ -57,6 +57,7 @@ from config.config import (
 from db import pool
 
 _hiddenalbumuid = None
+_hiddenalbumlock = asyncio.Lock()
 
 
 @AsyncTTL(time_to_live=300, maxsize=0)
@@ -1352,50 +1353,49 @@ async def getHiddenAlbumUser():
     if _hiddenalbumuid:
         return _hiddenalbumuid
 
-    async with (await pool()).acquire() as conn:
-        last_uid_row = await conn.fetchrow(
-            "select uid from allusers where is_last_hidden_album=true limit 1"
-        )
-        if last_uid_row:
-            last_uid = last_uid_row[0]
+    async with _hiddenalbumlock:
+        async with (await pool()).acquire() as conn:
+            last_uid_row = await conn.fetchrow(
+                "select uid from allusers where is_last_hidden_album=true limit 1"
+            )
+            if last_uid_row:
+                last_uid = last_uid_row[0]
+                if (
+                    await api.messages.is_messages_from_group_allowed(
+                        group_id=GROUP_ID, user_id=last_uid
+                    )
+                ).is_allowed:
+                    _hiddenalbumuid = last_uid
+                    return _hiddenalbumuid
+
+            await conn.execute(
+                "update allusers set is_last_hidden_album=false where is_last_hidden_album=true"
+            )
+
+            excluded = [
+                i[0]
+                for i in await conn.fetch("select uid from hiddenalbumserverinternalerror")
+            ]
+            userspool = await conn.fetch(
+                "select uid from allusers where not uid=ANY($1) and uid>0", excluded
+            )
+
+        for user in userspool:
+            uid = user[0]
             if (
                 await api.messages.is_messages_from_group_allowed(
-                    group_id=GROUP_ID, user_id=last_uid
+                    group_id=GROUP_ID, user_id=uid
                 )
             ).is_allowed:
-                _hiddenalbumuid = last_uid
+                _hiddenalbumuid = uid
+                async with (await pool()).acquire() as conn:
+                    await conn.execute("update allusers set is_last_hidden_album=false")
+                    await conn.execute(
+                        "update allusers set is_last_hidden_album=true where uid=$1", uid
+                    )
                 return _hiddenalbumuid
 
-        await conn.execute(
-            "update allusers set is_last_hidden_album=false where is_last_hidden_album=true"
-        )
-
-        excluded = [
-            i[0]
-            for i in await conn.fetch("select uid from hiddenalbumserverinternalerror")
-        ]
-        userspool = await conn.fetch(
-            "select uid from allusers where not uid=ANY($1) and uid>0", excluded
-        )
-
-    for user in userspool:
-        uid = user[0]
-        if (
-            await api.messages.is_messages_from_group_allowed(
-                group_id=GROUP_ID, user_id=uid
-            )
-        ).is_allowed:
-            _hiddenalbumuid = uid
-            async with (await pool()).acquire() as conn:
-                await conn.execute("update allusers set is_last_hidden_album=false")
-                await conn.execute(
-                    "update allusers set is_last_hidden_album=true where uid=$1", uid
-                )
-            return _hiddenalbumuid
-
-        await asyncio.sleep(0.51)
-
-    return None
+            await asyncio.sleep(0.51)
 
 
 async def getImportSettings(uid, chat_id):
