@@ -25,14 +25,16 @@ async def pool():
 async def schedulerpool():
     global _schedulerpool
     if _schedulerpool is None:
-        _schedulerpool = await create_asyncpool(DATABASE_STR, min_size=1, max_size=50, max_inactive_connection_lifetime=30)
+        _schedulerpool = await create_asyncpool(DATABASE_STR, min_size=1, max_size=80, max_inactive_connection_lifetime=30,
+                                                timeout=30, command_timeout=60, init=init_connection)
     return _schedulerpool
 
 
 async def smallpool():
     global _smallpool
     if _smallpool is None:
-        _smallpool = await create_asyncpool(DATABASE_STR, min_size=1, max_size=20, max_inactive_connection_lifetime=30)
+        _smallpool = await create_asyncpool(DATABASE_STR, min_size=1, max_size=20, max_inactive_connection_lifetime=30,
+                                            timeout=30, command_timeout=60, init=init_connection)
     return _smallpool
 
 
