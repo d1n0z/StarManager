@@ -36,7 +36,7 @@ async def smallpool():
     return _smallpool
 
 
-def syncpool() -> ConnectionPool:
+def syncpool():
     global _syncpool
     if _syncpool is None:
         _syncpool = ConnectionPool(DATABASE_STR, min_size=1, max_size=5, open=False)

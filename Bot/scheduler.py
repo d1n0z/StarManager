@@ -213,64 +213,60 @@ async def reboot(conn):
 
 async def every10min(conn):
     now = time.time()
-    async with conn.transaction():
-        expired = await conn.fetch(
-            "SELECT uid, cmid FROM premiumexpirenotified WHERE date < $1",
-            now - 86400 * 2,
-        )
-        if expired:
-            await asyncio.gather(*(deleteMessages(cmid, uid) for uid, cmid in expired))
-            await conn.execute(
-                "DELETE FROM premiumexpirenotified WHERE date < $1", now - 86400 * 2
-            )
-
-    async with conn.transaction():
-        notified = {
-            row[0] for row in await conn.fetch("SELECT uid FROM premiumexpirenotified")
-        }
-        expiring = await conn.fetch(
-            "SELECT uid FROM premium WHERE time < $1 AND time > $2 AND uid != ALL($3)",
-            now + 86400 * 3,
-            now + 86400 * 2,
-            list(notified),
-        )
-        for (uid,) in expiring:
-            promo = None
-            while not promo or await conn.fetchval(
-                "SELECT EXISTS(SELECT 1 FROM prempromo WHERE promo = $1)", promo
-            ):
-                promo = "".join(
-                    random.choice(string.ascii_letters + string.digits)
-                    for _ in range(8)
-                )
-            exp = datetime.fromtimestamp(now + 86400 * 2)
-            await conn.execute(
-                'INSERT INTO prempromo (promo, val, start, "end", uid) VALUES ($1, $2, $3, $4, $5)',
-                promo,
-                25,
-                now,
-                exp.replace(hour=0, minute=0).timestamp(),
-                uid,
-            )
-            cmid = (
-                await sendMessage(
-                    uid,
-                    messages.premium_expire(
-                        uid, await getUserName(uid), exp.strftime("%d.%m.%Y / 00:00")
-                    ),
-                    keyboard.premium_expire(promo),
-                )
-            )[0].conversation_message_id
-            await conn.execute(
-                "INSERT INTO premiumexpirenotified (uid, date, cmid) VALUES ($1, $2, $3)",
-                uid,
-                now,
-                cmid,
-            )
-
-    async with conn.transaction():
+    expired = await conn.fetch(
+        "SELECT uid, cmid FROM premiumexpirenotified WHERE date < $1",
+        now - 86400 * 2,
+    )
+    if expired:
+        await asyncio.gather(*(deleteMessages(cmid, uid) for uid, cmid in expired))
         await conn.execute(
-            """
+            "DELETE FROM premiumexpirenotified WHERE date < $1", now - 86400 * 2
+        )
+
+    notified = {
+        row[0] for row in await conn.fetch("SELECT uid FROM premiumexpirenotified")
+    }
+    expiring = await conn.fetch(
+        "SELECT uid FROM premium WHERE time < $1 AND time > $2 AND uid != ALL($3)",
+        now + 86400 * 3,
+        now + 86400 * 2,
+        list(notified),
+    )
+    for (uid,) in expiring:
+        promo = None
+        while not promo or await conn.fetchval(
+            "SELECT EXISTS(SELECT 1 FROM prempromo WHERE promo = $1)", promo
+        ):
+            promo = "".join(
+                random.choice(string.ascii_letters + string.digits) for _ in range(8)
+            )
+        exp = datetime.fromtimestamp(now + 86400 * 2)
+        await conn.execute(
+            'INSERT INTO prempromo (promo, val, start, "end", uid) VALUES ($1, $2, $3, $4, $5)',
+            promo,
+            25,
+            now,
+            exp.replace(hour=0, minute=0).timestamp(),
+            uid,
+        )
+        cmid = (
+            await sendMessage(
+                uid,
+                messages.premium_expire(
+                    uid, await getUserName(uid), exp.strftime("%d.%m.%Y / 00:00")
+                ),
+                keyboard.premium_expire(promo),
+            )
+        )[0].conversation_message_id
+        await conn.execute(
+            "INSERT INTO premiumexpirenotified (uid, date, cmid) VALUES ($1, $2, $3)",
+            uid,
+            now,
+            cmid,
+        )
+
+    await conn.execute(
+        """
                     WITH affected AS (
                         SELECT b.id, b.streak
                         FROM bonus b
@@ -287,29 +283,26 @@ async def every10min(conn):
                     DELETE FROM bonus
                     WHERE id IN (SELECT id FROM affected WHERE streak < 2);
                     """,
-            now - 172800,
-            now - 86400,
-        )
+        now - 172800,
+        now - 86400,
+    )
 
-    async with conn.transaction():
-        for chunk in chunks(
-            await conn.fetch(
-                "SELECT uid FROM rewardscollected WHERE deactivated = false"
-            ),
-            499,
-        ):
-            try:
-                members = await api.groups.is_member(
-                    group_id=GROUP_ID, user_ids=[row[0] for row in chunk]
+    for chunk in chunks(
+        await conn.fetch("SELECT uid FROM rewardscollected WHERE deactivated = false"),
+        499,
+    ):
+        try:
+            members = await api.groups.is_member(
+                group_id=GROUP_ID, user_ids=[row[0] for row in chunk]
+            )
+            to_deactivate = [m.user_id for m in members if not m.member]
+            if to_deactivate:
+                await conn.execute(
+                    "UPDATE rewardscollected SET deactivated = true WHERE uid = ANY($1)",
+                    to_deactivate,
                 )
-                to_deactivate = [m.user_id for m in members if not m.member]
-                if to_deactivate:
-                    await conn.execute(
-                        "UPDATE rewardscollected SET deactivated = true WHERE uid = ANY($1)",
-                        to_deactivate,
-                    )
-            except Exception:
-                pass
+        except Exception:
+            pass
 
 
 async def everyminute(conn):
@@ -317,45 +310,40 @@ async def everyminute(conn):
     os.system(f"find {PATH}media/temp/ -mtime +1 -exec rm {{}} \;")
     await conn.execute("DELETE FROM premium WHERE time < $1", now)
 
-    async with conn.transaction():
-        captchas = await conn.fetch(
-            "SELECT uid, chat_id FROM captcha WHERE exptime < $1", now
-        )
-        unique = set()
-        for uid, chat_id in captchas:
-            if (uid, chat_id) in unique:
-                continue
-            if await conn.fetchval(
-                "DELETE FROM typequeue WHERE chat_id = $1 AND uid = $2 AND type = 'captcha' RETURNING 1",
+    captchas = await conn.fetch(
+        "SELECT uid, chat_id FROM captcha WHERE exptime < $1", now
+    )
+    unique = set()
+    for uid, chat_id in captchas:
+        if (uid, chat_id) in unique:
+            continue
+        if await conn.fetchval(
+            "DELETE FROM typequeue WHERE chat_id = $1 AND uid = $2 AND type = 'captcha' RETURNING 1",
+            chat_id,
+            uid,
+        ):
+            unique.add((uid, chat_id))
+            s = await conn.fetchrow(
+                "SELECT id, punishment FROM settings WHERE chat_id = $1 AND setting = 'captcha'",
                 chat_id,
-                uid,
-            ):
-                unique.add((uid, chat_id))
-                s = await conn.fetchrow(
-                    "SELECT id, punishment FROM settings WHERE chat_id = $1 AND setting = 'captcha'",
-                    chat_id,
-                )
-                await punish(uid, chat_id, s[0])
-                await sendMessage(
-                    chat_id + 2000000000,
-                    messages.captcha_punish(uid, await getUserName(uid), s[1]),
-                )
+            )
+            await punish(uid, chat_id, s[0])
+            await sendMessage(
+                chat_id + 2000000000,
+                messages.captcha_punish(uid, await getUserName(uid), s[1]),
+            )
 
     await conn.execute("DELETE FROM captcha WHERE exptime < $1", now)
     await conn.execute('DELETE FROM prempromo WHERE "end" < $1', now)
 
-    async with conn.transaction():
-        todelete = await conn.fetch(
-            "SELECT peerid, cmid FROM todelete WHERE delete_at < $1", now
+    todelete = await conn.fetch(
+        "SELECT peerid, cmid FROM todelete WHERE delete_at < $1", now
+    )
+    if todelete:
+        await asyncio.gather(
+            *(deleteMessages(cmid, peerid - 2000000000) for peerid, cmid in todelete)
         )
-        if todelete:
-            await asyncio.gather(
-                *(
-                    deleteMessages(cmid, peerid - 2000000000)
-                    for peerid, cmid in todelete
-                )
-            )
-            await conn.execute("DELETE FROM todelete WHERE delete_at < $1", now)
+        await conn.execute("DELETE FROM todelete WHERE delete_at < $1", now)
 
 
 async def run_notifications(conn):
