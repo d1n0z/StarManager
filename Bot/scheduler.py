@@ -56,6 +56,7 @@ task_locks = {
     "run_nightmode_notifications": asyncio.Lock(),
     "botstatuschecker": asyncio.Lock(),
     "mathgiveaway": asyncio.Lock(),
+    "everyday": asyncio.Lock(),
 }
 
 
