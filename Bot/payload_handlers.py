@@ -211,7 +211,7 @@ async def duel(message: MessageEvent):
             await tgbot.send_message(
                 chat_id=TG_CHAT_ID,
                 message_thread_id=TG_DUEL_THREAD_ID,
-                text=f'<a href="vk.com/id{winid}">{winname}</a>/<a href="vk.com/id{loseid}">{losename}</a> | <a href="vk.com/id{uid}">{uname}</a> | <a href="vk.com/id{id}">{name}</a> | {duelcoins} | {com}% | {datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}',
+                text=f'{"W: " if uid == winid else "L: "}<a href="vk.com/id{uid}">{uname}</a> | {"W: " if id == winid else "L: "}<a href="vk.com/id{id}">{name}</a> | {duelcoins} | {com}% | {datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}',
                 disable_web_page_preview=True,
                 parse_mode="HTML",
             )
