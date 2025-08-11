@@ -165,10 +165,10 @@ async def duel(message: MessageEvent):
     coins = await utils.getUserCoins(id)
     ucoins = await utils.getUserCoins(uid)
     if coins < duelcoins:
-        await message.show_snackbar("У вас недостаточно XP")
+        await message.show_snackbar("У вас недостаточно монеток.")
         return
     if ucoins < duelcoins:
-        await message.show_snackbar("У вашего соперника недостаточно XP")
+        await message.show_snackbar("У вашего соперника недостаточно монеток.")
         return
 
     i = secrets.randbelow(2)
