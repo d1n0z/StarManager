@@ -60,15 +60,23 @@ task_locks = {
 }
 
 
-async def with_lock(name, func):
+async def with_lock(name, func, use_db=True):
     lock = task_locks[name]
     if lock.locked():
         return
     async with lock:
         try:
-            async with (await pool()).acquire() as conn:
-                await func(conn)
+            if use_db:
+                async with (await pool()).acquire() as conn:
+                    await func(conn)
+            else:
+                await func(None)
         except Exception:
+            traceback.print_exc()
+            await sendMessage(
+                DAILY_TO + 2000000000,
+                f"e from schedule {name}:\n" + traceback.format_exc(),
+            )
             traceback.print_exc()
             await sendMessage(
                 DAILY_TO + 2000000000,
@@ -76,7 +84,7 @@ async def with_lock(name, func):
             )
 
 
-async def backup(conn):
+async def backup():
     now = datetime.now().isoformat(timespec="seconds")
     filename = f"{DATABASE}-{now}.sql.gz"
     os.system(f"sudo rm {PATH}{DATABASE}-*.sql.gz > /dev/null 2>&1")
@@ -442,7 +450,7 @@ async def run_nightmode_notifications(conn):
             await sendMessage(chat_id + 2000000000, messages.nightmode_end())
 
 
-async def botstatuschecker(conn):
+async def botstatuschecker():
     await implicitapi.messages.send(
         random_id=0,
         peer_ids=STATUSCHECKER_TO + 2000000000,
@@ -520,7 +528,11 @@ async def run():
     aiocron.crontab(
         "*/10 * * * *", func=lambda: with_lock("every10min", every10min), loop=loop
     )
-    aiocron.crontab("0 6/12 * * *", func=lambda: with_lock("backup", backup), loop=loop)
+    aiocron.crontab(
+        "0 6/12 * * *",
+        func=lambda: with_lock("backup", backup, use_db=False),
+        loop=loop,
+    )
     aiocron.crontab(
         "0 1/3 * * *", func=lambda: with_lock("updateInfo", updateInfo), loop=loop
     )
