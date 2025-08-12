@@ -70,7 +70,7 @@ async def with_lock(name, func, use_db=True):
                 async with (await pool()).acquire() as conn:
                     await func(conn)
             else:
-                await func(None)
+                await func()
         except Exception:
             traceback.print_exc()
             await sendMessage(

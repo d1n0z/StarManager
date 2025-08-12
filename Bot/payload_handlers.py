@@ -193,10 +193,10 @@ async def duel(message: MessageEvent):
     if await utils.editMessage(
         messages.duel_res(
             winid,
-            winname := await utils.getUserName(winid),
+            await utils.getUserName(winid),
             await utils.getUserNickname(winid, chat_id),
             loseid,
-            losename := await utils.getUserName(loseid),
+            await utils.getUserName(loseid),
             await utils.getUserNickname(loseid, chat_id),
             duel_coins_com,
             has_comission,
