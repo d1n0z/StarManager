@@ -1,11 +1,13 @@
 import asyncio
+from collections import defaultdict
+import html
 import os
 import random
 import string
 import subprocess
 import time
-import traceback
 from datetime import datetime
+import traceback
 
 import aiocron
 import yadisk
@@ -15,7 +17,6 @@ import keyboard
 import messages
 from Bot.tgbot import tgbot
 from Bot.utils import (
-    beautifyNumber,
     chunks,
     deleteMessages,
     generateEasyProblem,
@@ -26,41 +27,51 @@ from Bot.utils import (
     sendMessage,
 )
 from config.config import (
-    DAILY_TO,
     DATABASE,
-    DEV_TGID,
     GROUP_ID,
     MATHGIVEAWAYS_TO,
     PASSWORD,
     PATH,
     PHOTO_NOT_FOUND,
-    STATUSCHECKER_CMD,
-    STATUSCHECKER_TO,
     TG_BACKUP_THREAD_ID,
+    TG_SCHEDULER_THREAD,
     TG_CHAT_ID,
     USER,
     YANDEX_TOKEN,
     api,
-    implicitapi,
     vk_api_session,
 )
 from db import schedulerpool as pool
 
-task_locks = {
-    "backup": asyncio.Lock(),
-    "updateInfo": asyncio.Lock(),
-    "reboot": asyncio.Lock(),
-    "every10min": asyncio.Lock(),
-    "everyminute": asyncio.Lock(),
-    "run_notifications": asyncio.Lock(),
-    "run_nightmode_notifications": asyncio.Lock(),
-    "botstatuschecker": asyncio.Lock(),
-    "mathgiveaway": asyncio.Lock(),
-    "everyday": asyncio.Lock(),
-}
+task_locks = defaultdict(asyncio.Lock)
 
 
-async def with_lock(name, func, use_db=True):
+def format_exception_for_telegram(exc: BaseException) -> str:
+    tb = ''.join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    header = "⚠️ Scheduler exception!\n"
+
+    tb = html.escape(tb)
+    code_block_start = "<pre><code>"
+    code_block_end = "</code></pre>"
+
+    body = f"{code_block_start}{tb}{code_block_end}"
+    full_message = f"{header}{body}"
+
+    if len(full_message) > 2 ** 12:
+        excess = len(full_message) - 2 ** 12
+        tb_lines = tb.splitlines()
+        trimmed_tb = "\n".join(tb_lines)
+        while excess > 0 and len(tb_lines) > 1:
+            tb_lines.pop(0)
+            trimmed_tb = "\n".join(tb_lines)
+            body = f"{code_block_start}... (output trimmed)\n{trimmed_tb}{code_block_end}"
+            full_message = f"{header}{body}"
+            excess = len(full_message) - 2 ** 12
+
+    return full_message
+
+
+async def with_lock(name: str, func, use_db=True):
     lock = task_locks[name]
     if lock.locked():
         return
@@ -71,16 +82,13 @@ async def with_lock(name, func, use_db=True):
                     await func(conn)
             else:
                 await func()
-        except Exception:
-            traceback.print_exc()
-            await sendMessage(
-                DAILY_TO + 2000000000,
-                f"e from schedule {name}:\n" + traceback.format_exc(),
-            )
-            traceback.print_exc()
-            await sendMessage(
-                DAILY_TO + 2000000000,
-                f"e from schedule {name}:\n" + traceback.format_exc(),
+        except Exception as e:
+            logger.exception('Exception traceback:')
+            await tgbot.send_message(
+                chat_id=TG_CHAT_ID,
+                message_thread_id=int(TG_SCHEDULER_THREAD),
+                text=format_exception_for_telegram(e),
+                parse_mode="HTML",
             )
 
 
@@ -200,17 +208,6 @@ async def updateInfo(conn):
                 "UPDATE publicchats SET isopen = false WHERE chat_id = $1", chat_id
             )
         await asyncio.sleep(0.2)
-
-
-async def reboot(conn):
-    await conn.execute(
-        "INSERT INTO reboots (chat_id, time, sended) VALUES ($1, $2, false)",
-        DAILY_TO + 2000000000,
-        time.time(),
-    )
-    await (await pool()).release(conn)
-    await (await pool()).close()
-    os.system("sudo reboot")
 
 
 async def every10min(conn):
@@ -443,20 +440,6 @@ async def run_nightmode_notifications(conn):
             await sendMessage(chat_id + 2000000000, messages.nightmode_end())
 
 
-async def botstatuschecker():
-    await implicitapi.messages.send(
-        random_id=0,
-        peer_ids=STATUSCHECKER_TO + 2000000000,
-        message=STATUSCHECKER_CMD,
-    )
-    await asyncio.sleep(300)
-    history = await implicitapi.messages.get_history(
-        count=1, peer_id=STATUSCHECKER_TO + 2000000000
-    )
-    if history.items[0].from_id != -GROUP_ID:
-        await tgbot.send_message(chat_id=DEV_TGID, text="Bot status: down...")
-
-
 async def mathgiveaway(conn):
     now = datetime.now()
     if now.hour in (9, 21) and now.minute < 15:
@@ -529,11 +512,9 @@ async def run():
     aiocron.crontab(
         "0 1/3 * * *", func=lambda: with_lock("updateInfo", updateInfo), loop=loop
     )
-    # aiocron.crontab("*/15 * * * *", func=lambda: with_lock("botstatuschecker", botstatuschecker), loop=loop)
     aiocron.crontab(
         "*/15 * * * *", func=lambda: with_lock("mathgiveaway", mathgiveaway), loop=loop
     )
-    # aiocron.crontab("50 23 * * *", func=lambda: with_lock("reboot", reboot), loop=loop)
     aiocron.crontab(
         "0 0 * * *", func=lambda: with_lock("everyday", everyday), loop=loop
     )

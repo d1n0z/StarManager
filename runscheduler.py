@@ -12,7 +12,7 @@ if __name__ == "__main__":
         return "API error(s) in response wasn't handled" not in message
 
     logger.remove()
-    logger.add(sys.stderr, level="INFO", filter=vkbottle_filter)
+    logger.add(sys.stderr, level="INFO", filter=vkbottle_filter, backtrace=True, diagnose=True)
     loop = asyncio.new_event_loop()
     loop.create_task(scheduler.run())
     loop.run_forever()
