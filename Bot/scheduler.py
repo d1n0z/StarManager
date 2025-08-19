@@ -111,13 +111,6 @@ async def backup():
 
 async def updateInfo(conn):
     ts_cutoff = time.time() - 43200
-    allusers = beautifyNumber(await conn.fetchval("SELECT COUNT(*) FROM allusers"))
-    allchats = beautifyNumber(await conn.fetchval("SELECT COUNT(*) FROM allchats"))
-    await implicitapi.status.set(
-        group_id=GROUP_ID,
-        text=f"👥 Пользователей: {allusers} | 💬 Бесед: {allchats}",
-    )
-
     for chunk in chunks(await conn.fetch("SELECT uid FROM usernames"), 999):
         try:
             names = await api.users.get(user_ids=[row[0] for row in chunk])
