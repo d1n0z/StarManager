@@ -151,20 +151,23 @@ async def join(message: MessageEvent):
     SearchPayloadCMD(["duel"], answer=False, checksender=False),
 )
 async def duel(message: MessageEvent):
-    print('test')
     if not message.conversation_message_id:
-        return
+        return  
 
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
-    async with managers.duel_lock.get_lock(chat_id, message.conversation_message_id):
-        print(f"locked: {peer_id}:{message.conversation_message_id}")
+    async with managers.duel_lock.get_context(chat_id, message.conversation_message_id) as ctx:
+        if not ctx.allowed:
+            await message.show_snackbar("Эта дуэль уже окончена.")
+            return
+        
         payload = message.payload
         duelcoins = int(payload["coins"])
         id = int(message.user_id)
         uid = int(payload["uid"])
 
         if id == uid or await getULvlBanned(id):
+            await message.show_snackbar("Вы не можете участвовать в дуэли.")
             return
 
         coins = await utils.getUserCoins(id)
@@ -201,33 +204,38 @@ async def duel(message: MessageEvent):
             peer_id,
             message.conversation_message_id,
         )
-        print(f"edit: {edit_result}")
-        if edit_result:
-            print(winid, duel_coins_com)
-            await utils.addUserCoins(loseid, -duelcoins)
-            await utils.addUserCoins(winid, duel_coins_com)
-            async with (await pool()).acquire() as conn:
-                if not await conn.fetchval(
-                    "update duelwins set wins=wins+1 where uid=$1 returning 1", winid
-                ):
-                    await conn.execute(
-                        "insert into duelwins (uid, wins) values ($1, 1)", winid
-                    )
-            await utils.sendMessageEventAnswer(message.event_id, id, peer_id)
-            uname = await utils.getUserNickname(uid, chat_id) or await utils.getUserName(
-                uid
-            )
-            name = await utils.getUserNickname(id, chat_id) or await utils.getUserName(id)
-            try:
-                await tgbot.send_message(
-                    chat_id=TG_CHAT_ID,
-                    message_thread_id=TG_DUEL_THREAD_ID,
-                    text=f'{"W: " if uid == winid else "L: "}<a href="vk.com/id{uid}">{uname}</a> | {"W: " if id == winid else "L: "}<a href="vk.com/id{id}">{name}</a> | {duelcoins} | {com}% | {datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}',
-                    disable_web_page_preview=True,
-                    parse_mode="HTML",
+        if not edit_result:
+            return
+        
+        ctx.mark_used()
+
+        await utils.addUserCoins(loseid, -duelcoins)
+        await utils.addUserCoins(winid, duel_coins_com)
+
+        async with (await pool()).acquire() as conn:
+            if not await conn.fetchval(
+                "update duelwins set wins=wins+1 where uid=$1 returning 1", winid
+            ):
+                await conn.execute(
+                    "insert into duelwins (uid, wins) values ($1, 1)", winid
                 )
-            except Exception:
-                pass
+        
+        await utils.sendMessageEventAnswer(message.event_id, id, peer_id)
+        
+        uname = await utils.getUserNickname(uid, chat_id) or await utils.getUserName(
+            uid
+        )
+        name = await utils.getUserNickname(id, chat_id) or await utils.getUserName(id)
+        try:
+            await tgbot.send_message(
+                chat_id=TG_CHAT_ID,
+                message_thread_id=TG_DUEL_THREAD_ID,
+                text=f'{"W: " if uid == winid else "L: "}<a href="vk.com/id{uid}">{uname}</a> | {"W: " if id == winid else "L: "}<a href="vk.com/id{id}">{name}</a> | {duelcoins} | {com}% | {datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}',
+                disable_web_page_preview=True,
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
 
 
 @bl.raw_event(

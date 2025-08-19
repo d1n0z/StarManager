@@ -13,7 +13,7 @@ class TimedAsyncLock:
         self._lock = asyncio.Lock()
         self.last_used = time.time()
         self.failure_count = 0
-        self.locked = self._lock.locked
+        self.used = False
 
     async def acquire(self):
         await self._lock.acquire()
@@ -23,14 +23,35 @@ class TimedAsyncLock:
         self._lock.release()
         self.last_used = time.time()
 
+    @property
+    def locked(self):
+        return self._lock.locked()
+
+
+class DuelContext:
+    def __init__(self, lock: TimedAsyncLock):
+        self._lock = lock
+        self.allowed = False
+
     async def __aenter__(self):
+        if self._lock.used:
+            return self
+
         await self._lock.acquire()
-        self.last_used = time.time()
+
+        if self._lock.used:
+            self._lock.release()
+            return self
+
+        self.allowed = True
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        self._lock.release()
-        self.last_used = time.time()
+        if self._lock.locked:
+            self._lock.release()
+
+    def mark_used(self):
+        self._lock.used = True
 
 
 class DuelLockManager(BaseManager):
@@ -41,8 +62,16 @@ class DuelLockManager(BaseManager):
         self._cleanup_interval = 600
         self._cleanup_task = bot.loop_wrapper.add_task(self._cleanup_loop)
 
-    def _cache_key(self, chat_id: int, cmid: int):
-        return (chat_id, cmid)
+    def _cache_key(self, chat_id: int, message_id: int):
+        return (chat_id, message_id)
+
+    def get_context(self, chat_id: int, message_id: int):
+        key = self._cache_key(chat_id, message_id)
+        if key not in self._locks:
+            self._locks[key] = TimedAsyncLock()
+        else:
+            self._locks[key].last_used = time.time()
+        return DuelContext(self._locks[key])
 
     def get_lock(self, chat_id: int, cmid: int):
         print("test")
@@ -66,7 +95,7 @@ class DuelLockManager(BaseManager):
         to_delete = []
 
         for key, lock in self._locks.items():
-            if lock.locked() or now - lock.last_used <= self._ttl:
+            if lock.locked or now - lock.last_used <= self._ttl:
                 continue
 
             chat_id, cmid = key
