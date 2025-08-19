@@ -10,7 +10,7 @@ from vkbottle_types.events import GroupEventType
 
 import keyboard
 import messages
-from Bot import utils
+from Bot import managers, utils
 from Bot.checkers import getULvlBanned, haveAccess
 from Bot.rules import SearchPayloadCMD
 from Bot.tgbot import tgbot
@@ -145,78 +145,89 @@ async def join(message: MessageEvent):
             )
             return
 
-
 @bl.raw_event(
     GroupEventType.MESSAGE_EVENT,
     MessageEvent,
     SearchPayloadCMD(["duel"], answer=False, checksender=False),
 )
 async def duel(message: MessageEvent):
-    payload = message.payload
+    print('test')
+    if not message.conversation_message_id:
+        return
+
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
-    duelcoins = int(payload["coins"])
-    id = int(message.user_id)
-    uid = int(payload["uid"])
+    async with managers.duel_lock.get_lock(chat_id, message.conversation_message_id):
+        print(f"locked: {peer_id}:{message.conversation_message_id}")
+        payload = message.payload
+        duelcoins = int(payload["coins"])
+        id = int(message.user_id)
+        uid = int(payload["uid"])
 
-    if id == uid or await getULvlBanned(id):
-        return
+        if id == uid or await getULvlBanned(id):
+            return
 
-    coins = await utils.getUserCoins(id)
-    ucoins = await utils.getUserCoins(uid)
-    if coins < duelcoins:
-        await message.show_snackbar("У вас недостаточно монеток.")
-        return
-    if ucoins < duelcoins:
-        await message.show_snackbar("У вашего соперника недостаточно монеток.")
-        return
+        coins = await utils.getUserCoins(id)
+        ucoins = await utils.getUserCoins(uid)
+        if coins < duelcoins:
+            await message.show_snackbar("У вас недостаточно монеток.")
+            return
+        if ucoins < duelcoins:
+            await message.show_snackbar("У вашего соперника недостаточно монеток.")
+            return
 
-    i = secrets.randbelow(2)
-    winid, loseid = (id, uid) if i else (uid, id)
+        i = secrets.randbelow(2)
+        winid, loseid = (id, uid) if i else (uid, id)
 
-    com,  duel_coins_com = 0, duelcoins
-    has_comission = not (
-        await utils.getUserPremium(winid)
-        or (await utils.getUserShopBonuses(uid))[1] > time.time()
-    )
-    if has_comission:
-        duel_coins_com, com = int(duelcoins / 100 * 90), 10
+        com, duel_coins_com = 0, duelcoins
+        has_comission = not (
+            await utils.getUserPremium(winid)
+            or (await utils.getUserShopBonuses(uid))[1] > time.time()
+        )
+        if has_comission:
+            duel_coins_com, com = int(duelcoins / 100 * 90), 10
 
-    await utils.addUserCoins(loseid, -duelcoins)
-    await utils.addUserCoins(winid, duel_coins_com)
-    async with (await pool()).acquire() as conn:
-        if not await conn.fetchval(
-            "update duelwins set wins=wins+1 where uid=$1 returning 1", winid
-        ):
-            await conn.execute("insert into duelwins (uid, wins) values ($1, 1)", winid)
-    
-    if await utils.editMessage(
-        messages.duel_res(
-            winid,
-            await utils.getUserName(winid),
-            await utils.getUserNickname(winid, chat_id),
-            loseid,
-            await utils.getUserName(loseid),
-            await utils.getUserNickname(loseid, chat_id),
-            duel_coins_com,
-            has_comission,
-        ),
-        peer_id,
-        message.conversation_message_id,
-    ):
-        await utils.sendMessageEventAnswer(message.event_id, id, peer_id)
-        uname = await utils.getUserNickname(uid, chat_id) or await utils.getUserName(uid)
-        name = await utils.getUserNickname(id, chat_id) or await utils.getUserName(id)
-        try:
-            await tgbot.send_message(
-                chat_id=TG_CHAT_ID,
-                message_thread_id=TG_DUEL_THREAD_ID,
-                text=f'{"W: " if uid == winid else "L: "}<a href="vk.com/id{uid}">{uname}</a> | {"W: " if id == winid else "L: "}<a href="vk.com/id{id}">{name}</a> | {duelcoins} | {com}% | {datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}',
-                disable_web_page_preview=True,
-                parse_mode="HTML",
+        edit_result = await utils.editMessage(
+            messages.duel_res(
+                winid,
+                await utils.getUserName(winid),
+                await utils.getUserNickname(winid, chat_id),
+                loseid,
+                await utils.getUserName(loseid),
+                await utils.getUserNickname(loseid, chat_id),
+                duel_coins_com,
+                has_comission,
+            ),
+            peer_id,
+            message.conversation_message_id,
+        )
+        print(f"edit: {edit_result}")
+        if edit_result:
+            print(winid, duel_coins_com)
+            await utils.addUserCoins(loseid, -duelcoins)
+            await utils.addUserCoins(winid, duel_coins_com)
+            async with (await pool()).acquire() as conn:
+                if not await conn.fetchval(
+                    "update duelwins set wins=wins+1 where uid=$1 returning 1", winid
+                ):
+                    await conn.execute(
+                        "insert into duelwins (uid, wins) values ($1, 1)", winid
+                    )
+            await utils.sendMessageEventAnswer(message.event_id, id, peer_id)
+            uname = await utils.getUserNickname(uid, chat_id) or await utils.getUserName(
+                uid
             )
-        except Exception:
-            pass
+            name = await utils.getUserNickname(id, chat_id) or await utils.getUserName(id)
+            try:
+                await tgbot.send_message(
+                    chat_id=TG_CHAT_ID,
+                    message_thread_id=TG_DUEL_THREAD_ID,
+                    text=f'{"W: " if uid == winid else "L: "}<a href="vk.com/id{uid}">{uname}</a> | {"W: " if id == winid else "L: "}<a href="vk.com/id{id}">{name}</a> | {duelcoins} | {com}% | {datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}',
+                    disable_web_page_preview=True,
+                    parse_mode="HTML",
+                )
+            except Exception:
+                pass
 
 
 @bl.raw_event(
@@ -1778,7 +1789,9 @@ async def kick_banned(message: MessageEvent):
     lst = (await api.messages.get_conversation_members(peer_id=peer_id)).items
     if len(lst) > 2900:
         async with (await pool()).acquire() as conn:
-            lst = await conn.fetch('select uid from userjoineddate where chat_id=$1', chat_id)
+            lst = await conn.fetch(
+                "select uid from userjoineddate where chat_id=$1", chat_id
+            )
             lst = [i[0] for i in lst]
     else:
         lst = [i.member_id for i in lst]

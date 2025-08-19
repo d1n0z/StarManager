@@ -1,7 +1,7 @@
 from Bot.managers.antispam_messages import AntispamMessagesManager
 from Bot.managers.commands_cooldown import CommandsCooldownManager
+from Bot.managers.duel import DuelLockManager
 
-__all__ = [
-    antispam := AntispamMessagesManager(),
-    commands_cooldown := CommandsCooldownManager(),
-]
+antispam = AntispamMessagesManager()
+commands_cooldown = CommandsCooldownManager()
+duel_lock = DuelLockManager()
