@@ -12,7 +12,7 @@ from config import config
 
 logger = logging.getLogger(__name__)
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
-
+print(config.VK_APP_SECRET)
 app.add_middleware(SessionMiddleware, secret_key=config.VK_APP_SECRET)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

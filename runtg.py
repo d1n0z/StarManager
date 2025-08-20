@@ -4,7 +4,7 @@ import traceback
 
 from loguru import logger
 
-from BotTG import Bot
+from BotTG.main import Bot
 
 
 if __name__ == "__main__":

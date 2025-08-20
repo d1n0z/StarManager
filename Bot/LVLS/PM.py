@@ -1,12 +1,19 @@
+import json
 import random
 import string
 import time
 from datetime import datetime
+from io import BytesIO
 
+from aiogram.types import InputMediaPhoto
+from loguru import logger
 from vkbottle.framework.labeler import BotLabeler
 from vkbottle_types import GroupTypes
 from vkbottle_types.events import GroupEventType
 
+import BotTG
+import BotTG.bot
+import BotTG.keyboard
 import keyboard
 import messages
 from Bot.rules import SearchPMCMD
@@ -22,7 +29,15 @@ from Bot.utils import (
     uploadImage,
     whoiscached,
 )
-from config.config import DEVS, GROUP_ID, PATH, REPORT_CD, REPORT_TO, api
+from config.config import (
+    DEVS,
+    GROUP_ID,
+    PATH,
+    REPORT_CD,
+    TG_REPORTS_CHAT_ID,
+    TG_REPORTS_NEW_THREAD_ID,
+    api,
+)
 from db import pool
 
 bl = BotLabeler()
@@ -173,15 +188,20 @@ async def report(message: GroupTypes.MessageNew):
     if await getURepBanned(uid) and uid not in DEVS:
         await sendMessage(message.peer_id, messages.repbanned())
         return
-    chat_id, data, photos = message.peer_id - 2000000000, message.text.split(), []
-    for i in message.attachments:
-        r = await api.http_client.request_content(i.photo.orig_photo.url)
-        with open(PATH + f"media/temp/{i.photo.owner_id}{i.photo.id}.jpg", "wb") as f:
-            f.write(r)
-        photos.append(
-            await uploadImage(PATH + f"media/temp/{i.photo.owner_id}{i.photo.id}.jpg")
-        )
-    if len(data) <= 1 and not photos:
+    data = message.text.split()
+
+    photo_chunks = []
+    current_chunk = []
+    for attachment in message.attachments:
+        current_chunk.append(attachment.photo.orig_photo.url)
+        if len(current_chunk) == 10:
+            photo_chunks.append(current_chunk)
+            current_chunk = []
+
+    if current_chunk:
+        photo_chunks.append(current_chunk)
+
+    if len(data) <= 1 and not photo_chunks:
         await sendMessage(message.peer_id, messages.report_empty())
         return
 
@@ -196,28 +216,61 @@ async def report(message: GroupTypes.MessageNew):
     async with (await pool()).acquire() as conn:
         repid = await conn.fetchval("select id from reports order by id desc limit 1")
         repid = (repid + 1) if repid else 1
-        await conn.execute(
-            "insert into reports (uid, id, time) VALUES ($1, $2, $3)",
-            uid,
-            repid,
-            time.time(),
-        )
 
-    photos = ",".join(photos) or None
-    await sendMessage(
-        peer_ids=REPORT_TO + 2000000000,
-        msg=messages.report(
-            uid,
-            await getUserName(uid),
-            " ".join(data[1:]),
-            repid,
-            chat_id,
-            await getChatName(chat_id),
-        ),
-        kbd=keyboard.report(uid, repid, chat_id, " ".join(data[1:]), photos),
-        photo=photos,
-    )
-    await sendMessage(message.peer_id, messages.report_sent(repid))
+    try:
+        message_ids = []
+        for chunk in photo_chunks:
+            if len(chunk) == 1:
+                msg = await BotTG.bot.bot.send_photo(
+                    chat_id=TG_REPORTS_CHAT_ID,
+                    photo=chunk[0],
+                    message_thread_id=TG_REPORTS_NEW_THREAD_ID,
+                )
+                message_ids.append(msg.message_id)
+            else:
+                msgs = await BotTG.bot.bot.send_media_group(
+                    chat_id=TG_REPORTS_CHAT_ID,
+                    media=[InputMediaPhoto(media=photo) for photo in chunk],
+                    message_thread_id=TG_REPORTS_NEW_THREAD_ID,
+                )
+                message_ids.extend([m.message_id for m in msgs])
+        msg = await BotTG.bot.bot.send_message(
+            chat_id=TG_REPORTS_CHAT_ID,
+            message_thread_id=TG_REPORTS_NEW_THREAD_ID,
+            text=(
+                report_text := messages.report(
+                    uid,
+                    await getUserName(uid),
+                    " ".join(data[1:]),
+                    repid,
+                )
+            ),
+            reply_markup=BotTG.keyboard.report(repid),
+            disable_web_page_preview=True,
+            parse_mode="HTML",
+        )
+        message_ids.append(msg.message_id)
+        try:
+            async with (await pool()).acquire() as conn:
+                await conn.execute(
+                    "insert into reports (uid, id, time, report_message_ids, report_text) VALUES ($1, $2, $3, $4, $5)",
+                    uid,
+                    repid,
+                    time.time(),
+                    json.dumps(message_ids),
+                    report_text,
+                )
+        except Exception as e:
+            try:
+                await msg.delete()
+            except Exception:
+                pass
+            raise e
+    except Exception:
+        logger.exception("Unable to send report:")
+        await sendMessage(message.peer_id, messages.report_error(repid))
+    else:
+        await sendMessage(message.peer_id, messages.report_sent(repid))
 
 
 @bl.raw_event(
@@ -244,5 +297,5 @@ async def shop(message: GroupTypes.MessageNew):
     await sendMessage(
         peer_ids=message.object.message.peer_id,
         msg=messages.shop(),
-        kbd=keyboard.shop(message.from_id)
+        kbd=keyboard.shop(message.from_id),
     )

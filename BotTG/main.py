@@ -1,8 +1,9 @@
+
 import asyncio
 
 import aiogram
 
-from BotTG import handlers, middlewares, scheduler, bot
+from BotTG import bot, handlers, middlewares, scheduler
 
 
 class Bot:

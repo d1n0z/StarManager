@@ -1350,10 +1350,13 @@ async def isMessagesFromGroupAllowed(uid):
 
 async def getHiddenAlbumUser():
     global _hiddenalbumuid
+
     if _hiddenalbumuid:
         return _hiddenalbumuid
-
     async with _hiddenalbumlock:
+        if _hiddenalbumuid:
+            return _hiddenalbumuid
+        
         async with (await pool()).acquire() as conn:
             last_uid_row = await conn.fetchrow(
                 "select uid from allusers where is_last_hidden_album=true limit 1"
@@ -1555,9 +1558,9 @@ async def create_payment(
     origcost,
     from_id,
     to_id,
-    promoexists=False,
     promo=None,
     chat_id=None,
+    coins=None,
     email=None,
     delete_message_cmid=None,
 ) -> PaymentResponse:
@@ -1581,9 +1584,6 @@ async def create_payment(
             },
             "items": [
                 {
-                    "description": "Premium-статус"
-                    if origcost != config.data["premiumchat"]
-                    else "Premium-беседа",
                     "amount": {"value": str(cost) + ".00", "currency": "RUB"},
                     "vat_code": 1,
                     "quantity": 1,
@@ -1592,10 +1592,7 @@ async def create_payment(
         },
         "metadata": {
             "pid": order_id,
-            "chat_id": 0 if origcost != config.data["premiumchat"] else chat_id,
             "origcost": origcost,
-            "personal": promo[2] if promoexists and promo[1] else 0,
-            "gift": 0 if to_id == from_id else to_id,
         },
         "merchant_customer_id": from_id,
         "confirmation": {
@@ -1604,11 +1601,28 @@ async def create_payment(
             "return_url": "https://vk.com/star_manager",
         },
     }
+    if coins:
+        payment["receipt"]["items"][0]["description"] = pointWords(coins, ("монетка", "монетки", "монеток"))
+        payment["metadata"]["coins"] = coins
+    elif chat_id:
+        payment["receipt"]["items"][0]["description"] = "Premium-беседа"
+        payment["metadata"]["chat_id"] = chat_id
+    else:
+        payment["receipt"]["items"][0]["description"] = "Premium-статус"
+
+    if promo and promo[1]:
+        payment["metadata"]["personal"] = promo[2]
+    
+    if to_id != from_id:
+        payment["metadata"]["gift"] = to_id
+
     if email:
         payment["receipt"]["customer"]["email"] = email
         payment["receipt"]["email"] = email
+    
     if delete_message_cmid:
         payment["metadata"]["del_cmid"] = delete_message_cmid
+    
     Configuration.account_id = YOOKASSA_MERCHANT_ID
     Configuration.secret_key = YOOKASSA_TOKEN
     return Payment.create(payment)

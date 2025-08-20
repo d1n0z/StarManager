@@ -55,7 +55,7 @@
             padding: 30px;
             border: 1px solid #30363D;
             border-radius: 6px;
-            max-width: 400px;
+            max-width: 600px;
             width: 100%;
             position: relative;
             z-index: 1;
@@ -367,6 +367,55 @@
             margin: 0 5px;
         }
 
+        .coins-input {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .coins-input input {
+            flex: 1;
+            text-align: center;
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #30363D;
+            border-radius: 6px;
+            background: #0D1117;
+            color: #C9D1D9;
+            font-size: 14px;
+            transition: border-color 0.2s ease;
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
+        .coins-input input::-webkit-inner-spin-button,
+        .coins-input input::-webkit-outer-spin-button {
+            -webkit-appearance: none; /* убираем стрелочки в Chrome/Safari */
+            margin: 0;
+        }
+
+        .coins-input input:focus {
+            border-color: #58A6FF;
+            outline: none;
+        }
+
+        .coins-btn {
+            background: #21262D;
+            border: 1px solid #30363D;
+            color: #C9D1D9;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s ease, color 0.2s ease;
+            font-size: 16px;
+            line-height: 1;
+        }
+
+        .coins-btn:hover {
+            background: #30363D;
+            color: #58A6FF;
+}
+
         ::-webkit-scrollbar {
             width: 6px;
         }
@@ -394,6 +443,33 @@
             <div class="tabs">
                 <button class="tab active" onclick="showTab('subscription')">Premium подписка</button>
                 <button class="tab" onclick="showTab('chat')">Premium чат</button>
+                <button class="tab" onclick="showTab('coins')">Монеты</button>
+            </div>
+
+            <div id="coins" class="tab-content" style="display: none;">
+                <div class="form-group">
+                    <label>Количество монет</label>
+                    <div class="coins-input">
+                    <button type="button" class="coins-btn" onclick="changeCoins(-800)">−</button>
+                    <input type="number" id="coins-value" value="800" step="800" min="800" oninput="recalcCoinsPriceSoft()" onblur="normalizeCoinsValue()">
+                    <button type="button" class="coins-btn" onclick="changeCoins(800)">+</button>
+                </div>
+            </div>
+            <div id="coins-hint" class="hint" style="text-align:center; font-size:12px; color:#8B949E; padding-bottom: 10px"></div>
+
+            <div class="form-group">
+                <label>Метод оплаты</label>
+                <div class="payment-methods">
+                <div class="payment-option">
+                    <input type="radio" id="yukassa-coins" name="payment-coins" value="yukassa" checked>
+                    <label for="yukassa-coins">ЮKassa (карты)</label>
+                </div>
+                </div>
+            </div>
+
+            <div class="price" id="coins-price">
+                <span class="original-price" id="coins-original-price">100 ₽</span>
+            </div>
             </div>
 
             <div id="subscription" class="tab-content">
@@ -607,6 +683,123 @@
             validateForm();
         }
 
+        const coinPricePerPack = 12.5; // 100 ₽ за каждые 800 монет
+
+        function roundCoins(value) {
+            // Нормализуем: минимум 800, кратно 100 (к ближайшему кратному)
+            if (isNaN(value) || value < 800) return 800;
+            return Math.max(800, Math.round(value / 100) * 100);
+        }
+
+        function priceForCoins(roundedValue) {
+            const packs = roundedValue / 100;
+            return Math.round(packs * coinPricePerPack);
+        }
+
+        function updateCoinsUI(viewValue) {
+            const numeric = parseInt(viewValue, 10);
+            if (isNaN(numeric)) return;
+
+            const rounded = roundCoins(numeric);
+            const total = priceForCoins(rounded);
+
+            document.getElementById('coins-original-price').textContent = `${total} ₽`;
+
+            const hint = document.getElementById('coins-hint');
+            if (numeric >= 800 && numeric % 100 === 0) {
+                hint.textContent = ''; // уже кратно — подсказка не нужна
+            } else {
+                hint.textContent = numeric < 800
+                    ? `Минимум 800 монет. Будет установлено ${rounded}.`
+                    : `Будет округлено до ${rounded} монет.`;
+            }
+        }
+
+        function recalcCoinsPriceSoft() {
+            const input = document.getElementById('coins-value');
+            updateCoinsUI(input.value);   // не перезаписываем input.value
+            validateForm();               // чтобы кнопка не блокировалась во время набора
+        }
+
+        function normalizeCoinsValue() {
+            // Жёстко правим поле (после blur или перед отправкой)
+            const input = document.getElementById('coins-value');
+            const rounded = roundCoins(parseInt(input.value, 10));
+            input.value = rounded;
+            updateCoinsUI(rounded);
+        }
+
+        function changeCoins(delta) {
+            const input = document.getElementById('coins-value');
+            let current = parseInt(input.value, 10) || 800;
+            let next = Math.max(800, current + delta);
+
+            const rounded = roundCoins(next);
+            input.value = rounded;
+
+            // передаём строку, чтобы updateCoinsUI сработал как при ручном вводе
+            updateCoinsUI(String(rounded));
+
+            input.focus();
+        }
+
+        //
+        // Перед отправкой — обязательно нормализуем, чтобы payload был кратным 800
+        //
+        async function generatePaymentLink() {
+            const errorMessage = document.getElementById('error-message');
+            const buyBtn = document.getElementById('buy-btn');
+
+            validateForm();
+            if (buyBtn.disabled) return;
+
+            errorMessage.classList.remove('active');
+            errorMessage.textContent = '';
+
+            const activeTab = document.querySelector('.tab.active').textContent;
+            let payload = {};
+
+            if (activeTab === 'Монеты') {
+                normalizeCoinsValue(); // гарантируем корректное значение
+                payload = {
+                type: 'coins',
+                data: {
+                    value: parseInt(document.getElementById('coins-value').value, 10),
+                    // если по новой схеме payment не нужен для Coins — просто убери строку ниже
+                    payment: document.querySelector('input[name="payment-coins"]:checked').value
+                }
+                };
+            }
+            // ... остальной код для подписки/чата — без изменений ...
+
+            try {
+                const response = await fetch('/api/payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                if (response.status === 401 && result?.redirect_url) {
+                window.location.href = result.redirect_url;
+                return;
+                }
+                if (response.ok && result?.payment_url) {
+                window.location.href = result.payment_url;
+                } else {
+                errorMessage.textContent = result.detail || 'Ошибка оплаты';
+                errorMessage.classList.add('active');
+                buyBtn.disabled = true;
+                }
+            } catch (err) {
+                console.error('Fetch error:', err);
+                errorMessage.textContent = 'Не удалось отправить данные.';
+                errorMessage.classList.add('active');
+                buyBtn.disabled = true;
+            }
+        }
+
         function validateForm() {
             const activeTab = document.querySelector('.tab.active').textContent;
             const errorMessage = document.getElementById('error-message');
@@ -639,7 +832,7 @@
                 } else {
                     promoSubInput.classList.remove('promo-invalid');
                 }
-            } else {
+            } else if (activeTab === 'Premium чат') {
                 // Check chat ID
                 if (!chatIdInput.value.trim()) {
                     error = 'Введите ID чата';
@@ -797,18 +990,30 @@
             if (activeTab === 'Premium подписка') {
                 payload = {
                     type: 'subscription',
-                    duration: document.getElementById('duration').value,
-                    gift: document.getElementById('gift').checked,
-                    gift_link: document.getElementById('gift-input').value || null,
-                    promo: document.getElementById('promo-sub').value,
-                    payment: document.querySelector('input[name="payment"]:checked').value
+                    data: {
+                        duration: document.getElementById('duration').value,
+                        gift: document.getElementById('gift').checked,
+                        gift_link: document.getElementById('gift-input').value || null,
+                        promo: document.getElementById('promo-sub').value,
+                        payment: document.querySelector('input[name="payment"]:checked').value
+                    }
+                };
+            } else if (activeTab === 'Монеты') {
+                payload = {
+                    type: 'coins',
+                    data: {
+                        value: parseInt(document.getElementById('coins-value').value, 10),
+                        payment: document.querySelector('input[name="payment-coins"]:checked').value
+                    }
                 };
             } else {
                 payload = {
                     type: 'chat',
-                    chat_id: document.getElementById('chat-id').value,
-                    promo: document.getElementById('promo-chat').value,
-                    payment: document.querySelector('input[name="payment-chat"]:checked').value
+                    data: {
+                        chat_id: document.getElementById('chat-id').value,
+                        promo: document.getElementById('promo-chat').value,
+                        payment: document.querySelector('input[name="payment-chat"]:checked').value
+                    }
                 };
             }
 

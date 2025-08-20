@@ -12,7 +12,6 @@ import keyboard
 import messages
 from Bot.utils import (
     getUserName,
-    getChatName,
     sendMessage,
     editMessage,
     uploadImage,
@@ -23,57 +22,11 @@ from Bot.utils import (
     getIDFromMessage,
 )
 from config.config import (
-    REPORT_TO,
     SETTINGS_COUNTABLE_MULTIPLE_ARGUMENTS,
     PATH,
     SETTINGS_COUNTABLE_SPECIAL_LIMITS,
 )
 from db import pool
-
-
-async def report_handler(event: MessageNew):
-    async with (await pool()).acquire() as conn:
-        if not (
-            repansi := await conn.fetchrow(
-                "select id, answering_id, uid, chat_id, repid, report_text, cmid, photos from reportanswers "
-                "where answering_id=$1",
-                event.object.message.from_id,
-            )
-        ):
-            return False
-        await conn.execute("delete from reportanswers where id=$1", repansi[0])
-    answering_name = await getUserName(repansi[1])
-    name = await getUserName(repansi[2])
-    await deleteMessages(
-        [repansi[6], event.object.message.conversation_message_id], REPORT_TO
-    )
-    await sendMessage(
-        repansi[3] + 2000000000,
-        messages.report_answer(
-            repansi[1],
-            answering_name,
-            repansi[4],
-            event.object.message.text,
-            repansi[2],
-            name,
-            repansi[5],
-        ),
-    )
-    await sendMessage(
-        REPORT_TO + 2000000000,
-        messages.report_answered(
-            repansi[1],
-            answering_name,
-            repansi[4],
-            event.object.message.text,
-            repansi[5],
-            repansi[2],
-            name,
-            repansi[3],
-            await getChatName(repansi[3]),
-        ),
-    )
-    return
 
 
 async def queue_handler(event: MessageNew):
@@ -801,6 +754,4 @@ async def queue_handler(event: MessageNew):
 
 
 async def answer_handler(event: MessageNew):
-    if event.object.message.peer_id - 2000000000 == REPORT_TO:
-        return await report_handler(event)
     return await queue_handler(event)

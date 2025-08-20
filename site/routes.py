@@ -222,7 +222,7 @@ async def validate_promo(request: Request):
 
 
 @router.post("/api/payment")
-async def create_payment(request: Request):
+async def create_payment(request: Request, data: models.Item):
     user = (
         models.User.model_construct(**request.session["user"])
         if "user" in request.session
@@ -234,34 +234,29 @@ async def create_payment(request: Request):
             content={"detail": "auth_required", "redirect_url": "/login"},
         )
 
-    ouid = user.id
-    try:
-        data = models.Subscription(**(await request.json()))
-    except pydantic.ValidationError:
-        raise HTTPException(
-            status_code=400, detail="Проверьте правильность введённых данных."
-        )
-
-    if data.type == "subscription" and not data.duration:
+    from_id = user.id
+    if data.type == "subscription" and (
+        not hasattr(data.data, "duration") or not data.data.duration  # type: ignore
+    ):
         raise HTTPException(status_code=400, detail="Не указана длительность подписки.")
 
-    if data.type == "chat" and not data.chat_id:
+    if data.type == "chat" and (
+        not hasattr(data.data, "chat_id") or not data.data.chat_id  # type: ignore
+    ):
         raise HTTPException(status_code=400, detail="Не указан ID чата.")
 
-    if data.gift:
+    if hasattr(data.data, "gift") and data.data.gift:  # type: ignore
         try:
-            user = (
+            recipient = (
                 await config.api.users.get(
-                    user_ids=data.gift_link.replace("@", "").split("/")[-1]
+                    user_ids=data.gift_link.replace("@", "").split("/")[-1]  # type: ignore
                 )
             )[0]
         except Exception:
-            raise HTTPException(
-                status_code=400, detail="Указанного пользователя не существует."
-            )
+            raise HTTPException(status_code=400, detail="Пользователь не существует.")
     else:
         try:
-            user = (await config.api.users.get(user_ids=user.id))[0]
+            recipient = (await config.api.users.get(user_ids=[user.id]))[0]
         except Exception:
             traceback.print_exc()
             return JSONResponse(
@@ -270,19 +265,25 @@ async def create_payment(request: Request):
             )
 
     if data.type == "subscription":
-        cost = origcost = config.PREMIUM_COST[data.duration]
-    else:
+        if hasattr(data.data, "duration"):
+            cost = origcost = config.PREMIUM_COST[data.data.duration]  # type: ignore
+        else:
+            raise HTTPException(
+                status_code=400, detail="Не указана длительность подписки."
+            )
+    elif data.type == "chat":
         cost = origcost = config.data["premiumchat"]
+        chat_id: int = data.data.chat_id  # type: ignore
         async with (await pool()).acquire() as conn:
             if await conn.fetchval(
-                "select premium from publicchats where chat_id=$1", data.chat_id
+                "select premium from publicchats where chat_id=$1", chat_id
             ):
                 raise HTTPException(
                     status_code=400, detail="У этой беседы уже есть Premium-статус."
                 )
         try:
             chat = await config.api.messages.get_conversation_members(
-                peer_id=2000000000 + data.chat_id
+                peer_id=2000000000 + chat_id
             )
             if not chat.items:
                 raise Exception
@@ -292,16 +293,20 @@ async def create_payment(request: Request):
                 detail="Не удалось найти беседу. Убедитесь, что бот добавлен в беседу "
                 "и имеет статус администратора.",
             )
-        if not [i for i in chat.items if i.member_id == int(user.id)]:
+        if not [i for i in chat.items if i.member_id == int(recipient.id)]:
             raise HTTPException(
                 status_code=400,
                 detail="Вам нужно быть участником беседы, чтобы приобрести для неё Premium-статус.",
             )
-    
-    if data.promo:
+    else:
+        coins: int = data.data.value  # type: ignore
+        cost = origcost = int(coins / 100 * 12.5)
+
+    if hasattr(data.data, "promo") and data.data.promo:  # type: ignore
         async with (await pool()).acquire() as conn:
             promo = await conn.fetchrow(
-                "select val, uid, id from prempromo where promo=$1", data.promo
+                "select val, uid, id from prempromo where promo=$1",
+                data.data.promo,  # type: ignore
             )
             cost = int(int(cost) * ((100 - promo[0]) / 100)) + 1
     else:
@@ -309,18 +314,18 @@ async def create_payment(request: Request):
 
     payment = await utils.create_payment(
         cost,
-        user.first_name,
-        user.last_name,
+        recipient.first_name,
+        recipient.last_name,
         origcost,
-        ouid,
-        user.id,
-        data.promo,
+        from_id,
+        recipient.id,
         promo,
-        data.chat_id,
+        chat_id if data.type == "chat" else None,
+        coins if data.type == "coins" else None,
         user.email,
     )
     return JSONResponse(
-        content={"valid": True, "payment_url": payment.confirmation.confirmation_url}
+        content={"valid": True, "payment_url": payment.confirmation.confirmation_url}  # type: ignore
     )
 
 
@@ -328,32 +333,46 @@ async def create_payment(request: Request):
 async def yookassa(request: Request):
     if request.method != "POST":
         return RedirectResponse(url="/", status_code=303)
-    query = (await request.json())["object"]
-    order_id = int(query["metadata"]["pid"])
-    chat_id = int(query["metadata"]["chat_id"])
-    order_id_p = query["id"]
-    from_id = int(query["merchant_customer_id"])
-    uid = int(query["metadata"]["gift"])
-    personal = int(query["metadata"]["personal"])
+    payment = models.Payment(**(await request.json())["object"])
 
     async with (await pool()).acquire() as conn:
         if not await conn.fetchval(
-            "update payments set success=1 where id=$1 returning 1", order_id
+            "update payments set success=1 where id=$1 returning 1", payment.order_id
         ):
             return JSONResponse(content="YES")
-        if personal:
-            await conn.execute("delete from prempromo where id=$1", personal)
+        if payment.personal_promo:
+            await conn.execute("delete from prempromo where id=$1", payment.personal_promo)
             await conn.execute(
-                "update premiumexpirenotified set date=0 where uid=$1", from_id
+                "update premiumexpirenotified set date=0 where uid=$1", payment.from_id
             )
 
-    days = (
-        list(config.PREMIUM_COST.keys())[
-            list(config.PREMIUM_COST.values()).index(int(query["metadata"]["origcost"]))
-        ]
-        if not chat_id
-        else 0
-    )
+    text = f"Номер: <b>#{payment.order_id}</b>\n"
+    if payment.chat_id:
+        payment_type = "Premium-беседа"
+        text += f"""Тип: <code>"Premium-беседа"</code>
+ID беседы: <code>{payment.chat_id}</code>\n"""
+    elif payment.coins:
+        payment_type = utils.pointWords(payment.coins, ("монетка", "монетки", "монеток"))
+        text += f"""Тип: <code>"Монетки"</code>
+Количество: <code>{utils.pointWords(payment.coins, ("монетка", "монетки", "монеток"))}</code>\n"""
+    else:
+        days = list(config.PREMIUM_COST.keys())[list(config.PREMIUM_COST.values()).index(payment.cost)]
+        payment_type = f"Premium-подписка ({days} дней)"
+        text += f"""Тип: <code>"Premium-статус"</code>
+Срок: <code>{days} дней</code>\n"""
+
+    text += f"""Сумма: <code>{payment.final_cost[:-3]} рублей</code>
+Покупатель: <a href="https://vk.com/id{payment.from_id}">@id{payment.from_id}</a>\n"""
+    
+    if not payment.chat_id:
+        text += f'Получатель: <a href="https://vk.com/id{payment.to_id}">@id{payment.to_id}</a>\n'
+
+    text += f"""Дата: <code>{datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}</code>
+Способ: <code>Юкасса</code>
+Код платежа: <code>{payment.yookassa_order_id}</code>"""
+
+    emojis = ["1️⃣", "2️⃣","3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
+    text = "\n".join([f"{emojis[k]} {i}" for k, i in enumerate(text.split("\n"))])
 
     async with httpx.AsyncClient() as client:
         await client.get(
@@ -363,110 +382,107 @@ async def yookassa(request: Request):
                 "message_thread_id": config.TG_PREMIUM_THREAD_ID,
                 "parse_mode": "html",
                 "disable_web_page_preview": True,
-                "text": f"""1️⃣ Номер: <b>#{order_id}</b> 
-2️⃣ Тип:<code> {"Premium-статус" if not chat_id else "Premium-беседа"}</code>
-3️⃣ Срок: <code>{f"{days} дней" if not chat_id else "навсегда"}</code>
-4️⃣ Сумма: <code>{query["amount"]["value"][:-3]} рублей</code>
-5️⃣ Покупатель: <a href="https://vk.com/id{from_id}">@id{from_id}</a>
-6️⃣ Получатель: {
-                    f'<a href="https://vk.com/id{uid or from_id}">@id{uid or from_id}</a>'
-                    if not chat_id
-                    else f"беседа {chat_id}"
-                }
-7️⃣ Дата: <code>{datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}</code>
-8️⃣ Способ: <code>Юкасса</code>
-9️⃣ Код платежа: <code>{query["id"]}</code>""",
+                "text": text,
             },
         )
 
     async with (await pool()).acquire() as conn:
-        if chat_id == 0:
-            lttime = await conn.fetchval(
-                "select time from premium where uid=$1", uid or from_id
+        if payment.chat_id:
+            if not await conn.fetchval(
+                "update publicchats set premium=true where chat_id=$1 returning 1",
+                payment.chat_id,
+            ):
+                await conn.execute(
+                    "insert into publicchats (chat_id, premium, isopen) values ($1, true, false)",
+                    payment.chat_id,
+                )
+        elif payment.coins:
+            await utils.addUserCoins(payment.to_id, payment.coins)
+        else:
+            user_premium = await conn.fetchval(
+                "select time from premium where uid=$1", payment.to_id
             )
-            if lttime is None:
+            if user_premium is None:
                 await conn.execute(
                     "insert into premium (uid, time) VALUES ($1, $2)",
-                    uid or from_id,
+                    payment.to_id,
                     int(days * 86400 + time.time()),
                 )
             else:
                 await conn.execute(
                     "update premium set time = $1 where uid=$2",
-                    int(days * 86400 + lttime),
-                    uid or from_id,
-                )
-        else:
-            if not await conn.fetchval(
-                "update publicchats set premium=true where chat_id=$1 returning 1",
-                chat_id,
-            ):
-                await conn.execute(
-                    "insert into publicchats (chat_id, premium, isopen) values ($1, true, false)",
-                    chat_id,
+                    int(days * 86400 + user_premium),
+                    payment.to_id,
                 )
 
     Configuration.account_id = config.YOOKASSA_MERCHANT_ID
     Configuration.secret_key = config.YOOKASSA_TOKEN
-    Payment.capture(order_id_p)
+    Payment.capture(payment.yookassa_order_id)
 
-    if chat_id:
-        user = (await config.api.users.get(user_ids=from_id))[0]
+    if payment.chat_id:
+        user = (await config.api.users.get(user_ids=[payment.from_id]))[0]
         msg = (
             f"⭐️ [id{user.id}|{user.first_name} {user.last_name}], вы успешно приобрели Premium-статус для беседы "
-            f"id{chat_id}, поздравляю! Чтобы узнать все подробности и возможности Premium-статуса, вы можете "
-            f"ознакомиться с информацией по ссылке — vk.cc/cJuJpg\n\n📗 Номер платежа: #{order_id}\n📗 Время "
+            f"id{payment.chat_id}, поздравляю! Чтобы узнать все подробности и возможности Premium-статуса, вы можете "
+            f"ознакомиться с информацией по ссылке — vk.cc/cJuJpg\n\n📗 Номер платежа: #{payment.order_id}\n📗 Время "
             f"покупки: {datetime.now().strftime('%d.%m.%Y / %H:%M:%S')}"
         )
-    elif uid:
-        user = (await config.api.users.get(user_ids=uid))[0]
-        fromuser = (await config.api.users.get(user_ids=from_id))[0]
+    elif payment.coins:
+        user = (await config.api.users.get(user_ids=[payment.from_id]))[0]
+        msg = (
+            f"⭐️ [id{user.id}|{user.first_name} {user.last_name}], вы успешно приобрели {utils.pointWords(payment.coins, ('монетку', 'монетки', 'монеток'))}"
+            f"! Вы можете обменять их с помощью команды /shop, передать с помощью /transfer или попробовать сыграть: /duel, /guess.\n\n📗 Номер платежа: #{payment.order_id}\n📗 Время "
+            f"покупки: {datetime.now().strftime('%d.%m.%Y / %H:%M:%S')}"
+        )
+    elif payment.to_id != payment.from_id:
+        user = (await config.api.users.get(user_ids=[payment.to_id]))[0]  # type: ignore
+        fromuser = (await config.api.users.get(user_ids=[payment.from_id]))[0]
         msg = (
             f"🎁 [id{user.id}|{user.first_name} {user.last_name}], вы получили Premium-подписку в подарок от "
             f"пользователя [id{fromuser.id}|{fromuser.first_name} {fromuser.last_name}]. Чтобы узнать все "
             f"подробности и возможности Premium-статуса, вы можете ознакомиться с информацией по ссылке — "
-            f"vk.cc/cJuJpg\n\n📗 Номер платежа: #{order_id}\n📗 Время "
+            f"vk.cc/cJuJpg\n\n📗 Номер платежа: #{payment.order_id}\n📗 Время "
             f"покупки: {datetime.now().strftime('%d.%m.%Y / %H:%M:%S')}"
         )
     else:
-        user = (await config.api.users.get(user_ids=from_id))[0]
+        user = (await config.api.users.get(user_ids=[payment.from_id]))[0]
         msg = (
             f"⭐️ [id{user.id}|{user.first_name} {user.last_name}], вы успешно приобрели Premium-подписку сроком на "
             f"{days} дней, поздравляю! Чтобы узнать все подробности и возможности Premium-пользователей, вы можете "
-            f"ознакомиться с информацией по ссылке — vk.cc/cJuJpg\n\n📗 Номер платежа: #{order_id}\n📗 Время "
+            f"ознакомиться с информацией по ссылке — vk.cc/cJuJpg\n\n📗 Номер платежа: #{payment.order_id}\n📗 Время "
             f"покупки: {datetime.now().strftime('%d.%m.%Y / %H:%M:%S')}"
         )
     try:
-        await config.api.messages.send(user_id=uid or from_id, message=msg, random_id=0)
+        await config.api.messages.send(user_id=payment.to_id, message=msg, random_id=0)
     except Exception:
-        pass
+        passd
 
-    if del_cmid := query["metadata"].get("del_cmid"):
+    if payment.delete_cmid:
         try:
             await config.api.messages.delete(
                 group_id=config.GROUP_ID,
                 delete_for_all=True,
-                peer_id=uid or from_id,
-                cmids=del_cmid,
+                peer_id=payment.to_id,
+                cmids=payment.delete_cmid,
             )
         except Exception:
             pass
 
-    if chat_id:
-        comment = f"Для беседы id{chat_id}"
-    elif uid:
-        comment = f"Подарок для @id{uid}"
+    if payment.chat_id:
+        comment = f"Для беседы id{payment.chat_id}"
+    elif payment.to_id != payment.from_id:
+        comment = f"Подарок для @id{payment.to_id}"
     else:
         comment = "-"
     try:
         async with (await pool()).acquire() as conn:
             await conn.execute(
                 "insert into paymenthistory (uid, pid, date, type, sum, comment) values ($1, $2, $3, $4, $5, $6)",
-                int(query["merchant_customer_id"]),
-                order_id,
+                payment.from_id,
+                payment.order_id,
                 int(time.time()),
-                f"Premium-подписка ({days} дней)" if chat_id == 0 else "Premium-беседа",
-                int(float(query["amount"]["value"])),
+                payment_type,
+                payment.final_cost,
                 comment,
             )
     except Exception:

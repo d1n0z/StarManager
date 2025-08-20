@@ -1,22 +1,25 @@
+import datetime
+import json
+import time
 import traceback
 
-from aiogram import Router, F
-from aiogram.filters import CommandStart, CommandObject
+from aiogram import F, Router
+from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
-    Message,
     CallbackQuery,
-    ChatMemberOwner,
     ChatMemberAdministrator,
     ChatMemberMember,
+    ChatMemberOwner,
+    Message,
 )
 from aiogram.utils.deep_linking import create_start_link
 from aiogram.utils.payload import decode_payload
 
-from Bot.utils import getUserName, pointWords, addUserXP
-from BotTG import keyboard, states
+from Bot.utils import addUserXP, getUserName, pointWords
+from BotTG import keyboard, states, utils
 from config import config
-from config.config import TG_PUBLIC_CHAT_ID
+from config.config import TG_ADMINS, TG_PUBLIC_CHAT_ID
 from db import smallpool as pool
 
 router: Router = Router()
@@ -119,6 +122,53 @@ async def start(message: Message | CallbackQuery, state: FSMContext):
     await state.update_data(msg=msg)
 
 
+@router.message(Command("info"), F.chat.type == "private")
+async def info(message: Message, state: FSMContext):
+    if message.from_user.id not in TG_ADMINS:
+        return
+    
+    await message.delete()
+    data = message.text.split()
+    if len(data) not in (1, 2) or (len(data) == 2 and not data[1].isdigit()):
+        msg = await message.bot.send_message(
+            chat_id=message.from_user.id,
+            text="Usage: /info <optional:tg_user_id>.",
+            parse_mode=None,
+        )
+        await state.clear()
+        await state.update_data(msg=msg)
+    answered_by = None if len(data) == 1 else data[1]
+
+    now = datetime.datetime.now()
+    today_start = datetime.datetime(now.year, now.month, now.day)
+    today_timestamp = int(today_start.timestamp())
+    week_start = today_start - datetime.timedelta(days=today_start.weekday())
+    week_timestamp = int(week_start.timestamp())
+
+    async with (await pool()).acquire() as conn:
+        if answered_by is not None:
+            stats = await conn.fetchrow(
+                "select count(*) filter (where time >= $1 and answered_by = $3), count(*) filter (where time >= $2 and answered_by = $3), count(*) filter (where answered_by = $3) from reports",
+                today_timestamp, week_timestamp, int(answered_by)
+            )
+        else:
+            stats = await conn.fetchrow(
+                "select count(*) filter (where time >= $1), count(*) filter (where time >= $2), count(*) from reports",
+                today_timestamp, week_timestamp
+            )
+    formatted_date = today_start.strftime("%d.%m.%Y")
+
+    msg = await message.bot.send_message(
+        chat_id=message.from_user.id,
+        text=f"""📘 СТАТИСТИКА РЕПОРТОВ
+├─ За день ({formatted_date}): {stats[0]} шт.
+├─ За неделю: {stats[1]} шт.
+└─ За всё время: {stats[2]} шт.""",
+    )
+    await state.clear()
+    await state.update_data(msg=msg)
+
+
 @router.callback_query(keyboard.Callback.filter(F.type == "link"))
 async def link(query: CallbackQuery, state: FSMContext):
     msg = await query.bot.send_message(
@@ -215,7 +265,7 @@ async def checksub(query: CallbackQuery, state: FSMContext):
                 f"вашей ссылке, вы получили <code>+150 опыта</code>.</b>",
             )
         except Exception:
-            traceback.print_exc()
+            logger.exception('Checksub exception:')
     msg = await query.bot.send_message(
         chat_id=query.from_user.id,
         reply_markup=keyboard.link(),
@@ -228,8 +278,83 @@ async def checksub(query: CallbackQuery, state: FSMContext):
     await state.update_data(msg=msg)
 
 
+@router.callback_query(keyboard.Callback.filter(F.type == "report_cancel"))
+async def report_cancel(query: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await query.message.delete()
+
+
+@router.callback_query(keyboard.ReportCallback.filter())
+async def report_callback_handler(
+    query: CallbackQuery, callback_data: keyboard.ReportCallback, state: FSMContext
+):
+    action = callback_data.type
+    if action == "answer":
+        msg = await query.message.answer(
+            f"🟣 Введите ответ на обращение #{callback_data.report_id}:",
+            reply_markup=keyboard.report_cancel(),
+        )
+        await state.clear()
+        await state.set_state(states.Report.answer.state)
+        await state.update_data(report_id=callback_data.report_id, msg=msg)
+        return
+
+    async with (await pool()).acquire() as conn:
+        async with conn.transaction():
+            report = await conn.fetchrow(
+                "select uid, time, report_message_ids, report_text from reports where id=$1",
+                callback_data.report_id,
+            )
+            if action == "ban":
+                if not await conn.fetchval(
+                    "select exists(select 1 from reportban where uid=$1 and time=0)",
+                    report[0],
+                ):
+                    if not await conn.fetchval(
+                        "update reportban set time = $1 where uid=$2 returning 1",
+                        time.time() + 86400,
+                        report[0],
+                    ):
+                        await conn.execute(
+                            "insert into reportban (uid, time) values ($1, $2)",
+                            report[0],
+                            time.time() + 86400,
+                        )
+            elif action != "delete":
+                raise Exception("Unknown ReportCallback action")
+    message_ids = json.loads(report[2])
+    await utils.archive_report(
+        message_ids, report[3], action, query.bot, callback_data.report_id, report[0]
+    )
+
+
+@router.message(states.Report.answer)
+async def report_answer(message: Message, state: FSMContext):
+    await message.delete()
+
+    report_id: int = (await state.get_data())["report_id"]
+    await state.clear()
+
+    async with (await pool()).acquire() as conn:
+        report = await conn.fetchrow(
+            "select uid, report_text, report_message_ids from reports where id=$1",
+            report_id,
+        )
+        await conn.execute("update reports set answered_by=$1 where id=$2", message.from_user.id, report_id)
+    message_ids = json.loads(report[2])
+    await utils.archive_report(
+        message_ids,
+        report[1],
+        "answer",
+        message.bot,
+        report_id,
+        report[0],
+        message.text,
+    )
+
+
 @router.message(states.Link.link)
-async def link(message: Message, state: FSMContext):
+async def link_s(message: Message, state: FSMContext):
     await message.delete()
 
     await state.clear()
@@ -239,7 +364,7 @@ async def link(message: Message, state: FSMContext):
                 "select vkid from tglink where code=$1", message.text
             )
             if not vkid:
-                text = f"<b>⚠️ Неверный код. Введите код из <code>/code</code>:</b>"
+                text = "<b>⚠️ Неверный код. Введите код из <code>/code</code>:</b>"
                 await state.set_state(states.Link.link.state)
             else:
                 text = f'<b>✅ Вы успешно привязали аккаунт(<a href="https://vk.com/id{vkid}">id{vkid}</a>).</b>'

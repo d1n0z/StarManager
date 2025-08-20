@@ -111,14 +111,12 @@ def query_error():
     return get("query_error")
 
 
-def report(uid, name, report, repid, chatid, chatname):
+def report(uid, name, report, repid):
     return get(
         "report",
         repid=repid,
         uid=uid,
         name=name,
-        chatid=chatid,
-        chatname=chatname,
         report=report,
     )
 
@@ -133,6 +131,10 @@ def report_answering(repid):
 
 def report_sent(rep_id):
     return get("report_sent", rep_id=rep_id)
+
+
+def report_error(rep_id):
+    return get("report_error", rep_id=rep_id)
 
 
 def report_empty():

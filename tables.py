@@ -355,24 +355,13 @@ class Reports(Model):
     uid = IntegerField(default=0, index=True)
     id = IntegerField(default=0)
     time = IntegerField(default=0)
+    report_message_ids = TextField()
+    report_text = TextField()
+    answered_by = IntegerField(null=True)
 
     class Meta:
         database = dbhandle
         table_name = 'reports'
-
-
-class ReportAnswers(Model):
-    answering_id = IntegerField(default=0, index=True)
-    uid = IntegerField(default=0)
-    chat_id = IntegerField(default=0)
-    repid = IntegerField(default=0, unique=True)
-    report_text = TextField(null=True)
-    cmid = IntegerField(null=True)
-    photos = TextField(null=True)
-
-    class Meta:
-        database = dbhandle
-        table_name = 'reportanswers'
 
 
 class Comments(Model):
