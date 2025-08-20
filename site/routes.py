@@ -249,7 +249,7 @@ async def create_payment(request: Request, data: models.Item):
         try:
             recipient = (
                 await config.api.users.get(
-                    user_ids=data.gift_link.replace("@", "").split("/")[-1]  # type: ignore
+                    user_ids=[await utils.getIDFromMessage(data.data.gift_link, None, 1) or None]
                 )
             )[0]
         except Exception:
