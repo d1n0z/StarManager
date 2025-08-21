@@ -354,10 +354,10 @@ class GlobalWarns(Model):
 class Reports(Model):
     uid = IntegerField(default=0, index=True)
     id = IntegerField(default=0)
-    time = IntegerField(default=0)
+    time = BigIntegerField(default=0)
     report_message_ids = TextField()
     report_text = TextField()
-    answered_by = IntegerField(null=True)
+    answered_by = BigIntegerField(null=True)
 
     class Meta:
         database = dbhandle
