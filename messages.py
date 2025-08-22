@@ -56,8 +56,8 @@ def start():
     return get("start")
 
 
-def id(uid, data, name, url):
-    return get("id", uid=uid, data=data, name=name, url=url)
+def id(uid, data, name, url, last_message):
+    return get("id", uid=uid, data=data, name=name, url=url, last_message=f"\n🕒 Последняя активность в чате: {last_message}" if last_message else "")
 
 
 async def top(top):
@@ -2015,7 +2015,7 @@ def duel_coins_minimum():
 
 
 def duel(uid, name, nick, coins):
-    return get("duel", uid=uid, n=nick or name, coins=coins)
+    return get("duel", uid=uid, n=nick or name, coins=coins, coins_win=coins * 2)
 
 
 def duel_res(uid, uname, unick, id, name, nick, coins, has_comission, com=10):

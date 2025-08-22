@@ -983,7 +983,7 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings):
 
 
 async def command_cooldown_check(uid: int, cmd: str):
-    if not (cd := COMMANDS_COOLDOWN.get(cmd, 0)):
+    if not (cd := (COMMANDS_COOLDOWN.get(cmd, 0) / (2 if await getUserPremium(uid) else 1))):
         return None
     if (
         last_command := managers.commands_cooldown.get_user_time(uid, cmd)

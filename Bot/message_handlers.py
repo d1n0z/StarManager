@@ -232,11 +232,11 @@ async def message_handle(event: MessageNew) -> Any:
         pinged := [
             i
             for i in [
-                await getIDFromMessage(event.object.message.text, None, place=k)
+                (await getIDFromMessage(event.object.message.text, None, place=k), data[k - 1])
                 for k in range(1, len(data) + 1)
                 if not data[k - 1].isdigit()
             ]
-            if i
+            if i[0]
         ]
     ):
         async with (await pool()).acquire() as conn:
@@ -260,13 +260,14 @@ async def message_handle(event: MessageNew) -> Any:
                     ),
                 )
         if tonotif := [
-            i for i in pinged if await getUserPremmenuSetting(i, "tagnotif", False)
+            i for i in pinged if await getUserPremmenuSetting(i[0], "tagnotif", False)
         ]:
             for i in tonotif:
                 if not await sendMessage(
-                    i,
-                    f"💥 [id{i}|{await getUserName(i)}], вас тегнул [id{uid}|{await getUserName(uid)}] "
-                    f'в чате ({await getChatName(chat_id)}) с текстом: "{event.object.message.text}"',
+                    i[0],
+                    f"""📌 Упоминание в чате: {await getChatName(chat_id)}
+👤 [id{i[0]}|{await getUserName(i[0])}] → {i[1]} 
+💬 Сообщение: \"{event.object.message.text}\"""",
                 ):
                     async with (await pool()).acquire() as conn:
                         await conn.execute(

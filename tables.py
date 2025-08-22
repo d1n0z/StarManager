@@ -120,7 +120,7 @@ class ChatGroups(Model):
 class Filters(Model):
     chat_id = IntegerField(null=True)
     owner_id = IntegerField(null=True)
-    filter = TextField()
+    filter = TextField()  # type: ignore
 
     class Meta:
         database = dbhandle
@@ -130,7 +130,7 @@ class Filters(Model):
 class FilterExceptions(Model):
     owner_id = IntegerField()
     chat_id = IntegerField()
-    filter = TextField()
+    filter = TextField()  # type: ignore
 
     class Meta:
         database = dbhandle

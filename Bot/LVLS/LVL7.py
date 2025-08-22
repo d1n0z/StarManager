@@ -46,7 +46,7 @@ async def asynch(message: Message):
             )
             else False
         )
-        if (not u_premium and bound >= 30) or (u_premium and bound >= 100):
+        if (not u_premium and bound >= 30) or (u_premium and bound >= 150):
             return await messagereply(
                 message, disable_mentions=1, message=messages.async_limit()
             )
@@ -106,7 +106,7 @@ async def creategroup(message: Message):
         )
     uid = message.from_id
     u_premium = await getUserPremium(uid)
-    limit = CREATEGROUPLEAGUES[await getUserLeague(uid) - 1] if not u_premium else 12
+    limit = CREATEGROUPLEAGUES[await getUserLeague(uid) - 1] if not u_premium else 30
     async with (await pool()).acquire() as conn:
         if (
             len(

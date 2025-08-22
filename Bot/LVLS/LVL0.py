@@ -15,50 +15,50 @@ from Bot.rules import SearchCMD
 from Bot.tgbot import tgbot
 from Bot.utils import (
     addUserCoins,
-    getIDFromMessage,
-    getUserName,
-    getRegDate,
-    getUserShopBonuses,
-    kickUser,
-    getUserNickname,
-    getUserAccessLevel,
-    getUserLastMessage,
-    getUserMute,
-    getUserBan,
-    getUserXP,
-    getUserCoins,
-    getUserNeededXP,
-    getUserPremium,
-    uploadImage,
     addUserXP,
-    isChatAdmin,
-    getUserWarns,
-    getUserMessages,
-    setUserAccessLevel,
-    getChatSettings,
-    deleteMessages,
-    getUserPremmenuSettings,
-    getUserPremmenuSetting,
     chatPremium,
+    deleteMessages,
+    getChatAccessName,
+    getChatSettings,
+    getIDFromMessage,
+    getRegDate,
+    getRepTop,
+    getUserAccessLevel,
+    getUserBan,
+    getUserCoins,
+    getUserLastMessage,
     getUserLeague,
     getUserLVL,
+    getUserMessages,
+    getUserMute,
+    getUserName,
+    getUserNeededXP,
+    getUserNickname,
+    getUserPremium,
+    getUserPremmenuSetting,
+    getUserPremmenuSettings,
     getUserRep,
-    getRepTop,
-    getChatAccessName,
+    getUserShopBonuses,
+    getUserWarns,
+    getUserXP,
+    isChatAdmin,
+    kickUser,
     messagereply,
     pointWords,
+    setUserAccessLevel,
+    uploadImage,
 )
 from config.config import (
+    CMDLEAGUES,
+    COMMANDS,
+    DEVS,
     GROUP_ID,
-    api,
     LVL_NAMES,
     PATH,
-    COMMANDS,
+    TG_BONUS_THREAD_ID,
     TG_CHAT_ID,
     TG_TRANSFER_THREAD_ID,
-    CMDLEAGUES,
-    DEVS,
-    TG_BONUS_THREAD_ID,
+    api,
 )
 from db import pool
 from media.stats.stats_img import createStatsImage
@@ -87,11 +87,18 @@ async def id(message: Message):
         return await messagereply(
             message, disable_mentions=1, message=messages.id_deleted()
         )
+    last_message = await getUserLastMessage(id, message.peer_id - 2000000000, None)
+    if isinstance(last_message, int):
+        last_message = datetime.fromtimestamp(last_message).strftime("%d.%m.%Y / %H:%M")
     await messagereply(
         message,
         disable_mentions=1,
         message=messages.id(
-            id, await getRegDate(id), await getUserName(id), f"https://vk.com/id{id}"
+            id,
+            await getRegDate(id),
+            await getUserName(id),
+            f"https://vk.com/id{id}",
+            last_message,
         ),
     )
 
@@ -563,7 +570,7 @@ async def transfer(message: Message):
                 )
             ]
         )
-    if (td >= 1500 and not u_prem) or (td >= 3000 and not u_prem):
+    if (td >= 500 and not u_prem) or (td >= 1000 and not u_prem):
         return await messagereply(
             message, disable_mentions=1, message=messages.transfer_limit(u_prem)
         )
@@ -671,12 +678,17 @@ async def guess(message: Message):
             message, disable_mentions=1, message=messages.guess_lose(data[1], num)
         )
     bet = int(data[1]) * 2.5
-    has_comission = not (await getUserPremium(message.from_id) or (await getUserShopBonuses(message.from_id))[1] > time.time())
+    has_comission = not (
+        await getUserPremium(message.from_id)
+        or (await getUserShopBonuses(message.from_id))[1] > time.time()
+    )
     if has_comission:
         bet = bet / 100 * 90
     await addUserCoins(message.from_id, bet)
     await messagereply(
-        message, disable_mentions=1, message=messages.guess_win(int(bet), data[2], has_comission)
+        message,
+        disable_mentions=1,
+        message=messages.guess_win(int(bet), data[2], has_comission),
     )
 
 
@@ -690,7 +702,8 @@ async def promo(message: Message):
     uid = message.from_id
     async with (await pool()).acquire() as conn:
         code = await conn.fetchrow(
-            "select code, date, usage, amnt, type from promocodes where code=$1", data[1]
+            "select code, date, usage, amnt, type from promocodes where code=$1",
+            data[1],
         )
         if code and (
             code[1]
@@ -727,7 +740,7 @@ async def promo(message: Message):
         await conn.execute(
             "insert into promocodeuses (code, uid) values ($1, $2)", data[1], uid
         )
-    if code[4] == 'xp':
+    if code[4] == "xp":
         await addUserXP(uid, int(code[3]))
     else:
         await addUserCoins(uid, int(code[3]))
@@ -917,5 +930,5 @@ async def shop(message: Message):
         message,
         disable_mentions=1,
         message=messages.shop(),
-        keyboard=keyboard.shop(message.from_id)
+        keyboard=keyboard.shop(message.from_id),
     )
