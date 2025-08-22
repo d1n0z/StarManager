@@ -266,7 +266,7 @@ async def message_handle(event: MessageNew) -> Any:
                 if not await sendMessage(
                     i[0],
                     f"""📌 Упоминание в чате: {await getChatName(chat_id)}
-👤 [id{i[0]}|{await getUserName(i[0])}] → {i[1]} 
+👤 [id{uid}|{await getUserName(uid)}] → {i[1]} 
 💬 Сообщение: \"{event.object.message.text}\"""",
                 ):
                     async with (await pool()).acquire() as conn:
