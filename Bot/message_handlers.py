@@ -247,7 +247,7 @@ async def message_handle(event: MessageNew) -> Any:
                 and await conn.fetchval(
                     "select exists(select 1 from antitag where chat_id=$1 and uid=ANY($2))",
                     chat_id,
-                    pinged,
+                    [i[0] for i in pinged],
                 )
                 and await deleteMessages(
                     event.object.message.conversation_message_id, chat_id
