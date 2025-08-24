@@ -41,7 +41,7 @@ from config.config import (
     api,
     vk_api_session,
 )
-from db import schedulerpool as pool
+from db import pool
 
 task_locks = defaultdict(asyncio.Lock)
 
