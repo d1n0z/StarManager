@@ -26,10 +26,21 @@ from db import pool
 async def action_handle(event: MessageNew) -> None:
     event = event.object.message
     action = event.action
+    uid = action.member_id
+    chat_id = event.peer_id - 2000000000
+    if action.type.value == "chat_invite_user_by_link" and await getRaidModeActive(chat_id):
+        async with (await pool()).acquire() as conn:
+            in_chat = [i[0] for i in await conn.fetch("select uid from userjoineddate where chat_id=$1", chat_id)]
+            in_chat.extend([i[0] for i in await conn.fetch("select uid from messages where chat_id=$1", chat_id)])
+        users = (await api.messages.get_conversation_members(
+            peer_id=event.peer_id
+        )).items
+        for user in users:
+            if user.member_id not in in_chat and user.member_id > 0:
+                print(await kickUser(user.member_id, chat_id=chat_id))
+        return
     if action.type.value not in ("chat_invite_user", "chat_kick_user"):
         return
-    chat_id = event.peer_id - 2000000000
-    uid = action.member_id
     if action.type.value == "chat_kick_user":
         if (await getChatSettings(chat_id))["main"]["kickLeaving"]:
             await kickUser(uid, chat_id=chat_id)
@@ -95,10 +106,7 @@ async def action_handle(event: MessageNew) -> None:
         await sendMessage(event.peer_id, messages.rejoin(), keyboard.rejoin(chat_id))
         return
 
-    if (
-        await getUserAccessLevel(id, chat_id) <= 0
-        and ((await getChatSettings(chat_id))["main"]["kickInvitedByNoAccess"] or await getRaidModeActive(chat_id))
-    ):
+    if (await getUserAccessLevel(id, chat_id) <= 0 and (await getChatSettings(chat_id))["main"]["kickInvitedByNoAccess"]) or await getRaidModeActive(chat_id):
         await kickUser(uid, chat_id=chat_id)
         return
 

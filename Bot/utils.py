@@ -91,6 +91,7 @@ async def kickUser(uid: int, chat_id: int) -> bool:
                 )
             await setChatMute(uid, chat_id, 0)
     except Exception:
+        traceback.print_exc()
         return False
     return True
 
