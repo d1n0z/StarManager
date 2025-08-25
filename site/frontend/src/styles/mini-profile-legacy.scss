@@ -1,0 +1,56 @@
+.mini-profile-legacy {
+  display: flex;
+
+  justify-content: center;
+
+  &__social {
+    &-list {
+      &__element {
+        margin-left: 16px;
+
+        display: inline-block;
+
+        .element-icon {
+          @media (min-width: 1280px) {
+            width: 46px;
+          }
+          @media (max-width: 1280px) {
+            width: 46 * 1.5px;
+          }
+
+          path {
+            transition: fill 0.3s ease-in-out;
+          }
+          rect {
+            transition: fill-opacity 0.3s ease-in-out;
+          }
+
+          &-long {
+            @extend .element-icon;
+
+            @media (min-width: 1280px) {
+              width: 160px;
+            }
+            @media (max-width: 1280px) {
+              width: 160 * 1.5px;
+            }
+          }
+        }
+
+        &:hover {
+          cursor: pointer;
+
+          .element-icon {
+            path {
+              fill: #fff;
+            }
+
+            rect {
+              fill-opacity: 1;
+            }
+          }
+        }
+      }
+    }
+  }
+}

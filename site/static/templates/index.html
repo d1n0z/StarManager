@@ -116,13 +116,13 @@
             margin: 0 auto 30px;
         }
 
-        .social-links {
+        .linkmenu-links {
             display: flex;
             justify-content: center;
             gap: 20px;
         }
 
-        .social-btn {
+        .linkmenu-btn {
             display: flex;
             align-items: center;
             gap: 8px;
@@ -136,12 +136,12 @@
             transition: all 0.2s ease;
         }
 
-        .social-btn:hover {
+        .linkmenu-btn:hover {
             background: #30363D;
             border-color: #58A6FF;
         }
 
-        .social-btn img {
+        .linkmenu-btn img {
             width: 20px;
             height: 20px;
         }
@@ -224,7 +224,7 @@
             .intro p, .premium p {
                 font-size: 14px;
             }
-            .social-btn, .buy-btn {
+            .linkmenu-btn, .buy-btn {
                 font-size: 12px;
             }
             .header {
@@ -304,14 +304,20 @@
         <div class="intro">
             <h1>Star Manager Bot</h1>
             <p>Это надёжный и эффективный бот для модерации бесед в социальной сети ВКонтакте. Наш бот предоставляет вам мощные инструменты для управления беседами, обеспечивая порядок и безопасность для всех участников.</p>
-            <div class="social-links">
-                <a href="{{ vk }}" class="social-btn" target="_blank">
+            <div class="linkmenu-links">
+                <a href="{{ vk }}" class="linkmenu-btn" target="_blank">
                     <img src="https://vk.com/favicon.ico" alt="VK">
                     ВКонтакте
                 </a>
-                <a href="{{ tg }}" class="social-btn" target="_blank">
+                <a href="{{ tg }}" class="linkmenu-btn" target="_blank">
                     <img src="https://telegram.Org/favicon.ico" alt="Telegram">
                     Telegram
+                </a>
+            </div>
+            <div class="linkmenu-links" style="margin-top: 20px;">
+                <a href="/leaderboard/" class="linkmenu-btn" target="_blank">
+                    <img src="https://images.emojiterra.com/twitter/v13.1/512px/1f4ca.png" alt="lb">
+                    Пользовательский Топ
                 </a>
             </div>
         </div>

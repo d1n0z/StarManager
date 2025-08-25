@@ -1,0 +1,4 @@
+after every build move site/frontend/build/static/* to site/static/
+i merged the frontend statics.
+there was no other way. the /static path couldn't serve two masters...
+now we have to be patient until react frontend is ready.

@@ -3,14 +3,16 @@ import time
 import traceback
 from datetime import datetime
 
+import enums
 import httpx
 import models
 import pydantic
 from authlib.integrations.starlette_client import OAuth
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.responses import JSONResponse
+from vkbottle_types.objects import UsersFields
 from yookassa import Configuration, Payment
 
 sys.path.append("../")
@@ -249,7 +251,10 @@ async def create_payment(request: Request, data: models.Item):
         try:
             recipient = (
                 await config.api.users.get(
-                    user_ids=[await utils.getIDFromMessage(data.data.gift_link, None, 1) or None]
+                    user_ids=[
+                        await utils.getIDFromMessage(data.data.gift_link, None, 1)
+                        or None
+                    ]
                 )
             )[0]
         except Exception:
@@ -341,7 +346,9 @@ async def yookassa(request: Request):
         ):
             return JSONResponse(content="YES")
         if payment.personal_promo:
-            await conn.execute("delete from prempromo where id=$1", payment.personal_promo)
+            await conn.execute(
+                "delete from prempromo where id=$1", payment.personal_promo
+            )
             await conn.execute(
                 "update premiumexpirenotified set date=0 where uid=$1", payment.from_id
             )
@@ -352,18 +359,22 @@ async def yookassa(request: Request):
         text += f"""Тип: <code>"Premium-беседа"</code>
 ID беседы: <code>{payment.chat_id}</code>\n"""
     elif payment.coins:
-        payment_type = utils.pointWords(payment.coins, ("монетка", "монетки", "монеток"))
+        payment_type = utils.pointWords(
+            payment.coins, ("монетка", "монетки", "монеток")
+        )
         text += f"""Тип: <code>"Монетки"</code>
 Количество: <code>{utils.pointWords(payment.coins, ("монетка", "монетки", "монеток"))}</code>\n"""
     else:
-        days = list(config.PREMIUM_COST.keys())[list(config.PREMIUM_COST.values()).index(payment.cost)]
+        days = list(config.PREMIUM_COST.keys())[
+            list(config.PREMIUM_COST.values()).index(payment.cost)
+        ]
         payment_type = f"Premium-подписка ({days} дней)"
         text += f"""Тип: <code>"Premium-статус"</code>
 Срок: <code>{days} дней</code>\n"""
 
     text += f"""Сумма: <code>{payment.final_cost[:-3]} рублей</code>
 Покупатель: <a href="https://vk.com/id{payment.from_id}">@id{payment.from_id}</a>\n"""
-    
+
     if not payment.chat_id:
         text += f'Получатель: <a href="https://vk.com/id{payment.to_id}">@id{payment.to_id}</a>\n'
 
@@ -371,7 +382,7 @@ ID беседы: <code>{payment.chat_id}</code>\n"""
 Способ: <code>Юкасса</code>
 Код платежа: <code>{payment.yookassa_order_id}</code>"""
 
-    emojis = ["1️⃣", "2️⃣","3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
+    emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
     text = "\n".join([f"{emojis[k]} {i}" for k, i in enumerate(text.split("\n"))])
 
     async with httpx.AsyncClient() as client:
@@ -489,3 +500,54 @@ ID беседы: <code>{payment.chat_id}</code>\n"""
         pass
 
     return JSONResponse(content="YES")
+
+
+@router.get("/api/leaderboard/{category}", response_model=models.LeaderboardPage)
+async def get_leaderboard(
+    category: enums.LeaderboardType,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=50),
+):
+    base_query, paginated_query = category.get_queries()
+    async with (await pool()).acquire() as conn:
+        records = await conn.fetch(paginated_query, offset, limit)
+        total = await conn.fetchval(f"SELECT COUNT(*) FROM ({base_query}) AS sub")
+
+    user_ids = list(set(record["uid"] for record in records))
+    user_data = await config.api.users.get(
+        user_ids=user_ids,
+        fields=[UsersFields.PHOTO_MAX.value, UsersFields.DOMAIN.value], # type: ignore
+    )
+    user_data = {user.id: user for user in user_data}
+
+    items = []
+    for i, record in enumerate(records):
+        uid = record["uid"]
+        user = user_data.get(uid)
+        if user is None:
+            continue
+
+        avatar_url = user.photo_max or "https://vk.com/images/camera_100.png"
+        username = f"{user.first_name} {user.last_name}"
+        value = (
+            f"{config.LEAGUE[record['league'] - 1]} | {record['lvl']} уровень"
+            if category == enums.LeaderboardType.LEAGUES
+            else str(record["value"])
+        )
+
+        items.append(
+            models.LeaderboardItem(
+                place=offset + i + 1,
+                avatar=pydantic.HttpUrl(url=avatar_url),
+                username=username,
+                domain=user.domain or f'id{user.id}',
+                value=value,
+            )
+        )
+
+    return models.LeaderboardPage(total=total, items=items)
+
+
+@router.get("/leaderboard")
+async def leaderboard():
+    return "test"

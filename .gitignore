@@ -1,8 +1,38 @@
+# ide
 .idea
 .vscode
+
+# pyc
 .__pycache__
 *.pyc
-venv
 
+venv
 /config/config*.ini
 /media/temp/*
+make.local
+
+# frontend:
+# dependencies
+node_modules
+.pnp
+.pnp.js
+
+# testing
+coverage
+
+# production
+build
+site/static/css
+site/static/js
+site/static/media
+
+# misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

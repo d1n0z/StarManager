@@ -1,0 +1,561 @@
+.payment {
+  display: flex;
+  justify-content: center;
+
+  &__menu {
+    overflow-x: hidden;
+
+    display: flex;
+    justify-content: center;
+
+    position: absolute;
+    top: 180px;
+
+    transition: height 0.8s ease-in-out;
+
+    @media (min-width: 1000px) {
+      width: 630px;
+      height: 690px;
+    }
+
+    @media (max-width: 1000px) {
+      width: 740px;
+      height: 940px;
+    }
+
+    background: #10151B;
+    border-radius: 40px;
+
+    &-pay {
+      margin-top: 40px;
+
+      margin-left: 14px;
+
+      &__svg {
+        @media (min-width: 1000px) {
+          width: 530px;
+        }
+
+        @media (max-width: 1000px) {
+          width: 626px;
+        }
+      }
+
+      &__button-buy {
+        height: 66px;
+
+        margin-top: 14px;
+        margin-left: -12px;
+
+        background: #5491D8;
+        border-radius: 20px;
+        border: none;
+
+        font-family: 'Montserrat', sans-serif;
+        font-style: normal;
+        font-weight: 600;
+        font-size: 24px;
+        text-align: center;
+
+        color: #FFFFFF;
+
+        @media (min-width: 1000px) {
+          width: 556px;
+        }
+
+        @media (max-width: 1000px) {
+          width: 656px;
+        }
+
+        &:hover {
+          cursor: pointer;
+        }
+      }
+
+      &__method {
+        background: #10151B;
+
+        border-radius: 20px;
+
+        margin-top: 20px;
+
+        @media (min-width: 1000px) {
+          border: 1px solid #5491D8;
+
+          width: 552px;
+          height: 105px;
+        }
+
+        @media (max-width: 1000px) {
+          border: 2px solid #5491D8;
+
+          width: 652px;
+          height: 130px;
+        }
+
+        &-svg {
+          width: 103px;
+        }
+
+        &:hover {
+          cursor: pointer;
+        }
+
+        &-text {
+          font-family: 'Roboto', sans-serif;
+          font-style: normal;
+          font-weight: 400;
+
+          color: #FFFFFF;
+
+          @media (min-width: 1000px) {
+            margin-left: 80px;
+            margin-top: 38px;
+
+            font-size: 24px;
+          }
+
+          @media (max-width: 1000px) {
+            margin-left: 100px;
+            margin-top: 46px;
+
+            font-size: 30px;
+          }
+        }
+
+        &-svg {
+          position: absolute;
+
+          @media (min-width: 1000px) {
+            margin-top: -58px;
+            margin-left: 428px;
+          }
+
+          @media (max-width: 1000px) {
+            margin-top: -84px;
+            margin-left: 456px;
+
+            width: 170px;
+          }
+        }
+
+        &-checkbox {
+          position: absolute;
+
+          @media (min-width: 1000px) {
+            margin-left: -54px;
+            margin-top: -4px;
+
+            width: 36px;
+          }
+
+          @media (max-width: 1000px) {
+            margin-left: -72px;
+            margin-top: -6px;
+
+            width: 48px;
+          }
+
+          &-fill {
+            fill: transparent;
+
+            transition: fill 0.2s ease-in-out;
+          }
+        }
+
+        &-pay {
+          margin-left: -51px;
+          margin-top: 38px;
+        }
+
+        &s {
+
+        }
+      }
+    }
+
+    &-option {
+      position: absolute;
+
+      margin-left: -40px;
+
+      @media (min-width: 1000px) {
+        margin-top: 200px;
+      }
+
+      @media (max-width: 1000px) {
+        margin-top: 250px;
+      }
+
+      transition: margin-left 0.8s ease-in-out;
+
+      &--chat {
+        @extend .payment__menu-option;
+
+        margin-left: -1500px;
+      }
+
+      &__input {
+        @media (min-width: 1000px) {
+          padding-top: 40px;
+        }
+
+        @media (max-width: 1000px) {
+          padding-top: 100px;
+        }
+
+        &-svg {
+          position: absolute;
+
+          &:hover {
+            cursor: pointer;
+          }
+
+          @media (min-width: 1000px) {
+            width: 24px;
+
+            margin-top: -28px;
+            margin-left: 490px;
+          }
+
+          @media (max-width: 1000px) {
+            width: 30px;
+
+            margin-top: -36px;
+            margin-left: 570px;
+          }
+        }
+
+        fieldset {
+          transition: border-radius 0.2s ease-in-out, border-bottom 0.4s ease-in-out;
+
+          @media (min-width: 1000px) {
+            border-radius: 16px;
+            border: 1px solid #5491D8;
+          }
+
+          @media (max-width: 1000px) {
+            border-radius: 22px;
+            border: 2px solid #5491D8;
+          }
+
+          legend {
+            margin-left: 50px;
+
+            padding-left: 10px;
+            padding-right: 10px;
+
+            font-family: 'Montserrat', sans-serif;
+            font-style: normal;
+            font-weight: 500;
+            font-size: 16px;
+
+            color: #5491D8;
+
+            @media (min-width: 1000px) {
+              font-size: 16px;
+            }
+
+            @media (max-width: 1000px) {
+              font-size: 22px;
+            }
+          }
+
+          input {
+            width: 100%;
+            height: 100%;
+
+            font-family: 'Montserrat', sans-serif;
+            font-style: normal;
+            font-weight: 600;
+            font-size: 20px;
+
+            color: white;
+
+            &::placeholder {
+              color: #FFFFFF;
+            }
+
+            &:focus {
+              outline: none;
+            }
+
+            padding-left: 12px;
+            padding-top: 8px;
+            padding-bottom: 10px;
+
+            border: none;
+            background: transparent;
+
+            @media (min-width: 1000px) {
+              font-size: 20px;
+            }
+
+            @media (max-width: 1000px) {
+              font-size: 28px;
+            }
+          }
+        }
+
+        @media (min-width: 1000px) {
+          width: 560px;
+        }
+
+        @media (max-width: 1000px) {
+          width: 660px;
+        }
+
+        &--twostyle {
+          @extend .payment__menu-option__input;
+
+          fieldset {
+            &:hover {
+              cursor: text;
+            }
+
+            input {
+              color: white;
+
+              &::placeholder {
+                color: #5491D8;
+              }
+            }
+          }
+        }
+
+        &-menu {
+          display: none;
+          opacity: 0;
+
+          position: absolute;
+
+          margin-left: -38px;
+
+          transition: opacity 0.4s ease-in-out;
+
+          &-button {
+            button {
+              margin-left: -140px;
+
+              width: 106px;
+              height: 40px;
+
+              background: linear-gradient(0deg, #5491D8, #5491D8), #121C28;
+              border-radius: 8px;
+
+              font-family: 'Montserrat', sans-serif;
+              font-style: normal;
+              font-weight: 500;
+              font-size: 16px;
+
+              color: #FFFFFF;
+
+              &:hover {
+                cursor: pointer;
+              }
+
+              @media (min-width: 1000px) {
+                width: 106px;
+                border: 1px solid #5491D8;
+              }
+
+              @media (max-width: 1000px) {
+                width: 100px;
+                border: 2px solid #5491D8;
+              }
+            }
+
+            input {
+              width: 530px;
+
+              /*border-radius: 16px;*/
+
+              background: #10151b;
+
+              height: 60px;
+
+              padding-left: 22px;
+              padding-top: 6px;
+
+              &::placeholder {
+                font-family: 'Montserrat', sans-serif;
+                font-style: normal;
+                font-weight: 600;
+                font-size: 20px;
+
+                color: #FFFFFF;
+              }
+
+              @media (min-width: 1000px) {
+                width: 530px;
+
+                border: 1px solid #5491D8;
+              }
+
+              @media (max-width: 1000px) {
+                width: 628px;
+
+                border: 2px solid #5491D8;
+              }
+            }
+            &s {
+            }
+          }
+        }
+
+        &-gift {
+          position: absolute;
+
+          font-family: 'Montserrat', sans-serif;
+          font-style: normal;
+          font-weight: 500;
+          font-size: 16px;
+
+          color: #FFFFFF;
+
+          background: linear-gradient(0deg, #5491D8, #5491D8), #121C28;
+          border: 1px solid #5491D8;
+          border-radius: 8px;
+
+          transition: margin-top 0.8s ease;
+
+          &:hover {
+            cursor: pointer;
+          }
+
+          @media (min-width: 1000px) {
+            width: 210px;
+            height: 32px;
+
+            font-size: 16px;
+
+            margin-left: 322px;
+            margin-top: -16px;
+          }
+
+          @media (max-width: 1000px) {
+            display: none;
+          }
+
+          &--mobile {
+            @extend .payment__menu-option__input-gift;
+
+            @media (min-width: 1000px) {
+              display: none;
+            }
+
+            @media (max-width: 1000px) {
+              display: block;
+
+              width: 660px;
+              height: 54px;
+
+              border-radius: 18px;
+
+              font-size: 24px;
+
+              margin-top: 10px;
+            }
+          }
+        }
+
+        &-elements {
+          display: flex;
+          justify-content: center;
+        }
+
+        &s {
+          margin-top: -50px;
+        }
+      }
+    }
+
+    &-title {
+      &__text {
+        font-family: 'Uni Sans', sans-serif;
+        font-style: normal;
+        font-weight: 800;
+
+        text-align: center;
+
+        color: #FFFFFF;
+
+        @media (min-width: 1000px) {
+          font-size: 32px;
+        }
+
+        @media (max-width: 1000px) {
+          font-size: 56px;
+        }
+      }
+
+      &__button {
+        opacity: 65%;
+
+        display: inline-block;
+
+        margin-right: 12px;
+
+        background: rgba(18, 28, 40, 0.63);
+        backdrop-filter: blur(2px);
+        border-radius: 12px;
+
+        font-family: 'Montserrat', sans-serif;
+        color: #56A0F6;
+
+        transition: opacity 0.4s ease-in-out;
+
+        &:hover {
+          cursor: pointer;
+        }
+
+        @media (min-width: 1000px) {
+          height: 48px;
+
+          border: 1px solid #56A0F6;
+
+          padding: 0 18px;
+
+          font-weight: 600;
+          font-size: 18px;
+        }
+
+        @media (max-width: 1000px) {
+          height: 60px;
+
+          border: 2px solid #56A0F6;
+
+          padding: 0 22px;
+
+          font-weight: 600;
+          font-size: 30px;
+        }
+
+        &--select {
+          @extend .payment__menu-title__button;
+
+          opacity: 100%;
+        }
+
+        &-elements {
+          display: flex;
+          justify-content: center;
+
+          margin-left: -30px;
+
+          @media (min-width: 1000px) {
+            margin-top: -30px;
+          }
+
+          @media (max-width: 1000px) {
+            margin-top: -50px;
+          }
+        }
+
+        &s {
+
+        }
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
-from typing import Optional, Union
+from typing import List, Optional, Union
 
-from pydantic import AliasPath, BaseModel, Field
+from pydantic import AliasPath, BaseModel, Field, HttpUrl
 
 
 class UserPremium(BaseModel):
@@ -61,3 +61,16 @@ class Payment(BaseModel):
     def model_post_init(self, _):
         if not self.to_id:
             self.to_id = self.from_id
+
+
+class LeaderboardItem(BaseModel):
+    place: int
+    avatar: HttpUrl
+    domain: str
+    username: str
+    value: str
+
+
+class LeaderboardPage(BaseModel):
+    total: int
+    items: List[LeaderboardItem]
