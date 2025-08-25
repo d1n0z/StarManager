@@ -4,8 +4,8 @@ from vkbottle_types.events.bot_events import MessageNew
 
 import keyboard
 import messages
-from Bot.checkers import getUInfBanned
 from Bot.utils import (
+    getRaidModeActive,
     kickUser,
     getUserName,
     getUserBan,
@@ -97,7 +97,7 @@ async def action_handle(event: MessageNew) -> None:
 
     if (
         await getUserAccessLevel(id, chat_id) <= 0
-        and (await getChatSettings(chat_id))["main"]["kickInvitedByNoAccess"]
+        and ((await getChatSettings(chat_id))["main"]["kickInvitedByNoAccess"] or await getRaidModeActive(chat_id))
     ):
         await kickUser(uid, chat_id=chat_id)
         return

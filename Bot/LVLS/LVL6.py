@@ -610,3 +610,15 @@ async def rename(message: Message):
             await getUserNickname(message.from_id, chat_id),
         ),
     )
+
+
+@bl.chat_message(SearchCMD("raid"))
+async def raid(message: Message):
+    async with (await pool()).acquire() as conn:
+        status = await conn.fetchval("select status from raidmode where chat_id=$1", message.peer_id - 2000000000)
+    await messagereply(
+        message,
+        disable_mentions=1,
+        message=messages.raid(),
+        keyboard=keyboard.raid(message.from_id, status)
+    )

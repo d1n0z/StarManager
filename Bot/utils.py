@@ -983,7 +983,9 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings):
 
 
 async def command_cooldown_check(uid: int, cmd: str):
-    if not (cd := (COMMANDS_COOLDOWN.get(cmd, 0) / (2 if await getUserPremium(uid) else 1))):
+    if not (
+        cd := (COMMANDS_COOLDOWN.get(cmd, 0) / (2 if await getUserPremium(uid) else 1))
+    ):
         return None
     if (
         last_command := managers.commands_cooldown.get_user_time(uid, cmd)
@@ -1356,7 +1358,7 @@ async def getHiddenAlbumUser():
     async with _hiddenalbumlock:
         if _hiddenalbumuid:
             return _hiddenalbumuid
-        
+
         async with (await pool()).acquire() as conn:
             last_uid_row = await conn.fetchrow(
                 "select uid from allusers where is_last_hidden_album=true limit 1"
@@ -1377,7 +1379,9 @@ async def getHiddenAlbumUser():
 
             excluded = [
                 i[0]
-                for i in await conn.fetch("select uid from hiddenalbumserverinternalerror")
+                for i in await conn.fetch(
+                    "select uid from hiddenalbumserverinternalerror"
+                )
             ]
             userspool = await conn.fetch(
                 "select uid from allusers where not uid=ANY($1) and uid>0", excluded
@@ -1394,7 +1398,8 @@ async def getHiddenAlbumUser():
                 async with (await pool()).acquire() as conn:
                     await conn.execute("update allusers set is_last_hidden_album=false")
                     await conn.execute(
-                        "update allusers set is_last_hidden_album=true where uid=$1", uid
+                        "update allusers set is_last_hidden_album=true where uid=$1",
+                        uid,
                     )
                 return _hiddenalbumuid
 
@@ -1602,7 +1607,9 @@ async def create_payment(
         },
     }
     if coins:
-        payment["receipt"]["items"][0]["description"] = pointWords(coins, ("монетка", "монетки", "монеток"))
+        payment["receipt"]["items"][0]["description"] = pointWords(
+            coins, ("монетка", "монетки", "монеток")
+        )
         payment["metadata"]["coins"] = coins
     elif chat_id:
         payment["receipt"]["items"][0]["description"] = "Premium-беседа"
@@ -1612,17 +1619,17 @@ async def create_payment(
 
     if promo and promo[1]:
         payment["metadata"]["personal"] = promo[2]
-    
+
     if to_id != from_id:
         payment["metadata"]["gift"] = to_id
 
     if email:
         payment["receipt"]["customer"]["email"] = email
         payment["receipt"]["email"] = email
-    
+
     if delete_message_cmid:
         payment["metadata"]["del_cmid"] = delete_message_cmid
-    
+
     Configuration.account_id = YOOKASSA_MERCHANT_ID
     Configuration.secret_key = YOOKASSA_TOKEN
     return Payment.create(payment)
@@ -1635,3 +1642,10 @@ async def getUserShopBonuses(uid):
                 "select exp_2x, no_comission from shop where uid=$1", uid
             )
         ) or [0, 0]
+
+
+async def getRaidModeActive(chat_id):
+    async with (await pool()).acquire() as conn:
+        return bool(
+            await conn.fetchval("select status from raidmode where chat_id=$1", chat_id)
+        )

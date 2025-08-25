@@ -2038,3 +2038,16 @@ def shop_bonuses(uid, activated_bonuses: list):
     kb.add(Callback("Назад", {"cmd": "shop", "uid": uid}))
 
     return kb.get_json()
+
+
+def raid(uid, status: bool):
+    kb = Keyboard(inline=True)
+
+    kb.add(
+        Callback(
+            "Выключить" if status else "Включить", {"cmd": "raid_turn", "uid": uid}
+        ),
+        KeyboardButtonColor.NEGATIVE if status else KeyboardButtonColor.POSITIVE
+    )
+
+    return kb.get_json()

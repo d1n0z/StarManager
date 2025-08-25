@@ -831,5 +831,14 @@ class Shop(Model):
         table_name = 'shop'
 
 
+class RaidMode(Model):
+    chat_id = IntegerField(unique=True)
+    status = BooleanField(default=False)
+
+    class Meta:
+        database = dbhandle
+        table_name = 'raidmode'
+
+
 if __name__ == '__main__':
     dbhandle.create_tables(Model.__subclasses__())

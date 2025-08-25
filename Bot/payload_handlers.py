@@ -145,6 +145,7 @@ async def join(message: MessageEvent):
             )
             return
 
+
 @bl.raw_event(
     GroupEventType.MESSAGE_EVENT,
     MessageEvent,
@@ -152,15 +153,17 @@ async def join(message: MessageEvent):
 )
 async def duel(message: MessageEvent):
     if not message.conversation_message_id:
-        return  
+        return
 
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
-    async with managers.duel_lock.get_context(chat_id, message.conversation_message_id) as ctx:
+    async with managers.duel_lock.get_context(
+        chat_id, message.conversation_message_id
+    ) as ctx:
         if not ctx.allowed:
             await message.show_snackbar("Эта дуэль уже окончена.")
             return
-        
+
         payload = message.payload
         duelcoins = int(payload["coins"])
         id = int(message.user_id)
@@ -206,7 +209,7 @@ async def duel(message: MessageEvent):
         )
         if not edit_result:
             return
-        
+
         ctx.mark_used()
 
         await utils.addUserCoins(loseid, -duelcoins)
@@ -219,9 +222,9 @@ async def duel(message: MessageEvent):
                 await conn.execute(
                     "insert into duelwins (uid, wins) values ($1, 1)", winid
                 )
-        
+
         await utils.sendMessageEventAnswer(message.event_id, id, peer_id)
-        
+
         uname = await utils.getUserNickname(uid, chat_id) or await utils.getUserName(
             uid
         )
@@ -3492,4 +3495,29 @@ async def shop_buy(message: MessageEvent):
     await utils.sendMessage(
         message.peer_id,
         f'🛍 [id{message.user_id}|{user_name}] успешно купил "{lot_name}" за {cost} монеток',
+    )
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["raid_turn"])
+)
+async def raid_turn(message: MessageEvent):
+    async with (await pool()).acquire() as conn:
+        if (
+            status := await conn.fetchval(
+                "update raidmode set status=not status where chat_id=$1 returning status",
+                message.peer_id - 2000000000,
+            )
+        ) is None:
+            await conn.execute(
+                "insert into raidmode (chat_id, status) values ($1, True)",
+                message.peer_id - 2000000000,
+            )
+            status = True
+
+    await utils.editMessage(
+        messages.raid(),
+        message.object.peer_id,
+        message.conversation_message_id,
+        keyboard.raid(message.user_id, status),
     )

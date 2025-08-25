@@ -3158,3 +3158,7 @@ def shop_xp(coins, limit):
 
 def shop_bonuses(coins):
     return get("shop_bonuses", coins=coins)
+
+
+def raid():
+    return get("raid")
