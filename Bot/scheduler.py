@@ -9,8 +9,9 @@ import time
 from datetime import datetime
 import traceback
 
-import aiocron
 import yadisk
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from loguru import logger
 
 import keyboard
@@ -71,8 +72,8 @@ def format_exception_for_telegram(exc: BaseException) -> str:
     return full_message
 
 
-async def with_lock(name: str, func, use_db=True):
-    lock = task_locks[name]
+async def with_lock(func, use_db=True):
+    lock = task_locks[func.__name__]
     if lock.locked():
         return
     async with lock:
@@ -90,6 +91,15 @@ async def with_lock(name: str, func, use_db=True):
                 text=format_exception_for_telegram(e),
                 parse_mode="HTML",
             )
+
+
+def schedule(coro_func, *, use_db: bool = True):
+    async def _runner():
+        try:
+            await with_lock(coro_func, use_db=use_db)
+        except Exception:
+            pass
+    return _runner
 
 
 async def backup():
@@ -482,39 +492,22 @@ async def everyday(conn):
 
 
 async def run():
-    loop = asyncio.get_event_loop()
-    asyncio.set_event_loop(loop)
+    scheduler = AsyncIOScheduler(timezone="GMT+3")
+
     logger.info("loading tasks")
 
-    aiocron.crontab(
-        "*/1 * * * *",
-        func=lambda: with_lock("run_notifications", run_notifications),
-        loop=loop,
-    )
-    aiocron.crontab(
-        "*/1 * * * *",
-        func=lambda: with_lock(
-            "run_nightmode_notifications", run_nightmode_notifications
-        ),
-        loop=loop,
-    )
-    aiocron.crontab(
-        "*/1 * * * *", func=lambda: with_lock("everyminute", everyminute), loop=loop
-    )
-    aiocron.crontab(
-        "*/10 * * * *", func=lambda: with_lock("every10min", every10min), loop=loop
-    )
-    aiocron.crontab(
-        "0 6/12 * * *",
-        func=lambda: with_lock("backup", backup, use_db=False),
-        loop=loop,
-    )
-    aiocron.crontab(
-        "0 1/3 * * *", func=lambda: with_lock("updateInfo", updateInfo), loop=loop
-    )
-    aiocron.crontab(
-        "*/15 * * * *", func=lambda: with_lock("mathgiveaway", mathgiveaway), loop=loop
-    )
-    aiocron.crontab(
-        "0 0 * * *", func=lambda: with_lock("everyday", everyday), loop=loop
-    )
+    scheduler.add_job(schedule(run_notifications), CronTrigger.from_crontab("*/1 * * * *"))
+    scheduler.add_job(schedule(run_nightmode_notifications), CronTrigger.from_crontab("*/1 * * * *"))
+    scheduler.add_job(schedule(everyminute), CronTrigger.from_crontab("*/1 * * * *"))
+
+    scheduler.add_job(schedule(every10min), CronTrigger.from_crontab("*/10 * * * *"))
+
+    scheduler.add_job(schedule(backup, use_db=False), CronTrigger.from_crontab("0 6,18 * * *"))
+
+    scheduler.add_job(schedule(updateInfo), CronTrigger.from_crontab("0 */3 * * *"))
+
+    scheduler.add_job(schedule(mathgiveaway), CronTrigger.from_crontab("*/15 * * * *"))
+
+    scheduler.add_job(schedule(everyday), CronTrigger.from_crontab("0 0 * * *"))
+
+    scheduler.start()
