@@ -75,7 +75,7 @@ async def getUserName(uid: int) -> str:
             "insert into usernames (uid, name, domain) values ($1, $2, $3)",
             uid,
             f"{name[0].first_name} {name[0].last_name}",
-            name[0].domain,
+            name[0].domain or f'id{name.id}',
         )
         return f"{name[0].first_name} {name[0].last_name}"
 
