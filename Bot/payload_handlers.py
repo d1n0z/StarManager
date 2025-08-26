@@ -3389,7 +3389,7 @@ async def shop_bonuses(message: MessageEvent):
 async def shop_buy(message: MessageEvent):
     category = message.payload.get("category")
     option = message.payload.get("option")
-    lot = SHOP_LOTS[category][option]
+    lot = SHOP_LOTS[category][list(SHOP_LOTS[category].keys())[option]]
     cost = lot["cost"]
 
     if (user_coins := await utils.getUserCoins(message.user_id)) < cost:
