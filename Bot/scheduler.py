@@ -142,7 +142,7 @@ async def updateInfo(conn):
         try:
             result = vk_api_session.method("execute", {"code": code})
             updates = []
-            for u in result["items"]:
+            for u in result:
                 full_name = f"{u['first_name']} {u['last_name']}"
                 domain = u.get("domain", f"id{u['id']}")
                 updates.append((full_name, domain, u["id"]))
