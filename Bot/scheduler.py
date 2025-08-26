@@ -132,13 +132,11 @@ async def backup():
 
 
 async def updateInfo(conn):
-    ts_cutoff = time.time() - 43200
-
     user_rows = await conn.fetch("select uid from usernames")
     for i in range(0, len(user_rows), 25):
         batch = [r[0] for r in user_rows[i : i + 25]]
         code = f"""
-        var users = API.users.get({{"user_ids": "{','.join(map(str, batch))}", "fields": "domain"}});
+        var users = API.users.get({{"user_ids": "{",".join(map(str, batch))}", "fields": "domain"}});
         return users;
         """
         try:
@@ -146,7 +144,7 @@ async def updateInfo(conn):
             updates = []
             for u in result["items"]:
                 full_name = f"{u['first_name']} {u['last_name']}"
-                domain = u.get("domain")
+                domain = u.get("domain", f"id{u['id']}")
                 updates.append((full_name, domain, u["id"]))
             await conn.executemany(
                 "update usernames set name = $1, domain = $2 where uid = $3", updates
@@ -179,7 +177,7 @@ async def updateInfo(conn):
     for i in range(0, len(group_rows), 500):
         batch = [r[0] for r in group_rows[i : i + 500]]
         code = f"""
-        var grp = API.groups.getById({{"group_ids": "{','.join(map(str, map(abs, batch)))}"}});
+        var grp = API.groups.getById({{"group_ids": "{",".join(map(str, map(abs, batch)))}"}});
         return grp;
         """
         try:
