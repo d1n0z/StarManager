@@ -2,6 +2,7 @@ import sys
 import time
 import traceback
 from datetime import datetime
+from typing import Optional
 
 import enums
 import httpx
@@ -507,16 +508,28 @@ async def get_leaderboard(
     category: enums.LeaderboardType,
     offset: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=50),
+    search: Optional[str] = Query(None, min_length=1),
 ):
     base_query, paginated_query = category.get_queries()
-    async with (await pool()).acquire() as conn:
-        records = await conn.fetch(paginated_query, offset, limit)
-        total = await conn.fetchval(f"SELECT COUNT(*) FROM ({base_query}) AS sub")
 
-    user_ids = list(set(record["uid"] for record in records))
+    if search:
+        search_pattern = f"%{search}%"
+        filter_clause = "WHERE (u.first_name || ' ' || u.last_name) ILIKE $1 OR u.domain ILIKE $1"
+        base_query = f"SELECT * FROM ({base_query}) AS v JOIN users u ON u.id = v.uid {filter_clause}"
+        paginated_query = f"{base_query} ORDER BY v.value DESC OFFSET $2 LIMIT $3"
+
+    async with (await pool()).acquire() as conn:
+        if search:
+            records = await conn.fetch(paginated_query, search_pattern, offset, limit)
+            total = await conn.fetchval(f"SELECT COUNT(*) FROM ({base_query}) AS sub", search_pattern)
+        else:
+            records = await conn.fetch(paginated_query, offset, limit)
+            total = await conn.fetchval(f"SELECT COUNT(*) FROM ({base_query}) AS sub")
+
+    user_ids = list({record["uid"] for record in records})
     user_data = await config.api.users.get(
         user_ids=user_ids,
-        fields=[UsersFields.PHOTO_MAX.value, UsersFields.DOMAIN.value], # type: ignore
+        fields=[UsersFields.PHOTO_MAX.value, UsersFields.DOMAIN.value],  # type: ignore
     )
     user_data = {user.id: user for user in user_data}
 
