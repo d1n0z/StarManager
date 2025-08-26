@@ -28,6 +28,7 @@ from vkbottle_types.objects import (
     MessagesMessage,
     MessagesMessageAttachmentType,
     MessagesSendUserIdsResponseItem,
+    UsersFields,
 )
 from yookassa import Configuration, Payment
 from yookassa.payment import PaymentResponse
@@ -67,13 +68,14 @@ async def getUserName(uid: int) -> str:
     async with (await pool()).acquire() as conn:
         if name := await conn.fetchval("select name from usernames where uid=$1", uid):
             return name
-        name = await api.users.get(user_ids=uid)
+        name = await api.users.get(user_ids=[uid], fields=[UsersFields.DOMAIN.value])  # type: ignore
         if not name:
             return "UNKNOWN"
         await conn.execute(
-            "insert into usernames (uid, name) values ($1, $2)",
+            "insert into usernames (uid, name, domain) values ($1, $2, $3)",
             uid,
             f"{name[0].first_name} {name[0].last_name}",
+            name[0].domain,
         )
         return f"{name[0].first_name} {name[0].last_name}"
 
