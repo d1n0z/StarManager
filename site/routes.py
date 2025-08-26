@@ -515,7 +515,7 @@ async def get_leaderboard(
     if search:
         search_pattern = f"%{search}%"
         filter_clause = "WHERE (u.first_name || ' ' || u.last_name) ILIKE $1 OR u.domain ILIKE $1"
-        base_query = f"SELECT * FROM ({base_query}) AS v JOIN users u ON u.id = v.uid {filter_clause}"
+        base_query = f"SELECT * FROM ({base_query}) AS v JOIN usernames u ON u.id = v.uid {filter_clause}"
         paginated_query = f"{base_query} ORDER BY v.value DESC OFFSET $2 LIMIT $3"
 
     async with (await pool()).acquire() as conn:

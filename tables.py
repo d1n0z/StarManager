@@ -457,6 +457,7 @@ class AllUsers(Model):
 class UserNames(Model):
     uid = IntegerField(default=0, index=True, unique=True)
     name = TextField()
+    domain = TextField(null=True)
 
     class Meta:
         database = dbhandle

@@ -133,8 +133,8 @@ async def updateInfo(conn):
         try:
             names = await api.users.get(user_ids=[row[0] for row in chunk])
             await conn.executemany(
-                "UPDATE usernames SET name = $1 WHERE uid = $2",
-                [(f"{name.first_name} {name.last_name}", name.id) for name in names],
+                "UPDATE usernames SET name = $1, domain = $2 WHERE uid = $3",
+                [(f"{name.first_name} {name.last_name}", name.domain or None, name.id) for name in names],
             )
         except Exception:
             pass
