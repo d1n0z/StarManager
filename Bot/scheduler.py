@@ -134,139 +134,65 @@ async def backup():
 async def updateInfo(conn):
     ts_cutoff = time.time() - 43200
 
-    for chunk in chunks(
-        await conn.fetch("SELECT uid FROM usernames"), 250
-    ):
-        ids = [row[0] for row in chunk]
+    user_rows = await conn.fetch("select uid from usernames")
+    for i in range(0, len(user_rows), 25):
+        batch = [r[0] for r in user_rows[i : i + 25]]
         code = f"""
-        var ids = {ids};
-        var result = [];
-        var i = 0;
-        while (i < ids.length) {{
-            var part = ids.slice(i, i + 25);
-            result = result + API.users.get({{"user_ids": part, "fields": "domain"}});
-            i = i + 25;
-        }}
-        return result;
+        var users = API.users.get({{"user_ids": "{','.join(map(str, batch))}", "fields": "domain"}});
+        return users;
         """
         try:
-            names = await api.execute(code=code)
+            result = vk_api_session.method("execute", {"code": code})
+            updates = []
+            for u in result["items"]:
+                full_name = f"{u['first_name']} {u['last_name']}"
+                domain = u.get("domain")
+                updates.append((full_name, domain, u["id"]))
             await conn.executemany(
-                "UPDATE usernames SET name = $1, domain = $2 WHERE uid = $3",
-                [
-                    (
-                        f"{user['first_name']} {user['last_name']}",
-                        user.get("domain"),
-                        user["id"],
-                    )
-                    for user in names
-                ],
+                "update usernames set name = $1, domain = $2 where uid = $3", updates
             )
         except Exception:
-            logger.exception("VKScript users.get failed")
+            logger.exception("Users update exception:")
 
-    for chunk in chunks(
-        await conn.fetch("SELECT chat_id FROM chatnames"), 100
-    ):
-        peer_ids = [2000000000 + row[0] for row in chunk]
+    chat_rows = await conn.fetch("select chat_id from chatnames")
+    for i in range(0, len(chat_rows), 100):
+        batch = [r[0] for r in chat_rows[i : i + 100]]
+        peer_ids = ",".join(str(2000000000 + cid) for cid in batch)
         code = f"""
-        return API.messages.getConversationsById({{"peer_ids": {peer_ids}}});
+        var conv = API.messages.getConversationsById({{"peer_ids": "{peer_ids}"}});
+        return conv;
         """
         try:
-            chats = await api.execute(code=code)
+            result = vk_api_session.method("execute", {"code": code})
+            updates = []
+            for item in result["items"]:
+                pid = item["peer"]["id"] - 2000000000
+                title = item["chat_settings"]["title"]
+                updates.append((title, pid))
             await conn.executemany(
-                "UPDATE chatnames SET name = $1 WHERE chat_id = $2",
-                [
-                    (
-                        chat["chat_settings"]["title"],
-                        chat["peer"]["id"] - 2000000000,
-                    )
-                    for chat in chats["items"]
-                ],
+                "update chatnames set name = $1 where chat_id = $2", updates
             )
         except Exception:
-            logger.exception("VKScript chatnames update failed")
+            logger.exception("Chats update exception:")
 
-    for chunk in chunks(
-        await conn.fetch("SELECT group_id FROM groupnames"), 500
-    ):
-        ids = [abs(row[0]) for row in chunk]
+    group_rows = await conn.fetch("select group_id from groupnames")
+    for i in range(0, len(group_rows), 500):
+        batch = [r[0] for r in group_rows[i : i + 500]]
         code = f"""
-        return API.groups.getById({{"group_ids": "{",".join(map(str, ids))}"}}); 
+        var grp = API.groups.getById({{"group_ids": "{','.join(map(str, map(abs, batch)))}"}});
+        return grp;
         """
         try:
-            groups = await api.execute(code=code)
+            result = vk_api_session.method("execute", {"code": code})
+            updates = []
+            for g in result["items"]:
+                gid = -abs(g["id"])
+                updates.append((g["name"], gid))
             await conn.executemany(
-                "UPDATE groupnames SET name = $1 WHERE group_id = $2",
-                [(g["name"], -abs(g["id"])) for g in groups],
+                "update groupnames set name = $1 where group_id = $2", updates
             )
         except Exception:
-            logger.exception("VKScript groups.getById failed")
-
-    recent_updates = [
-        row[0]
-        for row in await conn.fetch(
-            "SELECT chat_id FROM publicchatssettings WHERE last_update > $1",
-            ts_cutoff,
-        )
-    ]
-    target_chats = await conn.fetch(
-        "SELECT chat_id FROM publicchats WHERE isopen = true AND NOT chat_id = ANY($1)",
-        recent_updates,
-    )
-
-    for chunk in chunks(
-        target_chats, 10
-    ):
-        for row in chunk:
-            chat_id = row[0]
-            try:
-                link = vk_api_session.method(
-                    "messages.getInviteLink",
-                    {"peer_id": 2000000000 + chat_id, "group_id": GROUP_ID},
-                )["link"]
-
-                code = f"""
-                return API.messages.getConversationsById({{"peer_ids": [{2000000000 + chat_id}]}}).items;
-                """
-                result = await api.execute(code=code)
-
-                if not result:
-                    continue
-
-                vkchat = result[0]["chat_settings"]
-                photo = (
-                    vkchat.get("photo", {}).get("photo_200")
-                    or vkchat.get("photo", {}).get("photo_100")
-                    or vkchat.get("photo", {}).get("photo_50")
-                    or PHOTO_NOT_FOUND
-                )
-                updated = await conn.fetchval(
-                    "UPDATE publicchatssettings SET link = $1, photo = $2, name = $3, members = $4, last_update = $5 "
-                    "WHERE chat_id = $6 RETURNING 1",
-                    link,
-                    photo,
-                    vkchat["title"],
-                    vkchat["members_count"],
-                    time.time(),
-                    chat_id,
-                )
-                if not updated:
-                    await conn.execute(
-                        "INSERT INTO publicchatssettings (chat_id, link, photo, name, members, last_update) "
-                        "VALUES ($1, $2, $3, $4, $5, $6)",
-                        chat_id,
-                        link,
-                        photo,
-                        vkchat["title"],
-                        vkchat["members_count"],
-                        time.time(),
-                    )
-            except Exception:
-                await conn.execute(
-                    "UPDATE publicchats SET isopen = false WHERE chat_id = $1", chat_id
-                )
-            await asyncio.sleep(0.2)
+            logger.exception("Groups update exception:")
 
 
 async def every10min(conn):
