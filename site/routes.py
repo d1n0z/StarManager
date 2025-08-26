@@ -510,35 +510,33 @@ async def get_leaderboard(
     limit: int = Query(10, ge=1, le=50),
     search: Optional[str] = Query(None, min_length=1),
 ):
-    base_query, _ = category.get_queries()
+    base_query, paginated_query = category.get_queries()
+
+    if search:
+        search_pattern = f"%{search}%"
+        filter_clause = "WHERE (u.first_name || ' ' || u.last_name) ILIKE $1 OR u.domain ILIKE $1"
+        base_query = f"SELECT * FROM ({base_query}) AS v JOIN users u ON u.id = v.uid {filter_clause}"
+        paginated_query = f"{base_query} ORDER BY v.value DESC OFFSET $2 LIMIT $3"
 
     async with (await pool()).acquire() as conn:
-        records = await conn.fetch(base_query)
-    user_ids = list({record["uid"] for record in records})
+        if search:
+            records = await conn.fetch(paginated_query, search_pattern, offset, limit)
+            total = await conn.fetchval(f"SELECT COUNT(*) FROM ({base_query}) AS sub", search_pattern)
+        else:
+            records = await conn.fetch(paginated_query, offset, limit)
+            total = await conn.fetchval(f"SELECT COUNT(*) FROM ({base_query}) AS sub")
 
+    user_ids = list({record["uid"] for record in records})
     user_data = await config.api.users.get(
         user_ids=user_ids,
         fields=[UsersFields.PHOTO_MAX.value, UsersFields.DOMAIN.value],  # type: ignore
     )
-    user_data_map = {user.id: user for user in user_data}
-
-    if search:
-        lowered = search.lower()
-        allowed_ids = {
-            user.id
-            for user in user_data
-            if lowered in f"{user.first_name} {user.last_name}".lower()
-            or lowered in (user.domain or f"id{user.id}").lower()
-        }
-        records = [r for r in records if r["uid"] in allowed_ids]
-
-    total = len(records)
-    paginated_records = records[offset : offset + limit]
+    user_data = {user.id: user for user in user_data}
 
     items = []
-    for i, record in enumerate(paginated_records):
+    for i, record in enumerate(records):
         uid = record["uid"]
-        user = user_data_map.get(uid)
+        user = user_data.get(uid)
         if user is None:
             continue
 
@@ -555,7 +553,7 @@ async def get_leaderboard(
                 place=offset + i + 1,
                 avatar=pydantic.HttpUrl(url=avatar_url),
                 username=username,
-                domain=user.domain or f"id{user.id}",
+                domain=user.domain or f'id{user.id}',
                 value=value,
             )
         )
