@@ -1,18 +1,19 @@
 import asyncio
-from collections import defaultdict
 import html
 import os
 import random
 import string
 import subprocess
 import time
-from datetime import datetime
 import traceback
+from collections import defaultdict
+from datetime import datetime
 
 import yadisk
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from loguru import logger
+from vkbottle_types.objects import UsersFields
 
 import keyboard
 import messages
@@ -35,8 +36,8 @@ from config.config import (
     PATH,
     PHOTO_NOT_FOUND,
     TG_BACKUP_THREAD_ID,
-    TG_SCHEDULER_THREAD,
     TG_CHAT_ID,
+    TG_SCHEDULER_THREAD,
     USER,
     YANDEX_TOKEN,
     api,
@@ -48,7 +49,7 @@ task_locks = defaultdict(asyncio.Lock)
 
 
 def format_exception_for_telegram(exc: BaseException) -> str:
-    tb = ''.join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
     header = "⚠️ Scheduler exception!\n"
 
     tb = html.escape(tb)
@@ -58,16 +59,18 @@ def format_exception_for_telegram(exc: BaseException) -> str:
     body = f"{code_block_start}{tb}{code_block_end}"
     full_message = f"{header}{body}"
 
-    if len(full_message) > 2 ** 12:
-        excess = len(full_message) - 2 ** 12
+    if len(full_message) > 2**12:
+        excess = len(full_message) - 2**12
         tb_lines = tb.splitlines()
         trimmed_tb = "\n".join(tb_lines)
         while excess > 0 and len(tb_lines) > 1:
             tb_lines.pop(0)
             trimmed_tb = "\n".join(tb_lines)
-            body = f"{code_block_start}... (output trimmed)\n{trimmed_tb}{code_block_end}"
+            body = (
+                f"{code_block_start}... (output trimmed)\n{trimmed_tb}{code_block_end}"
+            )
             full_message = f"{header}{body}"
-            excess = len(full_message) - 2 ** 12
+            excess = len(full_message) - 2**12
 
     return full_message
 
@@ -84,7 +87,7 @@ async def with_lock(func, use_db=True):
             else:
                 await func()
         except Exception as e:
-            logger.exception('Exception traceback:')
+            logger.exception("Exception traceback:")
             await tgbot.send_message(
                 chat_id=TG_CHAT_ID,
                 message_thread_id=int(TG_SCHEDULER_THREAD),
@@ -99,6 +102,7 @@ def schedule(coro_func, *, use_db: bool = True):
             await with_lock(coro_func, use_db=use_db)
         except Exception:
             pass
+
     return _runner
 
 
@@ -131,10 +135,19 @@ async def updateInfo(conn):
     ts_cutoff = time.time() - 43200
     for chunk in chunks(await conn.fetch("SELECT uid FROM usernames"), 999):
         try:
-            names = await api.users.get(user_ids=[row[0] for row in chunk])
+            names = await api.users.get(
+                user_ids=[row[0] for row in chunk], fields=[UsersFields.DOMAIN.value]
+            )  # type: ignore
             await conn.executemany(
                 "UPDATE usernames SET name = $1, domain = $2 WHERE uid = $3",
-                [(f"{name.first_name} {name.last_name}", name.domain or None, name.id) for name in names],
+                [
+                    (
+                        f"{name.first_name} {name.last_name}",
+                        name.domain or None,
+                        name.id,
+                    )
+                    for name in names
+                ],
             )
         except Exception:
             pass
@@ -496,13 +509,19 @@ async def run():
 
     logger.info("loading tasks")
 
-    scheduler.add_job(schedule(run_notifications), CronTrigger.from_crontab("*/1 * * * *"))
-    scheduler.add_job(schedule(run_nightmode_notifications), CronTrigger.from_crontab("*/1 * * * *"))
+    scheduler.add_job(
+        schedule(run_notifications), CronTrigger.from_crontab("*/1 * * * *")
+    )
+    scheduler.add_job(
+        schedule(run_nightmode_notifications), CronTrigger.from_crontab("*/1 * * * *")
+    )
     scheduler.add_job(schedule(everyminute), CronTrigger.from_crontab("*/1 * * * *"))
 
     scheduler.add_job(schedule(every10min), CronTrigger.from_crontab("*/10 * * * *"))
 
-    scheduler.add_job(schedule(backup, use_db=False), CronTrigger.from_crontab("0 6,18 * * *"))
+    scheduler.add_job(
+        schedule(backup, use_db=False), CronTrigger.from_crontab("0 6,18 * * *")
+    )
 
     scheduler.add_job(schedule(updateInfo), CronTrigger.from_crontab("0 */3 * * *"))
 
