@@ -91,8 +91,8 @@ def main(args: Namespace | None):
         [
             "rm",
             f"{settings.database.name}.sql",
-            settings.service.path + "media/temp/*",
-            settings.service.path + "media/tmp/*",
+            settings.service.path + "src/StarManager/core/media/temp/*",
+            settings.service.path + "src/StarManager/core/media/tmp/*",
             ">",
             "/dev/null",
             "2>&1",

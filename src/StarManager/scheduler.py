@@ -275,7 +275,7 @@ async def every10min(conn):
 
 async def everyminute(conn):
     now = time.time()
-    os.system(rf"find {settings.service.path}media/temp/ -mtime +1 -exec rm {{}} \;")
+    os.system(rf"find {settings.service.path}src/StarManager/core/media/temp/ -mtime +1 -exec rm {{}} \;")
     await conn.execute("DELETE FROM premium WHERE time < $1", now)
 
     captchas = await conn.fetch(
