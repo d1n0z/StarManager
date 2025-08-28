@@ -21,10 +21,11 @@ from StarManager.core.utils import (
 
 @AsyncLRU(maxsize=0)
 async def get(key: str, **kwargs):
-    msg = await tables.BotMessages.filter(key=key).first()
+    async with (await pool()).acquire() as conn:
+        msg = await conn.fetchval("select text from botmessages where key=$1", key)
     if msg is None:
         raise Exception(f'unknown message key "{key}"')
-    return msg.text.format(**kwargs)
+    return msg.format(**kwargs)
 
 
 async def join():
