@@ -855,8 +855,8 @@ async def getUserPrefixes(u_prem, uid) -> list:
     return settings.commands.prefix
 
 
-async def antispamChecker(chat_id, uid, message: MessagesMessage, settings) -> str | Literal[False]:
-    if settings["antispam"]["messagesPerMinute"]:
+async def antispamChecker(chat_id, uid, message: MessagesMessage, chat_settings) -> str | Literal[False]:
+    if chat_settings["antispam"]["messagesPerMinute"]:
         async with (await pool()).acquire() as conn:
             setting = await conn.fetchrow(
                 'select "value" from settings where chat_id=$1 and '
@@ -866,7 +866,7 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings) -> s
             if setting is not None and setting[0] is not None:
                 if managers.antispam.get_count(chat_id, uid) >= setting[0]:
                     return "messagesPerMinute"
-    if settings["antispam"]["maximumCharsInMessage"]:
+    if chat_settings["antispam"]["maximumCharsInMessage"]:
         async with (await pool()).acquire() as conn:
             setting = await conn.fetchrow(
                 "select \"value\" from settings where chat_id=$1 and setting='maximumCharsInMessage'",
@@ -875,7 +875,7 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings) -> s
         if setting and setting[0] is not None:
             if len(message.text) >= setting[0]:
                 return "maximumCharsInMessage"
-    if settings["antispam"]["disallowLinks"] and not any(
+    if chat_settings["antispam"]["disallowLinks"] and not any(
         message.text.startswith(i)
         for i in await getUserPrefixes(await getUserPremium(uid), uid)
     ):
@@ -892,7 +892,7 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings) -> s
                         y.replace("https://", "").replace("/", ""),
                     ):
                         return "disallowLinks"
-    if settings["antispam"]["disallowNSFW"] and message.attachments is not None:
+    if chat_settings["antispam"]["disallowNSFW"] and message.attachments is not None:
         for i in message.attachments:
             if i.type != MessagesMessageAttachmentType.PHOTO or i.photo is None or i.photo.sizes is None:
                 continue
@@ -911,7 +911,7 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings) -> s
             isNSFW = await NSFWDetector(filename)
             if isNSFW:
                 return "disallowNSFW"
-    if settings["antispam"]["vkLinks"]:
+    if chat_settings["antispam"]["vkLinks"]:
         data = message.text.split()
         async with (await pool()).acquire() as conn:
             for i in data:
@@ -924,7 +924,7 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings) -> s
                     i[i.find("vk.") :],
                 ):
                     return "vkLinks"
-    if settings["antispam"]["forwardeds"] and (
+    if chat_settings["antispam"]["forwardeds"] and (
         message.fwd_messages or message.attachments
     ):
         msgs = []
