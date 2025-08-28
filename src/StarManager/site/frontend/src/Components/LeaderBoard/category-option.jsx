@@ -1,4 +1,4 @@
-export default function CategoryOption({ nameCategory, descriptorsetTextCategory, flags, descriptorSetDisplayCategoryOption }) {
+export default function CategoryOption({ nameCategory, descriptorSetTextCategory, flags }) {
     let sizeBorderTopRightRadius = "0";
     let sizeBorderTopLeftRadius = "0";
     let sizeBorderBottomRightRadius = "0";
@@ -18,8 +18,16 @@ export default function CategoryOption({ nameCategory, descriptorsetTextCategory
     return (
         <li className={"show-menu-category-lists-el"}
             onClick={() => {
-                descriptorsetTextCategory(nameCategory)
-                descriptorSetDisplayCategoryOption("none")
+                descriptorSetTextCategory(nameCategory);
+
+                const menuOption
+                    = document.querySelector(".show-menu-category");
+                const inputOption
+                    = document.getElementById("input-option");
+
+                inputOption.style.borderBottomLeftRadius = "8px";
+                inputOption.style.borderBottomRightRadius = "8px";
+                menuOption.style.display = "none";
             }}>
             <button style={{
                 borderTopRightRadius: sizeBorderTopRightRadius,

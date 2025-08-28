@@ -1,5 +1,5 @@
 // React
-import { useEffect, useState } from "react";
+import {useEffect, useRef, useState} from "react";
 
 // component
 import { MiniProfileLegacy } from "../Components/mini-profile-legacy";
@@ -29,7 +29,7 @@ const TEST_RESPONSE = {
             "avatar": "https://sun1-89.userapi.com/s/v1/ig2/N_9GZV99ir_-ajNHB4mfZU0-7tmpPTGcLq3IDY8HZ-WWZNMjKTCDVpYqgmBITYP0PuR0xUIzXdiucvss6NX_dtO-.jpg?quality=95&crop=0,266,1049,1049&as=32x32,48x48,72x72,108x108,160x160,240x240,360x360,480x480,540x540,640x640,720x720&ava=1&cs=400x400",
             "domain": "tsobaev_l",
             "username": "Loma Federal",
-            "value": "27074"
+            "value": "Платина | 80 уровень"
         },
         {
             "place": 2,
@@ -241,7 +241,6 @@ function LeaderBoard() {
     const [textCategory, setTextCategory] = useState("Топ по монетам");
     const [page, setPage] = useState(0);
     const [data, setData] = useState({ total: 0, items: [] });
-    const [displayCategoryOption, setDisplayCategoryOption] = useState("none");
     const [nameInput, setNameInput] = useState("");
 
     useEffect(() => {
@@ -261,20 +260,12 @@ function LeaderBoard() {
             .catch(console.error);
     }, [page, nameInput, textCategory]);
 
-    useEffect(() => {
-        const categoryInput = document.querySelector(".leaderboard__list-buttons__option");
-        if (categoryInput) {
-            categoryInput.style.borderBottomLeftRadius = displayCategoryOption === "block" ? "0" : "8px";
-            categoryInput.style.borderBottomRightRadius = displayCategoryOption === "block" ? "0" : "8px";
-        }
-    }, [displayCategoryOption]);
-
     const maxPage = Math.ceil(data.total / PAGE_SIZE) - 1;
 
     return (
         <div className="leaderboard">
             <header>
-                <MiniProfileLegacy />
+                <MiniProfileLegacy/>
             </header>
             <main>
                 <aside className="leaderboard__title">
@@ -305,15 +296,32 @@ function LeaderBoard() {
 
                             <li
                                 className="leaderboard__list-buttons__button"
-                                onMouseEnter={() => setDisplayCategoryOption("block")}
-                                onMouseLeave={() => setDisplayCategoryOption("none")}
+                                onMouseLeave={() => {
+                                    const menuOption
+                                        = document.querySelector(".show-menu-category");
+                                    const inputOption
+                                        = document.getElementById("input-option");
+
+                                    inputOption.style.borderBottomLeftRadius = "8px";
+                                    inputOption.style.borderBottomRightRadius = "8px";
+                                    menuOption.style.display = "none";
+                                }}
                             >
                                 <div className="leaderboard__list-buttons__option-div">
-                                    <input
+                                    <button
+                                        onClick={() => {
+                                            const menuOption
+                                                = document.querySelector(".show-menu-category");
+                                            const inputOption
+                                                = document.getElementById("input-option");
+
+                                            inputOption.style.borderBottomLeftRadius = "0";
+                                            inputOption.style.borderBottomRightRadius = "0";
+                                            menuOption.style.display = "block";
+                                        }}
+                                        id="input-option"
                                         className="leaderboard__list-buttons__option"
-                                        disabled
-                                        value={textCategory}
-                                    />
+                                    >{textCategory}</button>
 
                                     <svg
                                         className="leaderboard__list-buttons__option-svg"
@@ -328,17 +336,16 @@ function LeaderBoard() {
                                     </svg>
                                 </div>
 
-                                <nav className="show-menu-category" style={{ display: displayCategoryOption }}>
+                                <nav className="show-menu-category" style={{display: "none"}}>
                                     <ul className="show-menu-category-lists">
                                         {Object.keys(DICT_CATEGORY_NAME).map((name, i, arr) => (
                                             <CategoryOption
                                                 key={name}
                                                 nameCategory={name}
-                                                descriptorsetTextCategory={() => {
+                                                descriptorSetTextCategory={() => {
                                                     setTextCategory(name);
                                                     setPage(0);
                                                 }}
-                                                descriptorSetDisplayCategoryOption={setDisplayCategoryOption}
                                                 flags={i === arr.length - 1 ? "end" : undefined}
                                             />
                                         ))}
@@ -369,7 +376,7 @@ function LeaderBoard() {
                                 </nav>
                             </li>
 
-                            {data.items.map(user => (
+                            {TEST_RESPONSE.items.map(user => (
                                 <UserSection
                                     key={user.place}
                                     number={user.place}
