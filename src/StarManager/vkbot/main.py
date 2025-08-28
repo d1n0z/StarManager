@@ -34,6 +34,7 @@ def run():
     async def like_add(event: GroupTypes.LikeAdd):
         await like_handle(event)
 
+    bot.labeler.load(labeler)
     for labeler in found_labelers:
         bot.labeler.load(labeler)
     bot.labeler.message_view.register_middleware(CommandMiddleware)
