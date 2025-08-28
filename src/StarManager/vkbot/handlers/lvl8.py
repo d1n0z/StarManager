@@ -593,7 +593,7 @@ async def getuserchats(message: Message):
     limit = message.text.split()[-1]
     async with (await pool()).acquire() as conn:
         top = await conn.fetch(
-            "select chat_id, messages from await messages where uid=$1 order by await messages desc limit "
+            "select chat_id, messages from messages where uid=$1 order by messages desc limit "
             "$2",
             id,
             int(limit) if limit.isdigit() else 100,
@@ -621,7 +621,7 @@ async def getchats(message: Message):
     limit = message.text.split()[-1]
     async with (await pool()).acquire() as conn:
         top = await conn.fetch(
-            "select chat_id, messages from await messages order by await messages desc limit $1",
+            "select chat_id, messages from messages order by messages desc limit $1",
             int(limit) if limit.isdigit() else 100,
         )
     msg = "✝ Беседы:\n"

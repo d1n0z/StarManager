@@ -1346,7 +1346,7 @@ async def top(message: MessageEvent):
     chat_id = peer_id - 2000000000
     async with (await pool()).acquire() as conn:
         res = await conn.fetch(
-            "select uid, messages from messages where uid>0 and await messages>0 and chat_id=$1 and "
+            "select uid, messages from messages where uid>0 and messages>0 and chat_id=$1 and "
             "uid=ANY($2) order by messages desc limit 10",
             chat_id,
             [
