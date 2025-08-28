@@ -512,21 +512,32 @@ async def get_leaderboard(
 
     if search:
         search_pattern = f"%{search}%"
-        filter_clause = (
-            "WHERE u.name ILIKE $1 OR u.domain ILIKE $1"
-        )
-        base_query = f"SELECT * FROM ({base_query}) AS v JOIN usernames u ON u.id = v.uid {filter_clause}"
-        paginated_query = f"{base_query} ORDER BY v.value DESC OFFSET $2 LIMIT $3"
+        filtered_query = f"""
+            SELECT v.*, u.name, u.domain
+            FROM ({base_query}) AS v
+            JOIN usernames u ON u.id = v.uid
+            WHERE u.name ILIKE $1 OR u.domain ILIKE $1
+        """
+        paginated_query = f"""
+            {filtered_query}
+            ORDER BY v.value DESC
+            OFFSET $2 LIMIT $3
+        """
+    else:
+        filtered_query = base_query
+        paginated_query = f"""
+            {filtered_query}
+            ORDER BY v.value DESC
+            OFFSET $1 LIMIT $2
+        """
 
     async with (await pool()).acquire() as conn:
         if search:
             records = await conn.fetch(paginated_query, search_pattern, offset, limit)
-            total = await conn.fetchval(
-                f"SELECT COUNT(*) FROM ({base_query}) AS sub", search_pattern
-            )
+            total = await conn.fetchval(f"SELECT COUNT(*) FROM ({filtered_query}) AS sub", search_pattern)
         else:
             records = await conn.fetch(paginated_query, offset, limit)
-            total = await conn.fetchval(f"SELECT COUNT(*) FROM ({base_query}) AS sub")
+            total = await conn.fetchval(f"SELECT COUNT(*) FROM ({filtered_query}) AS sub")
 
     user_ids = list({record["uid"] for record in records})
     user_data = await vkapi.users.get(
