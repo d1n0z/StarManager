@@ -376,7 +376,7 @@ function LeaderBoard() {
                                 </nav>
                             </li>
 
-                            {date.items.map(user => (
+                            {data.items.map(user => (
                                 <UserSection
                                     key={user.place}
                                     number={user.place}
