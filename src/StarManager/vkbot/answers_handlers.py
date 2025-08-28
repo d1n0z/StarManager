@@ -356,9 +356,9 @@ async def queue_handler(event: MessageNew):
                     )
 
                 r = requests.get(attachment[0].photo.sizes[-1].url)
-                with open(f"{settings.service.path}media/temp/{uid}welcome.jpg", "wb") as f:
+                with open(f"{settings.service.path}src/StarManager/core/media/temp/{uid}welcome.jpg", "wb") as f:
                     f.write(r.content)
-                photo = await uploadImage(f"{settings.service.path}media/temp/{uid}welcome.jpg")
+                photo = await uploadImage(f"{settings.service.path}src/StarManager/core/media/temp/{uid}welcome.jpg")
                 async with (await pool()).acquire() as conn:
                     if not await conn.fetchval(
                         "update welcome set photo = $1 where chat_id=$2 returning 1",

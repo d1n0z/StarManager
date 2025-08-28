@@ -47,11 +47,11 @@ async def createStatsImage(
     else:
         imglvl = "75+"
 
-    img = Image.open(f"{settings.service.path}media/stats/{pss}/{imglvl}_{'' if prem > 0 else 'n'}p.png")
+    img = Image.open(f"{settings.service.path}src/StarManager/core/media/stats/{pss}/{imglvl}_{'' if prem > 0 else 'n'}p.png")
     img = img.convert("RGBA")
     draw = ImageDraw.Draw(img)
 
-    font = ImageFont.truetype(f"{settings.service.path}media/fonts/statsimg_font_bold.ttf", 24)
+    font = ImageFont.truetype(f"{settings.service.path}src/StarManager/core/media/fonts/statsimg_font_bold.ttf", 24)
     draw.text((107, 186), f"{messages}", font=font, fill=(255, 255, 255))
     draw.text((107, 260), f"{starcoins}", font=font, fill=(255, 255, 255))
     draw.text((107, 335), f"{last_activity}", font=font, fill=(255, 255, 255))
@@ -123,13 +123,13 @@ async def createStatsImage(
 
     draw.text((775, 285), f"{xp}", font=font, fill=(255, 255, 255), anchor="ma")
     lvlfont = ImageFont.truetype(
-        f"{settings.service.path}media/fonts/statsimg_font_bold.ttf", 35 if userlvl < 100 else 30
+        f"{settings.service.path}src/StarManager/core/media/fonts/statsimg_font_bold.ttf", 35 if userlvl < 100 else 30
     )
-    fontsmall = ImageFont.truetype(f"{settings.service.path}media/fonts/statsimg_font_bold.ttf", 17)
-    fontgrey = ImageFont.truetype(f"{settings.service.path}media/fonts/statsimg_font_bold.ttf", 15)
+    fontsmall = ImageFont.truetype(f"{settings.service.path}src/StarManager/core/media/fonts/statsimg_font_bold.ttf", 17)
+    fontgrey = ImageFont.truetype(f"{settings.service.path}src/StarManager/core/media/fonts/statsimg_font_bold.ttf", 15)
 
     if prem > 0:
-        premfont = ImageFont.truetype(f"{settings.service.path}media/fonts/statsimg_font_bold.ttf", 30)
+        premfont = ImageFont.truetype(f"{settings.service.path}src/StarManager/core/media/fonts/statsimg_font_bold.ttf", 30)
         x, y = 1010, 376
         draw.text(
             (x, y),
@@ -140,7 +140,7 @@ async def createStatsImage(
         )
         draw.text((x, y + 30), "дней", font=premfont, fill=(255, 255, 255), anchor="ma")
 
-    pfont = ImageFont.truetype(f"{settings.service.path}media/fonts/statsimg_font_bold.ttf", 20)
+    pfont = ImageFont.truetype(f"{settings.service.path}src/StarManager/core/media/fonts/statsimg_font_bold.ttf", 20)
     mute = int((mute - time.time()) / 60) + 1
     ban = int((ban - time.time()) / 86400) + 1
     if "mbw" in pss:
@@ -231,13 +231,13 @@ async def createStatsImage(
     )
     draw.ellipse((x + 10, y + 10, x + width - 10, y + height - 10), fill=(36, 36, 36))
 
-    ava = Image.open(f"{settings.service.path}media/temp/{uid}ava.jpg")
+    ava = Image.open(f"{settings.service.path}src/StarManager/core/media/temp/{uid}ava.jpg")
     ava = ava.resize((143, 143))
     avamask_im = Image.new("L", ava.size)
     avadraw = ImageDraw.Draw(avamask_im)
     avadraw.ellipse((0, 0, 143, 143), fill=255)
     img.paste(ava, (511, 156), mask=avamask_im)
-    lvl = Image.open(f"{settings.service.path}media/stats/icon/dot.png")
+    lvl = Image.open(f"{settings.service.path}src/StarManager/core/media/stats/icon/dot.png")
     img.paste(lvl, mask=lvl)
 
     draw.text((663, 158), f"{userlvl}", font=lvlfont, fill=(63, 63, 63), anchor="ma")
@@ -252,7 +252,7 @@ async def createStatsImage(
 
     draw.rectangle(((100, 390), (220, 410)), (29, 29, 29))
     draw.rectangle(((40, 380), (100, 450)), (29, 29, 29))
-    rep = Image.open(f"{settings.service.path}media/stats/icon/rep.png")
+    rep = Image.open(f"{settings.service.path}src/StarManager/core/media/stats/icon/rep.png")
     img.paste(rep, (38, 382), mask=rep)
     draw.text(
         xy=(151, 392),
@@ -264,7 +264,7 @@ async def createStatsImage(
 
     draw.rectangle(((100, 390 - 151), (260, 410 - 151)), (29, 29, 29))
     draw.rectangle(((40, 380 - 151), (100, 450 - 151)), (29, 29, 29))
-    coin = Image.open(f"{settings.service.path}media/stats/icon/coin.png")
+    coin = Image.open(f"{settings.service.path}src/StarManager/core/media/stats/icon/coin.png")
     img.paste(coin, (38, 382 - 151), mask=coin)
     draw.text(
         xy=(162, 392 - 151),
@@ -274,8 +274,8 @@ async def createStatsImage(
         anchor="ma",
     )
 
-    img.save(f"{settings.service.path}media/temp/frame{uid}.png")
-    return f"{settings.service.path}media/temp/frame{uid}.png"
+    img.save(f"{settings.service.path}src/StarManager/core/media/temp/frame{uid}.png")
+    return f"{settings.service.path}src/StarManager/core/media/temp/frame{uid}.png"
 
 
 if __name__ == "__main__":

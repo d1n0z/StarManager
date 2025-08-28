@@ -189,7 +189,7 @@ async def stats(message: Message):
     r = await api.http_client.request_content(
         url
     )
-    with open(settings.service.path + f"media/temp/{id}ava.jpg", "wb") as f:
+    with open(settings.service.path + f"src/StarManager/core/media/temp/{id}ava.jpg", "wb") as f:
         f.write(r)
 
     lvl_name = await getChatAccessName(chat_id, acc)

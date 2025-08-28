@@ -903,7 +903,7 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, settings) -> s
             if not photo.url:
                 continue
             r = requests.get(photo.url)
-            filename = settings.service.path + f"media/temp/{time.time()}.jpg"
+            filename = settings.service.path + f"src/StarManager/core/media/temp/{time.time()}.jpg"
             with open(filename, "wb") as f:
                 f.write(r.content)
                 f.close()
@@ -1035,7 +1035,7 @@ async def getURepBanned(uid) -> bool:
 async def generateCaptcha(uid, chat_id, exp):
     gen = CaptchaGenerator()
     image = gen.gen_math_captcha_image(difficult_level=2, multicolor=True)
-    name = f"{settings.service.path}media/temp/captcha{uid}_{chat_id}.png"
+    name = f"{settings.service.path}src/StarManager/core/media/temp/captcha{uid}_{chat_id}.png"
     image.image.save(name, "png")
     async with (await pool()).acquire() as conn:
         c = await conn.fetchval(
