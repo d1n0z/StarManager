@@ -29,14 +29,9 @@ def main():
         from StarManager.runsite import main as run_site
 
         return run_site()
-    if (
-        not args
-        or not (args.scheduler or args.telegram or args.site)
-        or args.only_vkbot
-    ):
-        from StarManager.main import main as run_vkbot
-
-        return run_vkbot(args)
+    from StarManager.main import main as run_vkbot
+    
+    return run_vkbot(args)
 
 
 if __name__ == "__main__":

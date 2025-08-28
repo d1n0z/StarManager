@@ -107,19 +107,19 @@ def main(args: Namespace | None):
 
     run_service(
         "scheduler",
-        "python3.11 run.py -sc",
+        "python3.11 main.py -sc",
         bool(args and args.no_scheduler and not args.only_vkbot),
     )
 
     run_service(
         "tgbot",
-        "python3.11 run.py -tg",
+        "python3.11 main.py -tg",
         bool(args and args.no_telegram and not args.only_vkbot),
     )
 
     run_service(
         "site",
-        "python3.11 run.py -st",
+        "python3.11 main.py -st",
         bool(args and args.no_site and not args.only_vkbot),
     )
 
