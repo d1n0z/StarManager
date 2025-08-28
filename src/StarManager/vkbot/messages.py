@@ -6,6 +6,7 @@ from cache.async_lru import AsyncLRU
 
 from StarManager.core.config import settings
 from StarManager.core import tables
+from StarManager.core.db import pool
 from StarManager.core.utils import (
     getChatAccessName,
     getChatSettingValue,
