@@ -4,8 +4,8 @@ from datetime import datetime
 
 from cache.async_lru import AsyncLRU
 
-from StarManager.core.config import settings
 from StarManager.core import tables
+from StarManager.core.config import settings
 from StarManager.core.db import pool
 from StarManager.core.utils import (
     getChatAccessName,
@@ -149,7 +149,9 @@ async def kick_error():
 
 
 async def kick_access(id, name, nick):
-    return await get("kick_access", i="club" if id < 0 else "id", id=abs(id), n=nick or name)
+    return await get(
+        "kick_access", i="club" if id < 0 else "id", id=abs(id), n=nick or name
+    )
 
 
 async def kick_myself():
@@ -359,7 +361,9 @@ async def staff(res, names, chat_id):
 
 
 async def unmute(uname, unickname, uid, name, nickname, id):
-    return await get("unmute", uid=uid, un=unickname or uname, id=id, n=nickname or name)
+    return await get(
+        "unmute", uid=uid, un=unickname or uname, id=id, n=nickname or name
+    )
 
 
 async def unmute_no_mute(id, name, nickname):
@@ -576,7 +580,9 @@ async def delasync_done(uid, u_name, u_nickname, chname=""):
 
 
 async def gkick(uid, u_name, u_nickname, chats, success):
-    return await get("gkick", uid=uid, n=u_nickname or u_name, success=success, chats=chats)
+    return await get(
+        "gkick", uid=uid, n=u_nickname or u_name, success=success, chats=chats
+    )
 
 
 async def gkick_start(uid, u_name, u_nickname, id, name, nickname, chats):
@@ -608,7 +614,9 @@ async def banlist(res, bancount):
 
 
 async def gban(uid, u_name, u_nickname, chats, success):
-    return await get("gban", uid=uid, n=u_nickname or u_name, success=success, chats=chats)
+    return await get(
+        "gban", uid=uid, n=u_nickname or u_name, success=success, chats=chats
+    )
 
 
 async def gban_start(uid, u_name, u_nickname, id, name, nickname, chats):
@@ -637,7 +645,9 @@ async def kick_banned(id, name, nick, btime, cause):
 
 
 async def gunban(uid, u_name, u_nickname, chats, success):
-    return await get("gunban", uid=uid, n=u_nickname or u_name, success=success, chats=chats)
+    return await get(
+        "gunban", uid=uid, n=u_nickname or u_name, success=success, chats=chats
+    )
 
 
 async def gunban_start(uid, u_name, u_nickname, id, name, nickname, chats):
@@ -656,7 +666,9 @@ async def gunban_hint():
 
 
 async def gmute(uid, u_name, u_nickname, chats, success):
-    return await get("gmute", uid=uid, n=u_nickname or u_name, success=success, chats=chats)
+    return await get(
+        "gmute", uid=uid, n=u_nickname or u_name, success=success, chats=chats
+    )
 
 
 async def gmute_start(uid, u_name, u_nickname, id, name, nickname, chats):
@@ -675,7 +687,9 @@ async def gmute_hint():
 
 
 async def gunmute(uid, u_name, u_nickname, chats, success):
-    return await get("gunmute", uid=uid, n=u_nickname or u_name, success=success, chats=chats)
+    return await get(
+        "gunmute", uid=uid, n=u_nickname or u_name, success=success, chats=chats
+    )
 
 
 async def gunmute_start(uid, u_name, u_nickname, id, name, nickname, chats):
@@ -694,7 +708,9 @@ async def gunmute_hint():
 
 
 async def gwarn(uid, u_name, u_nick, chats, success):
-    return await get("gwarn", uid=uid, un=u_nick or u_name, success=success, chats=chats)
+    return await get(
+        "gwarn", uid=uid, un=u_nick or u_name, success=success, chats=chats
+    )
 
 
 async def gwarn_start(uid, u_name, u_nickname, id, name, nickname, chats):
@@ -713,7 +729,9 @@ async def gwarn_hint():
 
 
 async def gunwarn(uid, u_name, u_nickname, chats, success):
-    return await get("gunwarn", uid=uid, n=u_nickname or u_name, success=success, chats=chats)
+    return await get(
+        "gunwarn", uid=uid, n=u_nickname or u_name, success=success, chats=chats
+    )
 
 
 async def gunwarn_start(uid, u_name, u_nickname, id, name, nickname, chats):
@@ -732,7 +750,9 @@ async def gunwarn_hint():
 
 
 async def gsnick(uid, u_name, u_nickname, chats, success):
-    return await get("gsnick", uid=uid, n=u_nickname or u_name, success=success, chats=chats)
+    return await get(
+        "gsnick", uid=uid, n=u_nickname or u_name, success=success, chats=chats
+    )
 
 
 async def gsnick_start(uid, u_name, u_nickname, id, name, nickname, chats):
@@ -751,7 +771,9 @@ async def gsnick_hint():
 
 
 async def grnick(uid, u_name, u_nickname, chats, success):
-    return await get("grnick", uid=uid, n=u_nickname or u_name, success=success, chats=chats)
+    return await get(
+        "grnick", uid=uid, n=u_nickname or u_name, success=success, chats=chats
+    )
 
 
 async def grnick_start(uid, u_name, u_nickname, id, name, nickname, chats):
@@ -841,7 +863,9 @@ async def gzov_start(uid, u_name, u_nickname, chats):
 
 
 async def gzov(uid, u_name, u_nickname, chats, success):
-    return await get("gzov", uid=uid, n=u_nickname or u_name, success=success, chats=chats)
+    return await get(
+        "gzov", uid=uid, n=u_nickname or u_name, success=success, chats=chats
+    )
 
 
 async def gzov_hint():
@@ -921,7 +945,9 @@ async def skick_hint():
 
 
 async def skick(uid, u_name, u_nickname, chats, success):
-    return await get("skick", uid=uid, n=u_nickname or u_name, success=success, chats=chats)
+    return await get(
+        "skick", uid=uid, n=u_nickname or u_name, success=success, chats=chats
+    )
 
 
 async def skick_start(uid, u_name, u_nickname, id, name, nickname, chats, group):
@@ -941,7 +967,9 @@ async def sban_hint():
 
 
 async def sban(uid, u_name, u_nickname, chats, success):
-    return await get("sban", uid=uid, n=u_nickname or u_name, success=success, chats=chats)
+    return await get(
+        "sban", uid=uid, n=u_nickname or u_name, success=success, chats=chats
+    )
 
 
 async def sban_start(uid, u_name, u_nickname, id, name, nickname, chats, group):
@@ -961,7 +989,9 @@ async def sunban_hint():
 
 
 async def sunban(uid, u_name, u_nickname, chats, success):
-    return await get("sunban", uid=uid, n=u_nickname or u_name, success=success, chats=chats)
+    return await get(
+        "sunban", uid=uid, n=u_nickname or u_name, success=success, chats=chats
+    )
 
 
 async def sunban_start(uid, u_name, u_nickname, id, name, nickname, chats, group):
@@ -981,7 +1011,9 @@ async def ssnick_hint():
 
 
 async def ssnick(uid, u_name, u_nickname, chats, success):
-    return await get("ssnick", uid=uid, n=u_nickname or u_name, success=success, chats=chats)
+    return await get(
+        "ssnick", uid=uid, n=u_nickname or u_name, success=success, chats=chats
+    )
 
 
 async def ssnick_start(uid, u_name, u_nickname, id, name, nickname, chats, group):
@@ -1021,7 +1053,9 @@ async def szov_hint():
 
 
 async def szov_start(uid, u_name, u_nickname, chats, group):
-    return await get("szov_start", uid=uid, un=u_nickname or u_name, group=group, chats=chats)
+    return await get(
+        "szov_start", uid=uid, un=u_nickname or u_name, group=group, chats=chats
+    )
 
 
 async def szov(uid, u_name, u_nickname, group, pool, success):
@@ -1275,7 +1309,9 @@ async def settings_change_countable(
             f"settings_change_countable_{setting}",
             status="Включено" if pos else "Выключено",
             status2="Да" if pos2 else "Нет",
-            value="Установлено" if pos and w is not None and (w.msg or w.photo) else "❌",
+            value="Установлено"
+            if pos and w is not None and (w.msg or w.photo)
+            else "❌",
         )
     elif setting == "autodelete":
         return await get(
@@ -1711,7 +1747,9 @@ async def buy():
 
 
 async def buy_order(order_id, uid, name, days, cost, url):
-    return await get("buy_order", oid=order_id, id=uid, n=name, days=days, cost=cost, url=url)
+    return await get(
+        "buy_order", oid=order_id, id=uid, n=name, days=days, cost=cost, url=url
+    )
 
 
 async def pm_market():
@@ -2271,7 +2309,9 @@ async def deanon(id, from_id, name, nickname, time):
     )
 
 
-async def antispam_punishment(uid, name, nick, setting, punishment, violation_count, time=0):
+async def antispam_punishment(
+    uid, name, nick, setting, punishment, violation_count, time=0
+):
     if setting in settings.settings_meta.positions["antispam"]:
         if punishment == "mute":
             time = f" {time} минут" if int(time) < 44600 else "всегда"
@@ -2895,3 +2935,16 @@ async def shop_bonuses(coins):
 
 async def raid():
     return await get("raid")
+
+
+async def raid_settings(trigger_status, trigger_invites, trigger_seconds):
+    return await get(
+        "raid_settings",
+        trigger_status="Включено" if trigger_status else "Выключено",
+        trigger_invites=trigger_invites,
+        trigger_seconds=trigger_seconds,
+    )
+
+
+async def raid_trigger_set():
+    return await get("raid_trigger_set")

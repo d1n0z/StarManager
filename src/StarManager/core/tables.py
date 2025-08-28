@@ -746,6 +746,9 @@ class Shop(Model):
 class RaidMode(Model):
     chat_id = fields.IntField(unique=True)
     status = fields.BooleanField(default=False)
+    trigger_status = fields.BooleanField(default=False)
+    limit_invites = fields.IntField(default=5)
+    limit_seconds = fields.IntField(default=60)
 
     class Meta:
         table = "raidmode"

@@ -6,6 +6,7 @@
             "deleteAccessAndNicknameOnLeave": 0,
             "disallowPings": 0,
             "disallowStickers": 0,
+            "kickInvitedByLink": 0,
             "nightmode": 0,
             "welcome": 0,
             "captcha": 0,

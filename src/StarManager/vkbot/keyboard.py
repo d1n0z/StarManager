@@ -1954,5 +1954,28 @@ def raid(uid, status: bool):
         ),
         KeyboardButtonColor.NEGATIVE if status else KeyboardButtonColor.POSITIVE,
     )
+    kb.add(
+        Callback(
+            "Настройки", {"cmd": "raid_settings", "uid": uid}
+        )
+    )
+
+    return kb.get_json()
+
+
+def raid_settings(uid, trigger_status: bool):
+    kb = Keyboard(inline=True)
+
+    kb.add(
+        Callback(
+            "Выключить" if trigger_status else "Включить", {"cmd": "raid_trigger_turn", "uid": uid}
+        ),
+        KeyboardButtonColor.NEGATIVE if trigger_status else KeyboardButtonColor.POSITIVE,
+    )
+    kb.add(
+        Callback(
+            "Лимиты", {"cmd": "raid_trigger_set", "uid": uid}
+        )
+    )
 
     return kb.get_json()

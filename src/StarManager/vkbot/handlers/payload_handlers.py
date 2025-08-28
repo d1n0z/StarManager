@@ -9,15 +9,13 @@ from vkbottle.bot import MessageEvent
 from vkbottle.framework.labeler import BotLabeler
 from vkbottle_types.events import GroupEventType
 
-from StarManager.vkbot import messages
 from StarManager.core import managers, utils
 from StarManager.core.config import api, settings
 from StarManager.core.db import pool
 from StarManager.tgbot.bot import bot as tgbot
-from StarManager.vkbot import keyboard
+from StarManager.vkbot import keyboard, messages
 from StarManager.vkbot.checkers import getULvlBanned, haveAccess
 from StarManager.vkbot.rules import SearchPayloadCMD
-
 
 bl = BotLabeler()
 
@@ -132,7 +130,9 @@ async def join(message: MessageEvent):
             if i.is_admin or i.is_owner
         ]:
             await utils.editMessage(
-                await messages.rejoin_activate(), peer_id, message.conversation_message_id
+                await messages.rejoin_activate(),
+                peer_id,
+                message.conversation_message_id,
             )
             return
 
@@ -324,7 +324,9 @@ async def premmenu_action(message: MessageEvent):
         )
         return
     await utils.editMessage(
-        await messages.premmenu_action(setting), peer_id, message.conversation_message_id
+        await messages.premmenu_action(setting),
+        peer_id,
+        message.conversation_message_id,
     )
 
 
@@ -994,9 +996,11 @@ async def page_nlist(message: MessageEvent):
         )
     if not (count := len(res)):
         return
-    res = res[page * 30:page * 30 + 30]
+    res = res[page * 30 : page * 30 + 30]
     await utils.editMessage(
-        await messages.nlist(res, await api.users.get(user_ids=[i[0] for i in res]), page),
+        await messages.nlist(
+            res, await api.users.get(user_ids=[i[0] for i in res]), page
+        ),
         peer_id,
         message.conversation_message_id,
         keyboard.nlist(message.user_id, page, count),
@@ -1055,9 +1059,9 @@ async def page_nnlist(message: MessageEvent):
             )
         ]
     members = await api.messages.get_conversation_members(peer_id=peer_id)
-    members_count = len(members.items[page * 30:])
+    members_count = len(members.items[page * 30 :])
     members = [i for i in members.items if i.member_id not in res][
-        page * 30:page * 30 + 30
+        page * 30 : page * 30 + 30
     ]
     if len(members) <= 0:
         return
@@ -1092,7 +1096,7 @@ async def page_mutelist(message: MessageEvent):
     if not (count := len(res)):
         return
     await utils.editMessage(
-        await messages.mutelist(res[page * 30:page * 30 + 30], count),
+        await messages.mutelist(res[page * 30 : page * 30 + 30], count),
         peer_id,
         message.conversation_message_id,
         keyboard.mutelist(message.user_id, page, count),
@@ -1118,7 +1122,7 @@ async def page_warnlist(message: MessageEvent):
         )
     if not (count := len(res)):
         return
-    res = res[page * 30:page * 30 + 30]
+    res = res[page * 30 : page * 30 + 30]
     await utils.editMessage(
         await messages.warnlist(res, count),
         peer_id,
@@ -1151,7 +1155,7 @@ async def page_banlist(message: MessageEvent):
     if not res:
         return
     banned_count = len(res)
-    res = res[page * 30:page * 30 + 30]
+    res = res[page * 30 : page * 30 + 30]
     await utils.editMessage(
         await messages.banlist(res, banned_count),
         peer_id,
@@ -1219,7 +1223,7 @@ async def page_statuslist(message: MessageEvent):
         )
     if len(premium_pool) <= 0:
         return
-    premium_pool = premium_pool[page * 30:page * 30 + 30]
+    premium_pool = premium_pool[page * 30 : page * 30 + 30]
     await utils.editMessage(
         await messages.statuslist(premium_pool),
         message.object.peer_id,
@@ -1299,7 +1303,9 @@ async def demote_disaccept(message: MessageEvent):
 )
 async def giveowner_no(message: MessageEvent):
     await utils.editMessage(
-        await messages.giveowner_no(), message.object.peer_id, message.conversation_message_id
+        await messages.giveowner_no(),
+        message.object.peer_id,
+        message.conversation_message_id,
     )
 
 
@@ -1870,7 +1876,9 @@ async def notification_status(message: MessageEvent):
             name,
         )
     await utils.editMessage(
-        await messages.notification(name, snotif[0], ntime, snotif[1], snotif[2], turn_to),
+        await messages.notification(
+            name, snotif[0], ntime, snotif[1], snotif[2], turn_to
+        ),
         peer_id,
         message.conversation_message_id,
         keyboard.notification(message.user_id, turn_to, name),
@@ -1896,7 +1904,9 @@ async def notification_text(message: MessageEvent):
             + "}",
         )
     await utils.editMessage(
-        await messages.notification_changing_text(), peer_id, message.conversation_message_id
+        await messages.notification_changing_text(),
+        peer_id,
+        message.conversation_message_id,
     )
 
 
@@ -1988,7 +1998,9 @@ async def notification_tag_change(message: MessageEvent):
             name,
         )
     await utils.editMessage(
-        await messages.notification(name, notif[0], notif[1], notif[2], ctype, notif[3]),
+        await messages.notification(
+            name, notif[0], notif[1], notif[2], ctype, notif[3]
+        ),
         peer_id,
         message.conversation_message_id,
         keyboard.notification(message.user_id, notif[3], name),
@@ -2012,7 +2024,9 @@ async def notification_delete(message: MessageEvent):
             name,
         )
     await utils.editMessage(
-        await messages.notification_delete(name), peer_id, message.conversation_message_id
+        await messages.notification_delete(name),
+        peer_id,
+        message.conversation_message_id,
     )
 
 
@@ -2032,7 +2046,7 @@ async def listasync(message: MessageEvent):
             )
         ]
     total = len(chat_ids)
-    chat_ids = chat_ids[(page - 1) * 10:page * 10]
+    chat_ids = chat_ids[(page - 1) * 10 : page * 10]
     names = (
         [await utils.getChatName(chat_id) for chat_id in chat_ids]
         if len(chat_ids) > 0
@@ -2087,7 +2101,7 @@ async def cmdlist(message: MessageEvent):
         }
     await utils.editMessage(
         await messages.cmdlist(
-            dict(list(cmdnames.items())[page * 10:(page * 10) + 10]),
+            dict(list(cmdnames.items())[page * 10 : (page * 10) + 10]),
             page,
             len(list(cmdnames)),
         ),
@@ -3179,9 +3193,11 @@ async def bindlist(message: MessageEvent):
         )
     if not (count := len(res)):
         return
-    res = res[page * 15:page * 15 + 15]
+    res = res[page * 15 : page * 15 + 15]
     await utils.editMessage(
-        await messages.bindlist(group, [(i[0], await utils.getChatName(i[0])) for i in res]),
+        await messages.bindlist(
+            group, [(i[0], await utils.getChatName(i[0])) for i in res]
+        ),
         message.object.peer_id,
         message.conversation_message_id,
         keyboard.bindlist(message.user_id, group, page, count),
@@ -3246,7 +3262,7 @@ async def filterlist(message: MessageEvent):
             or message.user_id,
         )
     await utils.editMessage(
-        await messages.filter_list(filters[25 * page:25 * page + 25], page),
+        await messages.filter_list(filters[25 * page : 25 * page + 25], page),
         message.object.peer_id,
         message.conversation_message_id,
         keyboard.filter_list(message.user_id, page, len(filters)),
@@ -3549,4 +3565,72 @@ async def raid_turn(message: MessageEvent):
         message.object.peer_id,
         message.conversation_message_id,
         keyboard.raid(message.user_id, status),
+    )
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["raid_settings"])
+)
+async def raid_settings(message: MessageEvent):
+    async with (await pool()).acquire() as conn:
+        raidmode = await conn.fetchrow(
+            "select trigger_status, limit_invites, limit_seconds from raidmode where chat_id=$1",
+            message.peer_id - 2000000000,
+        )
+    await utils.editMessage(
+        await messages.raid_settings(*raidmode),
+        message.object.peer_id,
+        message.conversation_message_id,
+        keyboard.raid_settings(message.user_id, raidmode[0]),
+    )
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["raid_trigger_turn"])
+)
+async def raid_trigger_turn(message: MessageEvent):
+    async with (await pool()).acquire() as conn:
+        if (
+            raidmode := await conn.fetchrow(
+                "update raidmode set trigger_status=not status where chat_id=$1 returning trigger_status, limit_invites, limit_seconds",
+                message.peer_id - 2000000000,
+            )
+        ) is None:
+            await conn.execute(
+                "insert into raidmode (chat_id, trigger_status) values ($1, True)",
+                message.peer_id - 2000000000,
+            )
+            raidmode = list(
+                await conn.fetchrow(
+                    "select trigger_status, limit_invites, limit_seconds from raidmode where chat_id=$1",
+                    message.peer_id - 2000000000,
+                )
+            )
+            raidmode[0] = True
+
+    await utils.editMessage(
+        await messages.raid_settings(*raidmode),
+        message.object.peer_id,
+        message.conversation_message_id,
+        keyboard.raid_settings(message.user_id, raidmode[0]),
+    )
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["raid_trigger_set"])
+)
+async def raid_trigger_set(message: MessageEvent):
+    async with (await pool()).acquire() as conn:
+        await conn.execute(
+            "insert into typequeue (chat_id, uid, type, additional) values ($1, $2, $3, $4)",
+            message.peer_id - 2000000000,
+            message.user_id,
+            "raid_trigger_set",
+            "{" + f'"cmid": "{message.conversation_message_id}"' + "}",
+        )
+
+    await utils.editMessage(
+        await messages.raid_trigger_set(),
+        message.object.peer_id,
+        message.conversation_message_id,
     )

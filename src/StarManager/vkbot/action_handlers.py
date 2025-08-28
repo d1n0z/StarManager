@@ -2,7 +2,7 @@ import time
 
 from vkbottle_types.events.bot_events import MessageNew
 
-from StarManager.core import utils
+from StarManager.core import managers, utils
 from StarManager.core.config import api, settings
 from StarManager.core.db import pool
 from StarManager.vkbot import keyboard, messages
@@ -10,16 +10,13 @@ from StarManager.vkbot import keyboard, messages
 
 async def action_handle(message: MessageNew) -> None:
     event = message.object.message
-    if (
-        event is None
-        or (action := event.action) is None
-        or (uid := action.member_id) is None
-    ):
+    if event is None or (action := event.action) is None:
         return
     chat_id = event.peer_id - 2000000000
-    if (
-        action.type.value == "chat_invite_user_by_link"
-        and await utils.getRaidModeActive(chat_id)
+    chat_settings = await utils.getChatSettings(chat_id)
+    if action.type.value == "chat_invite_user_by_link" and (
+        await utils.getRaidModeActive(chat_id)
+        or chat_settings["main"]["kickInvitedByLink"]
     ):
         async with (await pool()).acquire() as conn:
             in_chat = [
@@ -42,11 +39,48 @@ async def action_handle(message: MessageNew) -> None:
         for user in users:
             if user.member_id not in in_chat and user.member_id > 0:
                 await utils.kickUser(user.member_id, chat_id=chat_id)
+                await utils.sendMessage(
+                    event.peer_id,
+                    f"⛔️ [id{user.member_id}|{await utils.getUserName(user.member_id)}], был(-a) исключен(-на) из беседы. Вход по пригласительным ссылкам в беседе отключен.",
+                )
         return
+
+    if (uid := action.member_id) is None:
+        return
+
+    if action.type.value in ("chat_invite_user_by_link", "chat_invite_user"):
+        async with (await pool()).acquire() as conn:
+            raidmode = await conn.fetchrow(
+                "select trigger_status, limit_invites, limit_seconds, status from raidmode where chat_id=$1",
+                chat_id,
+            )
+        if raidmode[0] and not raidmode[3]:
+            managers.raid.add_user_id(action.type.value, chat_id, uid)
+            if len(
+                to_kick := managers.raid.get_users(
+                    action.type.value, chat_id, raidmode[2]
+                ).keys()
+            ) >= raidmode[1] and (
+                action.type.value != "chat_invite_user"
+                or await utils.getUserAccessLevel(uid, chat_id) == 0
+            ):
+                await utils.sendMessage(
+                    event.peer_id,
+                    "❗️ Активирована защита от рейдов, все новые участники чата будут кикнуты. Для отключения напишите команду /raid",
+                )
+                async with (await pool()).acquire() as conn:
+                    await conn.execute(
+                        "update raidmode set status=true where chat_id=$1", chat_id
+                    )
+                for user_id in to_kick:
+                    await utils.kickUser(user_id, chat_id)
+                return
+
     if action.type.value not in ("chat_invite_user", "chat_kick_user"):
         return
+
     if action.type.value == "chat_kick_user":
-        if (await utils.getChatSettings(chat_id))["main"]["kickLeaving"]:
+        if chat_settings["main"]["kickLeaving"]:
             await utils.kickUser(uid, chat_id=chat_id)
         async with (await pool()).acquire() as conn:
             await conn.execute(
@@ -112,10 +146,10 @@ async def action_handle(message: MessageNew) -> None:
         )
         return
 
-    if (
-        await utils.getUserAccessLevel(id, chat_id) <= 0
-        and (await utils.getChatSettings(chat_id))["main"]["kickInvitedByNoAccess"]
-    ) or await utils.getRaidModeActive(chat_id):
+    if await utils.getUserAccessLevel(id, chat_id) == 0 and (
+        chat_settings["main"]["kickInvitedByNoAccess"]
+        or await utils.getRaidModeActive(chat_id)
+    ):
         await utils.kickUser(uid, chat_id=chat_id)
         return
 
@@ -201,7 +235,9 @@ async def action_handle(message: MessageNew) -> None:
                     captcha = await utils.generateCaptcha(uid, chat_id, s[1])
                     m = await utils.sendMessage(
                         event.peer_id,
-                        await messages.captcha(uid, await utils.getUserName(uid), s[1], s[2]),
+                        await messages.captcha(
+                            uid, await utils.getUserName(uid), s[1], s[2]
+                        ),
                         photo=await utils.uploadImage(captcha[0]),
                     )
                     if m and not isinstance(m, (int, bool)):

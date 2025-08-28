@@ -744,6 +744,45 @@ async def queue_handler(event: MessageNew):
                 ),
                 keyboard.prefix_back(uid),
             )
+    elif queue[3] == "raid_trigger_set":
+        await deleteMessages(additional["cmid"], chat_id)
+        await deleteMessages(event.object.message.conversation_message_id, chat_id)
+        if len(data := event.object.message.text.split('/')) != 2 or any(not i.isdigit() for i in data):
+            await sendMessage(
+                event.object.message.peer_id,
+                await messages.settings_change_countable_format_error(),
+            )
+            return
+        if int(data[-1]) not in range(5, 121):
+            await sendMessage(
+                event.object.message.peer_id,
+                '⚠️ Разрешённый промежуток времени - от 5 до 120 секунд.',
+            )
+            return
+        async with (await pool()).acquire() as conn:
+            if (
+                raidmode := await conn.fetchrow(
+                    "update raidmode set limit_invites=$1, limit_seconds=$2 where chat_id=$3 returning trigger_status, limit_invites, limit_seconds",
+                    int(data[0]), int(data[1]), event.object.message.peer_id - 2000000000,
+                )
+            ) is None:
+                await conn.execute(
+                    "insert into raidmode (chat_id, trigger_status) values ($1, True)",
+                    event.object.message.peer_id - 2000000000,
+                )
+                raidmode = list(
+                    await conn.fetchrow(
+                        "select trigger_status, limit_invites, limit_seconds from raidmode where chat_id=$1",
+                        event.object.message.peer_id - 2000000000,
+                    )
+                )
+                raidmode[1] = int(data[1])
+                raidmode[2] = int(data[2])
+        await sendMessage(
+            event.object.message.peer_id,
+            await messages.raid_settings(*raidmode),
+            keyboard.raid_settings(event.object.message.from_id, raidmode[0]),
+        )
     return
 
 
