@@ -1,0 +1,364 @@
+{
+    "positions": {
+        "main": {
+            "kickInvitedByNoAccess": [
+                "Выкл.",
+                "Вкл."
+            ],
+            "kickLeaving": [
+                "Выкл.",
+                "Вкл."
+            ],
+            "deleteAccessAndNicknameOnLeave": [
+                "Выкл.",
+                "Вкл."
+            ],
+            "disallowPings": [
+                "Выкл.",
+                "Вкл."
+            ],
+            "disallowStickers": [
+                "Выкл.",
+                "Вкл."
+            ],
+            "nightmode": [
+                "Выкл.",
+                "Вкл."
+            ],
+            "welcome": [
+                "Выкл.",
+                "Вкл."
+            ],
+            "captcha": [
+                "Выкл.",
+                "Вкл."
+            ],
+            "autodelete": [
+                "Выкл.",
+                "Вкл."
+            ]
+        },
+        "entertaining": {
+            "allowDuel": [
+                "Выкл.",
+                "Вкл."
+            ],
+            "allowGuess": [
+                "Выкл.",
+                "Вкл."
+            ],
+            "allowTransfer": [
+                "Выкл.",
+                "Вкл."
+            ],
+            "allowAnon": [
+                "Выкл.",
+                "Вкл."
+            ]
+        },
+        "antispam": {
+            "messagesPerMinute": [
+                "Выкл.",
+                "Вкл."
+            ],
+            "maximumCharsInMessage": [
+                "Выкл.",
+                "Вкл."
+            ],
+            "disallowLinks": [
+                "Выкл.",
+                "Вкл."
+            ],
+            "disallowNSFW": [
+                "Выкл.",
+                "Вкл."
+            ],
+            "vkLinks": [
+                "Выкл.",
+                "Вкл."
+            ],
+            "forwardeds": [
+                "Выкл.",
+                "Вкл."
+            ]
+        },
+        "protect": {
+            "enable": [
+                "Выкл.",
+                "Вкл."
+            ]
+        }
+    },
+    "countable": [
+        "messagesPerMinute",
+        "maximumCharsInMessage",
+        "disallowLinks",
+        "disallowNSFW",
+        "vkLinks",
+        "forwardeds",
+        "nightmode",
+        "welcome",
+        "captcha",
+        "autodelete"
+    ],
+    "countable_multiple_arguments": [
+        "nightmode",
+        "welcome"
+    ],
+    "countable_no_punishment": [
+        "nightmode",
+        "welcome",
+        "autodelete"
+    ],
+    "countable_no_category": [
+        "nightmode",
+        "welcome",
+        "captcha",
+        "autodelete"
+    ],
+    "countable_punishment_no_delete_message": [
+        "messagesPerMinute",
+        "captcha"
+    ],
+    "countable_special_limits": {
+        "captcha": "range(1, 61)",
+        "autodelete": "range(300, 86400)"
+    },
+    "defaults": {
+        "captcha": {
+            "pos": 0,
+            "value": 10,
+            "punishment": "kick"
+        }
+    },
+    "premium": [
+        "captcha"
+    ],
+    "countable_changemenu": {
+        "messagesPerMinute": [
+            {
+                "action": "turn",
+                "button": [
+                    "Включить",
+                    "Выключить"
+                ]
+            },
+            {
+                "action": "set",
+                "button": "Количество"
+            },
+            {
+                "action": "setPunishment",
+                "button": "Наказание"
+            },
+            {
+                "action": "turnalt",
+                "button": [
+                    "Удаление сообщения",
+                    "Удаление сообщения"
+                ]
+            }
+        ],
+        "captcha": [
+            {
+                "action": "turn",
+                "button": [
+                    "Включить",
+                    "Выключить"
+                ]
+            },
+            {
+                "action": "set",
+                "button": "Время"
+            },
+            {
+                "action": "setPunishment",
+                "button": "Наказание"
+            }
+        ],
+        "nightmode": [
+            {
+                "action": "turn",
+                "button": [
+                    "Включить",
+                    "Выключить"
+                ]
+            },
+            {
+                "action": "set",
+                "button": "Установить время"
+            }
+        ],
+        "welcome": [
+            {
+                "action": "turn",
+                "button": [
+                    "Включить",
+                    "Выключить"
+                ]
+            },
+            {
+                "action": "set",
+                "button": "Установить сообщение"
+            },
+            {
+                "action": "turnalt",
+                "button": [
+                    "Удаление сообщения",
+                    "Удаление сообщения"
+                ]
+            }
+        ],
+        "maximumCharsInMessage": [
+            {
+                "action": "turn",
+                "button": [
+                    "Включить",
+                    "Выключить"
+                ]
+            },
+            {
+                "action": "set",
+                "button": "Количество"
+            },
+            {
+                "action": "setPunishment",
+                "button": "Наказание"
+            },
+            {
+                "action": "turnalt",
+                "button": [
+                    "Удаление сообщения",
+                    "Удаление сообщения"
+                ]
+            }
+        ],
+        "disallowLinks": [
+            {
+                "action": "turn",
+                "button": [
+                    "Включить",
+                    "Выключить"
+                ]
+            },
+            {
+                "action": "setPunishment",
+                "button": "Наказание"
+            },
+            {
+                "action": "setWhitelist",
+                "button": "Исключения"
+            }
+        ],
+        "disallowNSFW": [
+            {
+                "action": "turn",
+                "button": [
+                    "Включить",
+                    "Выключить"
+                ]
+            },
+            {
+                "action": "setPunishment",
+                "button": "Наказание"
+            }
+        ],
+        "vkLinks": [
+            {
+                "action": "turn",
+                "button": [
+                    "Включить",
+                    "Выключить"
+                ]
+            },
+            {
+                "action": "setPunishment",
+                "button": "Наказание"
+            },
+            {
+                "action": "turnalt",
+                "button": [
+                    "Удаление сообщения",
+                    "Удаление сообщения"
+                ]
+            },
+            {
+                "action": "setWhitelist",
+                "button": "Исключения"
+            }
+        ],
+        "forwardeds": [
+            {
+                "action": "turn",
+                "button": [
+                    "Включить",
+                    "Выключить"
+                ]
+            },
+            {
+                "action": "setPreset",
+                "button": "Типы"
+            },
+            {
+                "action": "setPunishment",
+                "button": "Наказание"
+            },
+            {
+                "action": "turnalt",
+                "button": [
+                    "Удаление сообщения",
+                    "Удаление сообщения"
+                ]
+            },
+            {
+                "action": "setWhitelist",
+                "button": "Исключения"
+            }
+        ],
+        "autodelete": [
+            {
+                "action": "turn",
+                "button": [
+                    "Включить",
+                    "Выключить"
+                ]
+            },
+            {
+                "action": "set",
+                "button": "Время"
+            }
+        ]
+    },
+    "preset_buttons": {
+        "forwardeds": [
+            {
+                "value": 0,
+                "name": "Все",
+                "action": "setValue"
+            },
+            {
+                "value": 1,
+                "name": "Пользователи",
+                "action": "setValue"
+            },
+            {
+                "value": 2,
+                "name": "Сообщества",
+                "action": "setValue"
+            }
+        ]
+    },
+    "alt_to_delete": [
+        "messagesPerMinute",
+        "maximumCharsInMessage",
+        "vkLinks",
+        "forwardeds"
+    ],
+    "subcats": {
+        "messagesPerMinute": "msgs",
+        "maximumCharsInMessage": "msgs",
+        "disallowLinks": "spam",
+        "vkLinks": "spam",
+        "forwardeds": "spam"
+    }
+}

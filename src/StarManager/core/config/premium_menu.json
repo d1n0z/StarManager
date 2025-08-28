@@ -1,0 +1,11 @@
+{
+    "default": {
+        "clear_by_fire": true,
+        "border_color": null,
+        "tagnotif": false
+    },
+    "turn": [
+        "clear_by_fire",
+        "tagnotif"
+    ]
+}

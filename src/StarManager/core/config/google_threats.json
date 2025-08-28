@@ -1,0 +1,7 @@
+{
+    "MALWARE": "вредоносное ПО",
+    "SOCIAL_ENGINEERING": "социальная инженерия",
+    "THREAT_TYPE_UNSPECIFIED": "тип угрозы не указан",
+    "UNWANTED_SOFTWARE": "нежелательное ПО",
+    "POTENTIALLY_HARMFUL_APPLICATION": "потенциально вредоносное приложение"
+}

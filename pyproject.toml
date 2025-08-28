@@ -1,0 +1,61 @@
+[project]
+name = "starmanager"
+version = "1.7.0"
+authors = [
+  { name="d1n0", email="ilushkaplyshka@gmail.com" },
+]
+description = "Bot for moderating VK chats."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aerich>=0.9.1",
+    "aiogram>=3.22.0",
+    "apscheduler>=3.11.0",
+    "async-cache>=1.1.1",
+    "asyncpg>=0.30.0",
+    "authlib>=1.6.3",
+    "cachetools>=6.2.0",
+    "dnspython>=2.7.0",
+    "fastapi[standard]>=0.116.1",
+    "flake8>=7.3.0",
+    "flake8-async>=25.7.1",
+    "itsdangerous>=2.2.0",
+    "loguru>=0.7.3",
+    "memoization>=0.4.0",
+    "multicolorcaptcha>=1.2.0",
+    "nudenet>=3.4.2",
+    "pillow>=11.3.0",
+    "pydantic-settings>=2.10.1",
+    "pysafebrowsing>=0.1.4",
+    "tortoise>=0.1.1",
+    "vk-api>=11.10.0",
+    "vkbottle>=4.5.2",
+    "xmltodict>=0.14.2",
+    "yadisk>=3.4.0",
+    "yookassa>=3.6.0",
+]
+license = "CC-BY-ND-4.0"
+license-files = ["LICENSE"]
+
+[project.urls]
+Home = "https://star-manager.ru"
+GitHub = "https://github.com/d1n0z/StarManager"
+
+[tool.aerich]
+tortoise_orm = "StarManager.core.config.database_config"
+location = "./migrations"
+src_folder = "./src"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.mypy]
+files = "src"
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true

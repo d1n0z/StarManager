@@ -1,0 +1,614 @@
+@media (min-width: 1280px) {
+  .leaderboard {
+    transform: scale(0.8);
+  }
+}
+.leaderboard main {
+  display: flex;
+  justify-content: center;
+  margin-top: 160px;
+}
+.leaderboard main .leaderboard__title__first {
+  font-family: "Uni Sans", sans-serif;
+  font-style: normal;
+  font-weight: 900;
+  font-size: 78px;
+  text-align: center;
+  color: #56A0F6;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__title__first {
+    font-size: 72px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__title__first {
+    font-size: 62px;
+  }
+}
+.leaderboard main .leaderboard__title__second {
+  color: #FFFFFF;
+}
+.leaderboard main .leaderboard__title__description {
+  margin-top: -30px;
+  font-family: "Montserrat", sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 18px;
+  text-align: center;
+  color: #ffffff;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__title__description {
+    margin-left: 70px;
+    width: 950px;
+    font-size: 18px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__title__description {
+    font-size: 12px;
+  }
+}
+.leaderboard main .leaderboard__title__description--main {
+  font-weight: 600;
+  color: #56A0F6;
+}
+.leaderboard main .leaderboard__list {
+  position: absolute;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list {
+    top: 600px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list {
+    top: 700px;
+  }
+}
+.leaderboard main .leaderboard__list-footerButton {
+  margin-top: 46px;
+  display: flex;
+  justify-content: center;
+}
+.leaderboard main .leaderboard__list-footerButton button {
+  margin-left: 16px;
+  margin-bottom: 46px;
+}
+.leaderboard main .leaderboard__list-footerButton .footerButton {
+  background: #10151B;
+  border: 1.3px solid #10151B;
+  border-radius: 10px;
+  font-family: "Montserrat", sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+.leaderboard main .leaderboard__list-footerButton .footerButton:hover {
+  cursor: pointer;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-footerButton .footerButton {
+    font-size: 22px;
+    padding: 14px 14px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-footerButton .footerButton {
+    font-size: 28px;
+    padding: 16px 34px;
+  }
+}
+.leaderboard main .leaderboard__list-footerButton .footerButton--disable {
+  border: 1.3px solid #10151B;
+  border-radius: 10px;
+  font-family: "Montserrat", sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  background: #0C1115;
+  color: #65696A;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-footerButton .footerButton--disable {
+    font-size: 22px;
+    padding: 14px 14px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-footerButton .footerButton--disable {
+    font-size: 28px;
+    padding: 16px 34px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-buttons {
+    margin-left: -50px;
+  }
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-buttons__button {
+    display: inline-block;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-buttons__button {
+    margin-top: 10px;
+    display: flex;
+  }
+}
+.leaderboard main .leaderboard__list-buttons__input {
+  background: #10151B;
+  border: 1px solid #1A212A;
+  font-family: "Montserrat", sans-serif;
+  font-style: normal;
+  color: #FFFFFF;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-buttons__input {
+    width: 336px;
+    height: 44px;
+    font-weight: 500;
+    font-size: 16px;
+    padding-left: 16px;
+    border-radius: 8px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-buttons__input {
+    width: 800px;
+    height: 80px;
+    font-weight: 400;
+    font-size: 28px;
+    padding-left: 32px;
+    border-radius: 8px;
+  }
+}
+.leaderboard main .leaderboard__list-buttons__input::placeholder {
+  color: #474B50;
+}
+.leaderboard main .leaderboard__list-buttons__input:focus {
+  outline: none;
+}
+.leaderboard main .leaderboard__list-buttons__option {
+  background: #10151B;
+  border: 1px solid #1A212A;
+  font-family: "Montserrat", sans-serif;
+  font-style: normal;
+  color: #FFFFFF;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-buttons__option {
+    width: 280px;
+    height: 44px;
+    font-weight: 500;
+    font-size: 16px;
+    padding-left: 16px;
+    border-radius: 8px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-buttons__option {
+    width: 800px;
+    height: 80px;
+    font-weight: 400;
+    font-size: 28px;
+    padding-left: 32px;
+    border-radius: 8px;
+  }
+}
+.leaderboard main .leaderboard__list-buttons__option-svg {
+  position: absolute;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-buttons__option-svg {
+    width: 14px;
+    margin-left: -30px;
+    margin-top: 20px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-buttons__option-svg {
+    width: 24px;
+    margin-left: -56px;
+    margin-top: 36px;
+  }
+}
+.leaderboard main .leaderboard__list-buttons__option-div {
+  display: inline-block;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-buttons__option-div {
+    margin-left: 12px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-users {
+    margin-top: 90px;
+  }
+}
+.leaderboard main .leaderboard__list-users__user, .leaderboard main .leaderboard__list-users__user--end, .leaderboard main .leaderboard__list-users__user--third, .leaderboard main .leaderboard__list-users__user--second, .leaderboard main .leaderboard__list-users__user--first {
+  margin-top: -1px;
+  width: 1180px;
+  height: 76px;
+  background: #10151B;
+  border: 1px solid #1A212A;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user, .leaderboard main .leaderboard__list-users__user--end, .leaderboard main .leaderboard__list-users__user--third, .leaderboard main .leaderboard__list-users__user--second, .leaderboard main .leaderboard__list-users__user--first {
+    width: 1180px;
+    height: 76px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user, .leaderboard main .leaderboard__list-users__user--end, .leaderboard main .leaderboard__list-users__user--third, .leaderboard main .leaderboard__list-users__user--second, .leaderboard main .leaderboard__list-users__user--first {
+    margin-left: -46px;
+    width: 830px;
+    height: 100px;
+  }
+}
+.leaderboard main .leaderboard__list-users__user--first .leaderboard__list-users__user-top {
+  background: rgba(251, 190, 77, 0.26);
+}
+.leaderboard main .leaderboard__list-users__user--first .top-number {
+  font-weight: 700 !important;
+  color: #FBBE4D !important;
+}
+.leaderboard main .leaderboard__list-users__user--first .info-name {
+  color: #FBBE4D !important;
+}
+.leaderboard main .leaderboard__list-users__user--first .info-username {
+  color: #FBBE4D !important;
+}
+.leaderboard main .leaderboard__list-users__user--first .info-count {
+  color: #FBBE4D !important;
+}
+.leaderboard main .leaderboard__list-users__user--second .leaderboard__list-users__user-top {
+  background: rgba(92, 172, 224, 0.26);
+}
+.leaderboard main .leaderboard__list-users__user--second .top-number {
+  font-weight: 700 !important;
+  color: #5DADE2 !important;
+}
+.leaderboard main .leaderboard__list-users__user--second .info-name {
+  color: #5DADE2 !important;
+}
+.leaderboard main .leaderboard__list-users__user--second .info-username {
+  color: #5DADE2 !important;
+}
+.leaderboard main .leaderboard__list-users__user--second .info-count {
+  color: #5DADE2 !important;
+}
+.leaderboard main .leaderboard__list-users__user--third .leaderboard__list-users__user-top {
+  background: rgba(183, 119, 57, 0.26);
+}
+.leaderboard main .leaderboard__list-users__user--third .top-number {
+  font-weight: 700 !important;
+  color: #B87839 !important;
+}
+.leaderboard main .leaderboard__list-users__user--third .info-name {
+  color: #B87839 !important;
+}
+.leaderboard main .leaderboard__list-users__user--third .info-username {
+  color: #B87839 !important;
+}
+.leaderboard main .leaderboard__list-users__user--third .info-count {
+  color: #B87839 !important;
+}
+.leaderboard main .leaderboard__list-users__user--end {
+  border-radius: 0 0 16px 16px;
+}
+.leaderboard main .leaderboard__list-users__user-header {
+  background: #141A21;
+  border-radius: 18px 18px 0 0;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-header {
+    width: 1182px;
+    height: 76px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-header {
+    margin-left: -46px;
+    width: 832px;
+    height: 80px;
+  }
+}
+.leaderboard main .leaderboard__list-users__user-header-names .lists-tag {
+  font-family: "Montserrat", sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  color: #FFFFFF;
+  display: inline-block;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-header-names .lists-tag {
+    font-size: 20px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-header-names .lists-tag {
+    font-size: 24px;
+  }
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-header-names #Place {
+    margin-top: 6px;
+    margin-left: -12px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-header-names #Place {
+    margin-top: 4px;
+    margin-left: 1px;
+  }
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-header-names #Name {
+    margin-left: 180px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-header-names #Name {
+    margin-left: 170px;
+    display: inline-block;
+  }
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-header-names #Name #HiddenName {
+    display: none;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-header-names #Name #HiddenName {
+    display: inline-block;
+  }
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-header-names #Username {
+    margin-left: 430px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-header-names #Username {
+    display: none;
+  }
+}
+.leaderboard main .leaderboard__list-users__user-header-names #Count {
+  position: absolute;
+  width: 160px;
+  text-align: center;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-header-names #Count {
+    margin-top: 6px;
+    margin-left: 210px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-header-names #Count {
+    margin-top: 6px;
+    margin-left: 200px;
+  }
+}
+.leaderboard main .leaderboard__list-users__user-top, .leaderboard main .leaderboard__list-users__user--first .leaderboard__list-users__user-top, .leaderboard main .leaderboard__list-users__user--second .leaderboard__list-users__user-top, .leaderboard main .leaderboard__list-users__user--third .leaderboard__list-users__user-top {
+  display: flex;
+  justify-content: center;
+  align-content: center;
+  margin-left: 34px;
+  /*background: rgba(251, 190, 77, 0.26);*/
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-top, .leaderboard main .leaderboard__list-users__user--first .leaderboard__list-users__user-top, .leaderboard main .leaderboard__list-users__user--second .leaderboard__list-users__user-top, .leaderboard main .leaderboard__list-users__user--third .leaderboard__list-users__user-top {
+    margin-top: 10px;
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-top, .leaderboard main .leaderboard__list-users__user--first .leaderboard__list-users__user-top, .leaderboard main .leaderboard__list-users__user--second .leaderboard__list-users__user-top, .leaderboard main .leaderboard__list-users__user--third .leaderboard__list-users__user-top {
+    margin-top: 10px;
+    width: 82px;
+    height: 82px;
+    border-radius: 18px;
+  }
+}
+.leaderboard main .leaderboard__list-users__user-top .top-number {
+  margin-top: 14px;
+  font-family: "Yandex Sans Text", sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 22px;
+  text-align: center;
+  color: #ffffff;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-top .top-number {
+    margin-top: 14px;
+    font-size: 22px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-top .top-number {
+    margin-top: 19px;
+    font-size: 38px;
+  }
+}
+.leaderboard main .leaderboard__list-users__user-info {
+  position: absolute;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-info {
+    margin-top: -56px;
+    margin-left: 160px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-info {
+    margin-top: -80px;
+    margin-left: 160px;
+  }
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-info .info-avatar {
+    border-radius: 8px;
+    width: 56px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-info .info-avatar {
+    border-radius: 18px;
+    width: 80px;
+  }
+}
+.leaderboard main .leaderboard__list-users__user-info .info-name {
+  font-family: "Montserrat", sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 18px;
+  color: #FFFFFF;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-info .info-name {
+    margin-top: -44px;
+    margin-left: 78px;
+    font-size: 18px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-info .info-name {
+    margin-top: -74px;
+    margin-left: 94px;
+    font-size: 28px;
+  }
+}
+.leaderboard main .leaderboard__list-users__user-username {
+  position: absolute;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-username {
+    width: 300px;
+    margin-top: -56px;
+    margin-left: 600px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-username {
+    margin-top: -56px;
+    margin-left: 252px;
+  }
+}
+.leaderboard main .leaderboard__list-users__user-username .info-username {
+  font-family: "Montserrat", sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  text-align: center;
+  color: #FFFFFF;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-username .info-username {
+    font-size: 18px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-username .info-username {
+    font-size: 22px;
+  }
+}
+.leaderboard main .leaderboard__list-users__user-username .info-username a,
+.leaderboard main .leaderboard__list-users__user-username .info-username a:link,
+.leaderboard main .leaderboard__list-users__user-username .info-username a:visited {
+  color: inherit;
+}
+.leaderboard main .leaderboard__list-users__user-count {
+  position: absolute;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-count {
+    width: 120px;
+    height: 76px;
+    margin-top: -66px;
+    margin-left: 1000px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-count {
+    margin-top: -66px;
+    margin-left: 624px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    height: 20px;
+    padding: 12px 16px;
+    width: 180px;
+  }
+}
+.leaderboard main .leaderboard__list-users__user-count .info-count {
+  font-family: "Montserrat", sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 18px;
+  color: #FFFFFF;
+}
+@media (min-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-count .info-count {
+    text-align: center;
+    font-size: 18px;
+  }
+}
+@media (max-width: 1280px) {
+  .leaderboard main .leaderboard__list-users__user-count .info-count {
+    font-size: 24px;
+  }
+}
+
+.show-menu-category {
+  position: absolute;
+  z-index: 10;
+}
+@media (min-width: 1280px) {
+  .show-menu-category {
+    margin-left: -28px;
+  }
+}
+@media (max-width: 1280px) {
+  .show-menu-category {
+    margin-top: 84px;
+    margin-left: -40px;
+  }
+}
+.show-menu-category-lists-el button {
+  background: #10151B;
+  border: 1px solid #1A212A;
+  font-family: "Montserrat", sans-serif;
+  font-style: normal;
+  color: #FFFFFF;
+  margin-top: -1px;
+  text-align: left;
+}
+@media (min-width: 1280px) {
+  .show-menu-category-lists-el button {
+    width: 300px;
+    height: 44px;
+    font-weight: 500;
+    font-size: 16px;
+    padding-left: 16px;
+  }
+}
+@media (max-width: 1280px) {
+  .show-menu-category-lists-el button {
+    width: 836px;
+    height: 80px;
+    font-weight: 400;
+    font-size: 28px;
+    padding-left: 32px;
+  }
+}
+.show-menu-category-lists-el button:hover {
+  cursor: pointer;
+}
+
+/*# sourceMappingURL=leaderboard.css.map */

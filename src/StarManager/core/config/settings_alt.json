@@ -1,0 +1,15 @@
+{
+    "defaults": {
+        "main": {
+            "welcome": 0
+        },
+        "entertaining": {},
+        "antispam": {
+            "messagesPerMinute": 1,
+            "maximumCharsInMessage": 1,
+            "vkLinks": 1,
+            "forwardeds": 1
+        },
+        "protect": {}
+    }
+}

@@ -1,38 +1,72 @@
-# ide
-.idea
-.vscode
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
 
-# pyc
-.__pycache__
-*.pyc
+# Distribution / packaging
+build/
+dist/
+wheels/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+src/StarManager/site/static/js/
+src/StarManager/site/static/css/
+src/StarManager/site/static/media/
+src/StarManager/site/static/docs/
 
-venv
-/config/config*.ini
-/media/temp/*
-make.local
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
 
-# frontend:
-# dependencies
-node_modules
-.pnp
-.pnp.js
+# Logs and local runtime files
+*.log
+logs/
+*.pid
+*.sqlite3
+src/StarManager/core/media/temp
 
-# testing
-coverage
+# dotenv
+.env
+.env.*
 
-# production
-build
-site/static/css
-site/static/js
-site/static/media
+# Aerich migrations
+migrations/
 
-# misc
+# MyPy / Pyright / Pyre / coverage
+.mypy_cache/
+.pytype/
+.pyre/
+.coverage
+htmlcov/
+
+# IDEs
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# macOS / Linux
 .DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+*.swp
+*.swo
 
+# Node stuff
+node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# pyproject build artifacts (PEP 517/518)
+__pypackages__/
+
+# local scripts
+Makefile
+make.local

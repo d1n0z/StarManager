@@ -1,0 +1,55 @@
+.mini-profile-legacy {
+  display: flex;
+  justify-content: center;
+}
+@media (min-width: 1280px) {
+  .mini-profile-legacy {
+    margin-top: -50px;
+  }
+}
+@media (max-width: 1280px) {
+  .mini-profile-legacy {
+    margin-top: 40px;
+  }
+}
+.mini-profile-legacy__social-list__element {
+  margin-left: 16px;
+  display: inline-block;
+}
+@media (min-width: 1280px) {
+  .mini-profile-legacy__social-list__element .element-icon, .mini-profile-legacy__social-list__element .element-icon-long {
+    width: 46px;
+  }
+}
+@media (max-width: 1280px) {
+  .mini-profile-legacy__social-list__element .element-icon, .mini-profile-legacy__social-list__element .element-icon-long {
+    width: 69px;
+  }
+}
+.mini-profile-legacy__social-list__element .element-icon path, .mini-profile-legacy__social-list__element .element-icon-long path {
+  transition: fill 0.3s ease-in-out;
+}
+.mini-profile-legacy__social-list__element .element-icon rect, .mini-profile-legacy__social-list__element .element-icon-long rect {
+  transition: fill-opacity 0.3s ease-in-out;
+}
+@media (min-width: 1280px) {
+  .mini-profile-legacy__social-list__element .element-icon-long {
+    width: 160px;
+  }
+}
+@media (max-width: 1280px) {
+  .mini-profile-legacy__social-list__element .element-icon-long {
+    width: 240px;
+  }
+}
+.mini-profile-legacy__social-list__element:hover {
+  cursor: pointer;
+}
+.mini-profile-legacy__social-list__element:hover .element-icon path, .mini-profile-legacy__social-list__element:hover .element-icon-long path {
+  fill: #fff;
+}
+.mini-profile-legacy__social-list__element:hover .element-icon rect, .mini-profile-legacy__social-list__element:hover .element-icon-long rect {
+  fill-opacity: 1;
+}
+
+/*# sourceMappingURL=mini-profile-legacy.css.map */

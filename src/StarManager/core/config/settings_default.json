@@ -1,0 +1,32 @@
+{
+    "defaults": {
+        "main": {
+            "kickInvitedByNoAccess": 1,
+            "kickLeaving": 1,
+            "deleteAccessAndNicknameOnLeave": 0,
+            "disallowPings": 0,
+            "disallowStickers": 0,
+            "nightmode": 0,
+            "welcome": 0,
+            "captcha": 0,
+            "autodelete": 0
+        },
+        "entertaining": {
+            "allowDuel": 1,
+            "allowGuess": 1,
+            "allowTransfer": 1,
+            "allowAnon": 1
+        },
+        "antispam": {
+            "messagesPerMinute": 0,
+            "maximumCharsInMessage": 0,
+            "disallowLinks": 0,
+            "disallowNSFW": 0,
+            "vkLinks": 0,
+            "forwardeds": 0
+        },
+        "protect": {
+            "enable": 0
+        }
+    }
+}
