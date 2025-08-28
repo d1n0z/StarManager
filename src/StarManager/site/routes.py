@@ -345,7 +345,7 @@ async def yookassa(request: Request):
 
     async with (await pool()).acquire() as conn:
         if not await conn.fetchval(
-            "update payments set success=1 where id=$1 returning 1", payment.order_id
+            "update payments set success=1 where id=$1 and success=0 returning 1", payment.order_id
         ):
             return JSONResponse(content="YES")
         if payment.personal_promo:
