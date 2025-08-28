@@ -441,7 +441,7 @@
 
               #Username {
                 @media (min-width: 1280px) {
-                  margin-left: 430px;
+                  margin-left: 416px;
                 }
                 @media (max-width: 1280px) {
                   display: none;
@@ -635,6 +635,11 @@
               font-weight: 600;
               font-size: 18px;
 
+              display: flex;
+              align-items: center;
+              justify-content: center;
+
+              height: 42px;
               color: #FFFFFF;
 
               @media (min-width: 1280px) {
@@ -643,6 +648,8 @@
                 font-size: 18px;
               }
               @media (max-width: 1280px) {
+                margin-top: 30px;
+
                 font-size: 24px;
               }
             }

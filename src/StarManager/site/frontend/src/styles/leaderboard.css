@@ -367,7 +367,7 @@
 }
 @media (min-width: 1280px) {
   .leaderboard main .leaderboard__list-users__user-header-names #Username {
-    margin-left: 430px;
+    margin-left: 416px;
   }
 }
 @media (max-width: 1280px) {
@@ -551,6 +551,10 @@
   font-style: normal;
   font-weight: 600;
   font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 42px;
   color: #FFFFFF;
 }
 @media (min-width: 1280px) {
@@ -561,6 +565,7 @@
 }
 @media (max-width: 1280px) {
   .leaderboard main .leaderboard__list-users__user-count .info-count {
+    margin-top: 30px;
     font-size: 24px;
   }
 }
