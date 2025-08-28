@@ -54,7 +54,7 @@ async def action_handle(message: MessageNew) -> None:
                 "select trigger_status, limit_invites, limit_seconds, status from raidmode where chat_id=$1",
                 chat_id,
             )
-        if raidmode[0] and not raidmode[3]:
+        if raidmode and raidmode[0] and not raidmode[3]:
             managers.raid.add_user_id(action.type.value, chat_id, uid)
             if len(
                 to_kick := managers.raid.get_users(
