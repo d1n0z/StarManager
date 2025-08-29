@@ -169,7 +169,7 @@ async def updateInfo(conn):
         try:
             result = vk_api_session.method("execute", {"code": code})
             updates = []
-            for g in result["items"]:
+            for g in result["groups"]:
                 gid = -abs(g["id"])
                 updates.append((g["name"], gid))
             await conn.executemany(

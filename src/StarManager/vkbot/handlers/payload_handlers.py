@@ -3576,7 +3576,7 @@ async def raid_settings(message: MessageEvent):
         raidmode = await conn.fetchrow(
             "select trigger_status, limit_invites, limit_seconds from raidmode where chat_id=$1",
             message.peer_id - 2000000000,
-        ) or [0, 5, 60]
+        ) or [False, 5, 60]
     await utils.editMessage(
         await messages.raid_settings(*raidmode),
         message.object.peer_id,
