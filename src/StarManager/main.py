@@ -64,17 +64,6 @@ def run_bot(max_retries: int = 0, retry_delay: int = 30):
 
 
 def send_error_notification() -> None:
-    # try:
-    #     vk_api_session.method(
-    #         "messages.send",
-    #         {
-    #             "chat_id": DAILY_TO,
-    #             "message": f"Unexpected exception caught in VkBot.run():\n{traceback.format_exc()}",
-    #             "random_id": 0,
-    #         },
-    #     )
-    # except Exception as notify_error:
-    #     logger.error(f"Failed to send error notification: {notify_error}")
     logger.exception("Full traceback of the error:")
 
 
@@ -90,7 +79,7 @@ def main(args: Namespace | None):
 
     logger.info("Cleaning temp files...")
     subprocess.run(
-        f"rm -f {settings.database.name}.sql {settings.service.path}src/StarManager/core/media/temp/* {settings.service.path}src/StarManager/core/media/tmp/* > /dev/null 2>&1",
+        f"rm -f {settings.database.name}*.sql {settings.service.path}src/StarManager/core/media/t?mp/* > /dev/null 2>&1",
         shell=True,
         check=False,
     )

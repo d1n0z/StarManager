@@ -91,7 +91,8 @@ class DuelLockManager(BaseManager):
         while True:
             await asyncio.sleep(self._cleanup_interval)
             try:
-                await self._cleanup()
+                async with self._lock:
+                    await self._cleanup()
             except Exception:
                 traceback.print_exc()
 

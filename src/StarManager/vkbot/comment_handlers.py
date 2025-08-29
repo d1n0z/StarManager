@@ -1,4 +1,5 @@
 import time
+from typing import Any
 
 from vkbottle_types import GroupTypes
 
@@ -8,7 +9,7 @@ from StarManager.core.db import pool
 from StarManager.core.utils import add_user_xp, get_user_name
 
 
-async def comment_handle(event: GroupTypes.WallReplyNew):
+async def comment_handle(event: GroupTypes.WallReplyNew) -> Any:
     uid = event.object.from_id
     if uid <= 0 or event.object.post_id is None:
         return

@@ -100,6 +100,7 @@ async def backup() -> None:
         f'PGPASSWORD="{settings.database.password}" pg_dump -h localhost -U {settings.database.name} {settings.database.name} | gzip > {filename}',
         shell=True,
     )
+
     drive = yadisk.AsyncClient(token=settings.yandex.token)
     async with drive:
         await drive.upload(
@@ -108,13 +109,14 @@ async def backup() -> None:
             timeout=int(os.stat(filename).st_size / 1000 / 128) * 1.5,
         )
         link = await drive.get_download_link(f"/StarManager/backups/{filename}")
+    
+    os.remove(filename)
     await tgbot.send_message(
         chat_id=settings.telegram.chat_id,
         message_thread_id=settings.telegram.backup_thread_id,
         text=f"<a href='{link}'>{filename}</a>",
         parse_mode="HTML",
     )
-    os.remove(filename)
 
 
 async def updateInfo(conn):
