@@ -6,15 +6,15 @@ from vkbottle.framework.labeler import BotLabeler
 from StarManager.core.config import settings
 from StarManager.core.db import pool
 from StarManager.core.utils import (
-    getChatAccessName,
-    getIDFromMessage,
-    getUserAccessLevel,
-    getUserMute,
-    getUserName,
-    getUserNickname,
+    get_chat_access_name,
+    search_id_in_message,
+    get_user_access_level,
+    get_user_mute,
+    get_user_name,
+    get_user_nickname,
     messagereply,
-    setChatMute,
-    setUserAccessLevel,
+    set_chat_mute,
+    set_user_access_level,
 )
 from StarManager.vkbot import keyboard, messages
 from StarManager.vkbot.rules import SearchCMD
@@ -26,7 +26,7 @@ bl = BotLabeler()
 async def unmute(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if not id:
         return await messagereply(
             message, disable_mentions=1, message=await messages.unmute_hint()
@@ -36,17 +36,19 @@ async def unmute(message: Message):
             message, disable_mentions=1, message=await messages.id_group()
         )
 
-    if await getUserAccessLevel(id, chat_id) >= await getUserAccessLevel(uid, chat_id):
+    if await get_user_access_level(id, chat_id) >= await get_user_access_level(
+        uid, chat_id
+    ):
         return await messagereply(
             message, disable_mentions=1, message=await messages.unmute_higher()
         )
 
-    if await getUserMute(id, chat_id) <= time.time():
+    if await get_user_mute(id, chat_id) <= time.time():
         return await messagereply(
             message,
             disable_mentions=1,
             message=await messages.unmute_no_mute(
-                id, await getUserName(id), await getUserNickname(id, chat_id)
+                id, await get_user_name(id), await get_user_nickname(id, chat_id)
             ),
         )
 
@@ -55,16 +57,16 @@ async def unmute(message: Message):
             "update mute set mute = 0 where chat_id=$1 and uid=$2", chat_id, id
         )
 
-    await setChatMute(id, chat_id, 0)
+    await set_chat_mute(id, chat_id, 0)
     await messagereply(
         message,
         disable_mentions=1,
         message=await messages.unmute(
-            await getUserName(uid),
-            await getUserNickname(uid, chat_id),
+            await get_user_name(uid),
+            await get_user_nickname(uid, chat_id),
             uid,
-            await getUserName(id),
-            await getUserNickname(id, chat_id),
+            await get_user_name(id),
+            await get_user_nickname(id, chat_id),
             id,
         ),
         keyboard=keyboard.deletemessages(uid, [message.conversation_message_id]),
@@ -93,7 +95,7 @@ async def mutelist(message: Message):
 async def unwarn(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if not id:
         return await messagereply(
             message, disable_mentions=1, message=await messages.unwarn_hint()
@@ -107,7 +109,9 @@ async def unwarn(message: Message):
             message, disable_mentions=1, message=await messages.unwarn_myself()
         )
 
-    if await getUserAccessLevel(id, chat_id) >= await getUserAccessLevel(uid, chat_id):
+    if await get_user_access_level(id, chat_id) >= await get_user_access_level(
+        uid, chat_id
+    ):
         return await messagereply(
             message, disable_mentions=1, message=await messages.unwarn_higher()
         )
@@ -122,18 +126,18 @@ async def unwarn(message: Message):
                 message,
                 disable_mentions=1,
                 message=await messages.unwarn_no_warns(
-                    id, await getUserName(id), await getUserNickname(id, chat_id)
+                    id, await get_user_name(id), await get_user_nickname(id, chat_id)
                 ),
             )
     await messagereply(
         message,
         disable_mentions=1,
         message=await messages.unwarn(
-            await getUserName(uid),
-            await getUserNickname(uid, chat_id),
+            await get_user_name(uid),
+            await get_user_nickname(uid, chat_id),
             uid,
-            await getUserName(id),
-            await getUserNickname(id, chat_id),
+            await get_user_name(id),
+            await get_user_nickname(id, chat_id),
             id,
         ),
         keyboard=keyboard.deletemessages(uid, [message.conversation_message_id]),
@@ -163,7 +167,7 @@ async def setaccess(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if (
         not id
         or (len(data) + bool(message.reply_message) < 3)
@@ -186,17 +190,17 @@ async def setaccess(message: Message):
         return await messagereply(
             message, disable_mentions=1, message=await messages.setacc_hint()
         )
-    ch_acc = await getUserAccessLevel(id, chat_id)
+    ch_acc = await get_user_access_level(id, chat_id)
     if acc == ch_acc:
         return await messagereply(
             message,
             disable_mentions=1,
             message=await messages.setacc_already_have_acc(
-                id, await getUserName(id), await getUserNickname(id, chat_id)
+                id, await get_user_name(id), await get_user_nickname(id, chat_id)
             ),
         )
 
-    u_acc = await getUserAccessLevel(uid, chat_id)
+    u_acc = await get_user_access_level(uid, chat_id)
     if not (acc < u_acc or u_acc >= 8) and uid not in settings.service.main_devs:
         return await messagereply(
             message, disable_mentions=1, message=await messages.setacc_low_acc(acc)
@@ -206,19 +210,19 @@ async def setaccess(message: Message):
             message, disable_mentions=1, message=await messages.setacc_higher()
         )
 
-    await setUserAccessLevel(id, chat_id, acc)
+    await set_user_access_level(id, chat_id, acc)
     await messagereply(
         message,
         disable_mentions=1,
         message=await messages.setacc(
             uid,
-            await getUserName(uid),
-            await getUserNickname(uid, chat_id),
+            await get_user_name(uid),
+            await get_user_nickname(uid, chat_id),
             acc,
             id,
-            await getUserName(id),
-            await getUserNickname(id, chat_id),
-            await getChatAccessName(chat_id, acc),
+            await get_user_name(id),
+            await get_user_nickname(id, chat_id),
+            await get_chat_access_name(chat_id, acc),
         ),
     )
 
@@ -227,7 +231,7 @@ async def setaccess(message: Message):
 async def delaccess(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if not id:
         return await messagereply(
             message, disable_mentions=1, message=await messages.delaccess_hint()
@@ -241,29 +245,32 @@ async def delaccess(message: Message):
             message, disable_mentions=1, message=await messages.delaccess_myself()
         )
 
-    ch_acc = await getUserAccessLevel(id, chat_id)
+    ch_acc = await get_user_access_level(id, chat_id)
     if ch_acc <= 0:
         return await messagereply(
             message,
             disable_mentions=1,
             message=await messages.delaccess_noacc(
-                id, await getUserName(id), await getUserNickname(id, chat_id)
+                id, await get_user_name(id), await get_user_nickname(id, chat_id)
             ),
         )
-    if ch_acc >= await getUserAccessLevel(uid, chat_id) and uid not in settings.service.devs:
+    if (
+        ch_acc >= await get_user_access_level(uid, chat_id)
+        and uid not in settings.service.devs
+    ):
         return await messagereply(
             message, disable_mentions=1, message=await messages.delaccess_higher()
         )
-    await setUserAccessLevel(id, chat_id, 0)
+    await set_user_access_level(id, chat_id, 0)
     await messagereply(
         message,
         disable_mentions=1,
         message=await messages.delaccess(
             uid,
-            await getUserName(uid),
-            await getUserNickname(uid, chat_id),
+            await get_user_name(uid),
+            await get_user_nickname(uid, chat_id),
             id,
-            await getUserName(id),
-            await getUserNickname(id, chat_id),
+            await get_user_name(id),
+            await get_user_nickname(id, chat_id),
         ),
     )

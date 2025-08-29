@@ -13,9 +13,9 @@ async def action_handle(message: MessageNew) -> None:
     if event is None or (action := event.action) is None:
         return
     chat_id = event.peer_id - 2000000000
-    chat_settings = await utils.getChatSettings(chat_id)
+    chat_settings = await utils.get_chat_settings(chat_id)
     if action.type.value == "chat_invite_user_by_link" and (
-        await utils.getRaidModeActive(chat_id)
+        await utils.get_raid_mode_active(chat_id)
         or chat_settings["main"]["kickInvitedByLink"]
     ):
         async with (await pool()).acquire() as conn:
@@ -38,10 +38,10 @@ async def action_handle(message: MessageNew) -> None:
         ).items
         for user in users:
             if user.member_id not in in_chat and user.member_id > 0:
-                await utils.kickUser(user.member_id, chat_id=chat_id)
-                await utils.sendMessage(
+                await utils.kick_user(user.member_id, chat_id=chat_id)
+                await utils.send_message(
                     event.peer_id,
-                    f"⛔️ [id{user.member_id}|{await utils.getUserName(user.member_id)}], был(-a) исключен(-на) из беседы. Вход по пригласительным ссылкам в беседе отключен.",
+                    f"⛔️ [id{user.member_id}|{await utils.get_user_name(user.member_id)}], был(-a) исключен(-на) из беседы. Вход по пригласительным ссылкам в беседе отключен.",
                 )
         return
 
@@ -62,9 +62,9 @@ async def action_handle(message: MessageNew) -> None:
                 ).keys()
             ) >= raidmode[1] and (
                 action.type.value != "chat_invite_user"
-                or await utils.getUserAccessLevel(uid, chat_id) == 0
+                or await utils.get_user_access_level(uid, chat_id) == 0
             ):
-                await utils.sendMessage(
+                await utils.send_message(
                     event.peer_id,
                     "❗️ Активирована защита от рейдов, все новые участники чата будут кикнуты. Для отключения напишите команду /raid",
                 )
@@ -73,7 +73,7 @@ async def action_handle(message: MessageNew) -> None:
                         "update raidmode set status=true where chat_id=$1", chat_id
                     )
                 for user_id in to_kick:
-                    await utils.kickUser(user_id, chat_id)
+                    await utils.kick_user(user_id, chat_id)
                 return
 
     if action.type.value not in ("chat_invite_user", "chat_kick_user"):
@@ -81,7 +81,7 @@ async def action_handle(message: MessageNew) -> None:
 
     if action.type.value == "chat_kick_user":
         if chat_settings["main"]["kickLeaving"]:
-            await utils.kickUser(uid, chat_id=chat_id)
+            await utils.kick_user(uid, chat_id=chat_id)
         async with (await pool()).acquire() as conn:
             await conn.execute(
                 "delete from captcha where chat_id=$1 and uid=$2", chat_id, uid
@@ -118,7 +118,7 @@ async def action_handle(message: MessageNew) -> None:
             if block := await conn.fetchrow(
                 "select reason from blocked where uid=$1 and type='chat'", chat_id
             ):
-                await utils.sendMessage(
+                await utils.send_message(
                     event.peer_id,
                     await messages.block_chatblocked(id, block[0]),
                     keyboard.block_chatblocked(),
@@ -128,8 +128,8 @@ async def action_handle(message: MessageNew) -> None:
             if await conn.fetchval(
                 "select exists(select 1 from blacklist where uid=$1)", id
             ):
-                await utils.sendMessage(event.peer_id, await messages.blocked())
-                await utils.kickUser(-settings.vk.group_id, chat_id=chat_id)
+                await utils.send_message(event.peer_id, await messages.blocked())
+                await utils.kick_user(-settings.vk.group_id, chat_id=chat_id)
                 return
             if not await conn.fetchval(
                 "select exists(select 1 from allchats where chat_id=$1)", chat_id
@@ -137,48 +137,48 @@ async def action_handle(message: MessageNew) -> None:
                 await conn.execute(
                     "insert into allchats (chat_id) values ($1)", chat_id
                 )
-                await utils.sendMessage(
+                await utils.send_message(
                     event.peer_id, await messages.join(), keyboard.join(chat_id)
                 )
                 return
-        await utils.sendMessage(
+        await utils.send_message(
             event.peer_id, await messages.rejoin(), keyboard.rejoin(chat_id)
         )
         return
 
-    if await utils.getUserAccessLevel(id, chat_id) == 0 and (
+    if await utils.get_user_access_level(id, chat_id) == 0 and (
         chat_settings["main"]["kickInvitedByNoAccess"]
-        or await utils.getRaidModeActive(chat_id)
+        or await utils.get_raid_mode_active(chat_id)
     ):
-        await utils.kickUser(uid, chat_id=chat_id)
+        await utils.kick_user(uid, chat_id=chat_id)
         return
 
     if uid < 0:
         return
-    if (ban := await utils.getUserBan(uid, chat_id)) > time.time():
-        await utils.sendMessage(
+    if (ban := await utils.get_user_ban(uid, chat_id)) > time.time():
+        await utils.send_message(
             event.peer_id,
             await messages.kick_banned(
                 uid,
-                await utils.getUserName(uid),
-                await utils.getUserNickname(uid, chat_id),
+                await utils.get_user_name(uid),
+                await utils.get_user_nickname(uid, chat_id),
                 ban,
-                (await utils.getUserBanInfo(uid, chat_id))["causes"][-1],
+                (await utils.get_user_ban_info(uid, chat_id))["causes"][-1],
             ),
         )
-        await utils.kickUser(uid, chat_id=chat_id)
+        await utils.kick_user(uid, chat_id=chat_id)
         return
     async with (await pool()).acquire() as conn:
         if block := await conn.fetchrow(
             "select reason from blocked where uid=$1 and type='user'", uid
         ):
-            await utils.sendMessage(
+            await utils.send_message(
                 event.peer_id,
                 await messages.block_blockeduserinvite(
-                    uid, await utils.getUserName(uid), block[0]
+                    uid, await utils.get_user_name(uid), block[0]
                 ),
             )
-            await utils.kickUser(uid, chat_id=chat_id)
+            await utils.kick_user(uid, chat_id=chat_id)
             return
 
     if id:
@@ -209,22 +209,22 @@ async def action_handle(message: MessageNew) -> None:
                     id,
                 )
             ):
-                await utils.addUserXP(id, 250)
+                await utils.add_user_xp(id, 250)
                 await conn.execute(
                     "insert into referralbonushistory (chat_id, uid, from_id) values ($1, $2, $3)",
                     chat_id,
                     uid,
                     id,
                 )
-                await utils.sendMessage(
+                await utils.send_message(
                     event.peer_id,
                     await messages.referralbonus(
                         id,
-                        await utils.getUserName(id),
-                        await utils.getUserNickname(id, chat_id),
+                        await utils.get_user_name(id),
+                        await utils.get_user_nickname(id, chat_id),
                         uid,
-                        await utils.getUserName(uid),
-                        await utils.getUserNickname(uid, chat_id),
+                        await utils.get_user_name(uid),
+                        await utils.get_user_nickname(uid, chat_id),
                     ),
                 )
             if s := await conn.fetchrow(
@@ -232,13 +232,13 @@ async def action_handle(message: MessageNew) -> None:
                 chat_id,
             ):
                 if s[0] and s[1] and s[2]:
-                    captcha = await utils.generateCaptcha(uid, chat_id, s[1])
-                    m = await utils.sendMessage(
+                    captcha = await utils.generate_captcha(uid, chat_id, s[1])
+                    m = await utils.send_message(
                         event.peer_id,
                         await messages.captcha(
-                            uid, await utils.getUserName(uid), s[1], s[2]
+                            uid, await utils.get_user_name(uid), s[1], s[2]
                         ),
-                        photo=await utils.uploadImage(captcha[0]),
+                        photo=await utils.upload_image(captcha[0]),
                     )
                     if m and not isinstance(m, (int, bool)):
                         await conn.execute(
@@ -263,12 +263,12 @@ async def action_handle(message: MessageNew) -> None:
                 )
                 if welcome is None or not s[0]:
                     return
-                u_nickname = await utils.getUserNickname(uid, chat_id)
-                m = await utils.sendMessage(
+                u_nickname = await utils.get_user_nickname(uid, chat_id)
+                m = await utils.send_message(
                     event.peer_id,
                     welcome[0].replace(
                         "%name%",
-                        f"[id{uid}|{await utils.getUserName(uid) if u_nickname is None else u_nickname}]",
+                        f"[id{uid}|{await utils.get_user_name(uid) if u_nickname is None else u_nickname}]",
                     ),
                     keyboard.urlbutton(welcome[1], welcome[2]),
                     welcome[3],
@@ -278,7 +278,7 @@ async def action_handle(message: MessageNew) -> None:
                         "delete from welcomehistory where chat_id=$1 returning cmid",
                         chat_id,
                     )
-                    await utils.deleteMessages(lw, chat_id)
+                    await utils.delete_messages(lw, chat_id)
                 if m and not isinstance(m, (int, bool)):
                     await conn.execute(
                         "insert into welcomehistory (chat_id, time, cmid) values ($1, $2, $3) on conflict "

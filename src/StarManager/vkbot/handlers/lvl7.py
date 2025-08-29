@@ -6,13 +6,13 @@ from vkbottle.framework.labeler import BotLabeler
 from StarManager.vkbot import keyboard, messages
 from StarManager.vkbot.rules import SearchCMD
 from StarManager.core.utils import (
-    getUserPremium,
-    getUserName,
-    getUserNickname,
-    getChatName,
-    getUserAccessLevel,
-    getIDFromMessage,
-    getUserLeague,
+    get_user_premium,
+    get_user_name,
+    get_user_nickname,
+    get_chat_name,
+    get_user_access_level,
+    search_id_in_message,
+    get_user_league,
     messagereply,
 )
 from StarManager.core.config import settings
@@ -32,7 +32,9 @@ async def asynch(message: Message):
             chat_id,
         ):
             return await messagereply(
-                message, disable_mentions=1, message=await messages.async_already_bound()
+                message,
+                disable_mentions=1,
+                message=await messages.async_already_bound(),
             )
         bound = await conn.fetchval("select count(*) as c from gpool where uid=$1", uid)
         u_premium = (
@@ -53,7 +55,7 @@ async def asynch(message: Message):
         message,
         disable_mentions=1,
         message=await messages.async_done(
-            uid, await getUserName(uid), await getUserNickname(uid, chat_id)
+            uid, await get_user_name(uid), await get_user_nickname(uid, chat_id)
         ),
     )
 
@@ -72,16 +74,18 @@ async def delasync(message: Message):
             "delete from gpool where uid=$1 and chat_id=$2 returning 1", uid, delchid
         ):
             return await messagereply(
-                message, disable_mentions=1, message=await messages.delasync_already_unbound()
+                message,
+                disable_mentions=1,
+                message=await messages.delasync_already_unbound(),
             )
     await messagereply(
         message,
         disable_mentions=1,
         message=await messages.delasync_done(
             uid,
-            await getUserName(uid),
-            await getUserNickname(uid, chat_id),
-            await getChatName(delchid),
+            await get_user_name(uid),
+            await get_user_nickname(uid, chat_id),
+            await get_chat_name(delchid),
         ),
     )
 
@@ -98,11 +102,17 @@ async def creategroup(message: Message):
     pattern = re.compile(r"[a-zA-Z0-9]")
     if len(pattern.findall(group_name)) != len(group_name) or len(group_name) > 16:
         return await messagereply(
-            message, disable_mentions=1, message=await messages.creategroup_incorrect_name()
+            message,
+            disable_mentions=1,
+            message=await messages.creategroup_incorrect_name(),
         )
     uid = message.from_id
-    u_premium = await getUserPremium(uid)
-    limit = settings.leagues.creategroup_bonus[await getUserLeague(uid) - 1] if not u_premium else 30
+    u_premium = await get_user_premium(uid)
+    limit = (
+        settings.leagues.creategroup_bonus[await get_user_league(uid) - 1]
+        if not u_premium
+        else 30
+    )
     async with (await pool()).acquire() as conn:
         if (
             len(
@@ -116,7 +126,9 @@ async def creategroup(message: Message):
             >= limit
         ):
             return await messagereply(
-                message, disable_mentions=1, message=await messages.creategroup_premium()
+                message,
+                disable_mentions=1,
+                message=await messages.creategroup_premium(),
             )
         if await conn.fetchval(
             'select exists(select 1 from chatgroups where uid=$1 and "group"=$2)',
@@ -138,7 +150,10 @@ async def creategroup(message: Message):
         message,
         disable_mentions=1,
         message=await messages.creategroup_done(
-            uid, await getUserName(uid), await getUserNickname(uid, chat_id), group_name
+            uid,
+            await get_user_name(uid),
+            await get_user_nickname(uid, chat_id),
+            group_name,
         ),
     )
 
@@ -184,7 +199,10 @@ async def bind(message: Message):
         message,
         disable_mentions=1,
         message=await messages.bind(
-            uid, await getUserName(uid), await getUserNickname(uid, chat_id), group_name
+            uid,
+            await get_user_name(uid),
+            await get_user_nickname(uid, chat_id),
+            group_name,
         ),
     )
 
@@ -222,7 +240,10 @@ async def unbind(message: Message):
         message,
         disable_mentions=1,
         message=await messages.unbind(
-            uid, await getUserName(uid), await getUserNickname(uid, chat_id), group_name
+            uid,
+            await get_user_name(uid),
+            await get_user_nickname(uid, chat_id),
+            group_name,
         ),
     )
 
@@ -254,7 +275,7 @@ async def bindlist(message: Message):
         disable_mentions=1,
         keyboard=keyboard.bindlist(message.from_id, group_name, 0, len(group)),
         message=await messages.bindlist(
-            group_name, [(i[0], await getChatName(i[0])) for i in group[:15]]
+            group_name, [(i[0], await get_chat_name(i[0])) for i in group[:15]]
         ),
     )
 
@@ -284,7 +305,10 @@ async def delgroup(message: Message):
         message,
         disable_mentions=1,
         message=await messages.delgroup(
-            uid, await getUserName(uid), await getUserNickname(uid, chat_id), group_name
+            uid,
+            await get_user_name(uid),
+            await get_user_nickname(uid, chat_id),
+            group_name,
         ),
     )
 
@@ -359,7 +383,7 @@ async def filteradd(message: Message):
                 word,
             )
     msg = await messages.filteradd(
-        uid, await getUserName(uid), await getUserNickname(uid, chat_id), word
+        uid, await get_user_name(uid), await get_user_nickname(uid, chat_id), word
     )
     await messagereply(
         message,
@@ -399,10 +423,12 @@ async def filterdel(message: Message):
             word,
         ):
             return await messagereply(
-                message, disable_mentions=1, message=await messages.filterdel_not_found(word)
+                message,
+                disable_mentions=1,
+                message=await messages.filterdel_not_found(word),
             )
     msg = await messages.filterdel(
-        uid, await getUserName(uid), await getUserNickname(uid, chat_id), word
+        uid, await get_user_name(uid), await get_user_nickname(uid, chat_id), word
     )
     await messagereply(
         message,
@@ -426,7 +452,7 @@ async def filter(message: Message):
 async def editlevel(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    if not await getUserPremium(uid):
+    if not await get_user_premium(uid):
         return await messagereply(
             message, disable_mentions=1, message=await messages.editlvl_no_premium()
         )
@@ -442,9 +468,13 @@ async def editlevel(message: Message):
         return await messagereply(
             message, disable_mentions=1, message=await messages.editlvl_hint()
         )
-    if command not in settings.commands.commands or settings.commands.commands[command] not in range(0, 8):
+    if command not in settings.commands.commands or settings.commands.commands[
+        command
+    ] not in range(0, 8):
         return await messagereply(
-            message, disable_mentions=1, message=await messages.editlvl_command_not_found()
+            message,
+            disable_mentions=1,
+            message=await messages.editlvl_command_not_found(),
         )
     async with (await pool()).acquire() as conn:
         bl = await conn.fetchrow(
@@ -473,8 +503,8 @@ async def editlevel(message: Message):
         disable_mentions=1,
         message=await messages.editlvl(
             uid,
-            await getUserName(uid),
-            await getUserNickname(uid, chat_id),
+            await get_user_name(uid),
+            await get_user_nickname(uid, chat_id),
             command,
             original_lvl,
             given_lvl,
@@ -485,7 +515,7 @@ async def editlevel(message: Message):
 @bl.chat_message(SearchCMD("giveowner"))
 async def giveowner(message: Message):
     chat_id = message.peer_id - 2000000000
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if not id or id < 0:
         return await messagereply(
             message, disable_mentions=1, message=await messages.giveowner_hint()
@@ -501,7 +531,7 @@ async def giveowner(message: Message):
 @bl.chat_message(SearchCMD("levelname"))
 async def levelname(message: Message):
     chat_id = message.peer_id - 2000000000
-    u_premium = await getUserPremium(message.from_id)
+    u_premium = await get_user_premium(message.from_id)
     if not u_premium:
         return await messagereply(
             message, disable_mentions=1, message=await messages.no_prem()
@@ -539,8 +569,8 @@ async def levelname(message: Message):
         disable_mentions=1,
         message=await messages.levelname(
             uid,
-            await getUserName(uid),
-            await getUserNickname(uid, chat_id),
+            await get_user_name(uid),
+            await get_user_nickname(uid, chat_id),
             lvl,
             " ".join(data[2:]),
         ),
@@ -550,7 +580,7 @@ async def levelname(message: Message):
 @bl.chat_message(SearchCMD("resetlevel"))
 async def resetlevel(message: Message):
     chat_id = message.peer_id - 2000000000
-    if not await getUserPremium(message.from_id):
+    if not await get_user_premium(message.from_id):
         return await messagereply(
             message, disable_mentions=1, message=await messages.no_prem()
         )
@@ -581,8 +611,8 @@ async def resetlevel(message: Message):
         disable_mentions=1,
         message=await messages.levelname(
             uid,
-            await getUserName(uid),
-            await getUserNickname(uid, chat_id),
+            await get_user_name(uid),
+            await get_user_nickname(uid, chat_id),
             lvl,
             settings.lvl_names[lvl],
         ),
@@ -614,7 +644,7 @@ async def listasync(message: Message):
     names = []
     if len(chat_ids) > 0:
         for i in chat_ids:
-            names.append(await getChatName(i))
+            names.append(await get_chat_name(i))
     chats_info = [{"id": i, "name": names[k]} for k, i in enumerate(chat_ids)]
     await messagereply(
         message,
@@ -632,13 +662,13 @@ async def import_(message: Message):
             message, disable_mentions=1, message=await messages.import_hint()
         )
     importchatid = int(data[1])
-    if await getUserAccessLevel(message.from_id, importchatid) < 7:
+    if await get_user_access_level(message.from_id, importchatid) < 7:
         return await messagereply(
             message, disable_mentions=1, message=await messages.import_notowner()
         )
     await messagereply(
         message,
         disable_mentions=1,
-        message=await messages.import_(importchatid, await getChatName(importchatid)),
+        message=await messages.import_(importchatid, await get_chat_name(importchatid)),
         keyboard=keyboard.import_(message.from_id, importchatid),
     )

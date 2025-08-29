@@ -8,13 +8,13 @@ from vkbottle.framework.labeler import BotLabeler
 from StarManager.core.config import api
 from StarManager.core.db import pool
 from StarManager.core.utils import (
-    getIDFromMessage,
-    getSilence,
-    getUserAccessLevel,
-    getUserBan,
-    getUserName,
-    getUserNickname,
-    kickUser,
+    search_id_in_message,
+    get_silence,
+    get_user_access_level,
+    get_user_ban,
+    get_user_name,
+    get_user_nickname,
+    kick_user,
     messagereply,
 )
 from StarManager.vkbot import keyboard, messages
@@ -25,7 +25,7 @@ bl = BotLabeler()
 
 @bl.chat_message(SearchCMD("timeout"))
 async def timeout(message: Message):
-    activated = await getSilence(message.peer_id - 2000000000)
+    activated = await get_silence(message.peer_id - 2000000000)
     await messagereply(
         message,
         disable_mentions=1,
@@ -65,7 +65,7 @@ async def inactive(message: Message):
     for i in res:
         if i[0] in members:
             try:
-                x = await kickUser(i[0], chat_id)
+                x = await kick_user(i[0], chat_id)
                 kicked += x
             except Exception:
                 pass
@@ -73,7 +73,7 @@ async def inactive(message: Message):
         message,
         disable_mentions=1,
         message=await messages.inactive(
-            uid, await getUserName(uid), await getUserNickname(uid, chat_id), kicked
+            uid, await get_user_name(uid), await get_user_nickname(uid, chat_id), kicked
         ),
     )
 
@@ -83,7 +83,7 @@ async def ban(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if id == uid:
         return await messagereply(
             message, disable_mentions=1, message=await messages.ban_myself()
@@ -132,17 +132,22 @@ async def ban(message: Message):
             message, disable_mentions=1, message=await messages.ban_hint()
         )
 
-    if await getUserAccessLevel(id, chat_id) >= await getUserAccessLevel(uid, chat_id):
+    if await get_user_access_level(id, chat_id) >= await get_user_access_level(
+        uid, chat_id
+    ):
         return await messagereply(
             message, disable_mentions=1, message=await messages.ban_higher()
         )
 
-    if (ch_ban := await getUserBan(id, chat_id)) >= time.time():
+    if (ch_ban := await get_user_ban(id, chat_id)) >= time.time():
         return await messagereply(
             message,
             disable_mentions=1,
             message=await messages.already_banned(
-                await getUserName(id), await getUserNickname(id, chat_id), id, ch_ban
+                await get_user_name(id),
+                await get_user_nickname(id, chat_id),
+                id,
+                ch_ban,
             ),
         )
 
@@ -168,7 +173,7 @@ async def ban(message: Message):
         ban_date = "Дата неизвестна"
     ban_times.append(ban_time)
     ban_causes.append(ban_cause)
-    u_name = await getUserName(uid)
+    u_name = await get_user_name(uid)
     ban_names.append(f"[id{uid}|{u_name}]")
     ban_dates.append(ban_date)
 
@@ -202,16 +207,16 @@ async def ban(message: Message):
         message=await messages.ban(
             uid,
             u_name,
-            await getUserNickname(uid, chat_id),
+            await get_user_nickname(uid, chat_id),
             id,
-            await getUserName(id),
-            await getUserNickname(id, chat_id),
+            await get_user_name(id),
+            await get_user_nickname(id, chat_id),
             ban_cause,
             ban_time // 86400,
         )
         + (
             "\n❗ Пользователя не удалось кикнуть"
-            if not await kickUser(id, chat_id)
+            if not await kick_user(id, chat_id)
             else ""
         ),
         keyboard=keyboard.punish_unpunish(
@@ -226,7 +231,7 @@ async def unban(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if id == uid:
         return await messagereply(
             message, disable_mentions=1, message=await messages.unban_myself()
@@ -240,16 +245,18 @@ async def unban(message: Message):
             message, disable_mentions=1, message=await messages.id_group()
         )
 
-    if await getUserAccessLevel(id, chat_id) >= await getUserAccessLevel(uid, chat_id):
+    if await get_user_access_level(id, chat_id) >= await get_user_access_level(
+        uid, chat_id
+    ):
         return await messagereply(
             message, disable_mentions=1, message=await messages.unban_higher()
         )
-    if await getUserBan(id, chat_id) <= time.time():
+    if await get_user_ban(id, chat_id) <= time.time():
         return await messagereply(
             message,
             disable_mentions=1,
             message=await messages.unban_no_ban(
-                id, await getUserName(id), await getUserNickname(id, chat_id)
+                id, await get_user_name(id), await get_user_nickname(id, chat_id)
             ),
         )
     async with (await pool()).acquire() as conn:
@@ -260,11 +267,11 @@ async def unban(message: Message):
         message,
         disable_mentions=1,
         message=await messages.unban(
-            await getUserName(uid),
-            await getUserNickname(uid, chat_id),
+            await get_user_name(uid),
+            await get_user_nickname(uid, chat_id),
             uid,
-            await getUserName(id),
-            await getUserNickname(id, chat_id),
+            await get_user_name(id),
+            await get_user_nickname(id, chat_id),
             id,
         ),
         keyboard=keyboard.deletemessages(uid, [message.conversation_message_id]),
@@ -302,8 +309,8 @@ async def zov(message: Message):
         message,
         message=await messages.zov(
             uid,
-            await getUserName(uid),
-            await getUserNickname(uid, message.peer_id - 2000000000),
+            await get_user_name(uid),
+            await get_user_nickname(uid, message.peer_id - 2000000000),
             " ".join(data[1:]),
             (
                 await api.messages.get_conversation_members(peer_id=message.peer_id)

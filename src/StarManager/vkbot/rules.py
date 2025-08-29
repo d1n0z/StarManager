@@ -2,7 +2,11 @@ from vkbottle import ABCRule
 from vkbottle.bot import Message, MessageEvent
 from vkbottle_types.events.bot_events import MessageNew
 
-from StarManager.core.utils import getUserPremium, sendMessageEventAnswer, getUserPrefixes
+from StarManager.core.utils import (
+    get_user_premium,
+    send_message_event_answer,
+    get_user_prefixes,
+)
 from StarManager.core.config import settings
 
 
@@ -25,10 +29,12 @@ class SearchPMCMD(ABCRule[Message]):
         if not message or message.peer_id > 2000000000 or not message.text:
             return False
         text = message.text.lower().split()[0]
-        for i in await getUserPrefixes(await getUserPremium(message.from_id), message.from_id):
+        for i in await get_user_prefixes(
+            await get_user_premium(message.from_id), message.from_id
+        ):
             if not text.startswith(i):
                 continue
-            cmd = text.replace(i, '')
+            cmd = text.replace(i, "")
             for y in settings.commands.pm:
                 if cmd != y:
                     continue
@@ -37,17 +43,23 @@ class SearchPMCMD(ABCRule[Message]):
 
 
 class SearchPayloadCMD(ABCRule[Message]):
-    def __init__(self, cmds: list | None = None, answer: bool = True, checksender: bool = True):
+    def __init__(
+        self, cmds: list | None = None, answer: bool = True, checksender: bool = True
+    ):
         self.cmds = cmds or []
         self.answer = answer
         self.checksender = checksender
 
     async def check(self, event: MessageEvent) -> bool:
-        if event.payload and event.payload['cmd'] in self.cmds:
+        if event.payload and event.payload["cmd"] in self.cmds:
             if self.answer:
-                await sendMessageEventAnswer(event.event_id, event.user_id, event.peer_id)
+                await send_message_event_answer(
+                    event.event_id, event.user_id, event.peer_id
+                )
             if self.checksender:
-                sender = event.payload['uid'] if 'uid' in event.payload else event.user_id
+                sender = (
+                    event.payload["uid"] if "uid" in event.payload else event.user_id
+                )
                 if sender != event.user_id:
                     return False
             return True

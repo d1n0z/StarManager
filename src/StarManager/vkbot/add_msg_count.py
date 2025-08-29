@@ -3,11 +3,11 @@ import time
 
 from StarManager.core.db import pool
 from StarManager.core.utils import (
-    addUserCoins,
-    addUserXP,
-    chatPremium,
-    getUserPremium,
-    getUserShopBonuses,
+    add_user_coins,
+    add_user_xp,
+    chat_premium,
+    get_user_premium,
+    get_user_shop_bonuses,
 )
 from StarManager.vkbot.checkers import getUInfBanned, getULvlBanned
 
@@ -69,23 +69,23 @@ async def add_msg_counter(chat_id, uid, audio=False, sticker=False) -> bool:
         addxp, addcoins = 5, 0
     else:
         addxp, addcoins = 10, 2
-    if await getUserPremium(uid):
+    if await get_user_premium(uid):
         addxp *= 2
-    if await chatPremium(chat_id):
+    if await chat_premium(chat_id):
         addxp *= 1.5
     if rewards and time.time() - rewards <= 86400 * 7:
         addxp *= 2
-    if (await getUserShopBonuses(uid))[0] > time.time():
+    if (await get_user_shop_bonuses(uid))[0] > time.time():
         addxp *= 2
 
     rannum = secrets.randbelow(100)
     if addcoins and rannum < 40:
-        await addUserCoins(
+        await add_user_coins(
             uid,
             addcoins,
             checklvlbanned=False,
             addlimit=True,
             bonus_peer_id=chat_id + 2000000000,
         )
-    await addUserXP(uid, addxp, checklvlbanned=False)
+    await add_user_xp(uid, addxp, checklvlbanned=False)
     return True

@@ -11,14 +11,14 @@ from vkbottle_types.objects import MessagesMessageAttachmentType
 from StarManager.core.config import settings
 from StarManager.core.db import pool
 from StarManager.core.utils import (
-    deleteMessages,
-    editMessage,
-    getIDFromMessage,
-    getUserName,
-    getUserNickname,
+    delete_messages,
+    edit_message,
+    search_id_in_message,
+    get_user_name,
+    get_user_nickname,
     hex_to_rgb,
-    sendMessage,
-    uploadImage,
+    send_message,
+    upload_image,
     whoiscachedurl,
 )
 from StarManager.vkbot import keyboard, messages
@@ -55,12 +55,12 @@ async def queue_handler(event: MessageNew):
                     chat_id,
                 )
 
-            await editMessage(
+            await edit_message(
                 await messages.notification_changed_text(name),
                 event.object.message.peer_id,
                 cmid,
             )
-            return await sendMessage(
+            return await send_message(
                 chat_id + 2000000000,
                 await messages.notification(
                     notif[0],
@@ -83,12 +83,12 @@ async def queue_handler(event: MessageNew):
                     ) or (
                         int(ctime.split(":")[1]) > 59 or int(ctime.split(":")[1]) < 0
                     ):
-                        return await sendMessage(
+                        return await send_message(
                             chat_id + 2000000000,
                             await messages.notification_changing_time_error(),
                         )
                 except Exception:
-                    return await sendMessage(
+                    return await send_message(
                         chat_id + 2000000000,
                         await messages.notification_changing_time_error(),
                     )
@@ -106,12 +106,12 @@ async def queue_handler(event: MessageNew):
                     ) or (
                         int(ctime.split(":")[1]) > 59 or int(ctime.split(":")[1]) < 0
                     ):
-                        return await sendMessage(
+                        return await send_message(
                             chat_id + 2000000000,
                             await messages.notification_changing_time_error(),
                         )
                 except Exception:
-                    return await sendMessage(
+                    return await send_message(
                         chat_id + 2000000000,
                         await messages.notification_changing_time_error(),
                     )
@@ -125,12 +125,12 @@ async def queue_handler(event: MessageNew):
             else:
                 try:
                     if int(ctime.split()[0]) < 0:
-                        return await sendMessage(
+                        return await send_message(
                             chat_id + 2000000000,
                             await messages.notification_changing_time_error(),
                         )
                 except Exception:
-                    return await sendMessage(
+                    return await send_message(
                         chat_id + 2000000000,
                         await messages.notification_changing_time_error(),
                     )
@@ -151,12 +151,12 @@ async def queue_handler(event: MessageNew):
                 )
 
             cmid = int(additional["cmid"])
-            await editMessage(
+            await edit_message(
                 await messages.notification_changed_time(name),
                 event.object.message.peer_id,
                 cmid,
             )
-            await sendMessage(
+            await send_message(
                 chat_id + 2000000000,
                 await messages.notification(*notif),
                 keyboard.notification(uid, notif[5], notif[0]),
@@ -171,7 +171,7 @@ async def queue_handler(event: MessageNew):
             cmid = additional["cmid"]
             text = event.object.message.text
             if not (matches := re.findall(r"(\d+)\s*([hm])", text)):
-                await editMessage(
+                await edit_message(
                     await messages.settings_autodelete_input_error(),
                     event.object.message.peer_id,
                     cmid,
@@ -187,7 +187,7 @@ async def queue_handler(event: MessageNew):
                 elif u == "m":
                     itime += int(val) * 60
             if itime > 86400 or itime < 300:
-                await editMessage(
+                await edit_message(
                     await messages.settings_autodelete_input_error(),
                     event.object.message.peer_id,
                     cmid,
@@ -203,7 +203,7 @@ async def queue_handler(event: MessageNew):
                     chat_id,
                     setting,
                 )
-            await editMessage(
+            await edit_message(
                 await messages.settings_change_autodelete_done(itime),
                 event.object.message.peer_id,
                 cmid,
@@ -225,7 +225,7 @@ async def queue_handler(event: MessageNew):
                 else:
                     limit = settings.settings_meta.countable_special_limits[setting]
                 if not text.isdigit() or int(text) not in limit:
-                    await editMessage(
+                    await edit_message(
                         await messages.settings_change_countable_digit_error(),
                         event.object.message.peer_id,
                         cmid,
@@ -256,7 +256,7 @@ async def queue_handler(event: MessageNew):
                             raise
                     except Exception:
                         traceback.print_exc()
-                        await editMessage(
+                        await edit_message(
                             await messages.settings_change_countable_format_error(),
                             event.object.message.peer_id,
                             cmid,
@@ -276,7 +276,7 @@ async def queue_handler(event: MessageNew):
                             chat_id,
                             setting,
                         )
-            await editMessage(
+            await edit_message(
                 await messages.settings_change_countable_done(setting, text),
                 event.object.message.peer_id,
                 cmid,
@@ -291,7 +291,7 @@ async def queue_handler(event: MessageNew):
                 uid, category, setting, onlybackbutton=True
             )
             if not text.isdigit() or int(text) < 0 or int(text) >= 10000:
-                await editMessage(
+                await edit_message(
                     await messages.settings_change_countable_digit_error(),
                     event.object.message.peer_id,
                     cmid,
@@ -309,7 +309,7 @@ async def queue_handler(event: MessageNew):
                     chat_id,
                     setting,
                 )
-            await editMessage(
+            await edit_message(
                 await messages.settings_set_punishment(action, int(pnshtime)),
                 event.object.message.peer_id,
                 cmid,
@@ -322,7 +322,7 @@ async def queue_handler(event: MessageNew):
                 )
             if queue[3] == "settings_set_welcome_text":
                 if not event.object.message.text:
-                    return await sendMessage(
+                    return await send_message(
                         chat_id + 2000000000,
                         await messages.get(queue[3] + "_no_text"),
                         keyboard.settings_change_countable(
@@ -343,22 +343,29 @@ async def queue_handler(event: MessageNew):
             elif queue[3] == "settings_set_welcome_photo":
                 attachment = event.object.message.attachments
                 if (
-                    not attachment or
-                    attachment[0].type != MessagesMessageAttachmentType.PHOTO or
-                    not attachment[0].photo or
-                    not attachment[0].photo.sizes or
-                    not attachment[0].photo.sizes[-1].url
+                    not attachment
+                    or attachment[0].type != MessagesMessageAttachmentType.PHOTO
+                    or not attachment[0].photo
+                    or not attachment[0].photo.sizes
+                    or not attachment[0].photo.sizes[-1].url
                 ):
-                    return await sendMessage(
+                    return await send_message(
                         chat_id + 2000000000,
                         await messages.get(queue[3] + "_not_photo"),
-                        keyboard.settings_change_countable(uid, "main", "welcome", onlybackbutton=True),
+                        keyboard.settings_change_countable(
+                            uid, "main", "welcome", onlybackbutton=True
+                        ),
                     )
 
                 r = requests.get(attachment[0].photo.sizes[-1].url)
-                with open(f"{settings.service.path}src/StarManager/core/media/temp/{uid}welcome.jpg", "wb") as f:
+                with open(
+                    f"{settings.service.path}src/StarManager/core/media/temp/{uid}welcome.jpg",
+                    "wb",
+                ) as f:
                     f.write(r.content)
-                photo = await uploadImage(f"{settings.service.path}src/StarManager/core/media/temp/{uid}welcome.jpg")
+                photo = await upload_image(
+                    f"{settings.service.path}src/StarManager/core/media/temp/{uid}welcome.jpg"
+                )
                 async with (await pool()).acquire() as conn:
                     if not await conn.fetchval(
                         "update welcome set photo = $1 where chat_id=$2 returning 1",
@@ -372,7 +379,7 @@ async def queue_handler(event: MessageNew):
                         )
             elif queue[3] == "settings_set_welcome_url":
                 if welcome and not welcome[0] and not welcome[1]:
-                    return await sendMessage(
+                    return await send_message(
                         chat_id + 2000000000,
                         await messages.get(queue[3] + "_empty_text_url"),
                         keyboard.settings_change_countable(
@@ -380,7 +387,7 @@ async def queue_handler(event: MessageNew):
                         ),
                     )
                 if len(" ".join(event.object.message.text.split()[1:])) > 40:
-                    return await sendMessage(
+                    return await send_message(
                         chat_id + 2000000000,
                         await messages.get(queue[3] + "_limit_text"),
                         keyboard.settings_change_countable(
@@ -391,7 +398,7 @@ async def queue_handler(event: MessageNew):
                     len(" ".join(event.object.message.text.split()[1:])) == 0
                     or event.object.message.text.count("\n") > 0
                 ):
-                    return await sendMessage(
+                    return await send_message(
                         chat_id + 2000000000,
                         await messages.settings_change_countable_format_error(),
                         keyboard.settings_change_countable(
@@ -400,7 +407,7 @@ async def queue_handler(event: MessageNew):
                     )
                 text = event.object.message.text.split()
                 if len(text) < 2:
-                    return await sendMessage(
+                    return await send_message(
                         chat_id + 2000000000,
                         await messages.settings_change_countable_format_error(),
                         keyboard.settings_change_countable(
@@ -411,7 +418,7 @@ async def queue_handler(event: MessageNew):
                     if not whoiscachedurl(text[-1]):
                         raise Exception
                 except Exception:
-                    return await sendMessage(
+                    return await send_message(
                         chat_id + 2000000000, await messages.get(queue[3] + "_no_url")
                     )
                 async with (await pool()).acquire() as conn:
@@ -428,7 +435,7 @@ async def queue_handler(event: MessageNew):
                             text[-1],
                             " ".join(text[0:-1]),
                         )
-            await sendMessage(
+            await send_message(
                 chat_id + 2000000000,
                 await messages.get(f"{queue[3]}_done"),
                 keyboard.settings_change_countable(
@@ -447,7 +454,7 @@ async def queue_handler(event: MessageNew):
                         if not whoiscachedurl(url):
                             raise
                     except Exception:
-                        return await sendMessage(
+                        return await send_message(
                             chat_id + 2000000000,
                             await messages.settings_change_countable_format_error(),
                             keyboard.settings_change_countable(
@@ -478,7 +485,7 @@ async def queue_handler(event: MessageNew):
                             chat_id,
                             url,
                         ):
-                            return await sendMessage(
+                            return await send_message(
                                 chat_id + 2000000000,
                                 await messages.settings_change_countable_format_error(),
                                 keyboard.settings_change_countable(
@@ -487,7 +494,7 @@ async def queue_handler(event: MessageNew):
                             )
                 else:
                     raise Exception
-                await sendMessage(
+                await send_message(
                     chat_id + 2000000000,
                     await messages.settings_listaction_done(setting, action, url),
                     keyboard.settings_change_countable(
@@ -498,12 +505,12 @@ async def queue_handler(event: MessageNew):
                 action = additional["action"]
                 if action == "add":
                     url = event.object.message.text
-                    url = url[url.find("vk."):]
+                    url = url[url.find("vk.") :]
                     try:
                         if "vk." not in url or not whoiscachedurl(url):
                             raise Exception
                     except Exception:
-                        return await sendMessage(
+                        return await send_message(
                             chat_id + 2000000000,
                             await messages.settings_change_countable_format_error(),
                             keyboard.settings_change_countable(
@@ -524,14 +531,14 @@ async def queue_handler(event: MessageNew):
                             )
                 elif action == "remove":
                     url = event.object.message.text
-                    url = url[url.find("vk."):]
+                    url = url[url.find("vk.") :]
                     async with (await pool()).acquire() as conn:
                         if not await conn.fetchval(
                             "delete from vklinksexceptions where chat_id=$1 and url=$2 returning 1",
                             chat_id,
                             url,
                         ):
-                            return await sendMessage(
+                            return await send_message(
                                 chat_id + 2000000000,
                                 await messages.settings_change_countable_format_error(),
                                 keyboard.settings_change_countable(
@@ -540,7 +547,7 @@ async def queue_handler(event: MessageNew):
                             )
                 else:
                     raise Exception
-                await sendMessage(
+                await send_message(
                     chat_id + 2000000000,
                     await messages.settings_listaction_done(setting, action, url),
                     keyboard.settings_change_countable(
@@ -550,13 +557,13 @@ async def queue_handler(event: MessageNew):
             if setting == "forwardeds":
                 action = additional["action"]
                 if action == "add":
-                    exc_id = await getIDFromMessage(
+                    exc_id = await search_id_in_message(
                         event.object.message.text,
                         event.object.message.reply_message,
                         place=1,
                     )
                     if not exc_id:
-                        return await sendMessage(
+                        return await send_message(
                             chat_id + 2000000000,
                             await messages.settings_change_countable_format_error(),
                             keyboard.settings_change_countable(
@@ -576,7 +583,7 @@ async def queue_handler(event: MessageNew):
                                 exc_id,
                             )
                 elif action == "remove":
-                    exc_id = await getIDFromMessage(
+                    exc_id = await search_id_in_message(
                         event.object.message.text,
                         event.object.message.reply_message,
                         place=1,
@@ -587,7 +594,7 @@ async def queue_handler(event: MessageNew):
                             chat_id,
                             exc_id,
                         ):
-                            return await sendMessage(
+                            return await send_message(
                                 chat_id + 2000000000,
                                 await messages.settings_change_countable_format_error(),
                                 keyboard.settings_change_countable(
@@ -596,7 +603,7 @@ async def queue_handler(event: MessageNew):
                             )
                 else:
                     raise Exception
-                await sendMessage(
+                await send_message(
                     chat_id + 2000000000,
                     await messages.settings_listaction_done(setting, action, exc_id),
                     keyboard.settings_change_countable(
@@ -616,9 +623,9 @@ async def queue_handler(event: MessageNew):
             elif re.search(r"^#[0-9a-fA-F]{6}$", data):
                 color = f"({','.join(str(i) for i in hex_to_rgb(data))})"
             else:
-                return await sendMessage(
+                return await send_message(
                     chat_id + 2000000000,
-                    await messages.settings_change_countable_format_error()
+                    await messages.settings_change_countable_format_error(),
                 )
             async with (await pool()).acquire() as conn:
                 if not await conn.fetchval(
@@ -633,7 +640,7 @@ async def queue_handler(event: MessageNew):
                         "border_color",
                         color,
                     )
-            await sendMessage(
+            await send_message(
                 chat_id + 2000000000,
                 await messages.premmenu_action_complete(
                     "border_color", color.replace("(", "").replace(")", "")
@@ -650,11 +657,11 @@ async def queue_handler(event: MessageNew):
         if c is None:
             return
         if c.strip() != event.object.message.text.strip():
-            await deleteMessages(event.object.message.conversation_message_id, chat_id)
+            await delete_messages(event.object.message.conversation_message_id, chat_id)
             return
 
-        name = await getUserName(uid)
-        await sendMessage(
+        name = await get_user_name(uid)
+        await send_message(
             chat_id + 2000000000,
             await messages.captcha_pass(
                 uid, name, datetime.datetime.now().strftime("%H:%M:%S %Y.%m.%d")
@@ -679,20 +686,20 @@ async def queue_handler(event: MessageNew):
                 "delete from captcha where chat_id=$1 and uid=$2", chat_id, uid
             )
         if s and s[0] and welcome:
-            await sendMessage(
+            await send_message(
                 event.object.message.peer_id,
                 welcome[0].replace("%name%", f"[id{uid}|{name}]"),
                 keyboard.urlbutton(welcome[1], welcome[2]),
                 welcome[3],
             )
-        await deleteMessages([i[0] for i in cmsgs], chat_id)
-        await deleteMessages(event.object.message.conversation_message_id, chat_id)
+        await delete_messages([i[0] for i in cmsgs], chat_id)
+        await delete_messages(event.object.message.conversation_message_id, chat_id)
     elif queue[3].startswith("prefix"):
         if queue[3] == "prefix_add":
-            await deleteMessages(additional["cmid"], chat_id)
-            await deleteMessages(event.object.message.conversation_message_id, chat_id)
+            await delete_messages(additional["cmid"], chat_id)
+            await delete_messages(event.object.message.conversation_message_id, chat_id)
             if len(event.object.message.text) > 2:
-                await sendMessage(
+                await send_message(
                     event.object.message.peer_id,
                     await messages.addprefix_too_long(),
                     keyboard.prefix_back(uid),
@@ -709,61 +716,65 @@ async def queue_handler(event: MessageNew):
                         uid,
                         event.object.message.text,
                     )
-            await sendMessage(
+            await send_message(
                 event.object.message.peer_id,
                 await messages.addprefix(
                     uid,
-                    await getUserName(uid),
-                    await getUserNickname(uid, chat_id),
+                    await get_user_name(uid),
+                    await get_user_nickname(uid, chat_id),
                     event.object.message.text,
                 ),
                 keyboard.prefix_back(uid),
             )
         elif queue[3] == "prefix_del":
-            await deleteMessages(additional["cmid"], chat_id)
-            await deleteMessages(event.object.message.conversation_message_id, chat_id)
+            await delete_messages(additional["cmid"], chat_id)
+            await delete_messages(event.object.message.conversation_message_id, chat_id)
             async with (await pool()).acquire() as conn:
                 if not await conn.fetchval(
                     "delete from prefix where uid=$1 and prefix=$2 returning 1",
                     uid,
                     event.object.message.text,
                 ):
-                    await sendMessage(
+                    await send_message(
                         event.object.message.peer_id,
                         await messages.delprefix_not_found(event.object.message.text),
                         keyboard.prefix_back(uid),
                     )
                     return
-            await sendMessage(
+            await send_message(
                 event.object.message.peer_id,
                 await messages.delprefix(
                     uid,
-                    await getUserName(uid),
-                    await getUserNickname(uid, chat_id),
+                    await get_user_name(uid),
+                    await get_user_nickname(uid, chat_id),
                     event.object.message.text,
                 ),
                 keyboard.prefix_back(uid),
             )
     elif queue[3] == "raid_trigger_set":
-        await deleteMessages(additional["cmid"], chat_id)
-        await deleteMessages(event.object.message.conversation_message_id, chat_id)
-        if len(data := event.object.message.text.split('/')) != 2 or any(not i.isdigit() for i in data):
-            await sendMessage(
+        await delete_messages(additional["cmid"], chat_id)
+        await delete_messages(event.object.message.conversation_message_id, chat_id)
+        if len(data := event.object.message.text.split("/")) != 2 or any(
+            not i.isdigit() for i in data
+        ):
+            await send_message(
                 event.object.message.peer_id,
                 await messages.settings_change_countable_format_error(),
             )
             return
         if int(data[-1]) not in range(5, 121):
-            await sendMessage(
+            await send_message(
                 event.object.message.peer_id,
-                '⚠️ Разрешённый промежуток времени - от 5 до 120 секунд.',
+                "⚠️ Разрешённый промежуток времени - от 5 до 120 секунд.",
             )
             return
         async with (await pool()).acquire() as conn:
             if (
                 raidmode := await conn.fetchrow(
                     "update raidmode set limit_invites=$1, limit_seconds=$2 where chat_id=$3 returning trigger_status, limit_invites, limit_seconds",
-                    int(data[0]), int(data[1]), event.object.message.peer_id - 2000000000,
+                    int(data[0]),
+                    int(data[1]),
+                    event.object.message.peer_id - 2000000000,
                 )
             ) is None:
                 await conn.execute(
@@ -778,7 +789,7 @@ async def queue_handler(event: MessageNew):
                 )
                 raidmode[1] = int(data[1])
                 raidmode[2] = int(data[2])
-        await sendMessage(
+        await send_message(
             event.object.message.peer_id,
             await messages.raid_settings(*raidmode),
             keyboard.raid_settings(event.object.message.from_id, raidmode[0]),

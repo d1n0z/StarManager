@@ -15,14 +15,14 @@ from StarManager.tgbot import keyboard as tgkeyboard
 from StarManager.vkbot import keyboard, messages
 from StarManager.vkbot.rules import SearchPMCMD
 from StarManager.core.utils import (
-    getChatName,
-    getChatSettings,
-    getURepBanned,
-    getUserName,
-    getUserNickname,
-    getUserPremium,
-    isChatMember,
-    sendMessage,
+    get_chat_name,
+    get_chat_settings,
+    get_user_rep_banned,
+    get_user_name,
+    get_user_nickname,
+    get_user_premium,
+    is_chat_member,
+    send_message,
     whoiscached,
 )
 from StarManager.core.config import settings, api
@@ -42,34 +42,34 @@ async def anon(event: GroupTypes.MessageNew):
     if not message:
         return
     uid = message.from_id
-    if not await getUserPremium(uid):
+    if not await get_user_premium(uid):
         return
     data = message.text.split()
     if len(data) < 3 or not data[1].isdigit():
-        await sendMessage(message.peer_id, await messages.anon_help())
+        await send_message(message.peer_id, await messages.anon_help())
         return
     chatid = int(data[1])
-    if not (await getChatSettings(chatid))["entertaining"]["allowAnon"]:
-        await sendMessage(message.peer_id, await messages.anon_not_allowed())
+    if not (await get_chat_settings(chatid))["entertaining"]["allowAnon"]:
+        await send_message(message.peer_id, await messages.anon_not_allowed())
         return
     try:
         await api.messages.get_conversations_by_id(
             peer_ids=[chatid + 2000000000], group_id=settings.vk.group_id
         )
     except Exception:
-        await sendMessage(message.peer_id, await messages.anon_chat_does_not_exist())
+        await send_message(message.peer_id, await messages.anon_chat_does_not_exist())
         return
     for i in data:
         for y in i.split("/"):
             if not whoiscached(y):
                 continue
-            await sendMessage(message.peer_id, await messages.anon_link())
+            await send_message(message.peer_id, await messages.anon_link())
             return
     if message.attachments and len(message.attachments) > 0:
-        await sendMessage(message.peer_id, await messages.anon_attachments())
+        await send_message(message.peer_id, await messages.anon_attachments())
         return
-    if not await isChatMember(uid, chatid):
-        await sendMessage(message.peer_id, await messages.anon_not_member())
+    if not await is_chat_member(uid, chatid):
+        await send_message(message.peer_id, await messages.anon_not_member())
         return
     date = datetime.now().replace(hour=0, minute=0, second=0)
     async with (await pool()).acquire() as conn:
@@ -80,7 +80,7 @@ async def anon(event: GroupTypes.MessageNew):
                 date.timestamp(),
             )
         ) and cnt >= 25:
-            await sendMessage(message.peer_id, await messages.anon_limit())
+            await send_message(message.peer_id, await messages.anon_limit())
             return
         mid = await conn.fetchval(
             "insert into anonmessages (fromid, chat_id, time) values ($1, $2, $3) "
@@ -89,11 +89,11 @@ async def anon(event: GroupTypes.MessageNew):
             chatid,
             time.time(),
         )
-    await sendMessage(
+    await send_message(
         chatid + 2000000000, await messages.anon_message(mid, " ".join(data[2:]))
     )
-    await sendMessage(
-        message.peer_id, await messages.anon_sent(mid, await getChatName(chatid))
+    await send_message(
+        message.peer_id, await messages.anon_sent(mid, await get_chat_name(chatid))
     )
 
 
@@ -108,34 +108,34 @@ async def deanon(event: GroupTypes.MessageNew):
     if not message:
         return
     uid = message.from_id
-    if not await getUserPremium(uid):
+    if not await get_user_premium(uid):
         return
     data = message.text.split()
     if len(data) < 2:
-        await sendMessage(message.peer_id, await messages.deanon_help())
+        await send_message(message.peer_id, await messages.deanon_help())
         return
     id = data[1].replace("#", "").replace("A", "").replace("А", "")
     if not id.isdigit():
-        await sendMessage(message.peer_id, await messages.deanon_help())
+        await send_message(message.peer_id, await messages.deanon_help())
         return
     async with (await pool()).acquire() as conn:
         deanon_target = await conn.fetchrow(
             "select chat_id, fromid, time from anonmessages where id=$1", int(id)
         )
     if deanon_target is None:
-        await sendMessage(message.peer_id, await messages.deanon_target_not_found())
+        await send_message(message.peer_id, await messages.deanon_target_not_found())
         return
     chatid, fromid = deanon_target[0], deanon_target[1]
-    if not await isChatMember(uid, chatid):
-        await sendMessage(message.peer_id, await messages.anon_not_member())
+    if not await is_chat_member(uid, chatid):
+        await send_message(message.peer_id, await messages.anon_not_member())
         return
-    await sendMessage(
+    await send_message(
         message.peer_id,
         await messages.deanon(
             id,
             fromid,
-            await getUserName(fromid),
-            await getUserNickname(fromid, chatid),
+            await get_user_name(fromid),
+            await get_user_nickname(fromid, chatid),
             deanon_target[2],
         ),
     )
@@ -167,7 +167,7 @@ async def code(event: GroupTypes.MessageNew):
             await conn.execute(
                 "insert into tglink (tgid, vkid, code) values (null, $1, $2)", uid, code
             )
-    await sendMessage(message.peer_id, await messages.code(code))
+    await send_message(message.peer_id, await messages.code(code))
 
 
 @bl.raw_event(
@@ -181,8 +181,8 @@ async def report(event: GroupTypes.MessageNew):
     if not message:
         return
     uid = message.from_id
-    if await getURepBanned(uid) and uid not in settings.service.devs:
-        await sendMessage(message.peer_id, await messages.repbanned())
+    if await get_user_rep_banned(uid) and uid not in settings.service.devs:
+        await send_message(message.peer_id, await messages.repbanned())
         return
     data = message.text.split()
 
@@ -199,15 +199,19 @@ async def report(event: GroupTypes.MessageNew):
         photo_chunks.append(current_chunk)
 
     if len(data) <= 1 and not photo_chunks:
-        await sendMessage(message.peer_id, await messages.report_empty())
+        await send_message(message.peer_id, await messages.report_empty())
         return
 
     async with (await pool()).acquire() as conn:
         repu = await conn.fetchval(
             "select time from reports where uid=$1 order by time desc limit 1", uid
         )
-    if repu is not None and time.time() - repu < settings.commands.cooldown['report'] and uid not in settings.service.devs:
-        await sendMessage(message.peer_id, await messages.report_cd())
+    if (
+        repu is not None
+        and time.time() - repu < settings.commands.cooldown["report"]
+        and uid not in settings.service.devs
+    ):
+        await send_message(message.peer_id, await messages.report_cd())
         return
 
     async with (await pool()).acquire() as conn:
@@ -237,7 +241,7 @@ async def report(event: GroupTypes.MessageNew):
             text=(
                 report_text := await messages.report(
                     uid,
-                    await getUserName(uid),
+                    await get_user_name(uid),
                     " ".join(data[1:]),
                     repid,
                 )
@@ -265,9 +269,9 @@ async def report(event: GroupTypes.MessageNew):
             raise e
     except Exception:
         logger.exception("Unable to send report:")
-        await sendMessage(message.peer_id, await messages.report_error(repid))
+        await send_message(message.peer_id, await messages.report_error(repid))
     else:
-        await sendMessage(message.peer_id, await messages.report_sent(repid))
+        await send_message(message.peer_id, await messages.report_sent(repid))
 
 
 @bl.raw_event(
@@ -280,7 +284,7 @@ async def premium(event: GroupTypes.MessageNew):
     message = event.object.message
     if not message:
         return
-    await sendMessage(
+    await send_message(
         peer_ids=message.peer_id,
         msg=await messages.pm_market(),
         kbd=keyboard.pm_market(message.from_id),
@@ -297,7 +301,7 @@ async def shop(event: GroupTypes.MessageNew):
     message = event.object.message
     if not message:
         return
-    await sendMessage(
+    await send_message(
         peer_ids=message.peer_id,
         msg=await messages.shop(),
         kbd=keyboard.shop(message.from_id),

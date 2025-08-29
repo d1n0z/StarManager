@@ -13,19 +13,19 @@ from StarManager.vkbot.checkers import getUInfBanned
 from StarManager.vkbot.rules import SearchCMD
 from StarManager.scheduler import backup
 from StarManager.core.utils import (
-    addUserCoins,
-    getUserName,
-    getIDFromMessage,
-    getUserNickname,
-    sendMessage,
-    addUserXP,
-    getChatName,
-    setUserAccessLevel,
-    pointWords,
+    add_user_coins,
+    get_user_name,
+    search_id_in_message,
+    get_user_nickname,
+    send_message,
+    add_user_xp,
+    get_chat_name,
+    set_user_access_level,
+    point_words,
     chunks,
-    getURepBanned,
+    get_user_rep_banned,
     messagereply,
-    kickUser,
+    kick_user,
 )
 from StarManager.core.config import api, settings
 from StarManager.core.db import pool
@@ -37,7 +37,7 @@ bl = BotLabeler()
 async def getdev_handler(message: Message):
     uid = message.from_id
     if uid in settings.service.devs:
-        await setUserAccessLevel(uid, message.peer_id - 2000000000, 8)
+        await set_user_access_level(uid, message.peer_id - 2000000000, 8)
 
 
 @bl.chat_message(SearchCMD("backup"))
@@ -83,7 +83,7 @@ async def msg(message: Message):
 async def addblack(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if id == 0:
         return await messagereply(message, await messages.addblack_hint())
     if id == uid:
@@ -94,8 +94,8 @@ async def addblack(message: Message):
         await conn.execute(
             "insert into blacklist (uid) values ($1) on conflict (uid) do nothing", id
         )
-    dev_name = await getUserName(uid)
-    dev_nickname = await getUserNickname(uid, chat_id)
+    dev_name = await get_user_name(uid)
+    dev_nickname = await get_user_nickname(uid, chat_id)
     await messagereply(
         message,
         await messages.addblack(
@@ -103,18 +103,18 @@ async def addblack(message: Message):
             dev_name,
             dev_nickname,
             id,
-            await getUserName(id),
-            await getUserNickname(id, chat_id),
+            await get_user_name(id),
+            await get_user_nickname(id, chat_id),
         ),
     )
-    await sendMessage(id, await messages.blacked(uid, dev_name, dev_nickname))
+    await send_message(id, await messages.blacked(uid, dev_name, dev_nickname))
 
 
 @bl.chat_message(SearchCMD("delblack"))
 async def delblack(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if id == 0:
         return await messagereply(message, await messages.delblack_hint())
     if id == uid:
@@ -128,11 +128,11 @@ async def delblack(message: Message):
             return await messagereply(
                 message,
                 await messages.delblack_no_user(
-                    id, await getUserName(id), await getUserNickname(id, chat_id)
+                    id, await get_user_name(id), await get_user_nickname(id, chat_id)
                 ),
             )
-    dev_name = await getUserName(uid)
-    dev_nickname = await getUserNickname(uid, chat_id)
+    dev_name = await get_user_name(uid)
+    dev_nickname = await get_user_nickname(uid, chat_id)
     await messagereply(
         message,
         await messages.delblack(
@@ -140,11 +140,11 @@ async def delblack(message: Message):
             dev_name,
             dev_nickname,
             id,
-            await getUserName(id),
-            await getUserNickname(id, chat_id),
+            await get_user_name(id),
+            await get_user_nickname(id, chat_id),
         ),
     )
-    await sendMessage(id, await messages.delblacked(uid, dev_name, dev_nickname))
+    await send_message(id, await messages.delblacked(uid, dev_name, dev_nickname))
 
 
 @bl.chat_message(SearchCMD("blacklist"))
@@ -153,7 +153,7 @@ async def blacklist(message: Message):
     async with (await pool()).acquire() as conn:
         blc = await conn.fetch("select uid from blacklist")
     for user in blc:
-        users[await getUserName(user[0])] = user[0]
+        users[await get_user_name(user[0])] = user[0]
     msg = f"⚛ Список пользователей в ЧС бота (Всего : {len(list(users))})\n\n"
     for k, i in users.items():
         msg += f"➖ {i} : | [id{i}|{k}]\n"
@@ -164,7 +164,7 @@ async def blacklist(message: Message):
 async def setstatus(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     data = message.text.split()
     if id == 0 or not data[2].isdigit():
         return await messagereply(message, await messages.setstatus_hint())
@@ -182,26 +182,26 @@ async def setstatus(message: Message):
                 time.time() + int(data[2]) * 86400,
             )
 
-    dev_name = await getUserName(uid)
+    dev_name = await get_user_name(uid)
     await messagereply(
         message,
         await messages.setstatus(
             uid,
             dev_name,
-            await getUserNickname(uid, chat_id),
+            await get_user_nickname(uid, chat_id),
             id,
-            await getUserName(id),
-            await getUserNickname(id, chat_id),
+            await get_user_name(id),
+            await get_user_nickname(id, chat_id),
         ),
     )
-    await sendMessage(
+    await send_message(
         id,
         await messages.ugiveStatus(
             id,
-            await getUserNickname(id, chat_id),
-            await getUserName(id),
+            await get_user_nickname(id, chat_id),
+            await get_user_name(id),
             uid,
-            await getUserNickname(uid, chat_id),
+            await get_user_nickname(uid, chat_id),
             dev_name,
             data[2],
         ),
@@ -212,7 +212,7 @@ async def setstatus(message: Message):
 async def delstatus(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if id == 0:
         return await messagereply(message, await messages.delstatus_hint())
     if id < 0:
@@ -220,19 +220,19 @@ async def delstatus(message: Message):
     async with (await pool()).acquire() as conn:
         await conn.execute("delete from premium where uid=$1", id)
 
-    dev_name = await getUserName(uid)
+    dev_name = await get_user_name(uid)
     await messagereply(
         message,
         await messages.delstatus(
             uid,
             dev_name,
-            await getUserNickname(uid, chat_id),
+            await get_user_nickname(uid, chat_id),
             id,
-            await getUserName(id),
-            await getUserNickname(id, chat_id),
+            await get_user_name(id),
+            await get_user_nickname(id, chat_id),
         ),
     )
-    await sendMessage(id, await messages.udelStatus(uid, dev_name))
+    await send_message(id, await messages.udelStatus(uid, dev_name))
 
 
 @bl.chat_message(SearchCMD("statuslist"))
@@ -249,7 +249,7 @@ async def statuslist(message: Message):
 @bl.chat_message(SearchCMD("setprem"))
 async def setprem(message: Message):
     uid = message.from_id
-    chat_id = await getIDFromMessage(message.text, message.reply_message)
+    chat_id = await search_id_in_message(message.text, message.reply_message)
     if chat_id <= 0:
         return await messagereply(message, await messages.setprem_hint())
     async with (await pool()).acquire() as conn:
@@ -263,12 +263,14 @@ async def setprem(message: Message):
             )
 
     await messagereply(message, await messages.setprem(chat_id))
-    await sendMessage(message.peer_id, await messages.premchat(uid, await getUserName(uid)))
+    await send_message(
+        message.peer_id, await messages.premchat(uid, await get_user_name(uid))
+    )
 
 
 @bl.chat_message(SearchCMD("delprem"))
 async def delprem(message: Message):
-    chat_id = await getIDFromMessage(message.text, message.reply_message)
+    chat_id = await search_id_in_message(message.text, message.reply_message)
     if chat_id <= 0:
         return await messagereply(message, await messages.delprem_hint())
     async with (await pool()).acquire() as conn:
@@ -288,15 +290,15 @@ async def permlist(message: Message):
 @bl.chat_message(SearchCMD("givexp"))
 async def givexp(message: Message):
     uid = message.from_id
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if not id:
         return await messagereply(message, "🔶 Пользователь не найден")
     data = message.text.split()
-    await addUserXP(id, int(data[2]))
+    await add_user_xp(id, int(data[2]))
     await messagereply(
         message,
         await messages.givexp(
-            uid, await getUserName(uid), id, await getUserName(id), data[2]
+            uid, await get_user_name(uid), id, await get_user_name(id), data[2]
         ),
     )
 
@@ -304,29 +306,32 @@ async def givexp(message: Message):
 @bl.chat_message(SearchCMD("givecoins"))
 async def givecoins(message: Message):
     uid = message.from_id
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if not id:
         return await messagereply(message, "🔶 Пользователь не найден")
     data = message.text.split()
-    await addUserCoins(id, int(data[2]))
+    await add_user_coins(id, int(data[2]))
     await messagereply(
         message,
         await messages.givecoins(
-            uid, await getUserName(uid), id, await getUserName(id), data[2]
+            uid, await get_user_name(uid), id, await get_user_name(id), data[2]
         ),
     )
 
 
 @bl.chat_message(SearchCMD("resetlvl"))
 async def resetlvl(message: Message):
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if not id:
         return await messagereply(message, "🔶 Пользователь не найден")
     async with (await pool()).acquire() as conn:
         await conn.execute("update xp set xp=0, lvl=0, league=1 where uid=$1", id)
-    u_name = await getUserName(id)
+    u_name = await get_user_name(id)
     msgsent = await messages.resetlvlcomplete(id, u_name)
-    if await sendMessage(peer_ids=id, msg=await messages.resetlvl(id, u_name)) is False:
+    if (
+        await send_message(peer_ids=id, msg=await messages.resetlvl(id, u_name))
+        is False
+    ):
         msgsent += "\n❗ Пользователю не удалось отправить сообщение"
     await messagereply(message, msgsent)
 
@@ -334,7 +339,7 @@ async def resetlvl(message: Message):
 @bl.chat_message(SearchCMD("block"))
 async def block(message: Message):
     data = message.text.lower().split()
-    id = await getIDFromMessage(message.text, message.reply_message, 3)
+    id = await search_id_in_message(message.text, message.reply_message, 3)
     if len(data) < 3 or data[1] not in ["chat", "user"] or not id or id < 0:
         return await messagereply(message, await messages.block_hint())
     reason = " ".join(data[3:]) or None
@@ -379,21 +384,25 @@ async def block(message: Message):
                     )
                 )
     if data[1] == "chat":
-        await sendMessage(
+        await send_message(
             id + 2000000000,
             await messages.block_chatblocked(id, reason),
             keyboard.block_chatblocked(),
         )
         await api.messages.remove_chat_user(id, member_id=-settings.vk.group_id)
     else:
-        await sendMessage(
-            id, await messages.block_userblocked(id, reason), keyboard.block_chatblocked()
+        await send_message(
+            id,
+            await messages.block_userblocked(id, reason),
+            keyboard.block_chatblocked(),
         )
         for i in chats:
-            if await kickUser(id, i):
-                await sendMessage(
+            if await kick_user(id, i):
+                await send_message(
                     i + 2000000000,
-                    await messages.block_blockeduserinvite(id, await getUserName(id), reason),
+                    await messages.block_blockeduserinvite(
+                        id, await get_user_name(id), reason
+                    ),
                 )
             await asyncio.sleep(0.3)
     await messagereply(message, await messages.block())
@@ -402,7 +411,7 @@ async def block(message: Message):
 @bl.chat_message(SearchCMD("unblock"))
 async def unblock(message: Message):
     data = message.text.lower().split()
-    id = await getIDFromMessage(message.text, message.reply_message, 3)
+    id = await search_id_in_message(message.text, message.reply_message, 3)
     if len(data) != 3 or data[1] not in ["chat", "user"] or not id:
         return await messagereply(message, await messages.unblock_hint())
     async with (await pool()).acquire() as conn:
@@ -411,7 +420,7 @@ async def unblock(message: Message):
         ):
             return await messagereply(message, await messages.unblock_noban())
     if data[1] == "chat":
-        await sendMessage(id + 2000000000, await messages.block_chatunblocked(id))
+        await send_message(id + 2000000000, await messages.block_chatunblocked(id))
     await messagereply(message, await messages.unblock())
 
 
@@ -422,7 +431,7 @@ async def blocklist(message: Message):
     msg = f"⚛ Список пользователей в блокировке бота (Всего : {len(inf)})\n\n"
     for user in inf:
         msg += (
-            f"➖ [id{user[0]}|{await getUserName(user[0])}]"
+            f"➖ [id{user[0]}|{await get_user_name(user[0])}]"
             + (f" | {user[1]}" if user[1] else "")
             + "\n"
         )
@@ -545,7 +554,9 @@ async def getlink(message: Message):
             message,
             (
                 await api.messages.get_invite_link(
-                    peer_id=int(data[1]) + 2000000000, reset=False, group_id=settings.vk.group_id
+                    peer_id=int(data[1]) + 2000000000,
+                    reset=False,
+                    group_id=settings.vk.group_id,
                 )
             ).link,
         )
@@ -558,7 +569,7 @@ async def reboot(message: Message):
     if len(data := message.text.split()) == 2:
         await messagereply(
             message,
-            f"⌛ Перезагрузка произойдет через {pointWords(int(data[1]), ('минуту', 'минуты', 'минут'))}.",
+            f"⌛ Перезагрузка произойдет через {point_words(int(data[1]), ('минуту', 'минуты', 'минут'))}.",
         )
         await asyncio.sleep(int(data[1]) * 60)
     async with (await pool()).acquire() as conn:
@@ -587,7 +598,7 @@ async def sudo(message: Message):
 
 @bl.chat_message(SearchCMD("getuserchats"))
 async def getuserchats(message: Message):
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if not id:
         return await messagereply(message, "🔶 Пользователь не найден")
     limit = message.text.split()[-1]
@@ -612,7 +623,7 @@ async def getuserchats(message: Message):
             )
         except Exception:
             chu = 0
-        msg += f"➖ {i[0]} | M: {i[1]} | C: {chu} | N: {await getChatName(i[0])} \n"
+        msg += f"➖ {i[0]} | M: {i[1]} | C: {chu} | N: {await get_chat_name(i[0])} \n"
     await messagereply(message, msg)
 
 
@@ -638,7 +649,7 @@ async def getchats(message: Message):
             )
         except Exception:
             chu = 0
-        msg += f"➖ {i[0]} | M: {i[1]} | C: {chu} | N: {await getChatName(i[0])}\n"
+        msg += f"➖ {i[0]} | M: {i[1]} | C: {chu} | N: {await get_chat_name(i[0])}\n"
     await messagereply(message, msg)
 
 
@@ -651,7 +662,7 @@ async def helpdev(message: Message):
 @bl.chat_message(SearchCMD("gettransferhistoryto"))
 @bl.chat_message(SearchCMD("gettransferhistoryfrom"))
 async def gettransferhistory(message: Message):
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if not id:
         await messagereply(message, "🔶 Пользователь не найден")
         return
@@ -682,7 +693,7 @@ async def gettransferhistory(message: Message):
     msg = "✝ Общие трансферы пользователя:"
     for i in transfers:
         msg += (
-            f"\n F: [id{i[0]}|{await getUserName(i[0])}] | T: [id{i[1]}|{await getUserName(i[1])}] | A: {i[2]} | C:"
+            f"\n F: [id{i[0]}|{await get_user_name(i[0])}] | T: [id{i[1]}|{await get_user_name(i[1])}] | A: {i[2]} | C:"
             f" {not bool(i[3])}"
         )
     await messagereply(message, msg)
@@ -691,7 +702,7 @@ async def gettransferhistory(message: Message):
 @bl.chat_message(SearchCMD("lvlban"))
 async def lvlban(message: Message):
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if len(data) != 2 or not id:
         return await messagereply(message, await messages.lvlban_hint())
     async with (await pool()).acquire() as conn:
@@ -704,7 +715,7 @@ async def lvlban(message: Message):
 @bl.chat_message(SearchCMD("lvlunban"))
 async def lvlunban(message: Message):
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if len(data) != 2 or not id:
         return await messagereply(message, await messages.lvlunban_hint())
     async with (await pool()).acquire() as conn:
@@ -721,17 +732,17 @@ async def lvlbanlist(message: Message):
         lvlban = await conn.fetch("select uid from lvlbanned")
     msg = f"⚛ Список пользователей в lvlban бота (Всего : {len(lvlban)})\n\n"
     for user in lvlban:
-        msg += f"➖ {user[0]} : | [id{user[0]}|{await getUserName(user[0])}]\n"
+        msg += f"➖ {user[0]} : | [id{user[0]}|{await get_user_name(user[0])}]\n"
     await messagereply(message, msg)
 
 
 @bl.chat_message(SearchCMD("repban"))
 async def repban(message: Message):
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if len(data) != 2 or not id:
         return await messagereply(message, await messages.repban_hint())
-    if not await getURepBanned(id):
+    if not await get_user_rep_banned(id):
         async with (await pool()).acquire() as conn:
             await conn.execute(
                 "insert into reportban (uid, time) values ($1, $2)", id, None
@@ -742,7 +753,7 @@ async def repban(message: Message):
 @bl.chat_message(SearchCMD("repunban"))
 async def repunban(message: Message):
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if len(data) != 2 or not id:
         return await messagereply(message, await messages.repunban_hint())
     async with (await pool()).acquire() as conn:
@@ -759,7 +770,7 @@ async def repbanlist(message: Message):
         repban = await conn.fetch("select uid from reportban")
     msg = f"⚛ Список пользователей в reportban бота (Всего : {len(repban)})\n\n"
     for user in repban:
-        msg += f"➖ {user[0]} : | [id{user[0]}|{await getUserName(user[0])}]\n"
+        msg += f"➖ {user[0]} : | [id{user[0]}|{await get_user_name(user[0])}]\n"
     await messagereply(message, msg)
 
 
@@ -773,8 +784,8 @@ async def chatsstats(message: Message):
             "select count(*) as c from settings where setting='captcha' and pos=true"
         )
     msg = (
-        f"🌓 Ночной режим включен в: {pointWords(nm or 0, ['беседе', 'беседах', 'беседах'])}\n"
-        f"🔢 Капча включена в: {pointWords(c or 0, ['беседе', 'беседах', 'беседах'])}"
+        f"🌓 Ночной режим включен в: {point_words(nm or 0, ['беседе', 'беседах', 'беседах'])}\n"
+        f"🔢 Капча включена в: {point_words(c or 0, ['беседе', 'беседах', 'беседах'])}"
     )
     await messagereply(message, msg)
 
@@ -787,14 +798,18 @@ async def linked(message: Message):
         )
     await messagereply(
         message,
-        f"Связано с Telegram : {pointWords(c, ('аккаунт', 'аккаунта', 'аккаунтов'))}.",
+        f"Связано с Telegram : {point_words(c, ('аккаунт', 'аккаунта', 'аккаунтов'))}.",
     )
 
 
 @bl.chat_message(SearchCMD("promocreate"))
 async def promocreate(message: Message):
     data = message.text.split()
-    if len(data) not in (5, 6) or not data[2].isdigit() or data[3] not in ('xp', 'coins'):
+    if (
+        len(data) not in (5, 6)
+        or not data[2].isdigit()
+        or data[3] not in ("xp", "coins")
+    ):
         return await messagereply(message, await messages.promocreate_hint())
     usage, date, amnt, promo_type = None, None, int(data[2]), data[3]
     try:
@@ -820,7 +835,9 @@ async def promocreate(message: Message):
             amnt,
             promo_type,
         )
-    await messagereply(message, await messages.promocreate(data[1], amnt, usage, date, promo_type))
+    await messagereply(
+        message, await messages.promocreate(data[1], amnt, usage, date, promo_type)
+    )
 
 
 @bl.chat_message(SearchCMD("promodel"))
@@ -832,7 +849,9 @@ async def promodel(message: Message):
         if not await conn.fetchval(
             "delete from promocodes where code=$1 returning 1", data[1]
         ):
-            return await messagereply(message, await messages.promodel_notfound(data[1]))
+            return await messagereply(
+                message, await messages.promodel_notfound(data[1])
+            )
     await messagereply(message, await messages.promodel(data[1]))
 
 
@@ -904,7 +923,9 @@ async def prempromodel(message: Message):
         if not await conn.fetchval(
             "delete from prempromo where promo=$1 returning 1", data[1]
         ):
-            return await messagereply(message, await messages.prempromodel_notfound(data[1]))
+            return await messagereply(
+                message, await messages.prempromodel_notfound(data[1])
+            )
     await messagereply(message, await messages.prempromodel(data[1]))
 
 
@@ -925,7 +946,7 @@ async def bonuslist(message: Message):
         message,
         "\n".join(
             [
-                f"{k + 1}. [id{i[0]}|{await getUserName(i[0])}] - Серия: {pointWords(i[1] + 1, ('день', 'дня', 'дней'))}"
+                f"{k + 1}. [id{i[0]}|{await get_user_name(i[0])}] - Серия: {point_words(i[1] + 1, ('день', 'дня', 'дней'))}"
                 for k, i in enumerate(users)
             ]
         ),

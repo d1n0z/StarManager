@@ -10,28 +10,28 @@ from StarManager.core import managers
 from StarManager.core.config import settings
 from StarManager.core.db import pool
 from StarManager.core.utils import (
-    addUserXP,
-    antispamChecker,
-    deleteMessages,
-    getChatName,
-    getChatSettings,
-    getIDFromMessage,
-    getSilence,
-    getSilenceAllowed,
-    getUserAccessLevel,
-    getUserBan,
-    getUserBanInfo,
-    getUserLastMessage,
-    getUserMute,
-    getUserName,
-    getUserNickname,
-    getUserPrefixes,
-    getUserPremium,
-    getUserPremmenuSetting,
-    kickUser,
+    add_user_xp,
+    antispam_checker,
+    delete_messages,
+    get_chat_name,
+    get_chat_settings,
+    search_id_in_message,
+    get_silence,
+    get_silence_allowed,
+    get_user_access_level,
+    get_user_ban,
+    get_user_ban_info,
+    get_user_last_message,
+    get_user_mute,
+    get_user_name,
+    get_user_nickname,
+    get_user_prefixes,
+    get_user_premium,
+    get_user_premmenu_setting,
+    kick_user,
     punish,
-    sendMessage,
-    setChatMute,
+    send_message,
+    set_chat_mute,
 )
 from StarManager.vkbot import keyboard, messages
 from StarManager.vkbot.action_handlers import action_handle
@@ -57,12 +57,12 @@ async def message_handle(event: MessageNew) -> Any:
             event.object.message.attachments
             and len(event.object.message.attachments) == 0
         ):
-            return await sendMessage(chat_id, await messages.pm())
+            return await send_message(chat_id, await messages.pm())
         elif (
             event.object.message.attachments
             and event.object.message.attachments[0].market
         ):
-            return await sendMessage(
+            return await send_message(
                 chat_id,
                 await messages.pm_market(),
                 kbd=keyboard.pm_market(event.object.message.from_id),
@@ -104,14 +104,14 @@ async def message_handle(event: MessageNew) -> Any:
                     or uid,
                 )
             ]
-        ) and not await getUserAccessLevel(uid, chat_id):
+        ) and not await get_user_access_level(uid, chat_id):
             pnt = await conn.fetchval(
                 "select punishment from filtersettings where chat_id=$1", chat_id
             )
     if pnt == -1:
         pass
     elif not pnt:
-        return await deleteMessages(
+        return await delete_messages(
             event.object.message.conversation_message_id, chat_id
         )
     elif pnt == 1:
@@ -160,12 +160,12 @@ async def message_handle(event: MessageNew) -> Any:
                     f"{mute_dates}",
                 )
 
-        await setChatMute(uid, chat_id)
-        await deleteMessages(event.object.message.conversation_message_id, chat_id)
-        return await sendMessage(
+        await set_chat_mute(uid, chat_id)
+        await delete_messages(event.object.message.conversation_message_id, chat_id)
+        return await send_message(
             chat_id + 2000000000,
             await messages.filterpunish_mute(
-                uid, await getUserName(uid), await getUserNickname(uid, chat_id)
+                uid, await get_user_name(uid), await get_user_nickname(uid, chat_id)
             ),
         )
     else:
@@ -214,15 +214,15 @@ async def message_handle(event: MessageNew) -> Any:
                     f"{ban_dates}",
                 )
 
-        await deleteMessages(event.object.message.conversation_message_id, chat_id)
-        return await sendMessage(
+        await delete_messages(event.object.message.conversation_message_id, chat_id)
+        return await send_message(
             chat_id + 2000000000,
             await messages.filterpunish_ban(
-                uid, await getUserName(uid), await getUserNickname(uid, chat_id)
+                uid, await get_user_name(uid), await get_user_nickname(uid, chat_id)
             )
             + (
                 "\n❗ Пользователя не удалось кикнуть"
-                if not await kickUser(uid, chat_id)
+                if not await kick_user(uid, chat_id)
                 else ""
             ),
         )
@@ -230,13 +230,15 @@ async def message_handle(event: MessageNew) -> Any:
     data = event.object.message.text.split()
     if not any(
         event.object.message.text.startswith(i)
-        for i in await getUserPrefixes(await getUserPremium(uid), uid)
+        for i in await get_user_prefixes(await get_user_premium(uid), uid)
     ) and (
         pinged := [
             i
             for i in [
                 (
-                    await getIDFromMessage(event.object.message.text, None, place=k),
+                    await search_id_in_message(
+                        event.object.message.text, None, place=k
+                    ),
                     data[k - 1],
                 )
                 for k in range(1, len(data) + 1)
@@ -255,24 +257,28 @@ async def message_handle(event: MessageNew) -> Any:
                     chat_id,
                     [i[0] for i in pinged],
                 )
-                and await deleteMessages(
+                and await delete_messages(
                     event.object.message.conversation_message_id, chat_id
                 )
             ):
-                return await sendMessage(
+                return await send_message(
                     event.object.message.peer_id,
                     await messages.antitag_on(
-                        uid, await getUserNickname(uid, chat_id), await getUserName(uid)
+                        uid,
+                        await get_user_nickname(uid, chat_id),
+                        await get_user_name(uid),
                     ),
                 )
         if tonotif := [
-            i for i in pinged if await getUserPremmenuSetting(i[0], "tagnotif", False)
+            i
+            for i in pinged
+            if await get_user_premmenu_setting(i[0], "tagnotif", False)
         ]:
             for i in tonotif:
-                if not await sendMessage(
+                if not await send_message(
                     i[0],
-                    f"""📌 Упоминание в чате: {await getChatName(chat_id)}
-👤 [id{uid}|{await getUserName(uid)}] → {i[1]} 
+                    f"""📌 Упоминание в чате: {await get_chat_name(chat_id)}
+👤 [id{uid}|{await get_user_name(uid)}] → {i[1]} 
 💬 Сообщение: \"{event.object.message.text}\"""",
                 ):
                     async with (await pool()).acquire() as conn:
@@ -283,32 +289,32 @@ async def message_handle(event: MessageNew) -> Any:
                             "tagnotif",
                         )
 
-    if (ban := await getUserBan(uid, chat_id)) >= time.time():
-        await deleteMessages(event.object.message.conversation_message_id, chat_id)
-        await sendMessage(
+    if (ban := await get_user_ban(uid, chat_id)) >= time.time():
+        await delete_messages(event.object.message.conversation_message_id, chat_id)
+        await send_message(
             event.object.message.peer_id,
             await messages.kick_banned(
                 uid,
-                await getUserName(uid),
-                await getUserNickname(uid, chat_id),
+                await get_user_name(uid),
+                await get_user_nickname(uid, chat_id),
                 ban,
-                (await getUserBanInfo(uid, chat_id))["causes"][-1],
+                (await get_user_ban_info(uid, chat_id))["causes"][-1],
             ),
         )
-        return await kickUser(uid, chat_id=chat_id)
-    if (uacc := await getUserAccessLevel(uid, chat_id)) == 0 and await getUChatLimit(
-        msgtime, await getUserLastMessage(uid, chat_id, 0), uacc, chat_id
+        return await kick_user(uid, chat_id=chat_id)
+    if (uacc := await get_user_access_level(uid, chat_id)) == 0 and await getUChatLimit(
+        msgtime, await get_user_last_message(uid, chat_id, 0), uacc, chat_id
     ):
-        return await deleteMessages(
+        return await delete_messages(
             event.object.message.conversation_message_id, chat_id
         )
     if (
-        await getSilence(chat_id) and uacc not in await getSilenceAllowed(chat_id)
-    ) or await getUserMute(uid, chat_id) > int(msgtime):
-        return await deleteMessages(
+        await get_silence(chat_id) and uacc not in await get_silence_allowed(chat_id)
+    ) or await get_user_mute(uid, chat_id) > int(msgtime):
+        return await delete_messages(
             event.object.message.conversation_message_id, chat_id
         )
-    chat_settings = await getChatSettings(chat_id)
+    chat_settings = await get_chat_settings(chat_id)
     if (
         uacc == 0
         and chat_settings["main"]["disallowPings"]
@@ -327,7 +333,7 @@ async def message_handle(event: MessageNew) -> Any:
             for i in event.object.message.text.replace("*", "@").lower().split()
         )
     ):
-        return await deleteMessages(
+        return await delete_messages(
             event.object.message.conversation_message_id, chat_id
         )
     if chat_settings["main"]["nightmode"] and uacc < 6:
@@ -347,7 +353,7 @@ async def message_handle(event: MessageNew) -> Any:
                 or (now.hour == start.hour and now.minute < start.minute)
                 or (now.hour == end.hour and now.minute >= end.minute)
             ):
-                return await deleteMessages(
+                return await delete_messages(
                     event.object.message.conversation_message_id, chat_id
                 )
 
@@ -369,7 +375,7 @@ async def message_handle(event: MessageNew) -> Any:
             == MessagesMessageAttachmentType.STICKER
         ):
             if chat_settings["main"]["disallowStickers"]:
-                return await deleteMessages(
+                return await delete_messages(
                     event.object.message.conversation_message_id, chat_id
                 )
             sticker = True
@@ -387,7 +393,7 @@ async def message_handle(event: MessageNew) -> Any:
                 managers.antispam.add_message(chat_id, uid, event.object.message.date)
 
     if uacc < 5 and (
-        setting := await antispamChecker(
+        setting := await antispam_checker(
             chat_id, uid, event.object.message, chat_settings
         )
     ):
@@ -399,12 +405,12 @@ async def message_handle(event: MessageNew) -> Any:
             )
         if punishment := await punish(uid, chat_id, setting[0]):
             if punishment != "del":
-                await sendMessage(
+                await send_message(
                     chat_id + 2000000000,
                     await messages.antispam_punishment(
                         uid,
-                        await getUserName(uid),
-                        await getUserNickname(uid, chat_id),
+                        await get_user_name(uid),
+                        await get_user_nickname(uid, chat_id),
                         setting[1],
                         punishment[0],
                         setting[2],
@@ -421,7 +427,7 @@ async def message_handle(event: MessageNew) -> Any:
                 )
             )
         ) or (setting[1] not in settings.settings_meta.alt_to_delete and punishment):
-            await deleteMessages(event.object.message.conversation_message_id, chat_id)
+            await delete_messages(event.object.message.conversation_message_id, chat_id)
 
     if chat_id == settings.service.mathgiveaways_to and msg.replace("-", "").isdigit():
         async with (await pool()).acquire() as conn:
@@ -434,14 +440,14 @@ async def message_handle(event: MessageNew) -> Any:
                     uid,
                     math[0],
                 )
-                await addUserXP(uid, math[3])
-                await deleteMessages(math[1], settings.service.mathgiveaways_to)
-                await sendMessage(
+                await add_user_xp(uid, math[3])
+                await delete_messages(math[1], settings.service.mathgiveaways_to)
+                await send_message(
                     settings.service.mathgiveaways_to + 2000000000,
                     await messages.math_winner(
                         uid,
-                        await getUserName(uid),
-                        await getUserNickname(uid, settings.service.mathgiveaways_to),
+                        await get_user_name(uid),
+                        await get_user_nickname(uid, settings.service.mathgiveaways_to),
                         msg,
                         math[3],
                         math[4],

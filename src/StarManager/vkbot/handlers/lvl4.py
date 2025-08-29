@@ -9,17 +9,17 @@ from StarManager.vkbot import messages
 from StarManager.vkbot.checkers import haveAccess
 from StarManager.vkbot.rules import SearchCMD
 from StarManager.core.utils import (
-    getIDFromMessage,
-    getUserAccessLevel,
-    getUserName,
-    getUserNickname,
-    kickUser,
-    getUserBan,
-    setChatMute,
-    getUserWarns,
-    getgpool,
-    editMessage,
-    sendMessage,
+    search_id_in_message,
+    get_user_access_level,
+    get_user_name,
+    get_user_nickname,
+    kick_user,
+    get_user_ban,
+    set_chat_mute,
+    get_user_warns,
+    get_gpool,
+    edit_message,
+    send_message,
     messagereply,
 )
 from StarManager.core.config import api
@@ -33,7 +33,7 @@ async def gkick(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if id == uid:
         return await messagereply(
             message, disable_mentions=1, message=await messages.kick_myself()
@@ -55,21 +55,21 @@ async def gkick(message: Message):
     if len(kick_cause) == 0:
         kick_cause = "Причина не указана"
 
-    if not (chats := await getgpool(chat_id)):
+    if not (chats := await get_gpool(chat_id)):
         return await messagereply(
             message, disable_mentions=1, message=await messages.chat_unbound()
         )
 
-    ch_name = await getUserName(id)
-    u_name = await getUserName(uid)
-    ch_nickname = await getUserNickname(id, chat_id)
+    ch_name = await get_user_name(id)
+    u_name = await get_user_name(uid)
+    ch_nickname = await get_user_nickname(id, chat_id)
     edit = await messagereply(
         message,
         disable_mentions=1,
         message=await messages.gkick_start(
             uid,
             u_name,
-            await getUserNickname(uid, chat_id),
+            await get_user_nickname(uid, chat_id),
             id,
             ch_name,
             ch_nickname,
@@ -78,21 +78,21 @@ async def gkick(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await getUserAccessLevel(uid, chat_id)
-        if u_acc <= await getUserAccessLevel(id, chat_id) or not await haveAccess(
+        u_acc = await get_user_access_level(uid, chat_id)
+        if u_acc <= await get_user_access_level(id, chat_id) or not await haveAccess(
             "gkick", chat_id, u_acc
         ):
             continue
-        if await kickUser(id, chat_id):
+        if await kick_user(id, chat_id):
             try:
-                await sendMessage(
+                await send_message(
                     peer_ids=chat_id + 2000000000,
                     msg=await messages.kick(
                         u_name,
-                        await getUserNickname(uid, chat_id),
+                        await get_user_nickname(uid, chat_id),
                         uid,
                         ch_name,
-                        await getUserNickname(id, chat_id),
+                        await get_user_nickname(id, chat_id),
                         id,
                         kick_cause,
                     ),
@@ -103,7 +103,7 @@ async def gkick(message: Message):
 
     if edit is None:
         return
-    await editMessage(
+    await edit_message(
         peer_id=edit.peer_id,
         cmid=edit.conversation_message_id,
         msg=await messages.gkick(id, ch_name, ch_nickname, len(chats), success),
@@ -115,7 +115,7 @@ async def gban(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if id == uid:
         return await messagereply(
             message, disable_mentions=1, message=await messages.ban_myself()
@@ -164,21 +164,21 @@ async def gban(message: Message):
             message, disable_mentions=1, message=await messages.gban_hint()
         )
 
-    if not (chats := await getgpool(chat_id)):
+    if not (chats := await get_gpool(chat_id)):
         return await messagereply(
             message, disable_mentions=1, message=await messages.chat_unbound()
         )
 
-    u_name = await getUserName(uid)
-    ch_name = await getUserName(id)
-    ch_nick = await getUserNickname(id, chat_id)
+    u_name = await get_user_name(uid)
+    ch_name = await get_user_name(id)
+    ch_nick = await get_user_nickname(id, chat_id)
     edit = await messagereply(
         message,
         disable_mentions=1,
         message=await messages.gban_start(
             uid,
             u_name,
-            await getUserNickname(uid, chat_id),
+            await get_user_nickname(uid, chat_id),
             id,
             ch_name,
             ch_nick,
@@ -187,8 +187,8 @@ async def gban(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await getUserAccessLevel(uid, chat_id)
-        if u_acc <= await getUserAccessLevel(id, chat_id) or not await haveAccess(
+        u_acc = await get_user_access_level(uid, chat_id)
+        if u_acc <= await get_user_access_level(id, chat_id) or not await haveAccess(
             "gban", chat_id, u_acc
         ):
             continue
@@ -241,15 +241,15 @@ async def gban(message: Message):
                     f"{ban_dates}",
                 )
 
-        if await kickUser(id, chat_id):
-            await sendMessage(
+        if await kick_user(id, chat_id):
+            await send_message(
                 msg=await messages.ban(
                     uid,
                     u_name,
-                    await getUserNickname(uid, chat_id),
+                    await get_user_nickname(uid, chat_id),
                     id,
                     ch_name,
-                    await getUserNickname(id, chat_id),
+                    await get_user_nickname(id, chat_id),
                     ban_cause,
                     ban_time // 86400,
                 ),
@@ -259,7 +259,7 @@ async def gban(message: Message):
 
     if edit is None:
         return
-    await editMessage(
+    await edit_message(
         peer_id=edit.peer_id,
         cmid=edit.conversation_message_id,
         msg=await messages.gban(id, ch_name, ch_nick, len(chats), success),
@@ -271,7 +271,7 @@ async def gunban(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if id == uid:
         return await messagereply(
             message, disable_mentions=1, message=await messages.unban_myself()
@@ -285,20 +285,20 @@ async def gunban(message: Message):
             message, disable_mentions=1, message=await messages.id_group()
         )
 
-    if not (chats := await getgpool(chat_id)):
+    if not (chats := await get_gpool(chat_id)):
         return await messagereply(
             message, disable_mentions=1, message=await messages.chat_unbound()
         )
 
-    name = await getUserName(id)
-    nick = await getUserNickname(id, chat_id)
+    name = await get_user_name(id)
+    nick = await get_user_nickname(id, chat_id)
     edit = await messagereply(
         message,
         disable_mentions=1,
         message=await messages.gunban_start(
             uid,
-            await getUserName(uid),
-            await getUserNickname(uid, chat_id),
+            await get_user_name(uid),
+            await get_user_nickname(uid, chat_id),
             id,
             name,
             nick,
@@ -307,12 +307,12 @@ async def gunban(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await getUserAccessLevel(uid, chat_id)
-        if u_acc <= await getUserAccessLevel(id, chat_id) or not await haveAccess(
+        u_acc = await get_user_access_level(uid, chat_id)
+        if u_acc <= await get_user_access_level(id, chat_id) or not await haveAccess(
             "gunban", chat_id, u_acc
         ):
             continue
-        if await getUserBan(id, chat_id) <= time.time():
+        if await get_user_ban(id, chat_id) <= time.time():
             continue
         async with (await pool()).acquire() as conn:
             if await conn.fetchval(
@@ -325,7 +325,7 @@ async def gunban(message: Message):
 
     if edit is None:
         return
-    await editMessage(
+    await edit_message(
         peer_id=edit.peer_id,
         cmid=edit.conversation_message_id,
         msg=await messages.gunban(id, name, nick, len(chats), success),
@@ -337,7 +337,7 @@ async def gmute(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if id == uid:
         return await messagereply(
             message, disable_mentions=1, message=await messages.mute_myself()
@@ -368,21 +368,21 @@ async def gmute(message: Message):
     else:
         mute_cause = " ".join(data[2:])
 
-    if not (chats := await getgpool(chat_id)):
+    if not (chats := await get_gpool(chat_id)):
         return await messagereply(
             message, disable_mentions=1, message=await messages.chat_unbound()
         )
 
-    u_name = await getUserName(uid)
-    ch_name = await getUserName(id)
-    ch_nick = await getUserNickname(uid, chat_id)
+    u_name = await get_user_name(uid)
+    ch_name = await get_user_name(id)
+    ch_nick = await get_user_nickname(uid, chat_id)
     edit = await messagereply(
         message,
         disable_mentions=1,
         message=await messages.gmute_start(
             uid,
             u_name,
-            await getUserNickname(uid, chat_id),
+            await get_user_nickname(uid, chat_id),
             id,
             ch_name,
             ch_nick,
@@ -391,8 +391,8 @@ async def gmute(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await getUserAccessLevel(uid, chat_id)
-        if u_acc <= await getUserAccessLevel(id, chat_id) or not await haveAccess(
+        u_acc = await get_user_access_level(uid, chat_id)
+        if u_acc <= await get_user_access_level(id, chat_id) or not await haveAccess(
             "gmute", chat_id, u_acc
         ):
             continue
@@ -447,15 +447,15 @@ async def gmute(message: Message):
                     f"{mute_dates}",
                 )
 
-        await setChatMute(id, chat_id, mute_time)
-        await sendMessage(
+        await set_chat_mute(id, chat_id, mute_time)
+        await send_message(
             peer_ids=chat_id + 2000000000,
             msg=await messages.mute(
                 u_name,
-                await getUserNickname(uid, chat_id),
+                await get_user_nickname(uid, chat_id),
                 uid,
                 ch_name,
-                await getUserNickname(id, chat_id),
+                await get_user_nickname(id, chat_id),
                 id,
                 mute_cause,
                 int(mute_time / 60),
@@ -465,7 +465,7 @@ async def gmute(message: Message):
 
     if edit is None:
         return
-    await editMessage(
+    await edit_message(
         peer_id=edit.peer_id,
         cmid=edit.conversation_message_id,
         msg=await messages.gmute(id, ch_name, ch_nick, len(chats), success),
@@ -477,7 +477,7 @@ async def gunmute(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if id == uid:
         return await messagereply(
             message, disable_mentions=1, message=await messages.unmute_myself()
@@ -491,21 +491,21 @@ async def gunmute(message: Message):
             message, disable_mentions=1, message=await messages.id_group()
         )
 
-    if not (chats := await getgpool(chat_id)):
+    if not (chats := await get_gpool(chat_id)):
         return await messagereply(
             message, disable_mentions=1, message=await messages.chat_unbound()
         )
 
-    u_name = await getUserName(uid)
-    ch_name = await getUserName(id)
-    ch_nick = await getUserNickname(id, chat_id)
+    u_name = await get_user_name(uid)
+    ch_name = await get_user_name(id)
+    ch_nick = await get_user_nickname(id, chat_id)
     edit = await messagereply(
         message,
         disable_mentions=1,
         message=await messages.gunmute_start(
             uid,
             u_name,
-            await getUserNickname(uid, chat_id),
+            await get_user_nickname(uid, chat_id),
             id,
             ch_name,
             ch_nick,
@@ -514,8 +514,8 @@ async def gunmute(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await getUserAccessLevel(uid, chat_id)
-        ch_acc = await getUserAccessLevel(id, chat_id)
+        u_acc = await get_user_access_level(uid, chat_id)
+        ch_acc = await get_user_access_level(id, chat_id)
         if u_acc <= ch_acc or not await haveAccess("gunmute", chat_id, u_acc):
             continue
         async with (await pool()).acquire() as conn:
@@ -525,15 +525,15 @@ async def gunmute(message: Message):
                 id,
             ):
                 continue
-        await setChatMute(id, chat_id, 0)
-        await sendMessage(
+        await set_chat_mute(id, chat_id, 0)
+        await send_message(
             peer_ids=chat_id + 2000000000,
             msg=await messages.unmute(
                 u_name,
-                await getUserNickname(uid, chat_id),
+                await get_user_nickname(uid, chat_id),
                 uid,
                 ch_name,
-                await getUserNickname(id, chat_id),
+                await get_user_nickname(id, chat_id),
                 id,
             ),
         )
@@ -541,7 +541,7 @@ async def gunmute(message: Message):
 
     if edit is None:
         return
-    await editMessage(
+    await edit_message(
         peer_id=edit.peer_id,
         cmid=edit.conversation_message_id,
         msg=await messages.gunmute(id, ch_name, ch_nick, len(chats), success),
@@ -553,7 +553,7 @@ async def gwarn(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if id == uid:
         return await messagereply(
             message, disable_mentions=1, message=await messages.warn_myself()
@@ -567,7 +567,7 @@ async def gwarn(message: Message):
             message, disable_mentions=1, message=await messages.id_group()
         )
 
-    if not (chats := await getgpool(chat_id)):
+    if not (chats := await get_gpool(chat_id)):
         return await messagereply(
             message, disable_mentions=1, message=await messages.chat_unbound()
         )
@@ -577,13 +577,13 @@ async def gwarn(message: Message):
     else:
         warn_cause = " ".join(data[1:])
 
-    u_name = await getUserName(uid)
-    ch_name = await getUserName(id)
-    ch_nick = await getUserNickname(id, chat_id)
+    u_name = await get_user_name(uid)
+    ch_name = await get_user_name(id)
+    ch_nick = await get_user_nickname(id, chat_id)
     msg = await messages.gwarn_start(
         uid,
         u_name,
-        await getUserNickname(uid, chat_id),
+        await get_user_nickname(uid, chat_id),
         id,
         ch_name,
         ch_nick,
@@ -592,8 +592,8 @@ async def gwarn(message: Message):
     edit = await messagereply(message, disable_mentions=1, message=msg)
     success = 0
     for chat_id in chats:
-        u_acc = await getUserAccessLevel(uid, chat_id)
-        if u_acc <= await getUserAccessLevel(id, chat_id) or not await haveAccess(
+        u_acc = await get_user_access_level(uid, chat_id)
+        if u_acc <= await get_user_access_level(id, chat_id) or not await haveAccess(
             "gwarn", chat_id, u_acc
         ):
             continue
@@ -626,23 +626,23 @@ async def gwarn(message: Message):
 
         if warns >= 3:
             warns = 0
-            await kickUser(id, chat_id)
+            await kick_user(id, chat_id)
             msg = await messages.warn_kick(
                 u_name,
-                await getUserNickname(uid, chat_id),
+                await get_user_nickname(uid, chat_id),
                 uid,
                 ch_name,
-                await getUserNickname(id, chat_id),
+                await get_user_nickname(id, chat_id),
                 id,
                 warn_cause,
             )
         else:
             msg = await messages.warn(
                 u_name,
-                await getUserNickname(uid, chat_id),
+                await get_user_nickname(uid, chat_id),
                 uid,
                 ch_name,
-                await getUserNickname(id, chat_id),
+                await get_user_nickname(id, chat_id),
                 id,
                 warn_cause,
             )
@@ -671,12 +671,12 @@ async def gwarn(message: Message):
                     f"{warn_dates}",
                 )
 
-        await sendMessage(msg=msg, peer_ids=chat_id + 2000000000)
+        await send_message(msg=msg, peer_ids=chat_id + 2000000000)
         success += 1
 
     if edit is None:
         return
-    await editMessage(
+    await edit_message(
         peer_id=edit.peer_id,
         cmid=edit.conversation_message_id,
         msg=await messages.gwarn(id, ch_name, ch_nick, len(chats), success),
@@ -688,7 +688,7 @@ async def gunwarn(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if id == uid:
         return await messagereply(
             message, disable_mentions=1, message=await messages.unwarn_myself()
@@ -702,21 +702,21 @@ async def gunwarn(message: Message):
             message, disable_mentions=1, message=await messages.id_group()
         )
 
-    if not (chats := await getgpool(chat_id)):
+    if not (chats := await get_gpool(chat_id)):
         return await messagereply(
             message, disable_mentions=1, message=await messages.chat_unbound()
         )
 
-    u_name = await getUserName(uid)
-    ch_name = await getUserName(id)
-    ch_nick = await getUserNickname(id, chat_id)
+    u_name = await get_user_name(uid)
+    ch_name = await get_user_name(id)
+    ch_nick = await get_user_nickname(id, chat_id)
     edit = await messagereply(
         message,
         disable_mentions=1,
         message=await messages.gunwarn_start(
             uid,
             u_name,
-            await getUserNickname(uid, chat_id),
+            await get_user_nickname(uid, chat_id),
             id,
             ch_name,
             ch_nick,
@@ -725,12 +725,12 @@ async def gunwarn(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await getUserAccessLevel(uid, chat_id)
-        if u_acc <= await getUserAccessLevel(id, chat_id) or not await haveAccess(
+        u_acc = await get_user_access_level(uid, chat_id)
+        if u_acc <= await get_user_access_level(id, chat_id) or not await haveAccess(
             "gunwarn", chat_id, u_acc
         ):
             continue
-        ch_warns = await getUserWarns(id, chat_id)
+        ch_warns = await get_user_warns(id, chat_id)
         if ch_warns == 0:
             continue
         async with (await pool()).acquire() as conn:
@@ -741,14 +741,14 @@ async def gunwarn(message: Message):
                 id,
             ):
                 continue
-        await sendMessage(
+        await send_message(
             peer_ids=chat_id + 2000000000,
             msg=await messages.unwarn(
                 u_name,
-                await getUserNickname(uid, chat_id),
+                await get_user_nickname(uid, chat_id),
                 uid,
                 ch_name,
-                await getUserNickname(id, chat_id),
+                await get_user_nickname(id, chat_id),
                 id,
             ),
         )
@@ -756,7 +756,7 @@ async def gunwarn(message: Message):
 
     if edit is None:
         return
-    await editMessage(
+    await edit_message(
         peer_id=edit.peer_id,
         cmid=edit.conversation_message_id,
         msg=await messages.gunwarn(id, ch_name, ch_nick, len(chats), success),
@@ -768,7 +768,7 @@ async def gsnick(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if (len(data) == 1 and message.reply_message is None) or not id:
         return await messagereply(
             message, disable_mentions=1, message=await messages.gsnick_hint()
@@ -784,23 +784,25 @@ async def gsnick(message: Message):
         nickname = " ".join(data[1:])
     if len(nickname) > 46 or "[" in nickname or "]" in nickname:
         return await messagereply(
-            message, disable_mentions=1, message=await messages.snick_too_long_nickname()
+            message,
+            disable_mentions=1,
+            message=await messages.snick_too_long_nickname(),
         )
-    if not (chats := await getgpool(chat_id)):
+    if not (chats := await get_gpool(chat_id)):
         return await messagereply(
             message, disable_mentions=1, message=await messages.chat_unbound()
         )
 
-    u_name = await getUserName(uid)
-    ch_name = await getUserName(id)
-    ch_nick = await getUserNickname(id, chat_id)
+    u_name = await get_user_name(uid)
+    ch_name = await get_user_name(id)
+    ch_nick = await get_user_nickname(id, chat_id)
     edit = await messagereply(
         message,
         disable_mentions=1,
         message=await messages.gsnick_start(
             uid,
             u_name,
-            await getUserNickname(uid, chat_id),
+            await get_user_nickname(uid, chat_id),
             id,
             ch_name,
             ch_nick,
@@ -809,9 +811,9 @@ async def gsnick(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await getUserAccessLevel(uid, chat_id)
+        u_acc = await get_user_access_level(uid, chat_id)
         if (
-            u_acc <= await getUserAccessLevel(id, chat_id) and uid != id
+            u_acc <= await get_user_access_level(id, chat_id) and uid != id
         ) or not await haveAccess("gsnick", chat_id, u_acc):
             continue
 
@@ -829,15 +831,15 @@ async def gsnick(message: Message):
                     nickname,
                 )
 
-        await sendMessage(
+        await send_message(
             peer_ids=chat_id + 2000000000,
             msg=await messages.snick(
                 uid,
                 u_name,
-                await getUserNickname(uid, chat_id),
+                await get_user_nickname(uid, chat_id),
                 id,
                 ch_name,
-                await getUserNickname(id, chat_id),
+                await get_user_nickname(id, chat_id),
                 nickname,
             ),
         )
@@ -845,7 +847,7 @@ async def gsnick(message: Message):
 
     if edit is None:
         return
-    await editMessage(
+    await edit_message(
         peer_id=edit.peer_id,
         cmid=edit.conversation_message_id,
         msg=await messages.gsnick(id, ch_name, ch_nick, len(chats), success),
@@ -857,7 +859,7 @@ async def grnick(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if (len(data) == 1 and message.reply_message is None) or not id:
         return await messagereply(
             message, disable_mentions=1, message=await messages.grnick_hint()
@@ -867,21 +869,21 @@ async def grnick(message: Message):
             message, disable_mentions=1, message=await messages.id_group()
         )
 
-    if not (chats := await getgpool(chat_id)):
+    if not (chats := await get_gpool(chat_id)):
         return await messagereply(
             message, disable_mentions=1, message=await messages.chat_unbound()
         )
 
-    u_name = await getUserName(uid)
-    ch_name = await getUserName(id)
-    ch_nick = await getUserNickname(id, chat_id)
+    u_name = await get_user_name(uid)
+    ch_name = await get_user_name(id)
+    ch_nick = await get_user_nickname(id, chat_id)
     edit = await messagereply(
         message,
         disable_mentions=1,
         message=await messages.grnick_start(
             uid,
             u_name,
-            await getUserNickname(uid, chat_id),
+            await get_user_nickname(uid, chat_id),
             id,
             ch_name,
             ch_nick,
@@ -890,21 +892,21 @@ async def grnick(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await getUserAccessLevel(uid, chat_id)
-        ch_nickname = await getUserNickname(id, chat_id)
+        u_acc = await get_user_access_level(uid, chat_id)
+        ch_nickname = await get_user_nickname(id, chat_id)
         if (
-            (u_acc <= await getUserAccessLevel(id, chat_id) and uid != id)
+            (u_acc <= await get_user_access_level(id, chat_id) and uid != id)
             or not await haveAccess("grnick", chat_id, u_acc)
             or ch_nickname is None
         ):
             continue
         try:
-            await sendMessage(
+            await send_message(
                 peer_ids=chat_id + 2000000000,
                 msg=await messages.rnick(
                     uid,
                     u_name,
-                    await getUserNickname(uid, chat_id),
+                    await get_user_nickname(uid, chat_id),
                     id,
                     ch_name,
                     ch_nickname,
@@ -920,7 +922,7 @@ async def grnick(message: Message):
 
     if edit is None:
         return
-    await editMessage(
+    await edit_message(
         peer_id=edit.peer_id,
         cmid=edit.conversation_message_id,
         msg=await messages.grnick(id, ch_name, ch_nick, len(chats), success),
@@ -937,19 +939,19 @@ async def gzov(message: Message):
             message, disable_mentions=1, message=await messages.gzov_hint()
         )
 
-    if not (chats := await getgpool(chat_id)):
+    if not (chats := await get_gpool(chat_id)):
         return await messagereply(
             message, disable_mentions=1, message=await messages.chat_unbound()
         )
 
-    u_name = await getUserName(uid)
-    u_nick = await getUserNickname(uid, chat_id)
+    u_name = await get_user_name(uid)
+    u_nick = await get_user_nickname(uid, chat_id)
     msg = await messages.gzov_start(uid, u_name, u_nick, len(chats))
     edit = await messagereply(message, disable_mentions=1, message=msg)
     success = 0
     cause = " ".join(data[1:])
     for chat_id in chats:
-        u_acc = await getUserAccessLevel(uid, chat_id)
+        u_acc = await get_user_access_level(uid, chat_id)
         if not await haveAccess("gzov", chat_id, u_acc):
             continue
         try:
@@ -958,10 +960,10 @@ async def gzov(message: Message):
                     peer_id=chat_id + 2000000000
                 )
             ).items
-            if not await sendMessage(
+            if not await send_message(
                 peer_ids=chat_id + 2000000000,
                 msg=await messages.zov(
-                    uid, u_name, await getUserNickname(uid, chat_id), cause, members
+                    uid, u_name, await get_user_nickname(uid, chat_id), cause, members
                 ),
                 disable_mentions=True,
             ):
@@ -972,7 +974,7 @@ async def gzov(message: Message):
 
     if edit is None:
         return
-    await editMessage(
+    await edit_message(
         peer_id=edit.peer_id,
         cmid=edit.conversation_message_id,
         msg=await messages.gzov(uid, u_name, u_nick, len(chats), success),

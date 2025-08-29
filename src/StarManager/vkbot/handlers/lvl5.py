@@ -9,17 +9,17 @@ from StarManager.vkbot import keyboard, messages
 from StarManager.vkbot.checkers import haveAccess
 from StarManager.vkbot.rules import SearchCMD
 from StarManager.core.utils import (
-    getIDFromMessage,
-    getUserAccessLevel,
-    getUserName,
-    getUserNickname,
-    kickUser,
-    getUserBan,
-    getChatName,
-    getGroupName,
-    getpool,
-    sendMessage,
-    deleteMessages,
+    search_id_in_message,
+    get_user_access_level,
+    get_user_name,
+    get_user_nickname,
+    kick_user,
+    get_user_ban,
+    get_chat_name,
+    get_group_name,
+    get_pool,
+    send_message,
+    delete_messages,
     messagereply,
 )
 from StarManager.core.config import api
@@ -33,7 +33,7 @@ async def skick(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message, 3)
+    id = await search_id_in_message(message.text, message.reply_message, 3)
     if not id or len(data) < 2:
         return await messagereply(
             message, disable_mentions=1, message=await messages.skick_hint()
@@ -54,15 +54,15 @@ async def skick(message: Message):
     except Exception:
         kick_cause = "Причина не указана"
 
-    if not (chats := await getpool(chat_id, data[1])):
+    if not (chats := await get_pool(chat_id, data[1])):
         return await messagereply(
             message, disable_mentions=1, message=await messages.s_invalid_group(data[1])
         )
 
-    u_nickname = await getUserNickname(uid, chat_id)
-    ch_nickname = await getUserNickname(id, chat_id)
-    u_name = await getUserName(uid)
-    ch_name = await getUserName(id)
+    u_nickname = await get_user_nickname(uid, chat_id)
+    ch_nickname = await get_user_nickname(id, chat_id)
+    u_name = await get_user_name(uid)
+    ch_name = await get_user_name(id)
     edit = await messagereply(
         message,
         disable_mentions=1,
@@ -72,16 +72,16 @@ async def skick(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await getUserAccessLevel(uid, chat_id)
+        u_acc = await get_user_access_level(uid, chat_id)
         if (
             not await haveAccess("skick", chat_id, u_acc)
-            or await getUserAccessLevel(id, chat_id) >= u_acc
+            or await get_user_access_level(id, chat_id) >= u_acc
         ):
             continue
-        ch_nickname = await getUserNickname(id, chat_id)
-        u_nickname = await getUserNickname(uid, chat_id)
-        if await kickUser(id, chat_id):
-            await sendMessage(
+        ch_nickname = await get_user_nickname(id, chat_id)
+        u_nickname = await get_user_nickname(uid, chat_id)
+        if await kick_user(id, chat_id):
+            await send_message(
                 peer_ids=chat_id + 2000000000,
                 msg=await messages.kick(
                     u_name, u_nickname, uid, ch_name, ch_nickname, id, kick_cause
@@ -97,7 +97,7 @@ async def skick(message: Message):
         message=await messages.skick(
             id,
             ch_name,
-            await getUserNickname(id, edit.peer_id - 2000000000),
+            await get_user_nickname(id, edit.peer_id - 2000000000),
             len(chats),
             success,
         ),
@@ -109,7 +109,7 @@ async def sban(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message, 3)
+    id = await search_id_in_message(message.text, message.reply_message, 3)
     if not id or len(data) < 2:
         return await messagereply(
             message, disable_mentions=1, message=await messages.sban_hint()
@@ -123,15 +123,15 @@ async def sban(message: Message):
             message, disable_mentions=1, message=await messages.ban_myself()
         )
 
-    if not (chats := await getpool(chat_id, data[1])):
+    if not (chats := await get_pool(chat_id, data[1])):
         return await messagereply(
             message, disable_mentions=1, message=await messages.s_invalid_group(data[1])
         )
 
-    u_name = await getUserName(uid)
-    ch_name = await getUserName(id)
-    u_nickname = await getUserNickname(uid, chat_id)
-    ch_nickname = await getUserNickname(id, chat_id)
+    u_name = await get_user_name(uid)
+    ch_name = await get_user_name(id)
+    u_nickname = await get_user_nickname(uid, chat_id)
+    ch_nickname = await get_user_nickname(id, chat_id)
 
     if message.reply_message is None:
         cdata = data[3:]
@@ -158,21 +158,21 @@ async def sban(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await getUserAccessLevel(uid, chat_id)
+        u_acc = await get_user_access_level(uid, chat_id)
         if (
             not await haveAccess("sban", chat_id, u_acc)
-            or await getUserAccessLevel(id, chat_id) >= u_acc
+            or await get_user_access_level(id, chat_id) >= u_acc
         ):
             continue
-        if await getUserBan(id, chat_id) >= time.time():
+        if await get_user_ban(id, chat_id) >= time.time():
             continue
         msg = await messages.ban(
             uid,
             u_name,
-            await getUserNickname(uid, chat_id),
+            await get_user_nickname(uid, chat_id),
             id,
             ch_name,
-            await getUserNickname(id, chat_id),
+            await get_user_nickname(id, chat_id),
             ban_cause,
             ban_time // 86400,
         )
@@ -224,8 +224,8 @@ async def sban(message: Message):
                     f"{ban_dates}",
                 )
 
-        if await kickUser(id, chat_id):
-            await sendMessage(msg=msg, peer_ids=chat_id + 2000000000)
+        if await kick_user(id, chat_id):
+            await send_message(msg=msg, peer_ids=chat_id + 2000000000)
         success += 1
 
     if edit is None:
@@ -236,7 +236,7 @@ async def sban(message: Message):
         message=await messages.sban(
             id,
             ch_name,
-            await getUserNickname(id, edit.peer_id - 2000000000),
+            await get_user_nickname(id, edit.peer_id - 2000000000),
             len(chats),
             success,
         ),
@@ -248,7 +248,7 @@ async def sunban(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message, 3)
+    id = await search_id_in_message(message.text, message.reply_message, 3)
     if not id or len(data) < 2:
         return await messagereply(
             message, disable_mentions=1, message=await messages.sunban_hint()
@@ -262,7 +262,7 @@ async def sunban(message: Message):
             message, disable_mentions=1, message=await messages.unban_myself()
         )
 
-    if not (chats := await getpool(chat_id, data[1])):
+    if not (chats := await get_pool(chat_id, data[1])):
         return await messagereply(
             message, disable_mentions=1, message=await messages.s_invalid_group(data[1])
         )
@@ -272,22 +272,22 @@ async def sunban(message: Message):
         disable_mentions=1,
         message=await messages.sunban_start(
             uid,
-            await getUserName(uid),
-            await getUserNickname(uid, chat_id),
+            await get_user_name(uid),
+            await get_user_nickname(uid, chat_id),
             id,
-            await getUserName(id),
-            await getUserNickname(id, chat_id),
+            await get_user_name(id),
+            await get_user_nickname(id, chat_id),
             len(chats),
             data[1],
         ),
     )
     success = 0
     for chat_id in chats:
-        u_acc = await getUserAccessLevel(uid, chat_id)
+        u_acc = await get_user_access_level(uid, chat_id)
         if (
             not await haveAccess("sunban", chat_id, u_acc)
-            or await getUserAccessLevel(id, chat_id) >= u_acc
-            or await getUserBan(id, chat_id) <= time.time()
+            or await get_user_access_level(id, chat_id) >= u_acc
+            or await get_user_ban(id, chat_id) <= time.time()
         ):
             continue
         async with (await pool()).acquire() as conn:
@@ -305,8 +305,8 @@ async def sunban(message: Message):
         conversation_message_id=edit.conversation_message_id,
         message=await messages.sunban(
             id,
-            await getUserName(id),
-            await getUserNickname(id, edit.peer_id - 2000000000),
+            await get_user_name(id),
+            await get_user_nickname(id, edit.peer_id - 2000000000),
             len(chats),
             success,
         ),
@@ -318,7 +318,7 @@ async def ssnick(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message, 3)
+    id = await search_id_in_message(message.text, message.reply_message, 3)
     if not id or (
         (len(data) < 4 and message.reply_message is None)
         or (len(data) < 3 and message.reply_message is not None)
@@ -331,7 +331,7 @@ async def ssnick(message: Message):
             message, disable_mentions=1, message=await messages.id_group()
         )
 
-    if not (chats := await getpool(chat_id, data[1])):
+    if not (chats := await get_pool(chat_id, data[1])):
         return await messagereply(
             message, disable_mentions=1, message=await messages.s_invalid_group(data[1])
         )
@@ -344,27 +344,27 @@ async def ssnick(message: Message):
             message, disable_mentions=1, message=await messages.ssnick_hint()
         )
 
-    u_name = await getUserName(uid)
-    name = await getUserName(id)
+    u_name = await get_user_name(uid)
+    name = await get_user_name(id)
     edit = await messagereply(
         message,
         disable_mentions=1,
         message=await messages.ssnick_start(
             uid,
             u_name,
-            await getUserNickname(uid, chat_id),
+            await get_user_nickname(uid, chat_id),
             id,
             name,
-            await getUserNickname(id, chat_id),
+            await get_user_nickname(id, chat_id),
             len(chats),
             data[1],
         ),
     )
     success = 0
     for chat_id in chats:
-        u_acc = await getUserAccessLevel(uid, chat_id)
+        u_acc = await get_user_access_level(uid, chat_id)
         if not await haveAccess("ssnick", chat_id, u_acc) or (
-            u_acc <= await getUserAccessLevel(id, chat_id) and uid != id
+            u_acc <= await get_user_access_level(id, chat_id) and uid != id
         ):
             continue
         async with (await pool()).acquire() as conn:
@@ -388,7 +388,7 @@ async def ssnick(message: Message):
                     chat_id,
                     nickname,
                 )
-        await sendMessage(
+        await send_message(
             chat_id + 2000000000,
             await messages.snick(uid, u_name, u_nick, id, name, ch_nick, nickname),
         )
@@ -402,7 +402,7 @@ async def ssnick(message: Message):
         message=await messages.ssnick(
             id,
             name,
-            await getUserNickname(id, edit.peer_id - 2000000000),
+            await get_user_nickname(id, edit.peer_id - 2000000000),
             len(chats),
             success,
         ),
@@ -414,7 +414,7 @@ async def srnick(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message, 3)
+    id = await search_id_in_message(message.text, message.reply_message, 3)
     if not id or len(data) < 2:
         return await messagereply(
             message, disable_mentions=1, message=await messages.srnick_hint()
@@ -424,32 +424,32 @@ async def srnick(message: Message):
             message, disable_mentions=1, message=await messages.id_group()
         )
 
-    if not (chats := await getpool(chat_id, data[1])):
+    if not (chats := await get_pool(chat_id, data[1])):
         return await messagereply(
             message, disable_mentions=1, message=await messages.s_invalid_group(data[1])
         )
 
-    ch_name = await getUserName(id)
-    u_name = await getUserName(uid)
+    ch_name = await get_user_name(id)
+    u_name = await get_user_name(uid)
     edit = await messagereply(
         message,
         disable_mentions=1,
         message=await messages.srnick_start(
             uid,
             u_name,
-            await getUserNickname(uid, chat_id),
+            await get_user_nickname(uid, chat_id),
             id,
             ch_name,
-            await getUserNickname(id, chat_id),
+            await get_user_nickname(id, chat_id),
             len(chats),
             data[1],
         ),
     )
     success = 0
     for chat_id in chats:
-        u_acc = await getUserAccessLevel(uid, chat_id)
+        u_acc = await get_user_access_level(uid, chat_id)
         if not await haveAccess("srnick", chat_id, u_acc) or (
-            u_acc <= await getUserAccessLevel(id, chat_id) and uid != id
+            u_acc <= await get_user_access_level(id, chat_id) and uid != id
         ):
             continue
         async with (await pool()).acquire() as conn:
@@ -458,15 +458,15 @@ async def srnick(message: Message):
                 chat_id,
                 id,
             ):
-                await sendMessage(
+                await send_message(
                     chat_id + 200000000,
                     await messages.rnick(
                         uid,
                         u_name,
-                        await getUserNickname(uid, chat_id),
+                        await get_user_nickname(uid, chat_id),
                         id,
                         ch_name,
-                        await getUserNickname(id, chat_id),
+                        await get_user_nickname(id, chat_id),
                     ),
                 )
                 success += 1
@@ -490,13 +490,13 @@ async def szov(message: Message):
             message, disable_mentions=1, message=await messages.szov_hint()
         )
 
-    if not (chats := await getpool(chat_id, data[1])):
+    if not (chats := await get_pool(chat_id, data[1])):
         return await messagereply(
             message, disable_mentions=1, message=await messages.s_invalid_group(data[1])
         )
 
-    name = await getUserName(uid)
-    nickname = await getUserNickname(uid, chat_id)
+    name = await get_user_name(uid)
+    nickname = await get_user_nickname(uid, chat_id)
     edit = await messagereply(
         message,
         disable_mentions=1,
@@ -506,17 +506,21 @@ async def szov(message: Message):
     text = " ".join(data[2:])
     for chat_id in chats:
         if not await haveAccess(
-            "szov", chat_id, await getUserAccessLevel(uid, chat_id)
+            "szov", chat_id, await get_user_access_level(uid, chat_id)
         ):
             continue
         try:
             members = await api.messages.get_conversation_members(
                 peer_id=chat_id + 2000000000
             )
-            if not await sendMessage(
+            if not await send_message(
                 peer_ids=chat_id + 2000000000,
                 msg=await messages.zov(
-                    uid, name, await getUserNickname(uid, chat_id), text, members.items
+                    uid,
+                    name,
+                    await get_user_nickname(uid, chat_id),
+                    text,
+                    members.items,
                 ),
                 disable_mentions=False,
             ):
@@ -533,7 +537,7 @@ async def szov(message: Message):
         message=await messages.szov(
             uid,
             name,
-            await getUserNickname(uid, edit.peer_id - 2000000000),
+            await get_user_nickname(uid, edit.peer_id - 2000000000),
             data[1],
             len(chats),
             success,
@@ -555,7 +559,7 @@ async def chat(message: Message):
         prefix = "id"
     except Exception:
         prefix = "club"
-        name = await getGroupName(-int(id))
+        name = await get_group_name(-int(id))
 
     async with (await pool()).acquire() as conn:
         chatgroup = (
@@ -622,12 +626,12 @@ async def chat(message: Message):
             len(members),
             bjd,
             prefix,
-            await getChatName(chat_id),
+            await get_chat_name(chat_id),
             prem,
         ),
         keyboard=None
         if not await haveAccess(
-            "settings", chat_id, await getUserAccessLevel(message.from_id, chat_id)
+            "settings", chat_id, await get_user_access_level(message.from_id, chat_id)
         )
         else (keyboard.chat(message.from_id, public == "Открытый")),
     )
@@ -639,7 +643,9 @@ async def antitag(message: Message):
     if (
         len(data) != 3
         or data[1] not in ("add", "del")
-        or not (id := await getIDFromMessage(message.text, message.reply_message, 3))
+        or not (
+            id := await search_id_in_message(message.text, message.reply_message, 3)
+        )
     ):
         return await messagereply(
             message,
@@ -657,7 +663,7 @@ async def antitag(message: Message):
             message,
             disable_mentions=1,
             message=await messages.antitag_add(
-                id, await getUserName(id), await getUserNickname(id, chat_id)
+                id, await get_user_name(id), await get_user_nickname(id, chat_id)
             ),
         )
     async with (await pool()).acquire() as conn:
@@ -668,7 +674,7 @@ async def antitag(message: Message):
         message,
         disable_mentions=1,
         message=await messages.antitag_del(
-            id, await getUserName(id), await getUserNickname(id, chat_id)
+            id, await get_user_name(id), await get_user_nickname(id, chat_id)
         ),
     )
 
@@ -689,12 +695,16 @@ async def pin(message: Message):
             message, disable_mentions=1, message=await messages.pin_cannot()
         )
     else:
-        await deleteMessages(message.conversation_message_id, message.chat_id)
+        await delete_messages(message.conversation_message_id, message.chat_id)
 
 
 @bl.chat_message(SearchCMD("unpin"))
 async def unpin(message: Message):
-    chat_settings = (await api.messages.get_conversations_by_id(peer_ids=[message.peer_id])).items[0].chat_settings
+    chat_settings = (
+        (await api.messages.get_conversations_by_id(peer_ids=[message.peer_id]))
+        .items[0]
+        .chat_settings
+    )
     if not chat_settings or not chat_settings.pinned_message:
         return await messagereply(
             message, disable_mentions=1, message=await messages.unpin_notpinned()
@@ -707,4 +717,4 @@ async def unpin(message: Message):
             message, disable_mentions=1, message=await messages.unpin_cannot()
         )
     else:
-        await deleteMessages(message.conversation_message_id, message.chat_id)
+        await delete_messages(message.conversation_message_id, message.chat_id)

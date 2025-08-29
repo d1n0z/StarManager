@@ -47,13 +47,13 @@ async def join(message: MessageEvent):
                 )
             ).items
         except Exception:
-            await utils.sendMessage(message.peer_id, await messages.notadmin())
+            await utils.send_message(message.peer_id, await messages.notadmin())
             return
 
         bp = message.user_id
         if (
             bp not in [i.member_id for i in members if i.is_admin or i.is_owner]
-            and await utils.getUserAccessLevel(bp, chat_id) < 7
+            and await utils.get_user_access_level(bp, chat_id) < 7
         ):
             return
         async with (await pool()).acquire() as conn:
@@ -62,7 +62,7 @@ async def join(message: MessageEvent):
                 chat_id,
                 time.time(),
             ):
-                await utils.setChatMute(i[0], chat_id, 0)
+                await utils.set_chat_mute(i[0], chat_id, 0)
             x = await conn.fetch(
                 "delete from accesslvl where chat_id=$1 returning uid", chat_id
             )
@@ -73,7 +73,7 @@ async def join(message: MessageEvent):
                 7,
             )
             for id in x:
-                await utils.setChatMute(id[0], chat_id, 0)
+                await utils.set_chat_mute(id[0], chat_id, 0)
             await conn.execute("delete from nickname where chat_id=$1", chat_id)
             await conn.execute("delete from settings where chat_id=$1", chat_id)
             await conn.execute("delete from welcome where chat_id=$1", chat_id)
@@ -108,8 +108,8 @@ async def join(message: MessageEvent):
                 await tgbot.send_message(
                     chat_id=settings.telegram.chat_id,
                     message_thread_id=settings.telegram.newchat_thread_id,
-                    text=f"{chat_id} | {await utils.getChatName(chat_id)} | "
-                    f"{await utils.getChatOwner(chat_id)} | {await utils.getChatMembers(chat_id)} | "
+                    text=f"{chat_id} | {await utils.get_chat_name(chat_id)} | "
+                    f"{await utils.get_chat_owner(chat_id)} | {await utils.get_chat_members(chat_id)} | "
                     f"{datetime.now().strftime('%H:%M:%S')}",
                     disable_web_page_preview=True,
                     parse_mode="HTML",
@@ -117,19 +117,19 @@ async def join(message: MessageEvent):
             except Exception:
                 pass
 
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.start(), peer_id, message.conversation_message_id
         )
         return
     elif cmd == "rejoin" and payload["activate"]:
-        if await utils.getUserAccessLevel(uid, chat_id) >= 7 or uid in [
+        if await utils.get_user_access_level(uid, chat_id) >= 7 or uid in [
             i.member_id
             for i in (
                 await api.messages.get_conversation_members(peer_id=peer_id)
             ).items
             if i.is_admin or i.is_owner
         ]:
-            await utils.editMessage(
+            await utils.edit_message(
                 await messages.rejoin_activate(),
                 peer_id,
                 message.conversation_message_id,
@@ -164,8 +164,8 @@ async def duel(message: MessageEvent):
             await message.show_snackbar("Вы не можете участвовать в дуэли.")
             return
 
-        coins = await utils.getUserCoins(id)
-        ucoins = await utils.getUserCoins(uid)
+        coins = await utils.get_user_coins(id)
+        ucoins = await utils.get_user_coins(uid)
         if coins < duelcoins:
             await message.show_snackbar("У вас недостаточно монеток.")
             return
@@ -178,20 +178,20 @@ async def duel(message: MessageEvent):
 
         com, duel_coins_com = 0, duelcoins
         has_comission = not (
-            await utils.getUserPremium(winid)
-            or (await utils.getUserShopBonuses(uid))[1] > time.time()
+            await utils.get_user_premium(winid)
+            or (await utils.get_user_shop_bonuses(uid))[1] > time.time()
         )
         if has_comission:
             duel_coins_com, com = int(duelcoins / 100 * 90), 10
 
-        edit_result = await utils.editMessage(
+        edit_result = await utils.edit_message(
             await messages.duel_res(
                 winid,
-                await utils.getUserName(winid),
-                await utils.getUserNickname(winid, chat_id),
+                await utils.get_user_name(winid),
+                await utils.get_user_nickname(winid, chat_id),
                 loseid,
-                await utils.getUserName(loseid),
-                await utils.getUserNickname(loseid, chat_id),
+                await utils.get_user_name(loseid),
+                await utils.get_user_nickname(loseid, chat_id),
                 duel_coins_com,
                 has_comission,
             ),
@@ -203,8 +203,8 @@ async def duel(message: MessageEvent):
 
         ctx.mark_used()
 
-        await utils.addUserCoins(loseid, -duelcoins)
-        await utils.addUserCoins(winid, duel_coins_com)
+        await utils.add_user_coins(loseid, -duelcoins)
+        await utils.add_user_coins(winid, duel_coins_com)
 
         async with (await pool()).acquire() as conn:
             if not await conn.fetchval(
@@ -214,12 +214,14 @@ async def duel(message: MessageEvent):
                     "insert into duelwins (uid, wins) values ($1, 1)", winid
                 )
 
-        await utils.sendMessageEventAnswer(message.event_id, id, peer_id)
+        await utils.send_message_event_answer(message.event_id, id, peer_id)
 
-        uname = await utils.getUserNickname(uid, chat_id) or await utils.getUserName(
-            uid
+        uname = await utils.get_user_nickname(
+            uid, chat_id
+        ) or await utils.get_user_name(uid)
+        name = await utils.get_user_nickname(id, chat_id) or await utils.get_user_name(
+            id
         )
-        name = await utils.getUserNickname(id, chat_id) or await utils.getUserName(id)
         try:
             await tgbot.send_message(
                 chat_id=settings.telegram.chat_id,
@@ -237,9 +239,9 @@ async def duel(message: MessageEvent):
 )
 async def premmenu(message: MessageEvent):
     uid = message.user_id
-    menu_settings = await utils.getUserPremmenuSettings(uid)
-    prem = await utils.getUserPremium(uid)
-    await utils.editMessage(
+    menu_settings = await utils.get_user_premmenu_settings(uid)
+    prem = await utils.get_user_premium(uid)
+    await utils.edit_message(
         await messages.premmenu(menu_settings, prem),
         message.peer_id,
         message.conversation_message_id,
@@ -256,9 +258,9 @@ async def premmenu_turn(message: MessageEvent):
     if not payload:
         return
     if payload["setting"] == "tagnotif" and not (
-        await utils.isMessagesFromGroupAllowed(uid)
+        await utils.is_messages_from_group_allowed(uid)
     ):
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.tagnotiferror(),
             message.peer_id,
             message.conversation_message_id,
@@ -277,9 +279,9 @@ async def premmenu_turn(message: MessageEvent):
                 payload["setting"],
                 int(not settings.premium_menu.default[payload["setting"]]),
             )
-    prem = await utils.getUserPremium(uid)
-    menu_settings = await utils.getUserPremmenuSettings(uid)
-    await utils.editMessage(
+    prem = await utils.get_user_premium(uid)
+    menu_settings = await utils.get_user_premmenu_settings(uid)
+    await utils.edit_message(
         await messages.premmenu(menu_settings, prem),
         message.peer_id,
         message.conversation_message_id,
@@ -314,16 +316,16 @@ async def premmenu_action(message: MessageEvent):
                 "{}",
             )
     if deleted:
-        prem = await utils.getUserPremium(uid)
-        menu_settings = await utils.getUserPremmenuSettings(uid)
-        await utils.editMessage(
+        prem = await utils.get_user_premium(uid)
+        menu_settings = await utils.get_user_premmenu_settings(uid)
+        await utils.edit_message(
             await messages.premmenu(menu_settings, prem),
             peer_id,
             message.conversation_message_id,
             keyboard.premmenu(uid, menu_settings, prem),
         )
         return
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.premmenu_action(setting),
         peer_id,
         message.conversation_message_id,
@@ -334,7 +336,7 @@ async def premmenu_action(message: MessageEvent):
     GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["settings_menu"])
 )
 async def settings_menu(message: MessageEvent):
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.settings_(),
         message.peer_id,
         message.conversation_message_id,
@@ -374,9 +376,9 @@ async def settings_menu_antispam(message: MessageEvent):
         ]
         msgslimit, chrslimit = "не задан", "не задан"
         if val := msgs[2]:
-            msgslimit = utils.pointWords(val, ("соообщение", "сообщения", "сообщений"))
+            msgslimit = utils.point_words(val, ("соообщение", "сообщения", "сообщений"))
         if val := chrs[2]:
-            chrslimit = utils.pointWords(val, ("символ", "символа", "символов"))
+            chrslimit = utils.point_words(val, ("символ", "символа", "символов"))
 
         msg = f"""💬 Сообщения\nНастройте лимиты на длину и частоту сообщений.\n
 1️⃣ Сообщений в минуту
@@ -431,7 +433,7 @@ async def settings_menu_antispam(message: MessageEvent):
     else:
         raise Exception("Unexpected setting")
 
-    await utils.editMessage(msg, message.peer_id, message.conversation_message_id, kbd)
+    await utils.edit_message(msg, message.peer_id, message.conversation_message_id, kbd)
 
 
 @bl.raw_event(
@@ -449,8 +451,8 @@ async def chat_settings(message: MessageEvent):
     category = payload["category"]
 
     if payload["cmd"] == "settings":
-        chat_settings = (await utils.getChatSettings(chat_id))[category]
-        await utils.editMessage(
+        chat_settings = (await utils.get_chat_settings(chat_id))[category]
+        await utils.edit_message(
             await messages.settings_category(category, chat_settings, chat_id),
             peer_id,
             message.conversation_message_id,
@@ -458,25 +460,25 @@ async def chat_settings(message: MessageEvent):
         )
         return
     setting = payload["setting"]
-    if setting in settings.settings_meta.premium and not await utils.getUserPremium(
+    if setting in settings.settings_meta.premium and not await utils.get_user_premium(
         uid
     ):
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.no_prem(),
             peer_id,
             message.conversation_message_id,
             keyboard.settings_goto(uid),
         )
         return
-    chat_settings = await utils.getChatSettings(chat_id)
-    altsettings = await utils.getChatAltSettings(chat_id)
+    chat_settings = await utils.get_chat_settings(chat_id)
+    altsettings = await utils.get_chat_alt_settings(chat_id)
     if setting not in settings.settings_meta.countable:
         if setting in chat_settings[category]:
             chat_settings[category][setting] = not chat_settings[category][setting]
         else:
             altsettings[category][setting] = not altsettings[category][setting]
-        await utils.turnChatSetting(chat_id, category, setting)
-        await utils.editMessage(
+        await utils.turn_chat_setting(chat_id, category, setting)
+        await utils.edit_message(
             await messages.settings_category(
                 category, chat_settings[category], chat_id
             ),
@@ -492,7 +494,7 @@ async def chat_settings(message: MessageEvent):
             chat_id,
             setting,
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.settings_change_countable(
             chat_id,
             setting,
@@ -528,10 +530,10 @@ async def settings_change_countable(message: MessageEvent):
     category = payload["category"]
     setting = payload["setting"]
 
-    if setting in settings.settings_meta.premium and not await utils.getUserPremium(
+    if setting in settings.settings_meta.premium and not await utils.get_user_premium(
         uid
     ):
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.no_prem(),
             peer_id,
             message.conversation_message_id,
@@ -543,13 +545,15 @@ async def settings_change_countable(message: MessageEvent):
             "delete from typequeue where chat_id=$1 and uid=$2", chat_id, uid
         )
     if action in ("turn", "turnalt"):
-        chat_settings = await utils.getChatSettings(chat_id)
-        altsettings = await utils.getChatAltSettings(chat_id)
+        chat_settings = await utils.get_chat_settings(chat_id)
+        altsettings = await utils.get_chat_alt_settings(chat_id)
         if action == "turn":
             chat_settings[category][setting] = not chat_settings[category][setting]
         else:
             altsettings[category][setting] = not altsettings[category][setting]
-        await utils.turnChatSetting(chat_id, category, setting, alt=action == "turnalt")
+        await utils.turn_chat_setting(
+            chat_id, category, setting, alt=action == "turnalt"
+        )
         async with (await pool()).acquire() as conn:
             chatsetting = await conn.fetchrow(
                 'select "value", value2, punishment, pos, pos2 from settings where '
@@ -557,7 +561,7 @@ async def settings_change_countable(message: MessageEvent):
                 chat_id,
                 setting,
             )
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.settings_change_countable(
                 chat_id,
                 setting,
@@ -583,7 +587,7 @@ async def settings_change_countable(message: MessageEvent):
                     "select msg, photo, url from welcome where chat_id=$1", chat_id
                 )
             if w:
-                await utils.editMessage(
+                await utils.edit_message(
                     await messages.settings_countable_action(
                         action, setting, w[0], w[1], w[2]
                     ),
@@ -592,7 +596,7 @@ async def settings_change_countable(message: MessageEvent):
                     keyboard.settings_set_welcome(uid, w[0], w[1], w[2]),
                 )
                 return
-            await utils.editMessage(
+            await utils.edit_message(
                 await messages.settings_countable_action(action, setting),
                 peer_id,
                 message.conversation_message_id,
@@ -608,14 +612,14 @@ async def settings_change_countable(message: MessageEvent):
                 "{" + f'"setting": "{setting}", "category": "{category}", "cmid": '
                 f'"{message.conversation_message_id}"' + "}",
             )
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.settings_countable_action(action, setting),
             peer_id,
             message.conversation_message_id,
         )
         return
     elif action == "setPunishment":
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.settings_choose_punishment(),
             peer_id,
             message.conversation_message_id,
@@ -629,7 +633,7 @@ async def settings_change_countable(message: MessageEvent):
                 chat_id,
                 setting,
             )
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.settings_set_preset(category, setting),
             peer_id,
             message.conversation_message_id,
@@ -637,7 +641,7 @@ async def settings_change_countable(message: MessageEvent):
         )
         return
     elif action in ("setWhitelist", "setBlacklist"):
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.settings_setlist(setting, action[3:-4]),
             peer_id,
             message.conversation_message_id,
@@ -673,7 +677,7 @@ async def settings_set_preset(message: MessageEvent):
                 setting,
                 data["value"],
             )
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.settings_set_preset(category, setting),
             peer_id,
             message.conversation_message_id,
@@ -698,10 +702,10 @@ async def settings_set_punishment(message: MessageEvent):
     category = payload["category"]
     setting = payload["setting"]
 
-    if setting in settings.settings_meta.premium and not await utils.getUserPremium(
+    if setting in settings.settings_meta.premium and not await utils.get_user_premium(
         uid
     ):
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.no_prem(),
             peer_id,
             message.conversation_message_id,
@@ -716,7 +720,7 @@ async def settings_set_punishment(message: MessageEvent):
                 chat_id,
                 setting,
             )
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.settings_set_punishment(action),
             peer_id,
             message.conversation_message_id,
@@ -724,8 +728,8 @@ async def settings_set_punishment(message: MessageEvent):
                 uid,
                 category,
                 setting,
-                await utils.getChatSettings(chat_id),
-                await utils.getChatAltSettings(chat_id),
+                await utils.get_chat_settings(chat_id),
+                await utils.get_chat_alt_settings(chat_id),
                 True,
             ),
         )
@@ -740,7 +744,7 @@ async def settings_set_punishment(message: MessageEvent):
             + f'"setting": "{setting}", "action": "{action}", "category": "{category}", '
             f'"cmid": "{message.conversation_message_id}"' + "}",
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.settings_set_punishment_input(action),
         peer_id,
         message.conversation_message_id,
@@ -761,10 +765,10 @@ async def settings_exceptionlist(message: MessageEvent):
     peer_id = message.peer_id
     setting = payload["setting"]
 
-    if setting in settings.settings_meta.premium and not await utils.getUserPremium(
+    if setting in settings.settings_meta.premium and not await utils.get_user_premium(
         uid
     ):
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.no_prem(),
             peer_id,
             message.conversation_message_id,
@@ -777,7 +781,7 @@ async def settings_exceptionlist(message: MessageEvent):
                 "select url from antispamurlexceptions where chat_id=$1",
                 peer_id - 2000000000,
             )
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.settings_exceptionlist([i[0] for i in lst]),
             peer_id,
             message.conversation_message_id,
@@ -791,7 +795,7 @@ async def settings_exceptionlist(message: MessageEvent):
                 "select url from vklinksexceptions where chat_id=$1",
                 peer_id - 2000000000,
             )
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.settings_exceptionlist([i[0] for i in lst]),
             peer_id,
             message.conversation_message_id,
@@ -805,10 +809,10 @@ async def settings_exceptionlist(message: MessageEvent):
                 "select exc_id from forwardedsexceptions where chat_id=$1",
                 peer_id - 2000000000,
             )
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.settings_exceptionlist(
                 [
-                    f"[id{i[0]}|{await utils.getUserName(i[0]) if i[0] > 0 else await utils.getGroupName(i[0])}]"
+                    f"[id{i[0]}|{await utils.get_user_name(i[0]) if i[0] > 0 else await utils.get_group_name(i[0])}]"
                     for i in lst
                 ]
             ),
@@ -835,10 +839,10 @@ async def settings_listaction(message: MessageEvent):
     setting = payload["setting"]
     action = payload["action"]
 
-    if setting in settings.settings_meta.premium and not await utils.getUserPremium(
+    if setting in settings.settings_meta.premium and not await utils.get_user_premium(
         uid
     ):
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.no_prem(),
             peer_id,
             message.conversation_message_id,
@@ -856,7 +860,7 @@ async def settings_listaction(message: MessageEvent):
             + f'"setting": "{setting}", "category": "{category}", "action": "{action}", "type": "{payload["type"]}"'
             + "}",
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.settings_listaction_action(setting, action),
         peer_id,
         message.conversation_message_id,
@@ -885,7 +889,7 @@ async def settings_set_welcome(message: MessageEvent):
             message.user_id,
             cmd,
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.get(cmd), message.peer_id, message.conversation_message_id
     )
 
@@ -930,7 +934,7 @@ async def settings_unset_welcome(message: MessageEvent):
             None if cmd == "settings_unset_welcome_url" else url,
             chat_id,
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.settings_countable_action("set", "welcome"),
         peer_id,
         message.conversation_message_id,
@@ -961,7 +965,7 @@ async def nicklist(message: MessageEvent):
         )
     count = len(res)
     res = res[:30]
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.nlist(res, await api.users.get(user_ids=[i[0] for i in res])),
         peer_id,
         message.conversation_message_id,
@@ -997,7 +1001,7 @@ async def page_nlist(message: MessageEvent):
     if not (count := len(res)):
         return
     res = res[page * 30 : page * 30 + 30]
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.nlist(
             res, await api.users.get(user_ids=[i[0] for i in res]), page
         ),
@@ -1031,7 +1035,7 @@ async def nonicklist(message: MessageEvent):
     ]
     count = len(members_uid)
     members_uid = members_uid[:30]
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.nnlist(await api.users.get(user_ids=members_uid)),  # type: ignore
         peer_id,
         message.conversation_message_id,
@@ -1065,7 +1069,7 @@ async def page_nnlist(message: MessageEvent):
     ]
     if len(members) <= 0:
         return
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.nnlist(
             await api.users.get(user_ids=[f"{i.member_id}" for i in members]), page
         ),
@@ -1095,7 +1099,7 @@ async def page_mutelist(message: MessageEvent):
         )
     if not (count := len(res)):
         return
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.mutelist(res[page * 30 : page * 30 + 30], count),
         peer_id,
         message.conversation_message_id,
@@ -1123,7 +1127,7 @@ async def page_warnlist(message: MessageEvent):
     if not (count := len(res)):
         return
     res = res[page * 30 : page * 30 + 30]
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.warnlist(res, count),
         peer_id,
         message.conversation_message_id,
@@ -1156,7 +1160,7 @@ async def page_banlist(message: MessageEvent):
         return
     banned_count = len(res)
     res = res[page * 30 : page * 30 + 30]
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.banlist(res, banned_count),
         peer_id,
         message.conversation_message_id,
@@ -1179,10 +1183,10 @@ async def punishlist_delall(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
 
-    if await utils.getUserAccessLevel(uid, chat_id) < 6:
+    if await utils.get_user_access_level(uid, chat_id) < 6:
         await message.show_snackbar("❌ Для данной функции требуется 6 уровень доступа")
         return
-    await utils.sendMessageEventAnswer(message.event_id, uid, peer_id)
+    await utils.send_message_event_answer(message.event_id, uid, peer_id)
 
     async with (await pool()).acquire() as conn:
         if cmd.startswith("mute"):
@@ -1190,14 +1194,14 @@ async def punishlist_delall(message: MessageEvent):
                 "update mute set mute=0 where chat_id=$1 returning uid", chat_id
             )
             for i in uids:
-                await utils.setChatMute(i[0], chat_id, 0)
+                await utils.set_chat_mute(i[0], chat_id, 0)
         elif cmd.startswith("warn"):
             await conn.execute("update warn set warns=0 where chat_id=$1", chat_id)
         elif cmd.startswith("ban"):
             await conn.execute("update ban set ban=0 where chat_id=$1", chat_id)
         else:
             raise Exception('cmd.startswith("mute" or "warn" or "ban")')
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.punishlist_delall_done(cmd.replace("list_delall", "")),
         peer_id,
         message.conversation_message_id,
@@ -1224,7 +1228,7 @@ async def page_statuslist(message: MessageEvent):
     if len(premium_pool) <= 0:
         return
     premium_pool = premium_pool[page * 30 : page * 30 + 30]
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.statuslist(premium_pool),
         message.object.peer_id,
         message.conversation_message_id,
@@ -1237,7 +1241,7 @@ async def demote(message: MessageEvent):
     if not message.payload:
         return
     payload = message.payload
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.demote_yon(),
         message.object.peer_id,
         message.conversation_message_id,
@@ -1263,7 +1267,7 @@ async def demote_accept(message: MessageEvent):
         )
         for i in members.items:
             if not i.is_admin and i.member_id > 0:
-                await utils.kickUser(i.member_id, chat_id)
+                await utils.kick_user(i.member_id, chat_id)
     elif option == "lvl":
         members = await api.messages.get_conversation_members(
             peer_id=chat_id + 2000000000
@@ -1271,16 +1275,16 @@ async def demote_accept(message: MessageEvent):
         kicking = []
         for i in members.items:
             if not i.is_admin and i.member_id > 0:
-                acc = await utils.getUserAccessLevel(i.member_id, chat_id)
+                acc = await utils.get_user_access_level(i.member_id, chat_id)
                 if acc == 0:
                     kicking.append(i.member_id)
         for i in kicking:
-            await utils.kickUser(i, chat_id)
-    await utils.editMessage(
+            await utils.kick_user(i, chat_id)
+    await utils.edit_message(
         await messages.demote_accept(
             payload["uid"] if "uid" in payload else message.user_id,
-            await utils.getUserName(uid),
-            await utils.getUserNickname(uid, chat_id),
+            await utils.get_user_name(uid),
+            await utils.get_user_nickname(uid, chat_id),
         ),
         peer_id,
         message.conversation_message_id,
@@ -1291,7 +1295,7 @@ async def demote_accept(message: MessageEvent):
     GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["demote_disaccept"])
 )
 async def demote_disaccept(message: MessageEvent):
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.demote_disaccept(),
         message.object.peer_id,
         message.conversation_message_id,
@@ -1302,7 +1306,7 @@ async def demote_disaccept(message: MessageEvent):
     GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["giveowner_no"])
 )
 async def giveowner_no(message: MessageEvent):
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.giveowner_no(),
         message.object.peer_id,
         message.conversation_message_id,
@@ -1329,17 +1333,17 @@ async def giveowner(message: MessageEvent):
             return
         await conn.execute("delete from gpool where chat_id=$1", chat_id)
         await conn.execute("delete from chatgroups where chat_id=$1", chat_id)
-    await utils.setUserAccessLevel(id, chat_id, 7)
-    await utils.setChatMute(id, chat_id, 0)
+    await utils.set_user_access_level(id, chat_id, 7)
+    await utils.set_chat_mute(id, chat_id, 0)
 
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.giveowner(
             uid,
-            await utils.getUserNickname(uid, chat_id),
-            await utils.getUserName(uid),
+            await utils.get_user_nickname(uid, chat_id),
+            await utils.get_user_name(uid),
             id,
-            await utils.getUserNickname(id, chat_id),
-            await utils.getUserName(id),
+            await utils.get_user_nickname(id, chat_id),
+            await utils.get_user_name(id),
         ),
         message.object.peer_id,
         message.conversation_message_id,
@@ -1362,7 +1366,7 @@ async def top(message: MessageEvent):
                 ).items
             ],
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.top(res),
         peer_id,
         message.conversation_message_id,
@@ -1378,8 +1382,8 @@ async def top_leagues(message: MessageEvent):
         return
     peer_id = message.object.peer_id
     lg = message.payload["league"]
-    top = await utils.getXPTop("lvl", league=lg)
-    chattop = await utils.getXPTop(
+    top = await utils.get_xp_top("lvl", league=lg)
+    chattop = await utils.get_xp_top(
         "lvl",
         league=lg,
         users=[
@@ -1397,7 +1401,7 @@ async def top_leagues(message: MessageEvent):
                 "select exists(select 1 from xp where league=$1)", k + 1
             )
         ]
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.top_lvls(top, chattop),
         peer_id,
         message.conversation_message_id,
@@ -1416,7 +1420,7 @@ async def top_duels(message: MessageEvent):
         lvln = await conn.fetch(
             "select uid, wins from duelwins where uid>0 order by wins desc limit 10"
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.top_duels({i[0]: i[1] for i in lvln}),
         peer_id,
         message.conversation_message_id,
@@ -1443,7 +1447,7 @@ async def top_duels_in_chat(message: MessageEvent):
             ],
         )
     lvln = {i[0]: i[1] for i in lvln}
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.top_duels(lvln, "в беседе"),
         peer_id,
         message.conversation_message_id,
@@ -1458,7 +1462,7 @@ async def top_rep(message: MessageEvent):
         top = await conn.fetch(
             "select uid, rep from reputation where uid>0 order by rep desc limit 10"
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.top_rep(top, "общее | положительные"),
         peer_id,
         message.conversation_message_id,
@@ -1475,7 +1479,7 @@ async def top_rep_neg(message: MessageEvent):
         top = await conn.fetch(
             "select uid, rep from reputation where uid>0 order by rep limit 10"
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.top_rep(top, "общее | отрицательные"),
         peer_id,
         message.conversation_message_id,
@@ -1498,7 +1502,7 @@ async def top_rep_in_chat(message: MessageEvent):
                 ).items
             ],
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.top_rep(top, "в беседе | положительные"),
         peer_id,
         message.conversation_message_id,
@@ -1526,7 +1530,7 @@ async def top_rep_in_chat_neg(message: MessageEvent):
                 ).items
             ],
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.top_rep(top, "в беседе | отрицательные"),
         peer_id,
         message.conversation_message_id,
@@ -1547,7 +1551,7 @@ async def top_math(message: MessageEvent):
     top = sorted(
         [(i, top.count(i)) for i in set(top)], key=lambda x: x[1], reverse=True
     )[:10]
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.top_math(top),
         peer_id,
         message.conversation_message_id,
@@ -1564,7 +1568,7 @@ async def top_bonus(message: MessageEvent):
         top = await conn.fetch(
             "select uid, streak from bonus order by streak desc limit 10"
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.top_bonus(top),
         peer_id,
         message.conversation_message_id,
@@ -1587,7 +1591,7 @@ async def top_bonus_in_chat(message: MessageEvent):
                 ).items
             ],
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.top_bonus(top),
         peer_id,
         message.conversation_message_id,
@@ -1602,7 +1606,7 @@ async def top_coins(message: MessageEvent):
     peer_id = message.object.peer_id
     async with (await pool()).acquire() as conn:
         top = await conn.fetch("select uid, coins from xp order by coins desc limit 10")
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.top_coins(top),
         peer_id,
         message.conversation_message_id,
@@ -1625,7 +1629,7 @@ async def top_coins_in_chat(message: MessageEvent):
                 ).items
             ],
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.top_coins(top),
         peer_id,
         message.conversation_message_id,
@@ -1643,8 +1647,8 @@ async def resetnick_accept(message: MessageEvent):
         await conn.execute(
             "delete from nickname where chat_id=$1", peer_id - 2000000000
         )
-    await utils.editMessage(
-        await messages.resetnick_accept(uid, await utils.getUserName(uid)),
+    await utils.edit_message(
+        await messages.resetnick_accept(uid, await utils.get_user_name(uid)),
         peer_id,
         message.conversation_message_id,
     )
@@ -1656,7 +1660,7 @@ async def resetnick_accept(message: MessageEvent):
     SearchPayloadCMD(["resetnick_disaccept"]),
 )
 async def resetnick_disaccept(message: MessageEvent):
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.resetnick_disaccept(),
         message.object.peer_id,
         message.conversation_message_id,
@@ -1680,8 +1684,8 @@ async def resetaccess_accept(message: MessageEvent):
             lvl,
             uid,
         )
-    await utils.editMessage(
-        await messages.resetaccess_accept(uid, await utils.getUserName(uid), lvl),
+    await utils.edit_message(
+        await messages.resetaccess_accept(uid, await utils.get_user_name(uid), lvl),
         peer_id,
         message.conversation_message_id,
     )
@@ -1695,7 +1699,7 @@ async def resetaccess_accept(message: MessageEvent):
 async def resetaccess_disaccept(message: MessageEvent):
     if not message.payload:
         return
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.resetaccess_disaccept(message.payload["lvl"]),
         message.object.peer_id,
         message.conversation_message_id,
@@ -1723,12 +1727,12 @@ async def kick_nonick(message: MessageEvent):
         await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     ).items:
         if i.member_id not in res and i.member_id > 0:
-            kicked += await utils.kickUser(i.member_id, chat_id)
-    await utils.sendMessage(
+            kicked += await utils.kick_user(i.member_id, chat_id)
+    await utils.send_message(
         msg=await messages.kickmenu_kick_nonick(
             uid,
-            await utils.getUserName(uid),
-            await utils.getUserNickname(uid, chat_id),
+            await utils.get_user_name(uid),
+            await utils.get_user_nickname(uid, chat_id),
             kicked,
         ),
         peer_ids=chat_id + 2000000000,
@@ -1750,12 +1754,12 @@ async def kick_nick(message: MessageEvent):
             uid,
         )
     for i in nicknamed:
-        kicked += await utils.kickUser(i[0], chat_id)
-    await utils.sendMessage(
+        kicked += await utils.kick_user(i[0], chat_id)
+    await utils.send_message(
         msg=await messages.kickmenu_kick_nick(
             uid,
-            await utils.getUserName(uid),
-            await utils.getUserNickname(uid, chat_id),
+            await utils.get_user_name(uid),
+            await utils.get_user_nickname(uid, chat_id),
             kicked,
         ),
         peer_ids=chat_id + 2000000000,
@@ -1782,12 +1786,12 @@ async def kick_banned(message: MessageEvent):
     lst = await api.users.get(user_ids=lst)  # type: ignore
     for i in lst:
         if i.deactivated:
-            kicked += await utils.kickUser(i.id, chat_id)
-    await utils.sendMessage(
+            kicked += await utils.kick_user(i.id, chat_id)
+    await utils.send_message(
         msg=await messages.kickmenu_kick_banned(
             uid,
-            await utils.getUserName(uid),
-            await utils.getUserNickname(uid, chat_id),
+            await utils.get_user_name(uid),
+            await utils.get_user_nickname(uid, chat_id),
             kicked,
         ),
         peer_ids=chat_id + 2000000000,
@@ -1805,7 +1809,7 @@ async def notif(message: MessageEvent):
             "select status, name from notifications where chat_id=$1 order by name desc",
             peer_id - 2000000000,
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.notifs(notifs),
         peer_id,
         message.conversation_message_id,
@@ -1837,7 +1841,7 @@ async def notif_select(message: MessageEvent):
         await conn.execute(
             "delete from typequeue where uid=$1 and chat_id=$2", uid, chat_id
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.notification(*notif),
         peer_id,
         message.conversation_message_id,
@@ -1875,7 +1879,7 @@ async def notification_status(message: MessageEvent):
             chat_id,
             name,
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.notification(
             name, snotif[0], ntime, snotif[1], snotif[2], turn_to
         ),
@@ -1903,7 +1907,7 @@ async def notification_text(message: MessageEvent):
             + f'"name": "{payload["name"]}", "cmid": "{message.conversation_message_id}"'
             + "}",
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.notification_changing_text(),
         peer_id,
         message.conversation_message_id,
@@ -1916,7 +1920,7 @@ async def notification_text(message: MessageEvent):
 async def notification_time(message: MessageEvent):
     if not message.payload:
         return
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.notification_changing_time_choose(),
         message.object.peer_id,
         message.conversation_message_id,
@@ -1946,19 +1950,19 @@ async def notification_time_change(message: MessageEvent):
             + "}",
         )
     if ctype == "single":
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.notification_changing_time_single(),
             peer_id,
             message.conversation_message_id,
         )
     elif ctype == "everyday":
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.notification_changing_time_everyday(),
             peer_id,
             message.conversation_message_id,
         )
     else:
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.notification_changing_time_everyxmin(),
             peer_id,
             message.conversation_message_id,
@@ -1971,7 +1975,7 @@ async def notification_time_change(message: MessageEvent):
 async def notification_tag(message: MessageEvent):
     if not message.payload:
         return
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.notification_changing_tag_choose(),
         message.object.peer_id,
         message.conversation_message_id,
@@ -1997,7 +2001,7 @@ async def notification_tag_change(message: MessageEvent):
             peer_id - 2000000000,
             name,
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.notification(
             name, notif[0], notif[1], notif[2], ctype, notif[3]
         ),
@@ -2023,7 +2027,7 @@ async def notification_delete(message: MessageEvent):
             peer_id - 2000000000,
             name,
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.notification_delete(name),
         peer_id,
         message.conversation_message_id,
@@ -2048,11 +2052,11 @@ async def listasync(message: MessageEvent):
     total = len(chat_ids)
     chat_ids = chat_ids[(page - 1) * 10 : page * 10]
     names = (
-        [await utils.getChatName(chat_id) for chat_id in chat_ids]
+        [await utils.get_chat_name(chat_id) for chat_id in chat_ids]
         if len(chat_ids) > 0
         else []
     )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.listasync(
             [{"id": i, "name": names[k]} for k, i in enumerate(chat_ids)], total
         ),
@@ -2078,7 +2082,7 @@ async def help(message: MessageEvent):
             base[i[0]] = int(i[1])
         except Exception:
             pass
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.help(payload["page"], base),
         peer_id,
         message.conversation_message_id,
@@ -2099,7 +2103,7 @@ async def cmdlist(message: MessageEvent):
                 "select cmd, name from cmdnames where uid=$1", uid
             )
         }
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.cmdlist(
             dict(list(cmdnames.items())[page * 10 : (page * 10) + 10]),
             page,
@@ -2138,12 +2142,12 @@ async def check(message: MessageEvent):
         else:
             u_bans_names = []
             ban_date = ban_from = ban_reason = ban_time = None
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.check_ban(
                 id,
-                await utils.getUserName(id),
-                await utils.getUserNickname(id, chat_id),
-                max(await utils.getUserBan(id, chat_id) - time.time(), 0),
+                await utils.get_user_name(id),
+                await utils.get_user_nickname(id, chat_id),
+                max(await utils.get_user_ban(id, chat_id) - time.time(), 0),
                 u_bans_names,
                 ban_date,
                 ban_from,
@@ -2171,12 +2175,12 @@ async def check(message: MessageEvent):
         else:
             u_mutes_names = []
             mute_date = mute_from = mute_reason = mute_time = None
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.check_mute(
                 id,
-                await utils.getUserName(id),
-                await utils.getUserNickname(id, chat_id),
-                max(await utils.getUserMute(id, chat_id) - time.time(), 0),
+                await utils.get_user_name(id),
+                await utils.get_user_nickname(id, chat_id),
+                max(await utils.get_user_mute(id, chat_id) - time.time(), 0),
                 u_mutes_names,
                 mute_date,
                 mute_from,
@@ -2201,12 +2205,12 @@ async def check(message: MessageEvent):
             u_warns_dates = literal_eval(res[2])[::-1]
         else:
             u_warns_names = u_warns_causes = u_warns_dates = []
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.check_warn(
                 id,
-                await utils.getUserName(id),
-                await utils.getUserNickname(id, chat_id),
-                await utils.getUserWarns(id, chat_id),
+                await utils.get_user_name(id),
+                await utils.get_user_nickname(id, chat_id),
+                await utils.get_user_warns(id, chat_id),
                 u_warns_names,
                 u_warns_dates,
                 u_warns_names,
@@ -2229,14 +2233,14 @@ async def check_menu(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
     id = payload["id"]
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.check(
             id,
-            await utils.getUserName(id),
-            await utils.getUserNickname(id, chat_id),
-            max(await utils.getUserBan(id, chat_id) - time.time(), 0),
-            await utils.getUserWarns(id, chat_id),
-            max(await utils.getUserMute(id, chat_id) - time.time(), 0),
+            await utils.get_user_name(id),
+            await utils.get_user_nickname(id, chat_id),
+            max(await utils.get_user_ban(id, chat_id) - time.time(), 0),
+            await utils.get_user_warns(id, chat_id),
+            max(await utils.get_user_mute(id, chat_id) - time.time(), 0),
         ),
         peer_id,
         message.conversation_message_id,
@@ -2259,14 +2263,14 @@ async def check_history(message: MessageEvent):
     id = payload["id"]
     check = payload["check"]
     if not int(payload["ie"]):
-        await utils.sendMessageEventAnswer(
+        await utils.send_message_event_answer(
             message.event_id,
             uid,
             message.peer_id,
             json.dumps({"type": "show_snackbar", "text": "Нету истории"}),
         )
         return
-    await utils.sendMessageEventAnswer(message.event_id, uid, peer_id)
+    await utils.send_message_event_answer(message.event_id, uid, peer_id)
     if check == "ban":
         async with (await pool()).acquire() as conn:
             res = await conn.fetchrow(
@@ -2282,11 +2286,11 @@ async def check_history(message: MessageEvent):
             bans_times = literal_eval(res[3])[::-1][:50]
         else:
             bans_causes = bans_names = bans_dates = bans_times = []
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.check_history_ban(
                 id,
-                await utils.getUserName(id),
-                await utils.getUserNickname(id, chat_id),
+                await utils.get_user_name(id),
+                await utils.get_user_nickname(id, chat_id),
                 bans_dates,
                 bans_names,
                 bans_times,
@@ -2310,11 +2314,11 @@ async def check_history(message: MessageEvent):
             mutes_times = literal_eval(res[3])[::-1][:50]
         else:
             mutes_causes = mutes_names = mutes_dates = mutes_times = []
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.check_history_mute(
                 id,
-                await utils.getUserName(id),
-                await utils.getUserNickname(id, chat_id),
+                await utils.get_user_name(id),
+                await utils.get_user_nickname(id, chat_id),
                 mutes_dates,
                 mutes_names,
                 mutes_times,
@@ -2338,11 +2342,11 @@ async def check_history(message: MessageEvent):
             warns_times = literal_eval(res[3])[::-1][:50]
         else:
             warns_causes = warns_names = warns_dates = warns_times = []
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.check_history_warn(
                 id,
-                await utils.getUserName(id),
-                await utils.getUserNickname(id, chat_id),
+                await utils.get_user_name(id),
+                await utils.get_user_nickname(id, chat_id),
                 warns_dates,
                 warns_names,
                 warns_times,
@@ -2368,18 +2372,18 @@ async def unpunish(message: MessageEvent):
     cmd = payload["cmd"]
     id = payload["id"]
     cmid = payload["cmid"]
-    u_acc = await utils.getUserAccessLevel(uid, chat_id)
-    if u_acc <= await utils.getUserAccessLevel(id, chat_id) or not await haveAccess(
+    u_acc = await utils.get_user_access_level(uid, chat_id)
+    if u_acc <= await utils.get_user_access_level(id, chat_id) or not await haveAccess(
         cmd, chat_id, u_acc
     ):
         await message.show_snackbar("⛔️ У вас недостаточно прав.")
         return
-    await utils.sendMessageEventAnswer(message.event_id, uid, peer_id)
+    await utils.send_message_event_answer(message.event_id, uid, peer_id)
 
-    name = await utils.getUserName(id)
-    nickname = await utils.getUserNickname(id, chat_id)
-    uname = await utils.getUserName(uid)
-    unickname = await utils.getUserNickname(uid, chat_id)
+    name = await utils.get_user_name(id)
+    nickname = await utils.get_user_nickname(id, chat_id)
+    uname = await utils.get_user_name(uid)
+    unickname = await utils.get_user_nickname(uid, chat_id)
     if cmd == "unmute":
         async with (await pool()).acquire() as conn:
             if not await conn.fetchval(
@@ -2389,8 +2393,8 @@ async def unpunish(message: MessageEvent):
                 time.time(),
             ):
                 return
-        await utils.setChatMute(id, chat_id, 0)
-        await utils.editMessage(
+        await utils.set_chat_mute(id, chat_id, 0)
+        await utils.edit_message(
             await messages.unmute(uname, unickname, uid, name, nickname, id),
             peer_id,
             message.conversation_message_id,
@@ -2405,7 +2409,7 @@ async def unpunish(message: MessageEvent):
                 id,
             ):
                 return
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.unwarn(uname, unickname, uid, name, nickname, id),
             peer_id,
             message.conversation_message_id,
@@ -2420,7 +2424,7 @@ async def unpunish(message: MessageEvent):
                 time.time(),
             ):
                 return
-        await utils.editMessage(
+        await utils.edit_message(
             await messages.unban(uname, unickname, uid, name, nickname, id),
             peer_id,
             message.conversation_message_id,
@@ -2428,7 +2432,7 @@ async def unpunish(message: MessageEvent):
         )
     else:
         return
-    await utils.deleteMessages(cmid, chat_id)
+    await utils.delete_messages(cmid, chat_id)
 
 
 @bl.raw_event(
@@ -2444,8 +2448,8 @@ async def prefix_(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
 
-    if not await utils.getUserPremium(uid):
-        await utils.editMessage(
+    if not await utils.get_user_premium(uid):
+        await utils.edit_message(
             await messages.no_prem(), peer_id, message.conversation_message_id
         )
         return
@@ -2457,7 +2461,7 @@ async def prefix_(message: MessageEvent):
             )
             > 2
         ):
-            await utils.editMessage(
+            await utils.edit_message(
                 await messages.addprefix_max(),
                 peer_id,
                 message.conversation_message_id,
@@ -2472,16 +2476,16 @@ async def prefix_(message: MessageEvent):
                 cmd,
                 '{"cmid": ' + str(message.conversation_message_id) + "}",
             )
-            await utils.editMessage(
+            await utils.edit_message(
                 await messages.get(cmd), peer_id, message.conversation_message_id
             )
         elif cmd == "prefix_list":
             prefixes = await conn.fetch("select prefix from prefix where uid=$1", uid)
-            await utils.editMessage(
+            await utils.edit_message(
                 await messages.listprefix(
                     uid,
-                    await utils.getUserName(uid),
-                    await utils.getUserNickname(uid, chat_id),
+                    await utils.get_user_name(uid),
+                    await utils.get_user_nickname(uid, chat_id),
                     prefixes,
                 ),
                 peer_id,
@@ -2489,7 +2493,7 @@ async def prefix_(message: MessageEvent):
                 keyboard.prefix_back(uid),
             )
         else:
-            await utils.editMessage(
+            await utils.edit_message(
                 await messages.prefix(),
                 peer_id,
                 message.conversation_message_id,
@@ -2519,24 +2523,24 @@ async def timeout_turn(message: MessageEvent):
                 activated,
             )
     if activated:
-        await utils.sendMessage(
+        await utils.send_message(
             peer_id,
             await messages.timeouton(
                 uid,
-                await utils.getUserName(uid),
-                await utils.getUserNickname(uid, chat_id),
+                await utils.get_user_name(uid),
+                await utils.get_user_nickname(uid, chat_id),
             ),
         )
     else:
-        await utils.sendMessage(
+        await utils.send_message(
             peer_id,
             await messages.timeoutoff(
                 uid,
-                await utils.getUserName(uid),
-                await utils.getUserNickname(uid, chat_id),
+                await utils.get_user_name(uid),
+                await utils.get_user_nickname(uid, chat_id),
             ),
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.timeout(activated),
         peer_id,
         message.conversation_message_id,
@@ -2547,8 +2551,8 @@ async def timeout_turn(message: MessageEvent):
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["timeout"]))
 async def timeout(message: MessageEvent):
     peer_id = message.object.peer_id
-    activated = await utils.getSilence(peer_id - 2000000000)
-    await utils.editMessage(
+    activated = await utils.get_silence(peer_id - 2000000000)
+    await utils.edit_message(
         await messages.timeout(activated),
         peer_id,
         message.conversation_message_id,
@@ -2568,12 +2572,12 @@ async def timeout_settings(message: MessageEvent):
             chat_id,
         ):
             return
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.timeout_settings(),
         peer_id,
         message.conversation_message_id,
         keyboard.timeout_settings(
-            message.user_id, await utils.getSilenceAllowed(chat_id)
+            message.user_id, await utils.get_silence_allowed(chat_id)
         ),
     )
 
@@ -2595,7 +2599,7 @@ async def timeout_settings_turn(message: MessageEvent):
             chat_id,
         ):
             return
-    allowed = sorted(await utils.getSilenceAllowed(chat_id))
+    allowed = sorted(await utils.get_silence_allowed(chat_id))
     if lvl in allowed:
         allowed.remove(lvl)
     else:
@@ -2611,7 +2615,7 @@ async def timeout_settings_turn(message: MessageEvent):
                 chat_id,
                 f"{allowed}",
             )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.timeout_settings(),
         peer_id,
         message.conversation_message_id,
@@ -2688,9 +2692,9 @@ async def turnpublic(message: MessageEvent):
         name = f"{names[0].first_name} {names[0].last_name}"
         prefix = "id"
     except Exception:
-        name = await utils.getGroupName(-int(id))
+        name = await utils.get_group_name(-int(id))
         prefix = "club"
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.chat(
             id,
             name,
@@ -2703,7 +2707,7 @@ async def turnpublic(message: MessageEvent):
             len(members),
             bjd,
             prefix,
-            await utils.getChatName(chat_id),
+            await utils.get_chat_name(chat_id),
             prem,
         ),
         peer_id,
@@ -2727,7 +2731,7 @@ async def antitag_list(message: MessageEvent):
                 )
             ]
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.antitag_list(users, chat_id),
         peer_id,
         message.conversation_message_id,
@@ -2739,15 +2743,15 @@ async def import_(message: MessageEvent):
     if not message.payload:
         return
     importchatid = message.payload["importchatid"]
-    if await utils.getUserAccessLevel(message.user_id, importchatid) < 7:
-        await utils.editMessage(
+    if await utils.get_user_access_level(message.user_id, importchatid) < 7:
+        await utils.edit_message(
             await messages.import_notowner(),
             message.object.peer_id,
             message.conversation_message_id,
         )
         return
-    await utils.editMessage(
-        await messages.import_(importchatid, await utils.getChatName(importchatid)),
+    await utils.edit_message(
+        await messages.import_(importchatid, await utils.get_chat_name(importchatid)),
         message.object.peer_id,
         message.conversation_message_id,
         keyboard.import_(message.user_id, importchatid),
@@ -2761,11 +2765,11 @@ async def import_settings(message: MessageEvent):
     if not message.payload:
         return
     importchid = message.payload["importchatid"]
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.import_settings(
             importchid,
-            await utils.getChatName(importchid),
-            s := await utils.getImportSettings(message.user_id, importchid),
+            await utils.get_chat_name(importchid),
+            s := await utils.get_import_settings(message.user_id, importchid),
         ),
         message.object.peer_id,
         message.conversation_message_id,
@@ -2781,12 +2785,12 @@ async def import_turn(message: MessageEvent):
         return
     importchid = message.payload["importchatid"]
     setting = message.payload["setting"]
-    await utils.turnImportSetting(importchid, message.user_id, setting)
-    await utils.editMessage(
+    await utils.turn_import_setting(importchid, message.user_id, setting)
+    await utils.edit_message(
         await messages.import_settings(
             importchid,
-            await utils.getChatName(importchid),
-            s := await utils.getImportSettings(message.user_id, importchid),
+            await utils.get_chat_name(importchid),
+            s := await utils.get_import_settings(message.user_id, importchid),
         ),
         message.object.peer_id,
         message.conversation_message_id,
@@ -2801,13 +2805,13 @@ async def import_start(message: MessageEvent):
     if not message.payload:
         return
     importchatid = message.payload["importchatid"]
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.import_start(importchatid),
         message.object.peer_id,
         message.conversation_message_id,
     )
     chatid = message.object.peer_id - 2000000000
-    settings = await utils.getImportSettings(message.user_id, importchatid)
+    settings = await utils.get_import_settings(message.user_id, importchatid)
     async with (await pool()).acquire() as conn:
         if settings["sys"]:
             if i := await conn.fetchrow(
@@ -3128,7 +3132,7 @@ async def import_start(message: MessageEvent):
                         chatid,
                         *i,
                     )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.import_end(importchatid),
         message.object.peer_id,
         message.conversation_message_id,
@@ -3144,11 +3148,11 @@ async def blocklist_chats(message: MessageEvent):
     msg = f"⚛ Список чатов в блокировке бота (Всего:{len(inf)})\n\n"
     for chat in inf:
         msg += (
-            f"➖ id {chat[0]} | {await utils.getChatName(chat[0])}"
+            f"➖ id {chat[0]} | {await utils.get_chat_name(chat[0])}"
             + (f" | {chat[1]}" if chat[1] else "")
             + "\n"
         )
-    await utils.editMessage(
+    await utils.edit_message(
         msg,
         message.object.peer_id,
         message.conversation_message_id,
@@ -3165,11 +3169,11 @@ async def blocklist(message: MessageEvent):
     msg = f"⚛ Список пользователей в блокировке бота (Всего:{len(inf)})\n\n"
     for user in inf:
         msg += (
-            f"➖ [id{user[0]}|{await utils.getUserName(user[0])}]"
+            f"➖ [id{user[0]}|{await utils.get_user_name(user[0])}]"
             + (f" | {user[1]}" if user[1] else "")
             + "\n"
         )
-    await utils.editMessage(
+    await utils.edit_message(
         msg,
         message.object.peer_id,
         message.conversation_message_id,
@@ -3194,9 +3198,9 @@ async def bindlist(message: MessageEvent):
     if not (count := len(res)):
         return
     res = res[page * 15 : page * 15 + 15]
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.bindlist(
-            group, [(i[0], await utils.getChatName(i[0])) for i in res]
+            group, [(i[0], await utils.get_chat_name(i[0])) for i in res]
         ),
         message.object.peer_id,
         message.conversation_message_id,
@@ -3233,7 +3237,7 @@ async def filterpunishments(message: MessageEvent):
                 )
                 or 0
             )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.filter_punishments(pnt),
         message.object.peer_id,
         message.conversation_message_id,
@@ -3261,7 +3265,7 @@ async def filterlist(message: MessageEvent):
             )
             or message.user_id,
         )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.filter_list(filters[25 * page : 25 * page + 25], page),
         message.object.peer_id,
         message.conversation_message_id,
@@ -3286,7 +3290,7 @@ async def filteradd(message: MessageEvent):
             or message.user_id,
             message.payload["fid"],
         )
-    await utils.editMessage(
+    await utils.edit_message(
         message.payload["msg"], message.object.peer_id, message.conversation_message_id
     )
 
@@ -3311,7 +3315,7 @@ async def filterdel(message: MessageEvent):
             or message.user_id,
             filter,
         )
-    await utils.editMessage(
+    await utils.edit_message(
         message.payload["msg"], message.object.peer_id, message.conversation_message_id
     )
 
@@ -3322,7 +3326,7 @@ async def filterdel(message: MessageEvent):
 async def deletemessages(message: MessageEvent):
     if not message.payload:
         return
-    await utils.deleteMessages(
+    await utils.delete_messages(
         message.payload["msgs"] + [message.conversation_message_id],
         message.peer_id - 2000000000,
     )
@@ -3330,7 +3334,7 @@ async def deletemessages(message: MessageEvent):
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["market"]))
 async def market(message: MessageEvent):
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.buy(),
         message.object.peer_id,
         message.conversation_message_id,
@@ -3345,7 +3349,7 @@ async def buy(message: MessageEvent):
     uid = message.user_id
     days = message.payload["days"]
     cost = settings.premium_cost.cost[days]
-    name = (await utils.getUserName(uid)).split()
+    name = (await utils.get_user_name(uid)).split()
 
     payment = await utils.create_payment(
         cost,
@@ -3356,7 +3360,7 @@ async def buy(message: MessageEvent):
         uid,
         delete_message_cmid=message.conversation_message_id,
     )
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.buy_order(
             payment.metadata["pid"],  # type: ignore
             uid,
@@ -3381,8 +3385,8 @@ async def shop_xp(message: MessageEvent):
         )
     limit = literal_eval(limit) if limit else [0, 0, 0, 0, 0]
 
-    await utils.editMessage(
-        await messages.shop_xp(await utils.getUserCoins(message.user_id), limit),
+    await utils.edit_message(
+        await messages.shop_xp(await utils.get_user_coins(message.user_id), limit),
         message.object.peer_id,
         message.conversation_message_id,
         keyboard.shop_xp(message.user_id, limit),
@@ -3391,7 +3395,7 @@ async def shop_xp(message: MessageEvent):
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["shop"]))
 async def shop(message: MessageEvent):
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.shop(),
         message.object.peer_id,
         message.conversation_message_id,
@@ -3413,8 +3417,8 @@ async def shop_bonuses(message: MessageEvent):
         else [0, 0]
     )
 
-    await utils.editMessage(
-        await messages.shop_bonuses(await utils.getUserCoins(message.user_id)),
+    await utils.edit_message(
+        await messages.shop_bonuses(await utils.get_user_coins(message.user_id)),
         message.object.peer_id,
         message.conversation_message_id,
         keyboard.shop_bonuses(message.user_id, activated_bonuses),
@@ -3437,7 +3441,7 @@ async def shop_buy(message: MessageEvent):
         lot = list(settings.shop.bonuses.values())[option]
     cost = lot["cost"]
 
-    if (user_coins := await utils.getUserCoins(message.user_id)) < cost:
+    if (user_coins := await utils.get_user_coins(message.user_id)) < cost:
         await message.show_snackbar(
             "🔴 Недостаточно монеток для покупки данного товара."
         )
@@ -3470,11 +3474,11 @@ async def shop_buy(message: MessageEvent):
                     f"{limit}",
                 )
         lot_name = f"{option} опыта"
-        await utils.addUserCoins(message.user_id, -cost)
-        await utils.addUserXP(message.user_id, option)
+        await utils.add_user_coins(message.user_id, -cost)
+        await utils.add_user_xp(message.user_id, option)
 
-        await utils.editMessage(
-            await messages.shop_xp(await utils.getUserCoins(message.user_id), limit),
+        await utils.edit_message(
+            await messages.shop_xp(await utils.get_user_coins(message.user_id), limit),
             message.object.peer_id,
             message.conversation_message_id,
             keyboard.shop_xp(message.user_id, limit),
@@ -3495,7 +3499,7 @@ async def shop_buy(message: MessageEvent):
         else:
             raise Exception('type not in ("xp_booster", "comission_removal")')
 
-        await utils.addUserCoins(message.user_id, -cost)
+        await utils.add_user_coins(message.user_id, -cost)
         async with (await pool()).acquire() as conn:
             activated_bonuses = await conn.fetchrow(
                 "select exp_2x, no_comission from shop where uid=$1", message.user_id
@@ -3516,8 +3520,8 @@ async def shop_buy(message: MessageEvent):
         activated_bonuses[activated_key] = active_until
         lot_name = lot["name"]
 
-        await utils.editMessage(
-            await messages.shop_bonuses(await utils.getUserCoins(message.user_id)),
+        await utils.edit_message(
+            await messages.shop_bonuses(await utils.get_user_coins(message.user_id)),
             message.object.peer_id,
             message.conversation_message_id,
             keyboard.shop_bonuses(message.user_id, activated_bonuses),
@@ -3526,7 +3530,7 @@ async def shop_buy(message: MessageEvent):
         raise Exception('category not in ("xp", "bonus")')
 
     category = "Опыт" if category == "xp" else "Бонус"
-    user_name = await utils.getUserName(message.user_id)
+    user_name = await utils.get_user_name(message.user_id)
     try:
         await tgbot.send_message(
             chat_id=settings.telegram.chat_id,
@@ -3537,7 +3541,7 @@ async def shop_buy(message: MessageEvent):
         )
     except Exception:
         pass
-    await utils.sendMessage(
+    await utils.send_message(
         message.peer_id,
         f'🛍 [id{message.user_id}|{user_name}] успешно купил "{lot_name}" за {cost} монеток',
     )
@@ -3560,7 +3564,7 @@ async def raid_turn(message: MessageEvent):
             )
             status = True
 
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.raid(),
         message.object.peer_id,
         message.conversation_message_id,
@@ -3577,7 +3581,7 @@ async def raid_settings(message: MessageEvent):
             "select trigger_status, limit_invites, limit_seconds from raidmode where chat_id=$1",
             message.peer_id - 2000000000,
         ) or [False, 5, 60]
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.raid_settings(*raidmode),
         message.object.peer_id,
         message.conversation_message_id,
@@ -3608,7 +3612,7 @@ async def raid_trigger_turn(message: MessageEvent):
             )
             raidmode[0] = True
 
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.raid_settings(*raidmode),
         message.object.peer_id,
         message.conversation_message_id,
@@ -3629,7 +3633,7 @@ async def raid_trigger_set(message: MessageEvent):
             "{" + f'"cmid": "{message.conversation_message_id}"' + "}",
         )
 
-    await utils.editMessage(
+    await utils.edit_message(
         await messages.raid_trigger_set(),
         message.object.peer_id,
         message.conversation_message_id,

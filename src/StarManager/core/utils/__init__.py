@@ -46,9 +46,9 @@ _hiddenalbumlock = asyncio.Lock()
 
 
 @AsyncTTL(time_to_live=300, maxsize=0)
-async def getUserName(uid: int) -> str:
+async def get_user_name(uid: int) -> str:
     if uid < 0:
-        return await getGroupName(uid)
+        return await get_group_name(uid)
     async with (await pool()).acquire() as conn:
         if name := await conn.fetchval("select name from usernames where uid=$1", uid):
             return name
@@ -64,10 +64,10 @@ async def getUserName(uid: int) -> str:
         return f"{name[0].first_name} {name[0].last_name}"
 
 
-async def kickUser(uid: int, chat_id: int) -> bool:
+async def kick_user(uid: int, chat_id: int) -> bool:
     try:
         await api.messages.remove_chat_user(chat_id=chat_id, member_id=uid)
-        if (await getChatSettings(chat_id))["main"]["deleteAccessAndNicknameOnLeave"]:
+        if (await get_chat_settings(chat_id))["main"]["deleteAccessAndNicknameOnLeave"]:
             async with (await pool()).acquire() as conn:
                 await conn.execute(
                     "delete from accesslvl where chat_id=$1 and uid=$2", chat_id, uid
@@ -75,13 +75,13 @@ async def kickUser(uid: int, chat_id: int) -> bool:
                 await conn.execute(
                     "delete from nickname where chat_id=$1 and uid=$2", chat_id, uid
                 )
-            await setChatMute(uid, chat_id, 0)
+            await set_chat_mute(uid, chat_id, 0)
     except Exception:
         return False
     return True
 
 
-async def deleteMessages(
+async def delete_messages(
     cmids: int | List[int], chat_id: int
 ) -> bool | list[MessagesDeleteFullResponseItem]:
     try:
@@ -95,73 +95,47 @@ async def deleteMessages(
         return False
 
 
-async def getIDFromMessage(
-    message: str, reply: ForeignMessageMin | MessagesForeignMessage | None, place: int = 2
+async def search_id_in_message(
+    message: str,
+    reply: ForeignMessageMin | MessagesForeignMessage | None,
+    place: int | None = 2,
 ) -> int:
-    """
-    The getIDFromMessage function is used to get the ID of a user from a message.
-
-    :param message: Get the message text
-    :param reply: Get the reply_message object
-    :param place: Determine which part of the message to get the id from
-    :return: The user's id
-    """
-    data = message.split()
-    if len(data) < place and not reply:
-        return 0
-    if reply is not None:
+    if reply:
         return reply.from_id
-    try:
-        if data[place - 1].count("[id") != 0:
-            return int(
-                data[place - 1][
-                    data[place - 1].find("[id") + 3 : data[place - 1].find("|")
-                ]
-            )
-        elif data[place - 1].count("[club") != 0:
-            return -abs(
-                int(
-                    data[place - 1][
-                        data[place - 1].find("[club") + 5 : data[place - 1].find("|")
-                    ]
-                )
-            )
-        elif data[place - 1].count("vk.") != 0:
-            id = data[place - 1][data[place - 1].find("vk.") :]
-            id = id[id.find("/") + 1 :]
-            if "club" in id or "public" in id:
-                try:
-                    gid = (await api.groups.get_by_id(group_ids=[id])).groups
-                except Exception:
-                    return -abs(int(id.replace("club", "").replace("public", "")))
-                return -abs(gid[0].id) if gid else 0
-            else:
-                try:
-                    uid = await api.users.get(user_ids=[id])
-                    if not uid or not uid:
-                        raise Exception
-                    return uid[0].id
-                except Exception:
-                    try:
-                        gid = await api.groups.get_by_id(group_ids=[id])
-                        if not gid or not gid.groups:
-                            raise Exception
-                        return -abs(gid.groups[0].id)
-                    except Exception:
-                        return int(id.replace("id", ""))
-        elif data[place - 1].isdigit() or (
-            data[place - 1][1:].isdigit() and data[place - 1][0] == "-"
-        ):
-            return int(data[place - 1])
-        elif data[place - 1].count("@id") != 0:
-            return int(data[place - 1][data[place - 1].find("@id") + 3 :])
-        return 0
-    except Exception:
-        logger.exception('getIDFromMessage exception:')
-        return 0
+
+    if place:
+        message = message.split()[place - 1]
+
+    from_link_id = re.search(r"vk\.com/id(\d+)", message)
+    from_link = re.search(r"vk\.com/([a-zA-Z0-9_.]+)", message)
+    from_mention = re.search(r"\[(club|id)(\d+)\|", message)
+
+    if from_link_id:
+        return int(from_link_id.group(1))
+
+    if from_link:
+        try:
+            user = await api.users.get(user_ids=[from_link.group(1)])
+            return user[0].id
+        except Exception:
+            group = await api.groups.get_by_id(group_id=from_link.group(1))
+            if group.groups:
+                return -group.groups[0].id
+
+    if from_mention:
+        return (
+            -int(from_mention.group(2))
+            if from_mention.group(1) == "club"
+            else int(from_mention.group(2))
+        )
+
+    if place is not None and message.isdigit():
+        return int(message)
+
+    return 0
 
 
-async def sendMessageEventAnswer(
+async def send_message_event_answer(
     event_id: Any, user_id: int, peer_id: int, event_data: str | None = None
 ) -> bool:
     try:
@@ -173,7 +147,7 @@ async def sendMessageEventAnswer(
     return True
 
 
-async def sendMessage(
+async def send_message(
     peer_ids: int | List[int],
     msg: str | None = None,
     kbd: str | None = None,
@@ -194,7 +168,7 @@ async def sendMessage(
     if (
         isinstance(peer_ids, int)
         and peer_ids > 2000000000
-        and (await getChatSettings((chatid := peer_ids - 2000000000)))["main"][
+        and (await get_chat_settings((chatid := peer_ids - 2000000000)))["main"][
             "autodelete"
         ]
     ):
@@ -213,7 +187,7 @@ async def sendMessage(
     return msgs
 
 
-async def editMessage(
+async def edit_message(
     msg: str, peer_id: int, cmid: int | None, kb=None, attachment=None
 ) -> bool:
     if not cmid:
@@ -232,7 +206,7 @@ async def editMessage(
 
 
 @AsyncTTL(time_to_live=300, maxsize=0)
-async def getChatName(chat_id: int) -> str:
+async def get_chat_name(chat_id: int) -> str:
     async with (await pool()).acquire() as conn:
         if name := await conn.fetchval(
             "select name from chatnames where chat_id=$1", chat_id
@@ -253,7 +227,7 @@ async def getChatName(chat_id: int) -> str:
 
 
 @AsyncTTL(time_to_live=300, maxsize=0)
-async def getGroupName(group_id: int) -> str:
+async def get_group_name(group_id: int) -> str:
     async with (await pool()).acquire() as conn:
         if name := await conn.fetchval(
             "select name from groupnames where group_id=$1", -abs(group_id)
@@ -272,7 +246,7 @@ async def getGroupName(group_id: int) -> str:
 
 
 @AsyncTTL(maxsize=0)
-async def isChatAdmin(id: int, chat_id: int) -> bool:
+async def is_chat_admin(id: int, chat_id: int) -> bool:
     try:
         status = await api.messages.get_conversation_members(
             peer_id=chat_id + 2000000000
@@ -286,7 +260,7 @@ async def isChatAdmin(id: int, chat_id: int) -> bool:
 
 
 @AsyncTTL(maxsize=0)
-async def getChatOwner(chat_id: int) -> int | bool:
+async def get_chat_owner(chat_id: int) -> int | bool:
     try:
         status = await api.messages.get_conversation_members(
             peer_id=chat_id + 2000000000
@@ -300,7 +274,7 @@ async def getChatOwner(chat_id: int) -> int | bool:
 
 
 @AsyncTTL(maxsize=0)
-async def getChatMembers(chat_id: int) -> int | bool:
+async def get_chat_members(chat_id: int) -> int | bool:
     try:
         status = await api.messages.get_conversation_members(
             peer_id=chat_id + 2000000000
@@ -310,7 +284,7 @@ async def getChatMembers(chat_id: int) -> int | bool:
         return False
 
 
-async def setChatMute(
+async def set_chat_mute(
     uid: int | Iterable[int], chat_id: int, mute_time: int | float | None = None
 ) -> Any:
     try:
@@ -331,15 +305,15 @@ async def setChatMute(
                 {"peer_id": chat_id + 2000000000, "member_ids": uid, "action": "rw"},
             )
     except Exception:
-        logger.exception('setChatMute exception:')
+        logger.exception("setChatMute exception:")
         return
 
 
-async def uploadImage(
+async def upload_image(
     file: str, uid: int | None = None, count: int = 0, delay: float = 1
 ) -> str | None:
     if not uid:
-        uid = await getHiddenAlbumUser()
+        uid = await get_hidden_album_user()
     try:
         photo = await PhotoMessageUploader(api).upload(file_source=file, peer_id=uid)
         if not photo:
@@ -353,17 +327,17 @@ async def uploadImage(
                 )
             global _hiddenalbumuid
             _hiddenalbumuid = None
-            uid = await getHiddenAlbumUser()
+            uid = await get_hidden_album_user()
         if "too many" in str(e).lower():
             await asyncio.sleep(1)
         if count != 2:
             await asyncio.sleep(delay)
-            return await uploadImage(file, uid, count + 1, delay + 1)
+            return await upload_image(file, uid, count + 1, delay + 1)
         raise e
 
 
 @AsyncLRU(maxsize=0)
-async def getRegDate(
+async def get_reg_date(
     id: int, format: str = "%d %B %Y", none: Any = "Не удалось определить"
 ) -> str | Any:
     try:
@@ -390,7 +364,7 @@ async def getRegDate(
 
 
 @AsyncTTL(time_to_live=2, maxsize=0)
-async def getUserAccessLevel(uid: int, chat_id: int, none: Any = 0) -> int | Any:
+async def get_user_access_level(uid: int, chat_id: int, none: Any = 0) -> int | Any:
     async with (await pool()).acquire() as conn:
         return (
             await conn.fetchval(
@@ -402,7 +376,7 @@ async def getUserAccessLevel(uid: int, chat_id: int, none: Any = 0) -> int | Any
         )
 
 
-async def getUserLastMessage(
+async def get_user_last_message(
     uid: int, chat_id: int, none: Any = "Неизвестно"
 ) -> int | Any:
     async with (await pool()).acquire() as conn:
@@ -416,7 +390,7 @@ async def getUserLastMessage(
         )
 
 
-async def getUserNickname(uid: int, chat_id: int, none: Any = None) -> str | Any:
+async def get_user_nickname(uid: int, chat_id: int, none: Any = None) -> str | Any:
     async with (await pool()).acquire() as conn:
         return (
             await conn.fetchval(
@@ -428,7 +402,7 @@ async def getUserNickname(uid: int, chat_id: int, none: Any = None) -> str | Any
         )
 
 
-async def getUserMute(uid, chat_id, none=0) -> int:
+async def get_user_mute(uid, chat_id, none=0) -> int:
     async with (await pool()).acquire() as conn:
         return (
             await conn.fetchval(
@@ -438,7 +412,7 @@ async def getUserMute(uid, chat_id, none=0) -> int:
         )
 
 
-async def getUserWarns(uid, chat_id, none=0) -> int:
+async def get_user_warns(uid, chat_id, none=0) -> int:
     async with (await pool()).acquire() as conn:
         return (
             await conn.fetchval(
@@ -448,7 +422,7 @@ async def getUserWarns(uid, chat_id, none=0) -> int:
         )
 
 
-async def getUserBan(uid, chat_id, none=0) -> int:
+async def get_user_ban(uid, chat_id, none=0) -> int:
     async with (await pool()).acquire() as conn:
         return (
             await conn.fetchval(
@@ -458,7 +432,7 @@ async def getUserBan(uid, chat_id, none=0) -> int:
         )
 
 
-async def getChatAccessName(chat_id: int, lvl: int, none: Any = None) -> int | None:
+async def get_chat_access_name(chat_id: int, lvl: int, none: Any = None) -> int | None:
     async with (await pool()).acquire() as conn:
         return (
             await conn.fetchval(
@@ -468,7 +442,7 @@ async def getChatAccessName(chat_id: int, lvl: int, none: Any = None) -> int | N
         )
 
 
-async def getUserBanInfo(uid, chat_id, none=None) -> dict:
+async def get_user_ban_info(uid, chat_id, none=None) -> dict:
     if none is None:
         none = {"times": [], "causes": [], "names": [], "dates": []}
     async with (await pool()).acquire() as conn:
@@ -488,33 +462,33 @@ async def getUserBanInfo(uid, chat_id, none=None) -> dict:
     return none
 
 
-async def getUserXP(uid, none=0) -> int:
+async def get_user_xp(uid, none=0) -> int:
     async with (await pool()).acquire() as conn:
         return await conn.fetchval("select xp from xp where uid=$1", uid) or none
 
 
-async def getUserCoins(uid, none=0) -> int:
+async def get_user_coins(uid, none=0) -> int:
     async with (await pool()).acquire() as conn:
         return await conn.fetchval("select coins from xp where uid=$1", uid) or none
 
 
-async def getUserLeague(uid, none=1) -> int:
+async def get_user_league(uid, none=1) -> int:
     async with (await pool()).acquire() as conn:
         return await conn.fetchval("select league from xp where uid=$1", uid) or none
 
 
-async def getUserLVL(uid, none=0) -> int:
+async def get_user_level(uid, none=0) -> int:
     async with (await pool()).acquire() as conn:
         return await conn.fetchval("select lvl from xp where uid=$1", uid) or none
 
 
 @AsyncLRU(maxsize=0)
-async def getUserNeededXP(xp):
+async def get_user_needed_xp(xp):
     return 1000 - xp
 
 
 @AsyncTTL(time_to_live=120, maxsize=0)
-async def getXPTop(
+async def get_xp_top(
     returnval="count", limit: int = 10, league: int = 1, users: Union[List, None] = None
 ) -> dict:
     async with (await pool()).acquire() as conn:
@@ -542,12 +516,12 @@ async def getXPTop(
 
 
 @AsyncTTL(time_to_live=10, maxsize=0)
-async def getUserPremium(uid, none=0) -> int:
+async def get_user_premium(uid, none=0) -> int:
     async with (await pool()).acquire() as conn:
         return await conn.fetchval("select time from premium where uid=$1", uid) or none
 
 
-async def getUserPremmenuSetting(uid, setting, none):
+async def get_user_premmenu_setting(uid, setting, none):
     async with (await pool()).acquire() as conn:
         res = await conn.fetchval(
             (
@@ -561,7 +535,7 @@ async def getUserPremmenuSetting(uid, setting, none):
     return res if res is not None else none
 
 
-async def getUserPremmenuSettings(uid):
+async def get_user_premmenu_settings(uid):
     user_settings = deepcopy(settings.premium_menu.default)
     async with (await pool()).acquire() as conn:
         clear_by_fire = await conn.fetchval(
@@ -584,7 +558,7 @@ async def getUserPremmenuSettings(uid):
     return user_settings
 
 
-async def getChatCommandLevel(chat_id, cmd, none):
+async def get_chat_command_level(chat_id, cmd, none):
     async with (await pool()).acquire() as conn:
         return (
             await conn.fetchval(
@@ -596,7 +570,7 @@ async def getChatCommandLevel(chat_id, cmd, none):
         )
 
 
-async def getUserMessages(uid, chat_id, none=0) -> int:
+async def get_user_messages(uid, chat_id, none=0) -> int:
     async with (await pool()).acquire() as conn:
         return (
             await conn.fetchval(
@@ -608,7 +582,7 @@ async def getUserMessages(uid, chat_id, none=0) -> int:
         )
 
 
-async def addUserXP(uid, addxp, checklvlbanned=True):
+async def add_user_xp(uid, addxp, checklvlbanned=True):
     async with (await pool()).acquire() as conn:
         if checklvlbanned:
             if await conn.fetchval(
@@ -646,7 +620,7 @@ async def addUserXP(uid, addxp, checklvlbanned=True):
             )
 
 
-async def addUserCoins(
+async def add_user_coins(
     uid, addcoins, checklvlbanned=True, addlimit=False, bonus_peer_id=None
 ) -> None:
     async with (await pool()).acquire() as conn:
@@ -670,15 +644,15 @@ async def addUserCoins(
                 time.time(),
             )
 
-        u_limit = 1600 if await getUserPremium(uid) else 800
+        u_limit = 1600 if await get_user_premium(uid) else 800
         if addlimit and xp_row[2] > u_limit:
             return
 
         if addlimit and (xp_row[2] + addcoins > u_limit):
             if bonus_peer_id:
-                await sendMessage(
+                await send_message(
                     bonus_peer_id,
-                    f"🎁 [id{uid}|{await getUserName(uid)}], вы получили +100 монеток за достижение дневного лимита в {u_limit} монеток.",
+                    f"🎁 [id{uid}|{await get_user_name(uid)}], вы получили +100 монеток за достижение дневного лимита в {u_limit} монеток.",
                 )
             bonus_coins = 100
         else:
@@ -693,7 +667,7 @@ async def addUserCoins(
 
 
 @AsyncTTL(time_to_live=5, maxsize=0)
-async def getChatSettings(chat_id) -> Dict[str, Dict[str, int]]:
+async def get_chat_settings(chat_id) -> Dict[str, Dict[str, int]]:
     async with (await pool()).acquire() as conn:
         dbchatsettings = {
             i[0]: i[1]
@@ -711,7 +685,7 @@ async def getChatSettings(chat_id) -> Dict[str, Dict[str, int]]:
 
 
 @AsyncTTL(time_to_live=5, maxsize=0)
-async def getChatSettingValue(chat_id, setting):
+async def get_chat_setting_value(chat_id, setting):
     async with (await pool()).acquire() as conn:
         return await conn.fetchval(
             "select value from settings where chat_id=$1 and setting=$2",
@@ -721,7 +695,7 @@ async def getChatSettingValue(chat_id, setting):
 
 
 @AsyncTTL(time_to_live=5, maxsize=0)
-async def getChatAltSettings(chat_id):
+async def get_chat_alt_settings(chat_id):
     chatsettings = deepcopy(settings.settings_alt.defaults)
     async with (await pool()).acquire() as conn:
         for cat, chat in chatsettings.items():
@@ -737,7 +711,7 @@ async def getChatAltSettings(chat_id):
     return chatsettings
 
 
-async def turnChatSetting(chat_id, category, setting, alt=False):
+async def turn_chat_setting(chat_id, category, setting, alt=False):
     async with (await pool()).acquire() as conn:
         if not await conn.fetchval(
             "update settings set "
@@ -764,7 +738,7 @@ async def turnChatSetting(chat_id, category, setting, alt=False):
             )
 
 
-async def setUserAccessLevel(uid, chat_id, access_level):
+async def set_user_access_level(uid, chat_id, access_level):
     async with (await pool()).acquire() as conn:
         if not access_level:
             await conn.execute(
@@ -786,7 +760,7 @@ async def setUserAccessLevel(uid, chat_id, access_level):
                 )
 
 
-async def getSilence(chat_id) -> bool:
+async def get_silence(chat_id) -> bool:
     async with (await pool()).acquire() as conn:
         return await conn.fetchval(
             "select exists(select 1 from silencemode where chat_id=$1 and activated=True)",
@@ -795,7 +769,7 @@ async def getSilence(chat_id) -> bool:
 
 
 @AsyncTTL(time_to_live=120, maxsize=0)
-async def isChatMember(uid, chat_id):
+async def is_chat_member(uid, chat_id):
     try:
         return uid in [
             i.member_id
@@ -809,7 +783,7 @@ async def isChatMember(uid, chat_id):
         return False
 
 
-async def NSFWDetector(pic_path):
+async def NSFW_detector(pic_path):
     detector = NudeDetector()
     with open(pic_path, "rb") as f:
         image_data = f.read()
@@ -847,7 +821,7 @@ def whoiscachedurl(text):
             continue
 
 
-async def getUserPrefixes(u_prem, uid) -> list:
+async def get_user_prefixes(u_prem, uid) -> list:
     if u_prem:
         async with (await pool()).acquire() as conn:
             prefixes = await conn.fetch("select prefix from prefix where uid=$1", uid)
@@ -855,7 +829,9 @@ async def getUserPrefixes(u_prem, uid) -> list:
     return settings.commands.prefix
 
 
-async def antispamChecker(chat_id, uid, message: MessagesMessage, chat_settings) -> str | Literal[False]:
+async def antispam_checker(
+    chat_id, uid, message: MessagesMessage, chat_settings
+) -> str | Literal[False]:
     if chat_settings["antispam"]["messagesPerMinute"]:
         async with (await pool()).acquire() as conn:
             setting = await conn.fetchrow(
@@ -877,13 +853,17 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, chat_settings)
                 return "maximumCharsInMessage"
     if chat_settings["antispam"]["disallowLinks"] and not any(
         message.text.startswith(i)
-        for i in await getUserPrefixes(await getUserPremium(uid), uid)
+        for i in await get_user_prefixes(await get_user_premium(uid), uid)
     ):
         data = message.text.split()
         async with (await pool()).acquire() as conn:
             for i in data:
                 for y in i.split("/"):
-                    if "." not in y or y in ["vk.com", "vk.ru", "star-manager.ru"] or not whoiscached(y):
+                    if (
+                        "." not in y
+                        or y in ["vk.com", "vk.ru", "star-manager.ru"]
+                        or not whoiscached(y)
+                    ):
                         continue
                     if not await conn.fetchval(
                         "select exists(select 1 from antispamurlexceptions where chat_id=$1"
@@ -894,7 +874,11 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, chat_settings)
                         return "disallowLinks"
     if chat_settings["antispam"]["disallowNSFW"] and message.attachments is not None:
         for i in message.attachments:
-            if i.type != MessagesMessageAttachmentType.PHOTO or i.photo is None or i.photo.sizes is None:
+            if (
+                i.type != MessagesMessageAttachmentType.PHOTO
+                or i.photo is None
+                or i.photo.sizes is None
+            ):
                 continue
             photo = i.photo.sizes[2]
             for y in i.photo.sizes:
@@ -903,12 +887,15 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, chat_settings)
             if not photo.url:
                 continue
             r = requests.get(photo.url)
-            filename = settings.service.path + f"src/StarManager/core/media/temp/{time.time()}.jpg"
+            filename = (
+                settings.service.path
+                + f"src/StarManager/core/media/temp/{time.time()}.jpg"
+            )
             with open(filename, "wb") as f:
                 f.write(r.content)
                 f.close()
             r.close()
-            isNSFW = await NSFWDetector(filename)
+            isNSFW = await NSFW_detector(filename)
             if isNSFW:
                 return "disallowNSFW"
     if chat_settings["antispam"]["vkLinks"]:
@@ -954,7 +941,10 @@ async def antispamChecker(chat_id, uid, message: MessagesMessage, chat_settings)
 
 async def command_cooldown_check(uid: int, cmd: str):
     if not (
-        cd := (settings.commands.cooldown.get(cmd, 0) / (2 if await getUserPremium(uid) else 1))
+        cd := (
+            settings.commands.cooldown.get(cmd, 0)
+            / (2 if await get_user_premium(uid) else 1)
+        )
     ):
         return None
     if (
@@ -967,7 +957,7 @@ async def command_cooldown_check(uid: int, cmd: str):
 
 
 @cached
-def pointDays(seconds):
+def point_days(seconds):
     res = int(int(seconds) // 86400)
     if res == 1:
         res = str(res) + " день"
@@ -979,7 +969,7 @@ def pointDays(seconds):
 
 
 @cached
-def pointHours(seconds):
+def point_hours(seconds):
     res = int(int(seconds) // 3600)
     if res in [23, 22, 4, 3, 2]:
         res = f"{res} часа"
@@ -991,7 +981,7 @@ def pointHours(seconds):
 
 
 @cached
-def pointMinutes(seconds):
+def point_minutes(seconds):
     res = int(int(seconds) // 60)
     if res % 10 == 1 and res % 100 != 11:
         res = str(res) + " минута"
@@ -1003,7 +993,7 @@ def pointMinutes(seconds):
 
 
 @cached
-def pointWords(value, words):
+def point_words(value, words):
     """
     :param value
     :param words: e.g. (минута, минуты, минут)
@@ -1023,7 +1013,7 @@ def chunks(li, n):
         yield li[i : i + n]
 
 
-async def getURepBanned(uid) -> bool:
+async def get_user_rep_banned(uid) -> bool:
     async with (await pool()).acquire() as conn:
         if (
             t := await conn.fetchval("select time from reportban where uid=$1", uid)
@@ -1032,7 +1022,7 @@ async def getURepBanned(uid) -> bool:
         return False
 
 
-async def generateCaptcha(uid, chat_id, exp):
+async def generate_captcha(uid, chat_id, exp):
     gen = CaptchaGenerator()
     image = gen.gen_math_captcha_image(difficult_level=2, multicolor=True)
     name = f"{settings.service.path}src/StarManager/core/media/temp/captcha{uid}_{chat_id}.png"
@@ -1059,13 +1049,16 @@ async def punish(uid, chat_id, setting_id):
     if punishment[0] == "deletemessage":
         return "del"
     if punishment[0] == "kick":
-        await kickUser(uid, chat_id)
+        await kick_user(uid, chat_id)
         return punishment
 
     if name in settings.settings_meta.positions["antispam"]:
         cause = (
             "Анти-спам (#AS"
-            + str(list(settings.settings_meta.positions["antispam"].keys()).index(name) + 1)
+            + str(
+                list(settings.settings_meta.positions["antispam"].keys()).index(name)
+                + 1
+            )
             + ")"
         )
     else:
@@ -1118,7 +1111,7 @@ async def punish(uid, chat_id, setting_id):
                     f"{mute_dates}",
                 )
 
-        await setChatMute(uid, chat_id, mute_time)
+        await set_chat_mute(uid, chat_id, mute_time)
         return punishment
     elif punishment[0] == "ban":
         ban_date = datetime.now().strftime("%Y.%m.%d %H:%M:%S")
@@ -1167,7 +1160,7 @@ async def punish(uid, chat_id, setting_id):
                     f"{ban_dates}",
                 )
 
-        await kickUser(uid, chat_id)
+        await kick_user(uid, chat_id)
         return punishment
     elif punishment[0] == "warn":
         async with (await pool()).acquire() as conn:
@@ -1193,7 +1186,7 @@ async def punish(uid, chat_id, setting_id):
 
         if warns >= 3:
             warns = 0
-            await kickUser(uid, chat_id)
+            await kick_user(uid, chat_id)
 
         async with (await pool()).acquire() as conn:
             if not await conn.fetchval(
@@ -1222,7 +1215,7 @@ async def punish(uid, chat_id, setting_id):
     return False
 
 
-async def getgpool(chat_id) -> List[Any] | Literal[False]:
+async def get_gpool(chat_id) -> List[Any] | Literal[False]:
     try:
         async with (await pool()).acquire() as conn:
             chats = [
@@ -1239,7 +1232,7 @@ async def getgpool(chat_id) -> List[Any] | Literal[False]:
         return False
 
 
-async def getpool(chat_id, group) -> list[Any] | Literal[False]:
+async def get_pool(chat_id, group) -> list[Any] | Literal[False]:
     try:
         async with (await pool()).acquire() as conn:
             chats = [
@@ -1259,7 +1252,7 @@ async def getpool(chat_id, group) -> list[Any] | Literal[False]:
         return False
 
 
-async def getSilenceAllowed(chat_id):
+async def get_silence_allowed(chat_id):
     async with (await pool()).acquire() as conn:
         lvls = await conn.fetchval(
             "select allowed from silencemode where chat_id=$1", chat_id
@@ -1269,12 +1262,12 @@ async def getSilenceAllowed(chat_id):
     return [7, 8]
 
 
-async def getUserRep(uid):
+async def get_user_rep(uid):
     async with (await pool()).acquire() as conn:
         return await conn.fetchval("select rep from reputation where uid=$1", uid) or 0
 
 
-async def getRepTop(uid):
+async def get_rep_top(uid):
     async with (await pool()).acquire() as conn:
         top = [
             i[0]
@@ -1291,7 +1284,7 @@ def hex_to_rgb(value):
     return tuple(int(value[i : i + lv // 3], 16) for i in range(0, lv, lv // 3))
 
 
-async def chatPremium(chat_id, none=False):
+async def chat_premium(chat_id, none=False):
     async with (await pool()).acquire() as conn:
         return (
             await conn.fetchval(
@@ -1302,7 +1295,7 @@ async def chatPremium(chat_id, none=False):
 
 
 @AsyncTTL(time_to_live=300, maxsize=0)
-async def isMessagesFromGroupAllowed(uid):
+async def is_messages_from_group_allowed(uid):
     return (
         await api.messages.is_messages_from_group_allowed(
             group_id=settings.vk.group_id, user_id=uid
@@ -1310,7 +1303,7 @@ async def isMessagesFromGroupAllowed(uid):
     ).is_allowed
 
 
-async def getHiddenAlbumUser():
+async def get_hidden_album_user():
     global _hiddenalbumuid
 
     if _hiddenalbumuid:
@@ -1366,7 +1359,7 @@ async def getHiddenAlbumUser():
             await asyncio.sleep(0.51)
 
 
-async def getImportSettings(uid, chat_id):
+async def get_import_settings(uid, chat_id):
     async with (await pool()).acquire() as conn:
         if s := await conn.fetchrow(
             "select sys, acc, nicks, punishes, binds from importsettings where uid=$1 and "
@@ -1384,7 +1377,7 @@ async def getImportSettings(uid, chat_id):
         return settings.import_settings.default
 
 
-async def turnImportSetting(chat_id, uid, setting):
+async def turn_import_setting(chat_id, uid, setting):
     async with (await pool()).acquire() as conn:
         if not await conn.fetchval(
             "update importsettings set "
@@ -1411,7 +1404,7 @@ async def turnImportSetting(chat_id, uid, setting):
 
 
 @cached
-def scanURLMalware(url):
+def scan_url_for_malware(url):
     try:
         url = requests.get(url, allow_redirects=True, timeout=2).url
     except requests.RequestException:
@@ -1422,7 +1415,7 @@ def scanURLMalware(url):
 
 
 @cached
-def scanURLRedirect(url):
+def scan_url_for_redirect(url):
     try:
         response = requests.get(url, allow_redirects=False, timeout=2)
         return (
@@ -1435,7 +1428,7 @@ def scanURLRedirect(url):
 
 
 @cached
-def scanURLShortened(url):
+def scan_url_is_shortened(url):
     try:
         response = requests.get(url, allow_redirects=True, timeout=2)
         return (
@@ -1450,12 +1443,12 @@ def scanURLShortened(url):
         return False
 
 
-def generateEasyProblem():
+def generate_easy_problem():
     a, op, b = random.randint(10, 99), random.choice(["+", "-"]), random.randint(10, 99)
     return f"{a} {op} {b} = ?", (a + b) if op == "+" else (a - b)
 
 
-def generateMediumProblem():
+def generate_medium_problem():
     x = random.randint(1, 33)
     a = random.randint(10, 499)
     b = random.randint(10, 499)
@@ -1467,7 +1460,7 @@ def generateMediumProblem():
     return f"({a}X {op} {b} = {c}) → X = ?", x
 
 
-def generateHardProblem():
+def generate_hard_problem():
     x = random.randint(12, 199)
     if random.randint(0, 1):
         a, b = random.randint(100, 1000), random.randint(100, 1000)
@@ -1487,7 +1480,7 @@ async def messagereply(
         msg = await protectedmessage.reply(*args, **kwargs)
         if (
             msg.peer_id > 2000000000
-            and (await getChatSettings((chatid := msg.peer_id - 2000000000)))["main"][
+            and (await get_chat_settings((chatid := msg.peer_id - 2000000000)))["main"][
                 "autodelete"
             ]
         ):
@@ -1559,7 +1552,7 @@ async def create_payment(
         },
     }
     if coins:
-        payment["receipt"]["items"][0]["description"] = pointWords(
+        payment["receipt"]["items"][0]["description"] = point_words(
             coins, ("монетка", "монетки", "монеток")
         )
         payment["metadata"]["coins"] = coins
@@ -1587,7 +1580,7 @@ async def create_payment(
     return Payment.create(payment)
 
 
-async def getUserShopBonuses(uid):
+async def get_user_shop_bonuses(uid):
     async with (await pool()).acquire() as conn:
         return (
             await conn.fetchrow(
@@ -1596,7 +1589,7 @@ async def getUserShopBonuses(uid):
         ) or [0, 0]
 
 
-async def getRaidModeActive(chat_id):
+async def get_raid_mode_active(chat_id):
     async with (await pool()).acquire() as conn:
         return bool(
             await conn.fetchval("select status from raidmode where chat_id=$1", chat_id)
@@ -1604,7 +1597,13 @@ async def getRaidModeActive(chat_id):
 
 
 async def archive_report(
-    message_ids, original_text: str, action, bot: aiogram.Bot, report_id, uid, answer=None
+    message_ids,
+    original_text: str,
+    action,
+    bot: aiogram.Bot,
+    report_id,
+    uid,
+    answer=None,
 ):
     new_text = original_text.split("\n")
     if action == "delete":
@@ -1663,6 +1662,8 @@ async def archive_report(
             logger.exception(f"Failed to edit/copy message {message_id}")
 
         try:
-            await bot.delete_message(chat_id=settings.telegram.reports_chat_id, message_id=message_id)
+            await bot.delete_message(
+                chat_id=settings.telegram.reports_chat_id, message_id=message_id
+            )
         except aiogram.exceptions.TelegramBadRequest:
             logger.exception(f"Failed to delete message {message_id}")

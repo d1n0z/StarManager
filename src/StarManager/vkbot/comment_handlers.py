@@ -5,7 +5,7 @@ from vkbottle_types import GroupTypes
 import StarManager.vkbot.messages as messages
 from StarManager.core.config import api, service_vk_api_session, settings
 from StarManager.core.db import pool
-from StarManager.core.utils import addUserXP, getUserName
+from StarManager.core.utils import add_user_xp, get_user_name
 
 
 async def comment_handle(event: GroupTypes.WallReplyNew):
@@ -28,7 +28,7 @@ async def comment_handle(event: GroupTypes.WallReplyNew):
                     post_id=settings.service.farm_post_id,
                     from_group=settings.vk.group_id,
                     message=await messages.farm_cd(
-                        await getUserName(uid), uid, 7200 - (time.time() - com)
+                        await get_user_name(uid), uid, 7200 - (time.time() - com)
                     ),
                     reply_to_comment=event.object.id,
                 )
@@ -36,12 +36,12 @@ async def comment_handle(event: GroupTypes.WallReplyNew):
                 await conn.execute(
                     "update comments set time = $1 where uid=$2", time.time(), uid
                 )
-        await addUserXP(uid, 50)
+        await add_user_xp(uid, 50)
         return await api.wall.create_comment(
             owner_id=-settings.vk.group_id,
             post_id=settings.service.farm_post_id,
             from_group=settings.vk.group_id,
-            message=await messages.farm(await getUserName(uid), uid),
+            message=await messages.farm(await get_user_name(uid), uid),
             reply_to_comment=event.object.id,
         )
     if (
@@ -61,7 +61,7 @@ async def comment_handle(event: GroupTypes.WallReplyNew):
                     owner_id=-settings.vk.group_id,
                     post_id=event.object.post_id,
                     from_group=settings.vk.group_id,
-                    message=await messages.newpost_dup(await getUserName(uid), uid),
+                    message=await messages.newpost_dup(await get_user_name(uid), uid),
                     reply_to_comment=event.object.id,
                 )
             await conn.execute(
@@ -69,11 +69,11 @@ async def comment_handle(event: GroupTypes.WallReplyNew):
                 uid,
                 event.object.post_id,
             )
-        await addUserXP(uid, 250)
+        await add_user_xp(uid, 250)
         return await api.wall.create_comment(
             owner_id=-settings.vk.group_id,
             post_id=event.object.post_id,
             from_group=settings.vk.group_id,
-            message=await messages.newpost(await getUserName(uid), uid),
+            message=await messages.newpost(await get_user_name(uid), uid),
             reply_to_comment=event.object.id,
         )

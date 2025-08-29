@@ -18,13 +18,13 @@ from StarManager.core.config import api, settings, vk_api_session
 from StarManager.core.db import pool
 from StarManager.core.utils import (
     chunks,
-    deleteMessages,
-    generateEasyProblem,
-    generateHardProblem,
-    generateMediumProblem,
-    getUserName,
+    delete_messages,
+    generate_easy_problem,
+    generate_hard_problem,
+    generate_medium_problem,
+    get_user_name,
     punish,
-    sendMessage,
+    send_message,
 )
 from StarManager.tgbot.bot import bot as tgbot
 from StarManager.vkbot import keyboard, messages
@@ -186,7 +186,7 @@ async def every10min(conn):
         now - 86400 * 2,
     )
     if expired:
-        await asyncio.gather(*(deleteMessages(cmid, uid) for uid, cmid in expired))
+        await asyncio.gather(*(delete_messages(cmid, uid) for uid, cmid in expired))
         await conn.execute(
             "DELETE FROM premiumexpirenotified WHERE date < $1", now - 86400 * 2
         )
@@ -218,10 +218,10 @@ async def every10min(conn):
             uid,
         )
         cmid = (
-            await sendMessage(
+            await send_message(
                 uid,
                 await messages.premium_expire(
-                    uid, await getUserName(uid), exp.strftime("%d.%m.%Y / 00:00")
+                    uid, await get_user_name(uid), exp.strftime("%d.%m.%Y / 00:00")
                 ),
                 keyboard.premium_expire(promo),
             )
@@ -275,7 +275,9 @@ async def every10min(conn):
 
 async def everyminute(conn):
     now = time.time()
-    os.system(rf"find {settings.service.path}src/StarManager/core/media/temp/ -mtime +1 -exec rm {{}} \;")
+    os.system(
+        rf"find {settings.service.path}src/StarManager/core/media/temp/ -mtime +1 -exec rm {{}} \;"
+    )
     await conn.execute("DELETE FROM premium WHERE time < $1", now)
 
     captchas = await conn.fetch(
@@ -296,9 +298,9 @@ async def everyminute(conn):
                 chat_id,
             )
             await punish(uid, chat_id, s[0])
-            await sendMessage(
+            await send_message(
                 chat_id + 2000000000,
-                await messages.captcha_punish(uid, await getUserName(uid), s[1]),
+                await messages.captcha_punish(uid, await get_user_name(uid), s[1]),
             )
 
     await conn.execute("DELETE FROM captcha WHERE exptime < $1", now)
@@ -309,7 +311,7 @@ async def everyminute(conn):
     )
     if todelete:
         await asyncio.gather(
-            *(deleteMessages(cmid, peerid - 2000000000) for peerid, cmid in todelete)
+            *(delete_messages(cmid, peerid - 2000000000) for peerid, cmid in todelete)
         )
         await conn.execute("DELETE FROM todelete WHERE delete_at < $1", now)
 
@@ -367,10 +369,10 @@ async def run_notifications(conn):
                 except Exception:
                     pass
             if call:
-                if not await sendMessage(
+                if not await send_message(
                     chat_id + 2000000000, await messages.send_notification(text, call)
                 ):
-                    await sendMessage(
+                    await send_message(
                         chat_id + 2000000000,
                         await messages.notification_too_long_text(name),
                     )
@@ -399,26 +401,26 @@ async def run_nightmode_notifications(conn):
         start = datetime.strptime(start_str, "%H:%M").replace(year=2024)
         end = datetime.strptime(end_str, "%H:%M").replace(year=2024)
         if now.hour == start.hour and now.minute == start.minute:
-            await sendMessage(
+            await send_message(
                 chat_id + 2000000000,
                 await messages.nightmode_start(
                     start.strftime("%H:%M"), end.strftime("%H:%M")
                 ),
             )
         elif now.hour == end.hour and now.minute == end.minute:
-            await sendMessage(chat_id + 2000000000, await messages.nightmode_end())
+            await send_message(chat_id + 2000000000, await messages.nightmode_end())
 
 
 async def mathgiveaway(conn):
     now = datetime.now()
     if now.hour in (9, 21) and now.minute < 15:
-        math, ans = generateHardProblem()
+        math, ans = generate_hard_problem()
         level, xp = 2, random.randint(1000, 1200)
     elif now.hour in range(0, 23, 2) and now.minute < 15:
-        math, ans = generateMediumProblem()
+        math, ans = generate_medium_problem()
         level, xp = 1, random.randint(500, 800)
     else:
-        math, ans = generateEasyProblem()
+        math, ans = generate_easy_problem()
         level, xp = 0, random.randint(200, 400)
 
     old = [
@@ -428,10 +430,10 @@ async def mathgiveaway(conn):
         )
     ]
     if old:
-        await deleteMessages(old, settings.service.mathgiveaways_to)
+        await delete_messages(old, settings.service.mathgiveaways_to)
     await conn.execute("UPDATE mathgiveaway SET finished = true WHERE finished = false")
     cmid = (
-        await sendMessage(
+        await send_message(
             settings.service.mathgiveaways_to + 2000000000,
             await messages.math_problem(math, level, xp),
         )

@@ -6,7 +6,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from StarManager.core.config import settings
 from StarManager.core.db import smallpool as pool
-from StarManager.core.utils import addUserXP, getUserName
+from StarManager.core.utils import add_user_xp, get_user_name
 from StarManager.tgbot import keyboard
 from StarManager.tgbot.bot import bot
 from StarManager.vkbot.checkers import getULvlBanned
@@ -52,7 +52,7 @@ async def end():
                         if len(winners) == 3:
                             break
         for i in winners:
-            await addUserXP(i[0], 999, False)
+            await add_user_xp(i[0], 999, False)
             try:
                 await bot.send_message(
                     chat_id=i[1],
@@ -65,7 +65,7 @@ async def end():
         if winners:
             text += "<blockquote><b>"
             for k, i in enumerate(winners):
-                text += f'{emoji[k]} Победитель: <a href="https://vk.com/id{i[0]}">{await getUserName(i[0])}</a>'
+                text += f'{emoji[k]} Победитель: <a href="https://vk.com/id{i[0]}">{await get_user_name(i[0])}</a>'
                 if k - 1 != len(winners):
                     text += "\n"
             text += (

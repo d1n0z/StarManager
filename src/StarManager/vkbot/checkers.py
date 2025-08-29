@@ -6,15 +6,15 @@ from cache.async_ttl import AsyncTTL
 import StarManager.vkbot.messages as messages
 from StarManager.core.utils import (
     command_cooldown_check,
-    deleteMessages,
-    getChatSettings,
-    getSilence,
-    getSilenceAllowed,
-    getUserAccessLevel,
-    getUserLastMessage,
-    getUserMute,
-    getUserPrefixes,
-    getUserPremium,
+    delete_messages,
+    get_chat_settings,
+    get_silence,
+    get_silence_allowed,
+    get_user_access_level,
+    get_user_last_message,
+    get_user_mute,
+    get_user_prefixes,
+    get_user_premium,
     messagereply,
 )
 from StarManager.core.config import settings
@@ -110,13 +110,18 @@ async def checkCMD(
             pass
         else:
             if (
-                cmd in settings.commands.pm or text.replace(prefix, "", 1) in settings.commands.pm
+                cmd in settings.commands.pm
+                or text.replace(prefix, "", 1) in settings.commands.pm
             ) and message.peer_id >= 2000000000:
                 await messagereply(message, await messages.pmcmd())
             return False
 
-    if fixing and uid not in (settings.service.devs if accesstoalldevs else settings.service.main_devs):
-        await messagereply(message, disable_mentions=1, message=await messages.inprogress())
+    if fixing and uid not in (
+        settings.service.devs if accesstoalldevs else settings.service.main_devs
+    ):
+        await messagereply(
+            message, disable_mentions=1, message=await messages.inprogress()
+        )
         return False
 
     if st := await command_cooldown_check(message.from_id, cmd):
@@ -129,17 +134,20 @@ async def checkCMD(
         )
         return False
 
-    u_acc = await getUserAccessLevel(uid, chat_id)
-    u_prem = await getUserPremium(uid)
+    u_acc = await get_user_access_level(uid, chat_id)
+    u_prem = await get_user_premium(uid)
     if (
         not await haveAccess(cmd, chat_id, u_acc, u_prem)
-        or prefix not in await getUserPrefixes(u_prem, uid)
-        or await getUserMute(uid, chat_id) > message.date
+        or prefix not in await get_user_prefixes(u_prem, uid)
+        or await get_user_mute(uid, chat_id) > message.date
         or await getUserIgnore(uid, chat_id)
         or await getUInfBanned(uid, chat_id)
-        or (await getSilence(chat_id) and u_acc not in await getSilenceAllowed(chat_id))
+        or (
+            await get_silence(chat_id)
+            and u_acc not in await get_silence_allowed(chat_id)
+        )
         or await getUChatLimit(
-            message.date, await getUserLastMessage(uid, chat_id, 0), u_acc, chat_id
+            message.date, await get_user_last_message(uid, chat_id, 0), u_acc, chat_id
         )
     ):
         return False
@@ -148,7 +156,7 @@ async def checkCMD(
         await messagereply(message, await messages.lvlbanned())
         return False
 
-    chat_settings = await getChatSettings(chat_id)
+    chat_settings = await get_chat_settings(chat_id)
     if chat_settings["main"]["nightmode"] and u_acc < 6:
         async with (await pool()).acquire() as conn:
             setting = await conn.fetchval(
@@ -166,7 +174,7 @@ async def checkCMD(
                 or (now.hour == start.hour and now.minute < start.minute)
                 or (now.hour == end.hour and now.minute >= end.minute)
             ):
-                await deleteMessages(message.conversation_message_id, chat_id)
+                await delete_messages(message.conversation_message_id, chat_id)
                 return False
         if chat_settings["main"]["captcha"]:
             async with (await pool()).acquire() as conn:

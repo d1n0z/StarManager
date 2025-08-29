@@ -16,39 +16,39 @@ from StarManager.vkbot.checkers import getULvlBanned
 from StarManager.vkbot.rules import SearchCMD
 from StarManager.tgbot.bot import bot as tgbot
 from StarManager.core.utils import (
-    addUserCoins,
-    addUserXP,
-    chatPremium,
-    deleteMessages,
-    getChatAccessName,
-    getChatSettings,
-    getIDFromMessage,
-    getRegDate,
-    getRepTop,
-    getUserAccessLevel,
-    getUserBan,
-    getUserCoins,
-    getUserLastMessage,
-    getUserLeague,
-    getUserLVL,
-    getUserMessages,
-    getUserMute,
-    getUserName,
-    getUserNeededXP,
-    getUserNickname,
-    getUserPremium,
-    getUserPremmenuSetting,
-    getUserPremmenuSettings,
-    getUserRep,
-    getUserShopBonuses,
-    getUserWarns,
-    getUserXP,
-    isChatAdmin,
-    kickUser,
+    add_user_coins,
+    add_user_xp,
+    chat_premium,
+    delete_messages,
+    get_chat_access_name,
+    get_chat_settings,
+    search_id_in_message,
+    get_reg_date,
+    get_rep_top,
+    get_user_access_level,
+    get_user_ban,
+    get_user_coins,
+    get_user_last_message,
+    get_user_league,
+    get_user_level,
+    get_user_messages,
+    get_user_mute,
+    get_user_name,
+    get_user_needed_xp,
+    get_user_nickname,
+    get_user_premium,
+    get_user_premmenu_setting,
+    get_user_premmenu_settings,
+    get_user_rep,
+    get_user_shop_bonuses,
+    get_user_warns,
+    get_user_xp,
+    is_chat_admin,
+    kick_user,
     messagereply,
-    pointWords,
-    setUserAccessLevel,
-    uploadImage,
+    point_words,
+    set_user_access_level,
+    upload_image,
 )
 from StarManager.core.config import settings, api
 from StarManager.core.db import pool
@@ -65,7 +65,7 @@ async def test_handler(message: Message):
 
 @bl.chat_message(SearchCMD("id"))
 async def id(message: Message):
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if not id:
         id = message.from_id
     if id < 0:
@@ -78,7 +78,7 @@ async def id(message: Message):
         return await messagereply(
             message, disable_mentions=1, message=await messages.id_deleted()
         )
-    last_message = await getUserLastMessage(id, message.peer_id - 2000000000, None)
+    last_message = await get_user_last_message(id, message.peer_id - 2000000000, None)
     if isinstance(last_message, int):
         last_message = datetime.fromtimestamp(last_message).strftime("%d.%m.%Y / %H:%M")
     await messagereply(
@@ -86,8 +86,8 @@ async def id(message: Message):
         disable_mentions=1,
         message=await messages.id(
             id,
-            await getRegDate(id),
-            await getUserName(id),
+            await get_reg_date(id),
+            await get_user_name(id),
             f"https://vk.com/id{id}",
             last_message,
         ),
@@ -99,20 +99,20 @@ async def q(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
 
-    if await kickUser(uid, chat_id):
-        await setUserAccessLevel(uid, chat_id, 0)
+    if await kick_user(uid, chat_id):
+        await set_user_access_level(uid, chat_id, 0)
         return await messagereply(
             message,
             disable_mentions=1,
             message=await messages.q(
-                uid, await getUserName(uid), await getUserNickname(uid, chat_id)
+                uid, await get_user_name(uid), await get_user_nickname(uid, chat_id)
             ),
         )
     await messagereply(
         message,
         disable_mentions=1,
         message=await messages.q_fail(
-            uid, await getUserName(uid), await getUserNickname(uid, chat_id)
+            uid, await get_user_name(uid), await get_user_nickname(uid, chat_id)
         ),
     )
 
@@ -154,8 +154,10 @@ async def top(message: Message):
 async def stats(message: Message):
     chat_id = message.peer_id - 2000000000
 
-    id = await getIDFromMessage(message.text, message.reply_message)
-    reply = await messagereply(message, await messages.stats_loading(), disable_mentions=1)
+    id = await search_id_in_message(message.text, message.reply_message)
+    reply = await messagereply(
+        message, await messages.stats_loading(), disable_mentions=1
+    )
     if not id:
         id = message.from_id
     if id < 0:
@@ -176,50 +178,52 @@ async def stats(message: Message):
             )
             or 0
         )
-    if acc < 1 and not await getUserPremium(message.from_id) and not rewards:
+    if acc < 1 and not await get_user_premium(message.from_id) and not rewards:
         id = message.from_id
     else:
-        acc = await getUserAccessLevel(id, chat_id)
-    last_message = await getUserLastMessage(id, chat_id)
+        acc = await get_user_access_level(id, chat_id)
+    last_message = await get_user_last_message(id, chat_id)
     if isinstance(last_message, int):
         last_message = datetime.fromtimestamp(last_message).strftime("%d.%m.%Y")
-    url = (await api.users.get(user_ids=[id], fields=[UsersFields.PHOTO_MAX_ORIG.value]))[0].photo_max_orig
+    url = (
+        await api.users.get(user_ids=[id], fields=[UsersFields.PHOTO_MAX_ORIG.value])
+    )[0].photo_max_orig
     if not url:
         return
-    r = await api.http_client.request_content(
-        url
-    )
-    with open(settings.service.path + f"src/StarManager/core/media/temp/{id}ava.jpg", "wb") as f:
+    r = await api.http_client.request_content(url)
+    with open(
+        settings.service.path + f"src/StarManager/core/media/temp/{id}ava.jpg", "wb"
+    ) as f:
         f.write(r)
 
-    lvl_name = await getChatAccessName(chat_id, acc)
-    xp = int(await getUserXP(id))
-    lvl = await getUserLVL(id) or 1
+    lvl_name = await get_chat_access_name(chat_id, acc)
+    xp = int(await get_user_xp(id))
+    lvl = await get_user_level(id) or 1
     try:
         await messagereply(
             message,
             disable_mentions=1,
-            attachment=await uploadImage(
+            attachment=await upload_image(
                 await createStatsImage(
-                    await getUserWarns(id, chat_id),
-                    await getUserMessages(id, chat_id),
+                    await get_user_warns(id, chat_id),
+                    await get_user_messages(id, chat_id),
                     id,
-                    await getUserAccessLevel(id, chat_id),
-                    await getUserNickname(id, chat_id),
-                    await getUserCoins(id),
+                    await get_user_access_level(id, chat_id),
+                    await get_user_nickname(id, chat_id),
+                    await get_user_coins(id),
                     last_message,
-                    await getUserPremium(id),
+                    await get_user_premium(id),
                     min(xp, 99999999),
                     min(lvl, 999),
-                    await getUserRep(id),
-                    await getRepTop(id),
-                    await getUserName(id),
-                    await getUserMute(id, chat_id),
-                    await getUserBan(id, chat_id),
+                    await get_user_rep(id),
+                    await get_rep_top(id),
+                    await get_user_name(id),
+                    await get_user_mute(id, chat_id),
+                    await get_user_ban(id, chat_id),
                     lvl_name or settings.lvl_names[acc],
-                    await getUserNeededXP(xp) if lvl < 999 else 0,
-                    await getUserPremmenuSetting(id, "border_color", False),
-                    await getUserLeague(id),
+                    await get_user_needed_xp(xp) if lvl < 999 else 0,
+                    await get_user_premmenu_setting(id, "border_color", False),
+                    await get_user_league(id),
                 )
             ),
         )
@@ -227,7 +231,7 @@ async def stats(message: Message):
         if message.from_id in settings.service.devs:
             traceback.print_exc()
         if reply and reply.conversation_message_id:
-            await deleteMessages(reply.conversation_message_id, chat_id)
+            await delete_messages(reply.conversation_message_id, chat_id)
         await messagereply(
             message,
             disable_mentions=1,
@@ -236,7 +240,7 @@ async def stats(message: Message):
         raise e
     else:
         if reply and reply.conversation_message_id:
-            await deleteMessages(reply.conversation_message_id, chat_id)
+            await delete_messages(reply.conversation_message_id, chat_id)
 
 
 @bl.chat_message(SearchCMD("help"))
@@ -254,7 +258,7 @@ async def help(message: Message):
         message,
         disable_mentions=1,
         message=await messages.help(cmds=base),
-        keyboard=keyboard.help(uid, u_prem=await getUserPremium(uid)),
+        keyboard=keyboard.help(uid, u_prem=await get_user_premium(uid)),
     )
 
 
@@ -262,7 +266,7 @@ async def help(message: Message):
 async def bonus(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
-    name = await getUserName(uid)
+    name = await get_user_name(uid)
 
     async with (await pool()).acquire() as conn:
         lasttime, streak = await conn.fetchrow(
@@ -289,14 +293,14 @@ async def bonus(message: Message):
                 time.time(),
             )
 
-    prem = await getUserPremium(uid)
+    prem = await get_user_premium(uid)
     addxp = min(100 + (50 if prem else 25) * streak, 2500 if prem else 1000)
-    await addUserXP(uid, addxp)
+    await add_user_xp(uid, addxp)
     await messagereply(
         message,
         disable_mentions=1,
         message=await messages.bonus(
-            uid, await getUserNickname(uid, chat_id), name, addxp, prem, streak
+            uid, await get_user_nickname(uid, chat_id), name, addxp, prem, streak
         ),
     )
 
@@ -304,8 +308,8 @@ async def bonus(message: Message):
         await tgbot.send_message(
             chat_id=settings.telegram.chat_id,
             message_thread_id=settings.telegram.bonus_thread_id,
-            text=f'{uid} | <a href="vk.com/id{uid}">{await getUserName(uid)}</a> | '
-            f"Серия: {pointWords(streak + 1, ('день', 'дня', 'дней'))}",
+            text=f'{uid} | <a href="vk.com/id{uid}">{await get_user_name(uid)}</a> | '
+            f"Серия: {point_words(streak + 1, ('день', 'дня', 'дней'))}",
             disable_web_page_preview=True,
             parse_mode="HTML",
         )
@@ -337,7 +341,9 @@ async def cmd(message: Message):
             )
         if cmd not in settings.commands.commands:
             return await messagereply(
-                message, disable_mentions=1, message=await messages.resetcmd_not_found(cmd)
+                message,
+                disable_mentions=1,
+                message=await messages.resetcmd_not_found(cmd),
             )
 
         async with (await pool()).acquire() as conn:
@@ -346,7 +352,9 @@ async def cmd(message: Message):
             )
         if not cmdn:
             return await messagereply(
-                message, disable_mentions=1, message=await messages.resetcmd_not_changed(cmd)
+                message,
+                disable_mentions=1,
+                message=await messages.resetcmd_not_changed(cmd),
             )
 
         await messagereply(
@@ -354,8 +362,8 @@ async def cmd(message: Message):
             disable_mentions=1,
             message=await messages.resetcmd(
                 uid,
-                await getUserName(uid),
-                await getUserNickname(uid, chat_id),
+                await get_user_name(uid),
+                await get_user_nickname(uid, chat_id),
                 cmd,
                 cmdn,
             ),
@@ -370,11 +378,15 @@ async def cmd(message: Message):
             )
         if cmd not in settings.commands.commands:
             return await messagereply(
-                message, disable_mentions=1, message=await messages.resetcmd_not_found(cmd)
+                message,
+                disable_mentions=1,
+                message=await messages.resetcmd_not_found(cmd),
             )
         if changed in settings.commands.commands:
             return await messagereply(
-                message, disable_mentions=1, message=await messages.cmd_changed_in_cmds()
+                message,
+                disable_mentions=1,
+                message=await messages.cmd_changed_in_cmds(),
             )
 
         async with (await pool()).acquire() as conn:
@@ -390,8 +402,8 @@ async def cmd(message: Message):
                     message=await messages.cmd_changed_in_users_cmds(i[0]),
                 )
         if (
-            not await getUserPremium(uid)
-            and len(res) >= settings.leagues.cmd_bonus[await getUserLeague(uid) - 1]
+            not await get_user_premium(uid)
+            and len(res) >= settings.leagues.cmd_bonus[await get_user_league(uid) - 1]
         ):
             return await messagereply(
                 message, disable_mentions=1, message=await messages.cmd_prem(len(res))
@@ -424,8 +436,8 @@ async def cmd(message: Message):
             disable_mentions=1,
             message=await messages.cmd_set(
                 uid,
-                await getUserName(uid),
-                await getUserNickname(uid, chat_id),
+                await get_user_name(uid),
+                await get_user_nickname(uid, chat_id),
                 cmd,
                 changed,
             ),
@@ -442,11 +454,11 @@ async def cmd(message: Message):
 @bl.chat_message(SearchCMD("premmenu"))
 async def premmenu(message: Message):
     uid = message.from_id
-    if not (prem := await getUserPremium(uid)) and await getUserLeague(uid) <= 1:
+    if not (prem := await get_user_premium(uid)) and await get_user_league(uid) <= 1:
         return await messagereply(
             message, disable_mentions=1, message=await messages.no_prem()
         )
-    menu_settings = await getUserPremmenuSettings(uid)
+    menu_settings = await get_user_premmenu_settings(uid)
     await messagereply(
         message,
         disable_mentions=1,
@@ -459,7 +471,7 @@ async def premmenu(message: Message):
 async def duel(message: Message):
     chat_id = message.peer_id - 2000000000
 
-    if not (await getChatSettings(chat_id))["entertaining"]["allowDuel"]:
+    if not (await get_chat_settings(chat_id))["entertaining"]["allowDuel"]:
         return await messagereply(
             message, disable_mentions=1, message=await messages.duel_not_allowed()
         )
@@ -482,12 +494,12 @@ async def duel(message: Message):
         )
 
     uid = message.from_id
-    if await getUserCoins(uid) < coins:
+    if await get_user_coins(uid) < coins:
         return await messagereply(
             message,
             disable_mentions=1,
             message=await messages.duel_ucoins_not_enough(
-                uid, await getUserName(uid), await getUserNickname(uid, chat_id)
+                uid, await get_user_name(uid), await get_user_nickname(uid, chat_id)
             ),
         )
 
@@ -495,7 +507,7 @@ async def duel(message: Message):
         message,
         disable_mentions=1,
         message=await messages.duel(
-            uid, await getUserName(uid), await getUserNickname(uid, chat_id), coins
+            uid, await get_user_name(uid), await get_user_nickname(uid, chat_id), coins
         ),
         keyboard=keyboard.duel(uid, coins),
     )
@@ -504,11 +516,11 @@ async def duel(message: Message):
 @bl.chat_message(SearchCMD("transfer"))
 async def transfer(message: Message):
     chat_id = message.chat_id
-    if not (await getChatSettings(chat_id))["entertaining"]["allowTransfer"]:
+    if not (await get_chat_settings(chat_id))["entertaining"]["allowTransfer"]:
         return await messagereply(message, await messages.transfer_not_allowed())
     uid = message.from_id
 
-    id = await getIDFromMessage(message.text, message.reply_message)
+    id = await search_id_in_message(message.text, message.reply_message)
     if id < 0:
         return await messagereply(
             message, disable_mentions=1, message=await messages.transfer_community()
@@ -540,18 +552,18 @@ async def transfer(message: Message):
             message, disable_mentions=1, message=await messages.transfer_hint()
         )
 
-    u_prem = await getUserPremium(uid)
+    u_prem = await get_user_premium(uid)
     if (tcoins > 500 and not u_prem) or (tcoins > 1000 and u_prem) or tcoins < 50:
         return await messagereply(
             message, disable_mentions=1, message=await messages.transfer_wrong_number()
         )
 
-    if await getUserCoins(uid) < tcoins:
+    if await get_user_coins(uid) < tcoins:
         return await messagereply(
             message,
             disable_mentions=1,
             message=await messages.transfer_not_enough(
-                uid, await getUserName(uid), await getUserNickname(uid, chat_id)
+                uid, await get_user_name(uid), await get_user_nickname(uid, chat_id)
             ),
         )
 
@@ -571,9 +583,9 @@ async def transfer(message: Message):
             message, disable_mentions=1, message=await messages.transfer_limit(u_prem)
         )
 
-    has_comission = not (u_prem or (await getUserShopBonuses(uid))[1] > time.time())
+    has_comission = not (u_prem or (await get_user_shop_bonuses(uid))[1] > time.time())
     if has_comission:
-        if await chatPremium(chat_id):
+        if await chat_premium(chat_id):
             comtcoins = int(tcoins / 100 * 97.5)
             com = 2.5
         else:
@@ -583,10 +595,10 @@ async def transfer(message: Message):
         comtcoins = tcoins
         com = 0
 
-    await addUserCoins(uid, -tcoins)
-    await addUserCoins(id, comtcoins)
-    uname = await getUserName(uid)
-    name = await getUserName(id)
+    await add_user_coins(uid, -tcoins)
+    await add_user_coins(id, comtcoins)
+    uname = await get_user_name(uid)
+    name = await get_user_name(id)
     async with (await pool()).acquire() as conn:
         await conn.execute(
             "insert into transferhistory (to_id, from_id, time, amount, com) VALUES ($1, $2, $3, $4, $5)",
@@ -618,9 +630,9 @@ async def transfer(message: Message):
 @bl.chat_message(SearchCMD("start"))
 async def start(message: Message):
     chat_id = message.peer_id - 2000000000
-    if await getUserAccessLevel(message.from_id, chat_id) >= 7 or await isChatAdmin(
+    if await get_user_access_level(
         message.from_id, chat_id
-    ):
+    ) >= 7 or await is_chat_admin(message.from_id, chat_id):
         await messagereply(
             message, await messages.rejoin(), keyboard=keyboard.rejoin(chat_id)
         )
@@ -645,7 +657,7 @@ async def chats(message: Message):
 
 @bl.chat_message(SearchCMD("guess"))
 async def guess(message: Message):
-    if not (await getChatSettings(message.chat_id))["entertaining"]["allowGuess"]:
+    if not (await get_chat_settings(message.chat_id))["entertaining"]["allowGuess"]:
         return await messagereply(
             message, disable_mentions=1, message=await messages.guess_not_allowed()
         )
@@ -664,23 +676,23 @@ async def guess(message: Message):
         return await messagereply(
             message, disable_mentions=1, message=await messages.guess_coins_minimum()
         )
-    if await getUserCoins(message.from_id) < int(data[1]):
+    if await get_user_coins(message.from_id) < int(data[1]):
         return await messagereply(
             message, disable_mentions=1, message=await messages.guess_notenoughcoins()
         )
     if int(data[2]) != (num := random.randint(1, 5)):
-        await addUserCoins(message.from_id, -int(data[1]))
+        await add_user_coins(message.from_id, -int(data[1]))
         return await messagereply(
             message, disable_mentions=1, message=await messages.guess_lose(data[1], num)
         )
     bet = int(data[1]) * 2.5
     has_comission = not (
-        await getUserPremium(message.from_id)
-        or (await getUserShopBonuses(message.from_id))[1] > time.time()
+        await get_user_premium(message.from_id)
+        or (await get_user_shop_bonuses(message.from_id))[1] > time.time()
     )
     if has_comission:
         bet = bet / 100 * 90
-    await addUserCoins(message.from_id, bet)
+    await add_user_coins(message.from_id, bet)
     await messagereply(
         message,
         disable_mentions=1,
@@ -729,24 +741,24 @@ async def promo(message: Message):
                 disable_mentions=1,
                 message=await messages.promo_alreadyusedornotexists(
                     uid,
-                    await getUserNickname(uid, message.chat_id),
-                    await getUserName(uid),
+                    await get_user_nickname(uid, message.chat_id),
+                    await get_user_name(uid),
                 ),
             )
         await conn.execute(
             "insert into promocodeuses (code, uid) values ($1, $2)", data[1], uid
         )
     if code[4] == "xp":
-        await addUserXP(uid, int(code[3]))
+        await add_user_xp(uid, int(code[3]))
     else:
-        await addUserCoins(uid, int(code[3]))
+        await add_user_coins(uid, int(code[3]))
     await messagereply(
         message,
         disable_mentions=1,
         message=await messages.promo(
             uid,
-            await getUserNickname(uid, message.chat_id),
-            await getUserName(uid),
+            await get_user_nickname(uid, message.chat_id),
+            await get_user_name(uid),
             code[0],
             code[3],
             code[4],
@@ -757,7 +769,7 @@ async def promo(message: Message):
 @bl.chat_message(SearchCMD("rep"))
 async def rep(message: Message):
     data = message.text.split()
-    id = await getIDFromMessage(message.text, message.reply_message, 3)
+    id = await search_id_in_message(message.text, message.reply_message, 3)
     if len(data) not in (2, 3) or data[1] not in ("+", "-") or not id or id < 0:
         return await messagereply(
             message, disable_mentions=1, message=await messages.rep_hint()
@@ -774,7 +786,7 @@ async def rep(message: Message):
             message, disable_mentions=1, message=await messages.rep_notinchat()
         )
     uid = message.from_id
-    uprem = await getUserPremium(uid)
+    uprem = await get_user_premium(uid)
     async with (await pool()).acquire() as conn:
         rephistory = await conn.fetch(
             "select time from rephistory where uid=$1 and id=$2 and time>$3 order by "
@@ -809,13 +821,13 @@ async def rep(message: Message):
         message=await messages.rep(
             data[1] == "+",
             uid,
-            await getUserName(uid),
-            await getUserNickname(uid, message.chat_id),
+            await get_user_name(uid),
+            await get_user_nickname(uid, message.chat_id),
             id,
-            await getUserName(id),
-            await getUserNickname(id, message.chat_id),
-            await getUserRep(id),
-            await getRepTop(id),
+            await get_user_name(id),
+            await get_user_nickname(id, message.chat_id),
+            await get_user_rep(id),
+            await get_rep_top(id),
         ),
     )
 
@@ -823,7 +835,7 @@ async def rep(message: Message):
 @bl.chat_message(SearchCMD("short"))
 async def short(message: Message):
     uid = message.from_id
-    if not await getUserPremium(uid):
+    if not await get_user_premium(uid):
         return await messagereply(
             message, disable_mentions=1, message=await messages.no_prem()
         )
@@ -867,7 +879,9 @@ async def rewards(message: Message):
                 KeyboardButtonColor.POSITIVE,
             ),
             message=await messages.rewards_unsubbed(
-                uid, await getUserName(uid), await getUserNickname(uid, message.chat_id)
+                uid,
+                await get_user_name(uid),
+                await get_user_nickname(uid, message.chat_id),
             ),
         )
     async with (await pool()).acquire() as conn:
@@ -884,8 +898,8 @@ async def rewards(message: Message):
                     disable_mentions=1,
                     message=await messages.rewards_activated(
                         uid,
-                        await getUserName(uid),
-                        await getUserNickname(uid, message.chat_id),
+                        await get_user_name(uid),
+                        await get_user_nickname(uid, message.chat_id),
                         collected[1],
                         7,
                     ),
@@ -895,8 +909,8 @@ async def rewards(message: Message):
                 disable_mentions=1,
                 message=await messages.rewards_collected(
                     uid,
-                    await getUserName(uid),
-                    await getUserNickname(uid, message.chat_id),
+                    await get_user_name(uid),
+                    await get_user_nickname(uid, message.chat_id),
                     datetime.fromtimestamp(collected[1]).strftime("%d.%m.%Y"),
                 ),
             )
@@ -905,14 +919,14 @@ async def rewards(message: Message):
             uid,
             int(time.time()),
         )
-    await addUserXP(uid, 10000)
+    await add_user_xp(uid, 10000)
     await messagereply(
         message,
         disable_mentions=1,
         message=await messages.rewards(
             uid,
-            await getUserName(uid),
-            await getUserNickname(uid, message.chat_id),
+            await get_user_name(uid),
+            await get_user_nickname(uid, message.chat_id),
             time.time(),
             7,
             10000,

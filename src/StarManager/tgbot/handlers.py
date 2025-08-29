@@ -18,7 +18,12 @@ from loguru import logger
 
 from StarManager.core.config import settings
 from StarManager.core.db import smallpool as pool
-from StarManager.core.utils import addUserXP, archive_report, getUserName, pointWords
+from StarManager.core.utils import (
+    add_user_xp,
+    archive_report,
+    get_user_name,
+    point_words,
+)
 from StarManager.tgbot import keyboard, states
 
 router: Router = Router()
@@ -116,7 +121,7 @@ async def start(message: Message | CallbackQuery, state: FSMContext, bot: Bot):
         msg = await bot.send_message(
             chat_id=from_id,
             reply_markup=keyboard.unlink(),
-            text=f'<b>⭐️ Добро пожаловать, <a href="https://vk.com/id{vkid}">{await getUserName(vkid)}</a>.\n\n'
+            text=f'<b>⭐️ Добро пожаловать, <a href="https://vk.com/id{vkid}">{await get_user_name(vkid)}</a>.\n\n'
             f"Вы успешно привязали профиль ВК, теперь в случае выигрыша опыт автоматически будет выдан на аккаунт."
             f"\n\nКроме того, вы можете получать по 150 опыта за каждого приглашенного друга в нашу группу.</b>",
         )
@@ -218,7 +223,7 @@ async def ref(query: CallbackQuery, state: FSMContext, bot: Bot):
         text=f"<b>👤 Пригласите ваших друзей подписаться на нашу группу бота в Telegram и получайте за каждого друга "
         f"по 150 опыта. Для этого достаточно поделится ссылкой на вступление в чат:\n\n<code>"
         f"{await create_start_link(bot, str(query.from_user.id), encode=True)}</code>\n\n💡 "
-        f"Вами приглашено: {pointWords(cnt, ('пользователь', 'пользователя', 'пользователей'))}</b>",
+        f"Вами приглашено: {point_words(cnt, ('пользователь', 'пользователя', 'пользователей'))}</b>",
     )
     await state.clear()
     await state.update_data(msg=msg)
@@ -259,7 +264,7 @@ async def checksub(query: CallbackQuery, state: FSMContext, bot: Bot):
                         int(ref),
                         query.from_user.id,
                     )
-        await addUserXP(vkid, 150)
+        await add_user_xp(vkid, 150)
         try:
             await bot.send_message(
                 chat_id=ref,
