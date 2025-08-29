@@ -255,7 +255,6 @@ async def queue_handler(event: MessageNew):
                         if start.timestamp() >= end.timestamp():
                             raise
                     except Exception:
-                        traceback.print_exc()
                         await edit_message(
                             await messages.settings_change_countable_format_error(),
                             event.object.message.peer_id,
