@@ -104,7 +104,10 @@ async def search_id_in_message(
         return reply.from_id
 
     if place:
-        message = message.split()[place - 1]
+        data = message.split()
+        if len(data) < place:
+            return 0
+        message = data[place - 1]
 
     from_link_id = re.search(r"vk\.com/id(\d+)", message)
     from_link = re.search(r"vk\.com/([a-zA-Z0-9_.]+)", message)
