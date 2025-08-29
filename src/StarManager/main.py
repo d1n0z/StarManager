@@ -87,16 +87,12 @@ def main(args: Namespace | None):
     logger.add(sys.stderr, level="INFO", filter=vkbottle_filter)
 
     logger.info("Starting...")
+
+    logger.info("Cleaning temp files...")
     subprocess.run(
-        [
-            "rm",
-            f"{settings.database.name}.sql",
-            settings.service.path + "src/StarManager/core/media/temp/*",
-            settings.service.path + "src/StarManager/core/media/tmp/*",
-            ">",
-            "/dev/null",
-            "2>&1",
-        ], shell=True, check=False
+        f"rm -f {settings.database.name}.sql {settings.service.path}src/StarManager/core/media/temp/* {settings.service.path}src/StarManager/core/media/tmp/* > /dev/null 2>&1",
+        shell=True,
+        check=False,
     )
 
     logger.info("Creating tables...")
