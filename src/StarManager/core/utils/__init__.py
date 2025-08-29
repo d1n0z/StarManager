@@ -121,9 +121,12 @@ async def search_id_in_message(
             user = await api.users.get(user_ids=[from_link.group(1)])
             return user[0].id
         except Exception:
-            group = await api.groups.get_by_id(group_id=from_link.group(1))
-            if group.groups:
-                return -group.groups[0].id
+            try:
+                group = await api.groups.get_by_id(group_id=from_link.group(1))
+                if group.groups:
+                    return -group.groups[0].id
+            except Exception:
+                pass
 
     if from_mention:
         return (
