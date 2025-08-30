@@ -74,6 +74,8 @@ async def joingiveaway(query: CallbackQuery, bot: Bot):
 async def startdeep(
     message: Message, state: FSMContext, command: CommandObject, bot: Bot
 ):
+    if message.from_user is None:
+        return
     await message.delete()
     payload = decode_payload(command.args or "")
     if not payload.isdigit():
@@ -82,12 +84,12 @@ async def startdeep(
         async with conn.transaction():
             await conn.execute(
                 "insert into tgwaitingforsubscription (tgid) values ($1) on conflict (tgid) do nothing ",
-                from_id := message.from_user.id,  # type: ignore
+                from_id := message.from_user.id
             )
     msg = await bot.send_message(
         chat_id=from_id,
         reply_markup=keyboard.check(int(payload)),
-        text=f'<b>⭐️ Добро пожаловать, <a href="tg://user?id={from_id}">{message.from_user.first_name}'  # type: ignore
+        text=f'<b>⭐️ Добро пожаловать, <a href="tg://user?id={from_id}">{message.from_user.first_name}'
         f'</a>.\n\nЧтобы использовать бота вы должны присоединиться к <a href="'
         f'{(await bot.create_chat_invite_link(settings.telegram.public_chat_id)).invite_link}">нашей группе</a>.</b>',
     )
@@ -98,11 +100,13 @@ async def startdeep(
 @router.callback_query(keyboard.Callback.filter(F.type == "start"))
 @router.message(CommandStart(), F.chat.type == "private")
 async def start(message: Message | CallbackQuery, state: FSMContext, bot: Bot):
+    if message.from_user is None:
+        return
     async with (await pool()).acquire() as conn:
         async with conn.transaction():
             if await conn.fetchval(
                 "select 1 from tgwaitingforsubscription where tgid=$1",
-                from_id := message.from_user.id,  # type: ignore
+                from_id := message.from_user.id,
             ):
                 return
             vkid = await conn.fetchval("select vkid from tglink where tgid=$1", from_id)
@@ -112,7 +116,7 @@ async def start(message: Message | CallbackQuery, state: FSMContext, bot: Bot):
         msg = await bot.send_message(
             chat_id=from_id,
             reply_markup=keyboard.link(),
-            text=f'<b>⭐️ Добро пожаловать, <a href="tg://user?id={from_id}">{message.from_user.first_name}'  # type: ignore
+            text=f'<b>⭐️ Добро пожаловать, <a href="tg://user?id={from_id}">{message.from_user.first_name}'
             f"</a>.\n\nЗдесь вы можете привязать свой аккаунт ВКонтакте для получения опыта в случае победы в "
             f"конкурсе.\n\nКроме того, вы можете получать по 150 опыта за каждого приглашенного друга в нашу "
             f"группу.</b>",
@@ -131,11 +135,11 @@ async def start(message: Message | CallbackQuery, state: FSMContext, bot: Bot):
 
 @router.message(Command("info"), F.chat.type == "private")
 async def info(message: Message, state: FSMContext, bot: Bot):
-    if (from_id := message.from_user.id) not in settings.telegram.admins:  # type: ignore
+    if message.from_user is None or message.text is None or (from_id := message.from_user.id) not in settings.telegram.admins:
         return
 
     await message.delete()
-    data = message.text.split()  # type: ignore
+    data = message.text.split()
     if len(data) not in (1, 2) or (len(data) == 2 and not data[1].isdigit()):
         msg = await bot.send_message(
             chat_id=from_id,
@@ -231,6 +235,8 @@ async def ref(query: CallbackQuery, state: FSMContext, bot: Bot):
 
 @router.callback_query(keyboard.Callback.filter(F.type.startswith("checksub_")))
 async def checksub(query: CallbackQuery, state: FSMContext, bot: Bot):
+    if query.data is None:
+        return
     try:
         member = await bot.get_chat_member(
             chat_id=settings.telegram.public_chat_id, user_id=query.from_user.id
@@ -244,7 +250,7 @@ async def checksub(query: CallbackQuery, state: FSMContext, bot: Bot):
             text="Вы не являетесь участником группы.", show_alert=True
         )
     if (
-        ref := int(query.data.split(":")[-1].split("_")[-1])  # type: ignore
+        ref := int(query.data.split(":")[-1].split("_")[-1])
     ) and ref != query.from_user.id:
         async with (await pool()).acquire() as conn:
             async with conn.transaction():
@@ -289,7 +295,12 @@ async def checksub(query: CallbackQuery, state: FSMContext, bot: Bot):
 @router.callback_query(keyboard.Callback.filter(F.type == "report_cancel"))
 async def report_cancel(query: CallbackQuery, state: FSMContext):
     await state.clear()
-    await query.message.delete()  # type: ignore
+    if not isinstance(query.message, Message):
+        return
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
 
 
 @router.callback_query(keyboard.ReportCallback.filter())
@@ -299,9 +310,11 @@ async def report_callback_handler(
     state: FSMContext,
     bot: Bot,
 ):
+    if query.message is None:
+        return
     action = callback_data.type
     if action == "answer":
-        msg = await query.message.answer(  # type: ignore
+        msg = await query.message.answer(
             f"🟣 Введите ответ на обращение #{callback_data.report_id}:",
             reply_markup=keyboard.report_cancel(),
         )
@@ -341,6 +354,8 @@ async def report_callback_handler(
 
 @router.message(states.Report.answer)
 async def report_answer(message: Message, state: FSMContext, bot: Bot):
+    if message.from_user is None:
+        return
     await message.delete()
 
     report_id: int = (await state.get_data())["report_id"]
@@ -353,7 +368,7 @@ async def report_answer(message: Message, state: FSMContext, bot: Bot):
         )
         await conn.execute(
             "update reports set answered_by=$1 where id=$2",
-            message.from_user.id,  # type: ignore
+            message.from_user.id,
             report_id,
         )
     message_ids = json.loads(report[2])
@@ -370,6 +385,8 @@ async def report_answer(message: Message, state: FSMContext, bot: Bot):
 
 @router.message(states.Link.link)
 async def link_s(message: Message, state: FSMContext, bot: Bot):
+    if message.from_user is None:
+        return
     await message.delete()
 
     await state.clear()
@@ -385,7 +402,7 @@ async def link_s(message: Message, state: FSMContext, bot: Bot):
                 text = f'<b>✅ Вы успешно привязали аккаунт(<a href="https://vk.com/id{vkid}">id{vkid}</a>).</b>'
                 await conn.execute(
                     "update tglink set tgid = $1 where vkid=$2",
-                    from_id := message.from_user.id,  # type: ignore
+                    from_id := message.from_user.id,
                     vkid,
                 )
     msg = await bot.send_message(
