@@ -102,19 +102,25 @@ async def checkCMD(
         if not prefix:
             return False
 
-        if (cmd := text.replace(prefix, "", 1)) in settings.commands.commands:
-            pass
-        elif cmd := await conn.fetchval(
-            "select cmd from cmdnames where uid=$1 and name=$2", uid, cmd
-        ):
-            pass
+        raw = text.replace(prefix, "", 1)
+
+        if raw in settings.commands.commands:
+            cmd = raw
         else:
-            if (
-                cmd in settings.commands.pm
-                or text.replace(prefix, "", 1) in settings.commands.pm
-            ) and message.peer_id >= 2000000000:
-                await messagereply(message, await messages.pmcmd())
-            return False
+            db_cmd = await conn.fetchval(
+                "select cmd from cmdnames where uid=$1 and name=$2", uid, raw
+            )
+            if db_cmd:
+                cmd = db_cmd
+            else:
+                if raw in settings.commands.pm and message.peer_id >= 2000000000:
+                    await messagereply(message, await messages.pmcmd())
+                return False
+
+    if raw in settings.commands.pm:
+        if message.peer_id >= 2000000000:
+            await messagereply(message, await messages.pmcmd())
+        return False
 
     if fixing and uid not in (
         settings.service.devs if accesstoalldevs else settings.service.main_devs

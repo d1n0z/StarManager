@@ -209,7 +209,6 @@ async def report(event: GroupTypes.MessageNew):
     if (
         repu is not None
         and time.time() - repu < settings.commands.cooldown["report"]
-        and uid not in settings.service.devs
     ):
         await send_message(message.peer_id, await messages.report_cd())
         return
