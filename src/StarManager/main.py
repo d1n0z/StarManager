@@ -70,7 +70,7 @@ def send_error_notification() -> None:
 def main(args: Namespace | None):
     def vkbottle_filter(record):
         message = record["message"]
-        return "API error(s) in response wasn't handled" not in message
+        return "API error(s) in response wasn't handled" not in message and "You don't have access to this chat" not in message
 
     logger.remove()
     logger.add(sys.stderr, level="INFO", filter=vkbottle_filter)

@@ -153,7 +153,7 @@ async def updateInfo(conn):
             updates = []
             for item in result["items"]:
                 pid = item["peer"]["id"] - 2000000000
-                title = item["chat_settings"]["title"]
+                title = item["peer"]["chat_settings"]["title"]
                 updates.append((title, pid))
             await conn.executemany(
                 "update chatnames set name = $1 where chat_id = $2", updates
