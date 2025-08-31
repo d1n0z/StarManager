@@ -106,7 +106,7 @@ async def backup() -> None:
         await drive.upload(
             filename,
             f"/StarManager/backups/{filename}",
-            timeout=int(os.stat(filename).st_size / 1000 / 128) * 1.5,
+            timeout=36000,
         )
         link = await drive.get_download_link(f"/StarManager/backups/{filename}")
     
