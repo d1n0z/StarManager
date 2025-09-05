@@ -152,9 +152,10 @@ async def updateInfo(conn):
             result = vk_api_session.method("execute", {"code": code})
             updates = []
             for item in result["items"]:
-                pid = item["peer"]["id"] - 2000000000
-                title = item["peer"]["chat_settings"]["title"]
-                updates.append((title, pid))
+                if "peer" in item and "id" in item["peer"] and "chat_settings" in item["peer"] and "title" in item["peer"]["chat_settings"]:
+                    pid = item["peer"]["id"] - 2000000000
+                    title = item["peer"]["chat_settings"]["title"]
+                    updates.append((title, pid))
             await conn.executemany(
                 "update chatnames set name = $1 where chat_id = $2", updates
             )
