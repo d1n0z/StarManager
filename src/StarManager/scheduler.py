@@ -94,7 +94,7 @@ async def backup() -> None:
     now = datetime.now().isoformat(timespec="seconds")
     filename = f"{settings.database.name}-{now}.sql.gz"
     os.system(
-        f"sudo rm {settings.service.path}{settings.database.name}-*.sql.gz > /dev/null 2>&1"
+        f"sudo rm {settings.service.path}{settings.database.name}*.sql.gz > /dev/null 2>&1"
     )
     subprocess.run(
         f'PGPASSWORD="{settings.database.password}" pg_dump -h localhost -U {settings.database.name} {settings.database.name} | gzip > {filename}',

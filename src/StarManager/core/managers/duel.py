@@ -4,8 +4,7 @@ import traceback
 from typing import Dict, Tuple
 
 from StarManager.core.config import settings, api
-from StarManager.core.managers.base.manager import BaseManager
-from StarManager.vkbot.bot import bot
+from StarManager.core.managers.base import BaseManager
 
 
 class TimedAsyncLock:

@@ -7,30 +7,31 @@ from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 from vkbottle_types.objects import UsersFields
 
-from StarManager.vkbot import keyboard
-from StarManager.vkbot import messages
-from StarManager.vkbot.rules import SearchCMD
+from StarManager.core import managers
+from StarManager.core.config import api
+from StarManager.core.db import pool
 from StarManager.core.utils import (
-    search_id_in_message,
+    chunks,
+    delete_messages,
+    get_user_access_level,
+    get_user_ban,
+    get_user_mute,
     get_user_name,
     get_user_nickname,
-    is_chat_admin,
-    get_user_access_level,
-    kick_user,
     get_user_premium,
-    get_user_mute,
-    set_chat_mute,
-    get_user_ban,
     get_user_warns,
-    whoiscached,
+    is_chat_admin,
+    kick_user,
+    messagereply,
     scan_url_for_malware,
     scan_url_for_redirect,
     scan_url_is_shortened,
-    messagereply,
-    delete_messages,
+    search_id_in_message,
+    set_chat_mute,
+    whoiscached,
 )
-from StarManager.core.config import api
-from StarManager.core.db import pool
+from StarManager.vkbot import keyboard, messages
+from StarManager.vkbot.rules import SearchCMD
 
 bl = BotLabeler()
 
@@ -360,73 +361,84 @@ async def clear(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
 
-    deleting = []
-    for i in (
-        (message.fwd_messages + [message.reply_message])
-        if message.reply_message
-        else message.fwd_messages
-    ):
-        deleting.append((i.from_id, i.conversation_message_id))
-    # data = message.text.split()
-    # if (len(data) < 2 and not deleting) or (len(data) == 2 and not data[1].isdigit()) or (
-    #         len(data) == 3 and not (id := await getIDFromMessage(message.text, None,) and not data[2].isdigit())):
-    if not deleting:
-        return await messagereply(
-            message, disable_mentions=1, message=await messages.clear_hint()
+    delete_from = await search_id_in_message(message.text, None)
+    if delete_from:
+        if await get_user_access_level(
+            delete_from, chat_id
+        ) > await get_user_access_level(uid, chat_id):
+            return await messagereply(
+                message, disable_mentions=1, message=await messages.clear_higher()
+            )
+        to_delete = [
+            (delete_from, i)
+            for i in await managers.chat_user_cmids.get_cmids(uid, chat_id)
+        ]
+    else:
+        to_delete: list[tuple[int, int]] = []
+        for i in (
+            (message.fwd_messages + [message.reply_message])
+            if message.reply_message
+            else message.fwd_messages
+        ):
+            to_delete.append((i.from_id, i.conversation_message_id))
+        if not to_delete:
+            return await messagereply(
+                message, disable_mentions=1, message=await messages.clear_hint()
+            )
+        to_delete = [
+            i
+            for i in to_delete
+            if await get_user_access_level(i[0], chat_id)
+            <= await get_user_access_level(uid, chat_id)
+        ]
+        if not to_delete:
+            return await messagereply(
+                message, disable_mentions=1, message=await messages.clear_higher()
+            )
+
+    try:
+        deleted = []
+        for chunk in chunks([mid for _, mid in to_delete], 99):
+            new_deleted = await delete_messages(chat_id=chat_id, cmids=chunk)
+            if isinstance(new_deleted, list):
+                deleted.extend(new_deleted)
+
+        if deleted:
+            if all(
+                True
+                if i.error
+                and (
+                    i.error.description is None
+                    or "admin message" in i.error.description
+                )
+                else False
+                for i in deleted
+            ):
+                return await messagereply(
+                    message,
+                    disable_mentions=1,
+                    message=await messages.clear_admin(),
+                )
+            if not delete_from and all(True if i.error else False for i in deleted):
+                return await messagereply(
+                    message, disable_mentions=1, message=await messages.clear_old()
+                )
+            deleted = [i.conversation_message_id for i in deleted if i.error]
+            deleted = [i[0] for i in to_delete if i[1] not in deleted]
+    except VKAPIError[15]:
+        await messagereply(
+            message, disable_mentions=1, message=await messages.clear_admin()
         )
-    deleting = [
-        i
-        for i in deleting
-        if await get_user_access_level(i[0], chat_id)
-        <= await get_user_access_level(uid, chat_id)
-    ]
-    if deleting:
-        try:
-            deleted = await delete_messages(
-                chat_id=chat_id, cmids=[mid for _, mid in deleting]
-            )
-            if not isinstance(deleted, bool):
-                if all(
-                    True
-                    if i.error
-                    and (
-                        i.error.description is None
-                        or "admin message" in i.error.description
-                    )
-                    else False
-                    for i in deleted
-                ):
-                    return await messagereply(
-                        message,
-                        disable_mentions=1,
-                        message=await messages.clear_admin(),
-                    )
-                if all(True if i.error else False for i in deleted):
-                    return await messagereply(
-                        message, disable_mentions=1, message=await messages.clear_old()
-                    )
-                deleted = [i.conversation_message_id for i in deleted if i.error]
-                deleting = [i[0] for i in deleting if i[1] not in deleted]
-        except VKAPIError[15]:
-            await messagereply(
-                message, disable_mentions=1, message=await messages.clear_admin()
-            )
-        except VKAPIError:
-            await messagereply(
-                message, disable_mentions=1, message=await messages.clear_old()
-            )
-        else:
-            await messagereply(
-                message,
-                disable_mentions=1,
-                message=await messages.clear(deleting, uid, chat_id),
-                keyboard=keyboard.deletemessages(
-                    uid, [message.conversation_message_id]
-                ),
-            )
+    except VKAPIError:
+        await messagereply(
+            message, disable_mentions=1, message=await messages.clear_old()
+        )
     else:
         await messagereply(
-            message, disable_mentions=1, message=await messages.clear_higher()
+            message,
+            disable_mentions=1,
+            message=await messages.clear(deleted, uid, chat_id, delete_from),
+            keyboard=keyboard.deletemessages(uid, [message.conversation_message_id]),
         )
 
 
@@ -634,7 +646,11 @@ async def olist(message: Message):
                 online_mobile = False
             members_online[f"[id{i.id}|{i.first_name} {i.last_name}]"] = online_mobile
     await messagereply(
-        message, disable_mentions=1, message=await messages.olist(members_online)
+        message,
+        disable_mentions=1,
+        message=await messages.olist(
+            dict(sorted(members_online.items(), key=lambda item: item[1]))
+        ),
     )
 
 

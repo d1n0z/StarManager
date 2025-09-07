@@ -234,7 +234,16 @@ async def unwarn_myself():
     return await get("unwarn_myself")
 
 
-async def clear(deleting, uid, chat_id):
+async def clear(deleting, uid, chat_id, delete_from):
+    if delete_from:
+        return await get(
+            "clear_from",
+            uid=uid,
+            u_name=await get_user_name(uid) or await get_user_nickname(uid, chat_id),
+            id=delete_from,
+            name=await get_user_name(delete_from) or await get_user_nickname(delete_from, chat_id),
+            deleted=len(deleting),
+        )
     return await get(
         "clear",
         uid=uid,
@@ -1877,14 +1886,11 @@ async def resetaccess_disaccept(lvl):
 
 async def olist(members):
     msg = await get("olist", members=len(list(members.keys())))
-    ind = 0
     for k, i in members.items():
-        ind += 1
-        msg += f"[{ind}]. {k} - "
         if i:
-            msg += "Телефон\n"
+            msg += f"📱 {k} — Телефон\n"
         else:
-            msg += "ПК\n"
+            msg += f"💻 {k} — ПК\n"
     return msg
 
 

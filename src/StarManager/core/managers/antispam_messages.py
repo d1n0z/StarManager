@@ -4,7 +4,7 @@ from typing import Tuple
 
 from cachetools import TTLCache
 
-from StarManager.core.managers.base.manager import BaseManager
+from StarManager.core.managers.base import BaseManager
 
 
 class AntispamMessagesManager(BaseManager):

@@ -155,15 +155,15 @@ async def stats(message: Message):
     chat_id = message.peer_id - 2000000000
 
     id = await search_id_in_message(message.text, message.reply_message)
-    reply = await messagereply(
-        message, await messages.stats_loading(), disable_mentions=1
-    )
     if not id:
         id = message.from_id
     if id < 0:
         return await messagereply(
             message, disable_mentions=1, message=await messages.id_group()
         )
+    reply = await messagereply(
+        message, await messages.stats_loading(), disable_mentions=1
+    )
 
     async with (await pool()).acquire() as conn:
         rewards = await conn.fetchval(

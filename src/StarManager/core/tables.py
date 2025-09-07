@@ -1,6 +1,7 @@
 import asyncio
 
 from tortoise import Tortoise, fields
+from tortoise.contrib.postgres.fields import ArrayField
 from tortoise.models import Model
 
 from StarManager.core.config import database_config
@@ -752,6 +753,15 @@ class RaidMode(Model):
 
     class Meta:
         table = "raidmode"
+
+
+class ChatUserCMIDs(Model):  # questionable solution, looking for a new one
+    chat_id = fields.IntField()
+    uid = fields.IntField()
+    cmids = ArrayField(element_type="int")
+
+    class Meta:
+        table = "chatusercmids"
 
 
 async def init():

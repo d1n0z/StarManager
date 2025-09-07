@@ -3,7 +3,7 @@ from typing import Dict, Literal, TypeAlias
 
 from cachetools import TTLCache
 
-from StarManager.core.managers.base.manager import BaseManager
+from StarManager.core.managers.base import BaseManager
 
 EventType: TypeAlias = Literal["chat_invite_user_by_link", "chat_invite_user"]
 

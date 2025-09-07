@@ -4,7 +4,7 @@ from typing import Dict
 from cachetools import TTLCache
 
 from StarManager.core.config import settings
-from StarManager.core.managers.base.manager import BaseManager
+from StarManager.core.managers.base import BaseManager
 
 
 class CommandsCooldownManager(BaseManager):

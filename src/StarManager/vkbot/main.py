@@ -1,7 +1,9 @@
+import asyncio
 from loguru import logger
 from vkbottle import GroupEventType, GroupTypes
 from vkbottle.framework.labeler import BotLabeler
 
+from StarManager.core import managers
 from StarManager.vkbot.bot import bot
 from StarManager.vkbot.handlers import found_labelers
 from StarManager.vkbot.comment_handlers import comment_handle
@@ -24,6 +26,8 @@ def run():
         GroupEventType.MESSAGE_NEW, dataclass=GroupTypes.MessageNew, blocking=False
     )
     async def new_message(event: GroupTypes.MessageNew):
+        if (message := event.object.message) and (message.peer_id - 2000000000 > 0):
+            await managers.chat_user_cmids.append_cmid(message.from_id, message.peer_id - 2000000000, message.conversation_message_id)
         await message_handle(event)
 
     @labeler.raw_event(GroupEventType.WALL_REPLY_NEW, dataclass=GroupTypes.WallReplyNew)
@@ -38,6 +42,7 @@ def run():
     for labeler in found_labelers:
         bot.labeler.load(labeler)
     bot.labeler.message_view.register_middleware(CommandMiddleware)
+    bot.loop_wrapper.add_task(managers.initialize())
 
     logger.info("Loaded. Starting the bot...")
     bot.run_forever()
