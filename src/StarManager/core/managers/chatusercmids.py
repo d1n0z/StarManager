@@ -21,7 +21,7 @@ class ChatUserCMIDsRepository(BaseRepository):
         self, uid: int, chat_id: int, defaults: Optional[Dict[str, Any]] = None
     ) -> ChatUserCMIDs:
         defaults = defaults or {"cmids": []}
-        obj, _ = await ChatUserCMIDs.get_or_create(
+        obj, _created = await ChatUserCMIDs.get_or_create(
             uid=uid, chat_id=chat_id, defaults=defaults
         )
         async with self._lock:
