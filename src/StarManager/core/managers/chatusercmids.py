@@ -1,7 +1,8 @@
 import asyncio
-from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set, Tuple
+
+from tortoise.expressions import Q
 
 from StarManager.core.managers.base import BaseCacheManager, BaseManager, BaseRepository, BaseCachedModel
 from StarManager.core.tables import ChatUserCMIDs
@@ -68,14 +69,16 @@ class ChatUserCMIDsCache(BaseCacheManager):
         async with self._lock:
             self._cache[cache_key] = _CachedChatUserCMIDs.from_model(model)
 
-    async def get(self, cache_key: Tuple[int, int]) -> List[int]:
+    async def get(self, cache_key: Tuple[int, int]) -> Tuple[int, ...]:
         async with self._lock:
             obj = self._cache.get(cache_key)
-            return deepcopy(obj.cmids) if obj else []
+            return tuple(obj.cmids) if obj else ()
 
     async def append(self, cache_key: Tuple[int, int], cmid: int):
         await self._ensure_cached(cache_key, {"cmids": []})
         async with self._lock:
+            if cmid in self._cache[cache_key].cmids:
+                return
             self._cache[cache_key].cmids.append(cmid)
             self._dirty.add(cache_key)
 
@@ -85,25 +88,30 @@ class ChatUserCMIDsCache(BaseCacheManager):
                 return
             dirty = set(self._dirty)
             payloads = {
-                (uid, chat_id): list(self._cache[(uid, chat_id)].cmids)
+                (uid, chat_id): self._cache[(uid, chat_id)].cmids
                 for uid, chat_id in dirty
                 if (uid, chat_id) in self._cache
             }
 
-        queries = []
-        for (uid, chat_id), cmids in payloads.items():
-            queries.append(
-                ChatUserCMIDs.filter(uid=uid, chat_id=chat_id).update(cmids=cmids)
-            )
-        results = await asyncio.gather(*queries)
-        queries.clear()
+        query = Q()
+        for uid, chat_id in payloads.keys():
+            query |= Q(uid=uid, chat_id=chat_id)
+        existing = await ChatUserCMIDs.filter(query) if query else []
+        existing = {(row.uid, row.chat_id): row for row in existing}
 
+        to_update, to_create = [], []
         for (uid, chat_id), cmids in payloads.items():
-            if results.pop(0) == 0:
-                queries.append(
-                    ChatUserCMIDs.create(uid=uid, chat_id=chat_id, cmids=cmids)
-                )
-        await asyncio.gather(*queries)
+            if (uid, chat_id) in existing:
+                row = existing[(uid, chat_id)]
+                row.cmids = cmids
+                to_update.append(row)
+            else:
+                to_create.append(ChatUserCMIDs(uid=uid, chat_id=chat_id, cmids=cmids))
+
+        if to_update:
+            await ChatUserCMIDs.bulk_update(to_update, fields=["cmids"])
+        if to_create:
+            await ChatUserCMIDs.bulk_create(to_create)
 
         async with self._lock:
             self._dirty.difference_update(dirty)
@@ -125,7 +133,7 @@ class ChatUserCMIDsManager(BaseManager):
     def make_key(self, uid: int, chat_id: int) -> Tuple[int, int]:
         return self.cache.make_cache_key(uid, chat_id)
 
-    async def get_cmids(self, uid: int, chat_id: int) -> List[int]:
+    async def get_cmids(self, uid: int, chat_id: int) -> Tuple[int, ...]:
         return await self.cache.get(self.make_key(uid, chat_id))
 
     async def append_cmid(self, uid: int, chat_id: int, cmid: int):

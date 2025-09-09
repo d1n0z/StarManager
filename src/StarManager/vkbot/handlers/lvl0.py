@@ -10,6 +10,7 @@ from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 from vkbottle_types.objects import UsersFields
 
+from StarManager.core import managers
 from StarManager.vkbot import keyboard
 from StarManager.vkbot import messages
 from StarManager.vkbot.checkers import getULvlBanned
@@ -170,14 +171,7 @@ async def stats(message: Message):
             "select exists(select 1 from rewardscollected where uid=$1 and deactivated=false)",
             message.from_id,
         )
-        acc = (
-            await conn.fetchval(
-                "select access_level from accesslvl where chat_id=$1 and uid=$2",
-                chat_id,
-                message.from_id,
-            )
-            or 0
-        )
+    acc = await managers.access_level.get_access_level(message.from_id, chat_id)
     if acc < 1 and not await get_user_premium(message.from_id) and not rewards:
         id = message.from_id
     else:

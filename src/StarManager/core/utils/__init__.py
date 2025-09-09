@@ -68,10 +68,8 @@ async def kick_user(uid: int, chat_id: int) -> bool:
     try:
         await api.messages.remove_chat_user(chat_id=chat_id, member_id=uid)
         if (await get_chat_settings(chat_id))["main"]["deleteAccessAndNicknameOnLeave"]:
+            await managers.access_level.delete(uid, chat_id)
             async with (await pool()).acquire() as conn:
-                await conn.execute(
-                    "delete from accesslvl where chat_id=$1 and uid=$2", chat_id, uid
-                )
                 await conn.execute(
                     "delete from nickname where chat_id=$1 and uid=$2", chat_id, uid
                 )
@@ -371,15 +369,7 @@ async def get_reg_date(
 
 @AsyncTTL(time_to_live=2, maxsize=0)
 async def get_user_access_level(uid: int, chat_id: int, none: Any = 0) -> int | Any:
-    async with (await pool()).acquire() as conn:
-        return (
-            await conn.fetchval(
-                "select access_level from accesslvl where chat_id=$1 and uid=$2",
-                chat_id,
-                uid,
-            )
-            or none
-        )
+    return await managers.access_level.get_access_level(uid, chat_id) or none
 
 
 async def get_user_last_message(
@@ -745,25 +735,7 @@ async def turn_chat_setting(chat_id, category, setting, alt=False):
 
 
 async def set_user_access_level(uid, chat_id, access_level):
-    async with (await pool()).acquire() as conn:
-        if not access_level:
-            await conn.execute(
-                "delete from accesslvl where chat_id=$1 and uid=$2", chat_id, uid
-            )
-        else:
-            if not await conn.fetchval(
-                "update accesslvl set access_level = $1 where chat_id=$2 and uid=$3 "
-                "returning 1",
-                access_level,
-                chat_id,
-                uid,
-            ):
-                await conn.execute(
-                    "insert into accesslvl (uid, chat_id, access_level) values ($1, $2, $3)",
-                    uid,
-                    chat_id,
-                    access_level,
-                )
+    await managers.access_level.edit_access_level(uid, chat_id, access_level)
 
 
 async def get_silence(chat_id) -> bool:

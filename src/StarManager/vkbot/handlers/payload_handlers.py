@@ -66,12 +66,6 @@ async def join(message: MessageEvent):
             x = await conn.fetch(
                 "delete from accesslvl where chat_id=$1 returning uid", chat_id
             )
-            await conn.execute(
-                "insert into accesslvl (uid, chat_id, access_level) values ($1, $2, $3)",
-                bp,
-                chat_id,
-                7,
-            )
             for id in x:
                 await utils.set_chat_mute(id[0], chat_id, 0)
             await conn.execute("delete from nickname where chat_id=$1", chat_id)
@@ -102,6 +96,8 @@ async def join(message: MessageEvent):
                 chat_id,
                 time.time(),
             )
+
+        await managers.access_level.edit_access_level(bp, chat_id, 7)
 
         if cmd == "join":
             try:
@@ -1324,13 +1320,8 @@ async def giveowner(message: MessageEvent):
     uid = payload["uid"]
     id = payload["chid"]
 
+    await managers.access_level.delete(uid, chat_id)
     async with (await pool()).acquire() as conn:
-        if not await conn.fetchval(
-            "delete from accesslvl where chat_id=$1 and uid=$2 returning 1",
-            chat_id,
-            uid,
-        ):
-            return
         await conn.execute("delete from gpool where chat_id=$1", chat_id)
         await conn.execute("delete from chatgroups where chat_id=$1", chat_id)
     await utils.set_user_access_level(id, chat_id, 7)

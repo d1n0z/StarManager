@@ -1,5 +1,6 @@
 from StarManager.core.managers.antispam_messages import AntispamMessagesManager
 from StarManager.core.managers.chatusercmids import ChatUserCMIDsManager
+from StarManager.core.managers.access_level import AccessLevelManager
 from StarManager.core.managers.commands_cooldown import CommandsCooldownManager
 from StarManager.core.managers.duel import DuelLockManager
 from StarManager.core.managers.raid import RaidManager
@@ -9,9 +10,10 @@ commands_cooldown = CommandsCooldownManager()
 duel_lock = DuelLockManager()
 raid = RaidManager()
 chat_user_cmids = ChatUserCMIDsManager()
+access_level = AccessLevelManager()
 
 
-to_init = [chat_user_cmids]
+to_init = [chat_user_cmids, access_level]
 
 
 async def initialize():
