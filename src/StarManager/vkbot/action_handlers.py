@@ -266,10 +266,14 @@ async def action_handle(message: MessageNew) -> None:
                 u_nickname = await utils.get_user_nickname(uid, chat_id)
                 m = await utils.send_message(
                     event.peer_id,
-                    welcome[0].replace(
-                        "%name%",
-                        f"[id{uid}|{await utils.get_user_name(uid) if u_nickname is None else u_nickname}]",
-                    ),
+                    (
+                        welcome[0].replace(
+                            "%name%",
+                            f"[id{uid}|{await utils.get_user_name(uid) if u_nickname is None else u_nickname}]",
+                        )
+                    )
+                    if welcome[0]
+                    else None,
                     keyboard.urlbutton(welcome[1], welcome[2]),
                     welcome[3],
                 )

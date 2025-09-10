@@ -89,7 +89,7 @@ class AccessLevelCache(BaseCacheManager):
         async with self._lock:
             self._cache[cache_key].access_level = access_level
             self._dirty.add(cache_key)
-    
+
     async def remove(self, cache_key: Tuple[int, int]):
         async with self._lock:
             if cache_key in self._cache:
