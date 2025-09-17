@@ -313,7 +313,9 @@ async def zov(message: Message):
             await get_user_nickname(uid, message.peer_id - 2000000000),
             " ".join(data[1:]),
             (
-                await api.messages.get_conversation_members(peer_id=message.peer_id)
+                await api.messages.get_conversation_members(
+                    peer_id=message.peer_id, fields=["deactivated"]  # type: ignore
+                )
             ).items,
         ),
     )

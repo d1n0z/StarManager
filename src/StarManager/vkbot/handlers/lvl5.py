@@ -511,7 +511,7 @@ async def szov(message: Message):
             continue
         try:
             members = await api.messages.get_conversation_members(
-                peer_id=chat_id + 2000000000
+                peer_id=chat_id + 2000000000, fields=['deactivated']  # type: ignore
             )
             if not await send_message(
                 peer_ids=chat_id + 2000000000,

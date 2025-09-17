@@ -957,7 +957,7 @@ async def gzov(message: Message):
         try:
             members = (
                 await api.messages.get_conversation_members(
-                    peer_id=chat_id + 2000000000
+                    peer_id=chat_id + 2000000000, fields=['deactivated']  # type: ignore
                 )
             ).items
             if not await send_message(

@@ -1,8 +1,10 @@
 import time
 from ast import literal_eval
 from datetime import datetime
+from typing import List
 
 from cache.async_lru import AsyncLRU
+from vkbottle_types.objects import MessagesConversationMember
 
 from StarManager.core import tables
 from StarManager.core.config import settings
@@ -241,7 +243,8 @@ async def clear(deleting, uid, chat_id, delete_from):
             uid=uid,
             u_name=await get_user_name(uid) or await get_user_nickname(uid, chat_id),
             id=delete_from,
-            name=await get_user_name(delete_from) or await get_user_nickname(delete_from, chat_id),
+            name=await get_user_name(delete_from)
+            or await get_user_nickname(delete_from, chat_id),
             deleted=len(deleting),
         )
     return await get(
@@ -847,7 +850,11 @@ async def gsetaccess_hint():
 
 
 async def zov(uid, name, nickname, cause, members):
-    call = [f"[id{i.member_id}|\u200b\u206c]" for i in members if i.member_id > 0]
+    call = [
+        f"[id{i.member_id}|\u200b\u206c]"
+        for i in members
+        if i.member_id > 0 and not getattr(i, 'deleted', False) and not getattr(i, 'banned', False)
+    ]
     return await get(
         "zov",
         uid=uid,
