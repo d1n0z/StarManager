@@ -2,7 +2,7 @@ from StarManager.core.config import settings
 from StarManager.core.tables import BotMessages
 
 
-async def load():
+async def load() -> None:
     await BotMessages.all().delete()
     await BotMessages.bulk_create([
         BotMessages(key='join', text='📢 Привет! Для начала работы, нужно выдать боту администратора и нажать Начать'),
