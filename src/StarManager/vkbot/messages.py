@@ -64,7 +64,7 @@ async def id(uid, data, name, url, last_message):
 async def top(top):
     return await get("top") + "".join(
         [
-            f"[{number_to_emoji(k + 1)}]. [id{i[0]}|{await get_user_name(i[0])}] - {i[1]} сообщений\n"
+            f"{number_to_emoji(k + 1)}. [id{i[0]}|{await get_user_name(i[0])}] - {i[1]} сообщений\n"
             for k, i in enumerate(top)
         ]
     )
@@ -1574,45 +1574,45 @@ async def bonus_time(id, nick, name, timeleft):
 async def top_lvls(top, chattop):
     msg = await get("top_lvls")
     for k, i in enumerate(top.items()):
-        msg += f"[{number_to_emoji(k + 1)}]. [id{i[0]}|{await get_user_name(i[0])}] - {i[1]} уровень\n"
+        msg += f"{number_to_emoji(k + 1)}. [id{i[0]}|{await get_user_name(i[0])}] - {i[1]} уровень\n"
     msg += "\n🥨 В беседе:\n"
     for k, i in enumerate(chattop.items()):
-        msg += f"[{number_to_emoji(k + 1)}]. [id{i[0]}|{await get_user_name(i[0])}] - {i[1]} уровень\n"
+        msg += f"{number_to_emoji(k + 1)}. [id{i[0]}|{await get_user_name(i[0])}] - {i[1]} уровень\n"
     return msg
 
 
 async def top_duels(duels, category="общее"):
     msg = await get("top_duels", category=category)
     for k, item in enumerate(duels.items()) if top else []:
-        msg += f"[{number_to_emoji(k + 1)}]. [id{item[0]}|{await get_user_name(item[0])}] - {item[1]} побед\n"
+        msg += f"{number_to_emoji(k + 1)}. [id{item[0]}|{await get_user_name(item[0])}] - {item[1]} побед\n"
     return msg
 
 
 async def top_rep(top, category):
     msg = await get("top_rep", category=category)
     for k, item in enumerate(top[:10]) if top else []:
-        msg += f"[{number_to_emoji(k + 1)}]. [id{item[0]}|{await get_user_name(item[0])}] - {'+' if item[1] > 0 else ''}{item[1]}\n"
+        msg += f"{number_to_emoji(k + 1)}. [id{item[0]}|{await get_user_name(item[0])}] - {'+' if item[1] > 0 else ''}{item[1]}\n"
     return msg
 
 
 async def top_math(top):
     msg = await get("top_math")
     for k, item in enumerate(top[:10]) if top else []:
-        msg += f"[{number_to_emoji(k + 1)}]. [id{item[0]}|{await get_user_name(item[0])}] - {item[1]} ответов\n"
+        msg += f"{number_to_emoji(k + 1)}. [id{item[0]}|{await get_user_name(item[0])}] - {item[1]} ответов\n"
     return msg
 
 
 async def top_bonus(top):
     msg = await get("top_bonus")
     for k, item in enumerate(top[:10]) if top else []:
-        msg += f"[{number_to_emoji(k + 1)}]. [id{item[0]}|{await get_user_name(item[0])}] - {item[1]} дней\n"
+        msg += f"{number_to_emoji(k + 1)}. [id{item[0]}|{await get_user_name(item[0])}] - {item[1]} дней\n"
     return msg
 
 
 async def top_coins(top):
     msg = await get("top_coins")
     for k, item in enumerate(top[:10]) if top else []:
-        msg += f"[{number_to_emoji(k + 1)}]. [id{item[0]}|{await get_user_name(item[0])}] - {point_words(item[1], ('монетка', 'монетки', 'монет'))}\n"
+        msg += f"{number_to_emoji(k + 1)}. [id{item[0]}|{await get_user_name(item[0])}] - {point_words(item[1], ('монетка', 'монетки', 'монет'))}\n"
     return msg
 
 
