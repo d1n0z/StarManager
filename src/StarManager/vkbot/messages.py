@@ -1,10 +1,10 @@
 import time
 from ast import literal_eval
+from collections import defaultdict
 from datetime import datetime
-from typing import List
+from typing import Dict
 
 from cache.async_lru import AsyncLRU
-from vkbottle_types.objects import MessagesConversationMember
 
 from StarManager.core import tables
 from StarManager.core.config import settings
@@ -15,6 +15,7 @@ from StarManager.core.utils import (
     get_group_name,
     get_user_name,
     get_user_nickname,
+    number_to_emoji,
     point_days,
     point_hours,
     point_minutes,
@@ -63,36 +64,33 @@ async def id(uid, data, name, url, last_message):
 async def top(top):
     return await get("top") + "".join(
         [
-            f"[{k + 1}]. [id{i[0]}|{await get_user_name(i[0])}] - {i[1]} сообщений\n"
+            f"[{number_to_emoji(k + 1)}]. [id{i[0]}|{await get_user_name(i[0])}] - {i[1]} сообщений\n"
             for k, i in enumerate(top)
         ]
     )
 
 
-async def help(page=0, cmds=settings.commands.commands):
-    descs = {i: [] for i in range(0, 9)}
-    if page != 8:
-        for k, i in cmds.items():
-            try:
-                descs[int(i)].append(settings.commands.descriptions[k])
-            except Exception:
-                pass
-        return (
-            await get(f"help_page{page}")
-            + "".join([f"{i}\n" for i in descs[page]])
-            + await get("help_last")
+async def help(page: int = 0, cmds: Dict[str, int] = settings.commands.commands) -> str:
+    header = await get(f"help_page{page}")
+    footer = await get("help_last")
+
+    if page == 8:
+        premium_descs = (
+            f"{settings.commands.descriptions[name]}\n"
+            for name in settings.commands.premium
         )
-    else:
-        return (
-            await get(f"help_page{page}")
-            + "".join(
-                [
-                    f"{settings.commands.descriptions[i]}\n"
-                    for i in settings.commands.premium
-                ]
-            )
-            + await get("help_last")
-        )
+        return header + "".join(premium_descs) + footer
+
+    descs: dict[int, list[str]] = defaultdict(list)
+    for name, group in cmds.items():
+        if name in settings.commands.premium:
+            continue
+        try:
+            descs[int(group)].append(settings.commands.descriptions[name])
+        except (KeyError, ValueError):
+            continue
+
+    return header + "".join(f"{d}\n" for d in descs[page]) + footer
 
 
 async def helpdev():
@@ -853,7 +851,9 @@ async def zov(uid, name, nickname, cause, members):
     call = [
         f"[id{i.member_id}|\u200b\u206c]"
         for i in members
-        if i.member_id > 0 and not getattr(i, 'deleted', False) and not getattr(i, 'banned', False)
+        if i.member_id > 0
+        and not getattr(i, "deleted", False)
+        and not getattr(i, "banned", False)
     ]
     return await get(
         "zov",
@@ -1574,45 +1574,45 @@ async def bonus_time(id, nick, name, timeleft):
 async def top_lvls(top, chattop):
     msg = await get("top_lvls")
     for k, i in enumerate(top.items()):
-        msg += f"[{k + 1}]. [id{i[0]}|{await get_user_name(i[0])}] - {i[1]} уровень\n"
+        msg += f"[{number_to_emoji(k + 1)}]. [id{i[0]}|{await get_user_name(i[0])}] - {i[1]} уровень\n"
     msg += "\n🥨 В беседе:\n"
     for k, i in enumerate(chattop.items()):
-        msg += f"[{k + 1}]. [id{i[0]}|{await get_user_name(i[0])}] - {i[1]} уровень\n"
+        msg += f"[{number_to_emoji(k + 1)}]. [id{i[0]}|{await get_user_name(i[0])}] - {i[1]} уровень\n"
     return msg
 
 
 async def top_duels(duels, category="общее"):
     msg = await get("top_duels", category=category)
     for k, item in enumerate(duels.items()) if top else []:
-        msg += f"[{k + 1}]. [id{item[0]}|{await get_user_name(item[0])}] - {item[1]} побед\n"
+        msg += f"[{number_to_emoji(k + 1)}]. [id{item[0]}|{await get_user_name(item[0])}] - {item[1]} побед\n"
     return msg
 
 
 async def top_rep(top, category):
     msg = await get("top_rep", category=category)
     for k, item in enumerate(top[:10]) if top else []:
-        msg += f"[{k + 1}]. [id{item[0]}|{await get_user_name(item[0])}] - {'+' if item[1] > 0 else ''}{item[1]}\n"
+        msg += f"[{number_to_emoji(k + 1)}]. [id{item[0]}|{await get_user_name(item[0])}] - {'+' if item[1] > 0 else ''}{item[1]}\n"
     return msg
 
 
 async def top_math(top):
     msg = await get("top_math")
     for k, item in enumerate(top[:10]) if top else []:
-        msg += f"[{k + 1}]. [id{item[0]}|{await get_user_name(item[0])}] - {item[1]} ответов\n"
+        msg += f"[{number_to_emoji(k + 1)}]. [id{item[0]}|{await get_user_name(item[0])}] - {item[1]} ответов\n"
     return msg
 
 
 async def top_bonus(top):
     msg = await get("top_bonus")
     for k, item in enumerate(top[:10]) if top else []:
-        msg += f"[{k + 1}]. [id{item[0]}|{await get_user_name(item[0])}] - {item[1]} дней\n"
+        msg += f"[{number_to_emoji(k + 1)}]. [id{item[0]}|{await get_user_name(item[0])}] - {item[1]} дней\n"
     return msg
 
 
 async def top_coins(top):
     msg = await get("top_coins")
     for k, item in enumerate(top[:10]) if top else []:
-        msg += f"[{k + 1}]. [id{item[0]}|{await get_user_name(item[0])}] - {point_words(item[1], ('монетка', 'монетки', 'монет'))}\n"
+        msg += f"[{number_to_emoji(k + 1)}]. [id{item[0]}|{await get_user_name(item[0])}] - {point_words(item[1], ('монетка', 'монетки', 'монет'))}\n"
     return msg
 
 

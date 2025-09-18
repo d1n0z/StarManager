@@ -10,7 +10,7 @@ from copy import deepcopy
 from datetime import date, datetime
 from typing import Any, Dict, Iterable, List, Literal, Union
 from urllib.parse import urlparse
-from loguru import logger
+
 import aiogram
 import aiogram.exceptions
 import dns.resolver
@@ -20,6 +20,7 @@ import urllib3
 import xmltodict
 from cache.async_lru import AsyncLRU
 from cache.async_ttl import AsyncTTL
+from loguru import logger
 from memoization import cached
 from multicolorcaptcha import CaptchaGenerator
 from nudenet import NudeDetector
@@ -37,7 +38,7 @@ from vkbottle_types.objects import (
 from yookassa import Configuration, Payment
 from yookassa.payment import PaymentResponse
 
-from StarManager.core import managers, config
+from StarManager.core import config, managers
 from StarManager.core.config import api, settings, vk_api_session
 from StarManager.core.db import pool
 
@@ -1645,3 +1646,10 @@ async def archive_report(
             )
         except aiogram.exceptions.TelegramBadRequest:
             logger.exception(f"Failed to delete message {message_id}")
+
+
+def number_to_emoji(n: int) -> str:
+    if n == 10:
+        return "🔟"
+    mapping = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
+    return "".join(mapping[int(d)] for d in str(n))

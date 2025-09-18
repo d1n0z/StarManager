@@ -1,12 +1,10 @@
 import time
-from datetime import datetime
 
 from cache.async_ttl import AsyncTTL
 
 import StarManager.vkbot.messages as messages
 from StarManager.core.utils import (
     command_cooldown_check,
-    delete_messages,
     get_chat_settings,
     get_silence,
     get_silence_allowed,
@@ -163,33 +161,14 @@ async def checkCMD(
         return False
 
     chat_settings = await get_chat_settings(chat_id)
-    if chat_settings["main"]["nightmode"] and u_acc < 6:
+    if chat_settings["main"]["captcha"]:
         async with (await pool()).acquire() as conn:
-            setting = await conn.fetchval(
-                "select value2 from settings where chat_id=$1 and setting='nightmode'",
+            if await conn.fetchval(
+                "select exists(select id from typequeue where chat_id=$1 and uid=$2 and type='captcha')",
                 chat_id,
-            )
-        if setting:
-            setting = setting.split("-")
-            now = datetime.now()
-            start = datetime.strptime(setting[0], "%H:%M").replace(year=now.year)
-            end = datetime.strptime(setting[1], "%H:%M").replace(year=now.year)
-            if not (
-                now.hour < start.hour
-                or now.hour > end.hour
-                or (now.hour == start.hour and now.minute < start.minute)
-                or (now.hour == end.hour and now.minute >= end.minute)
+                uid,
             ):
-                await delete_messages(message.conversation_message_id, chat_id)
                 return False
-        if chat_settings["main"]["captcha"]:
-            async with (await pool()).acquire() as conn:
-                if await conn.fetchval(
-                    "select exists(select id from typequeue where chat_id=$1 and uid=$2 and type='captcha')",
-                    chat_id,
-                    uid,
-                ):
-                    return False
 
     if returncmd:
         return cmd

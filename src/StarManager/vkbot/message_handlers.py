@@ -45,8 +45,6 @@ async def message_handle(event: MessageNew) -> Any:
         return
     if event.object.message.action:
         return await action_handle(event)
-    if event.object.message.from_id < 0:
-        return
     msg = event.object.message.text
     if event.object.message.peer_id < 2000000000:
         chat_id = event.object.message.peer_id
@@ -67,13 +65,39 @@ async def message_handle(event: MessageNew) -> Any:
                 await messages.pm_market(),
                 kbd=keyboard.pm_market(event.object.message.from_id),
             )
-
-    if await answer_handler(event):
-        return
-
+    
     uid = event.object.message.from_id
     msgtime = event.object.message.date
     chat_id = event.object.message.peer_id - 2000000000
+    chat_settings = await get_chat_settings(chat_id)
+    uacc = await get_user_access_level(uid, chat_id) if uid > 0 else 0
+
+    if chat_settings["main"]["nightmode"] and (uacc <= 6):
+        async with (await pool()).acquire() as conn:
+            chatsetting = await conn.fetchrow(
+                "select value2 from settings where chat_id=$1 and setting='nightmode'",
+                chat_id,
+            )
+        if chatsetting and (setting := chatsetting[0]):
+            setting = setting.split("-")
+            now = datetime.now()
+            start = datetime.strptime(setting[0], "%H:%M").replace(year=now.year)
+            end = datetime.strptime(setting[1], "%H:%M").replace(year=now.year)
+            if not (
+                now.hour < start.hour
+                or now.hour > end.hour
+                or (now.hour == start.hour and now.minute < start.minute)
+                or (now.hour == end.hour and now.minute >= end.minute)
+            ):
+                return await delete_messages(
+                    event.object.message.conversation_message_id, chat_id
+                )
+
+    if event.object.message.from_id < 0:
+        return
+    if await answer_handler(event):
+        return
+
     if uid in settings.service.admins:
         print(f"{uid}({chat_id}): {msg}")
 
@@ -302,7 +326,7 @@ async def message_handle(event: MessageNew) -> Any:
             ),
         )
         return await kick_user(uid, chat_id=chat_id)
-    if (uacc := await get_user_access_level(uid, chat_id)) == 0 and await getUChatLimit(
+    if uacc == 0 and await getUChatLimit(
         msgtime, await get_user_last_message(uid, chat_id, 0), uacc, chat_id
     ):
         return await delete_messages(
@@ -314,7 +338,6 @@ async def message_handle(event: MessageNew) -> Any:
         return await delete_messages(
             event.object.message.conversation_message_id, chat_id
         )
-    chat_settings = await get_chat_settings(chat_id)
     if (
         uacc == 0
         and chat_settings["main"]["disallowPings"]
@@ -336,26 +359,6 @@ async def message_handle(event: MessageNew) -> Any:
         return await delete_messages(
             event.object.message.conversation_message_id, chat_id
         )
-    if chat_settings["main"]["nightmode"] and uacc < 6:
-        async with (await pool()).acquire() as conn:
-            chatsetting = await conn.fetchrow(
-                "select value2 from settings where chat_id=$1 and setting='nightmode'",
-                chat_id,
-            )
-        if chatsetting and (setting := chatsetting[0]):
-            setting = setting.split("-")
-            now = datetime.now()
-            start = datetime.strptime(setting[0], "%H:%M").replace(year=now.year)
-            end = datetime.strptime(setting[1], "%H:%M").replace(year=now.year)
-            if not (
-                now.hour < start.hour
-                or now.hour > end.hour
-                or (now.hour == start.hour and now.minute < start.minute)
-                or (now.hour == end.hour and now.minute >= end.minute)
-            ):
-                return await delete_messages(
-                    event.object.message.conversation_message_id, chat_id
-                )
 
     try:
         if (
