@@ -6,6 +6,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 
 argparser = ArgumentParser()
+argparser.add_argument("-t", "--tests", action="store_true")
 argparser.add_argument("-o", "--only-vkbot", action="store_true")
 argparser.add_argument("-nsc", "--no-scheduler", action="store_true")
 argparser.add_argument("-sc", "--scheduler", action="store_true")
@@ -17,6 +18,10 @@ argparser.add_argument("-st", "--site", action="store_true")
 
 def main():
     args = argparser.parse_args()
+    if args.tests:
+        from tests import main as run_tests
+
+        return run_tests()
     if args.scheduler:
         from StarManager.runscheduler import main as run_scheduler
 

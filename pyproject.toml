@@ -25,6 +25,7 @@ dependencies = [
     "pillow>=11.3.0",
     "pydantic-settings>=2.10.1",
     "pysafebrowsing>=0.1.4",
+    "pytest-asyncio>=1.2.0",
     "tortoise>=0.1.1",
     "vk-api>=11.10.0",
     "vkbottle>=4.5.2",
