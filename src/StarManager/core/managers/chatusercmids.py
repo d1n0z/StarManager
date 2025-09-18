@@ -1,10 +1,15 @@
-import asyncio
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from tortoise.expressions import Q
 
-from StarManager.core.managers.base import BaseCacheManager, BaseManager, BaseRepository, BaseCachedModel
+from StarManager.core.managers.base import (
+    BaseCachedModel,
+    BaseCacheManager,
+    BaseManager,
+    BaseRepository,
+)
 from StarManager.core.tables import ChatUserCMIDs
 
 
@@ -12,30 +17,23 @@ from StarManager.core.tables import ChatUserCMIDs
 class _CachedChatUserCMIDs(BaseCachedModel):
     cmids: List[int]
 
+    @classmethod
+    def from_list(cls, cmids_list: List[int]):
+        return cls(cmids=list(cmids_list))
+
 
 class ChatUserCMIDsRepository(BaseRepository):
     def __init__(self, items: List[ChatUserCMIDs]):
         super().__init__()
         self._items = items
 
-    async def ensure_record(
-        self, uid: int, chat_id: int, defaults: Optional[Dict[str, Any]] = None
-    ) -> ChatUserCMIDs:
-        defaults = defaults or {"cmids": []}
-        obj, _created = await ChatUserCMIDs.get_or_create(
-            uid=uid, chat_id=chat_id, defaults=defaults
-        )
+    async def get_existing_cmids(self, uid: int, chat_id: int) -> Set[int]:
         async with self._lock:
-            if obj not in self._items:
-                self._items.append(obj)
-        return obj
-
-    async def get_record(self, uid: int, chat_id: int) -> Optional[ChatUserCMIDs]:
-        async with self._lock:
-            return next(
-                (i for i in self._items if i.uid == uid and i.chat_id == chat_id),
-                None,
-            )
+            return {
+                row.cmid
+                for row in self._items
+                if row.uid == uid and row.chat_id == chat_id
+            }
 
 
 class ChatUserCMIDsCache(BaseCacheManager):
@@ -50,10 +48,14 @@ class ChatUserCMIDsCache(BaseCacheManager):
         return (uid, chat_id)
 
     async def initialize(self):
+        groups: Dict[Tuple[int, int], List[int]] = defaultdict(list)
         async with self._lock:
             for row in self._items:
                 key = self.make_cache_key(row.uid, row.chat_id)
-                self._cache[key] = _CachedChatUserCMIDs.from_model(row)
+                groups[key].append(row.cmid)
+
+            for key, cmids in groups.items():
+                self._cache[key] = _CachedChatUserCMIDs.from_list(sorted(set(cmids)))
         await super().initialize()
 
     async def _ensure_cached(
@@ -63,11 +65,20 @@ class ChatUserCMIDsCache(BaseCacheManager):
         async with self._lock:
             if cache_key in self._cache:
                 return
-
-        uid, chat_id = cache_key
-        model = await self.repo.ensure_record(uid, chat_id, defaults=initial_data)
-        async with self._lock:
-            self._cache[cache_key] = _CachedChatUserCMIDs.from_model(model)
+            uid, chat_id = cache_key
+            existing = [
+                row.cmid
+                for row in self._items
+                if row.uid == uid and row.chat_id == chat_id
+            ]
+            if existing:
+                self._cache[cache_key] = _CachedChatUserCMIDs.from_list(
+                    sorted(set(existing))
+                )
+            else:
+                self._cache[cache_key] = _CachedChatUserCMIDs.from_list(
+                    initial_data.get("cmids", [])
+                )
 
     async def get(self, cache_key: Tuple[int, int]) -> Tuple[int, ...]:
         async with self._lock:
@@ -77,9 +88,10 @@ class ChatUserCMIDsCache(BaseCacheManager):
     async def append(self, cache_key: Tuple[int, int], cmid: int):
         await self._ensure_cached(cache_key, {"cmids": []})
         async with self._lock:
-            if cmid in self._cache[cache_key].cmids:
+            lst = self._cache[cache_key].cmids
+            if cmid in lst:
                 return
-            self._cache[cache_key].cmids.append(cmid)
+            lst.append(cmid)
             self._dirty.add(cache_key)
 
     async def sync(self):
@@ -87,31 +99,34 @@ class ChatUserCMIDsCache(BaseCacheManager):
             if not self._dirty:
                 return
             dirty = set(self._dirty)
+            # snapshot payloads
             payloads = {
-                (uid, chat_id): self._cache[(uid, chat_id)].cmids
-                for uid, chat_id in dirty
-                if (uid, chat_id) in self._cache
+                key: list(self._cache[key].cmids) for key in dirty if key in self._cache
             }
+            if not payloads:
+                return
 
         query = Q()
         for uid, chat_id in payloads.keys():
             query |= Q(uid=uid, chat_id=chat_id)
-        existing = await ChatUserCMIDs.filter(query) if query else []
-        existing = {(row.uid, row.chat_id): row for row in existing}
+        existing_rows = await ChatUserCMIDs.filter(query)
+        existing_map: Dict[Tuple[int, int], Set[int]] = defaultdict(set)
+        for row in existing_rows:
+            existing_map[(row.uid, row.chat_id)].add(row.cmid)
 
-        to_update, to_create = [], []
+        to_create: List[ChatUserCMIDs] = []
         for (uid, chat_id), cmids in payloads.items():
-            if (uid, chat_id) in existing:
-                row = existing[(uid, chat_id)]
-                row.cmids = cmids
-                to_update.append(row)
-            else:
-                to_create.append(ChatUserCMIDs(uid=uid, chat_id=chat_id, cmids=cmids))
+            present_set = existing_map.get((uid, chat_id), set())
+            new_cmids = set(cmids) - present_set
+            for cm in new_cmids:
+                to_create.append(ChatUserCMIDs(uid=uid, chat_id=chat_id, cmid=cm))
 
-        if to_update:
-            await ChatUserCMIDs.bulk_update(to_update, fields=["cmids"])
         if to_create:
-            await ChatUserCMIDs.bulk_create(to_create)
+            BATCH = 5000
+            for i in range(0, len(to_create), BATCH):
+                await ChatUserCMIDs.bulk_create(to_create[i : i + BATCH])
+            async with self._lock:
+                self._items.extend(to_create)
 
         async with self._lock:
             self._dirty.difference_update(dirty)

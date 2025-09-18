@@ -758,7 +758,7 @@ class RaidMode(Model):
 class ChatUserCMIDs(Model):  # questionable solution, looking for a new one
     chat_id = fields.IntField()
     uid = fields.IntField()
-    cmids = ArrayField(element_type="int")
+    cmid = fields.IntField()
 
     class Meta:
         table = "chatusercmids"
