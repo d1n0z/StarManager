@@ -72,7 +72,7 @@ async def message_handle(event: MessageNew) -> Any:
     chat_settings = await get_chat_settings(chat_id)
     uacc = await get_user_access_level(uid, chat_id) if uid > 0 else 0
 
-    if chat_settings["main"]["nightmode"] and (uacc <= 6):
+    if chat_settings["main"]["nightmode"] and uacc <= 6:
         async with (await pool()).acquire() as conn:
             chatsetting = await conn.fetchrow(
                 "select value2 from settings where chat_id=$1 and setting='nightmode'",
@@ -92,6 +92,13 @@ async def message_handle(event: MessageNew) -> Any:
                 return await delete_messages(
                     event.object.message.conversation_message_id, chat_id
                 )
+    
+    if (
+        await get_silence(chat_id) and uacc not in await get_silence_allowed(chat_id)
+    ) or await get_user_mute(uid, chat_id) > int(msgtime):
+        return await delete_messages(
+            event.object.message.conversation_message_id, chat_id
+        )
 
     if event.object.message.from_id < 0:
         return
@@ -329,12 +336,6 @@ async def message_handle(event: MessageNew) -> Any:
     if uacc == 0 and await getUChatLimit(
         msgtime, await get_user_last_message(uid, chat_id, 0), uacc, chat_id
     ):
-        return await delete_messages(
-            event.object.message.conversation_message_id, chat_id
-        )
-    if (
-        await get_silence(chat_id) and uacc not in await get_silence_allowed(chat_id)
-    ) or await get_user_mute(uid, chat_id) > int(msgtime):
         return await delete_messages(
             event.object.message.conversation_message_id, chat_id
         )
