@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, TypeAlias
 
 from tortoise.expressions import Q
 
@@ -22,36 +22,37 @@ class _CachedChatUserCMIDs(BaseCachedModel):
         return cls(cmids=list(cmids_list))
 
 
+CacheKey: TypeAlias = Tuple[int, int]
+Cache: TypeAlias = Dict[CacheKey, _CachedChatUserCMIDs]
+
+
+def _make_cache_key(uid: int, chat_id: int) -> CacheKey:
+    return (uid, chat_id)
+
+
 class ChatUserCMIDsRepository(BaseRepository):
-    def __init__(self, items: List[ChatUserCMIDs]):
+    def __init__(self):
         super().__init__()
-        self._items = items
 
     async def get_existing_cmids(self, uid: int, chat_id: int) -> Set[int]:
-        async with self._lock:
-            return {
-                row.cmid
-                for row in self._items
-                if row.uid == uid and row.chat_id == chat_id
-            }
+        return {
+            row.cmid
+            for row in await ChatUserCMIDs.filter(uid=uid, chat_id=chat_id).all()
+        }
 
 
 class ChatUserCMIDsCache(BaseCacheManager):
-    def __init__(self, repo: ChatUserCMIDsRepository, items: List[ChatUserCMIDs]):
+    def __init__(self, repo: ChatUserCMIDsRepository, cache: Cache):
         super().__init__()
-        self._cache: Dict[Tuple[int, int], _CachedChatUserCMIDs] = {}
-        self._dirty: Set[Tuple[int, int]] = set()
+        self._cache: Cache = cache
+        self._dirty: Set[CacheKey] = set()
         self.repo = repo
-        self._items = items
-
-    def make_cache_key(self, uid: int, chat_id: int) -> Tuple[int, int]:
-        return (uid, chat_id)
 
     async def initialize(self):
-        groups: Dict[Tuple[int, int], List[int]] = defaultdict(list)
+        groups: Dict[CacheKey, List[int]] = defaultdict(list)
         async with self._lock:
-            for row in self._items:
-                key = self.make_cache_key(row.uid, row.chat_id)
+            for row in await ChatUserCMIDs.all():
+                key = _make_cache_key(row.uid, row.chat_id)
                 groups[key].append(row.cmid)
 
             for key, cmids in groups.items():
@@ -59,18 +60,13 @@ class ChatUserCMIDsCache(BaseCacheManager):
         await super().initialize()
 
     async def _ensure_cached(
-        self, cache_key: Tuple[int, int], initial_data: Optional[Dict[str, Any]] = None
+        self, cache_key: CacheKey, initial_data: Optional[Dict[str, Any]] = None
     ):
         initial_data = initial_data or {"cmids": []}
         async with self._lock:
             if cache_key in self._cache:
                 return
-            uid, chat_id = cache_key
-            existing = [
-                row.cmid
-                for row in self._items
-                if row.uid == uid and row.chat_id == chat_id
-            ]
+            existing = await self.repo.get_existing_cmids(*cache_key)
             if existing:
                 self._cache[cache_key] = _CachedChatUserCMIDs.from_list(
                     sorted(set(existing))
@@ -80,12 +76,12 @@ class ChatUserCMIDsCache(BaseCacheManager):
                     initial_data.get("cmids", [])
                 )
 
-    async def get(self, cache_key: Tuple[int, int]) -> Tuple[int, ...]:
+    async def get(self, cache_key: CacheKey):
         async with self._lock:
             obj = self._cache.get(cache_key)
             return tuple(obj.cmids) if obj else ()
 
-    async def append(self, cache_key: Tuple[int, int], cmid: int):
+    async def append(self, cache_key: CacheKey, cmid: int):
         await self._ensure_cached(cache_key, {"cmids": []})
         async with self._lock:
             lst = self._cache[cache_key].cmids
@@ -94,65 +90,66 @@ class ChatUserCMIDsCache(BaseCacheManager):
             lst.append(cmid)
             self._dirty.add(cache_key)
 
-    async def sync(self):
+    async def sync(self, batch_size: int = 1000):
         async with self._lock:
             if not self._dirty:
                 return
-            dirty = set(self._dirty)
-            # snapshot payloads
+            dirty_snapshot = set(self._dirty)
             payloads = {
-                key: list(self._cache[key].cmids) for key in dirty if key in self._cache
+                key: set(self._cache[key].cmids)
+                for key in dirty_snapshot
+                if key in self._cache
             }
-            if not payloads:
-                return
 
+        if not payloads:
+            return
+
+        items = list(payloads.items())
         query = Q()
         for uid, chat_id in payloads.keys():
             query |= Q(uid=uid, chat_id=chat_id)
-        existing_rows = await ChatUserCMIDs.filter(query)
-        existing_map: Dict[Tuple[int, int], Set[int]] = defaultdict(set)
-        for row in existing_rows:
-            existing_map[(row.uid, row.chat_id)].add(row.cmid)
+        try:
+            existing_rows = await ChatUserCMIDs.filter(query)
+            existing_map: Dict[Tuple[int, int], Set[int]] = defaultdict(set)
+            for row in existing_rows:
+                existing_map[_make_cache_key(row.uid, row.chat_id)].add(row.cmid)
 
-        to_create: List[ChatUserCMIDs] = []
-        for (uid, chat_id), cmids in payloads.items():
-            present_set = existing_map.get((uid, chat_id), set())
-            new_cmids = set(cmids) - present_set
-            for cm in new_cmids:
-                to_create.append(ChatUserCMIDs(uid=uid, chat_id=chat_id, cmid=cm))
+            for i in range(0, len(items), batch_size):
+                batch, to_create = items[i : i + batch_size], []
 
-        if to_create:
-            BATCH = 5000
-            for i in range(0, len(to_create), BATCH):
-                await ChatUserCMIDs.bulk_create(to_create[i : i + BATCH])
-            async with self._lock:
-                self._items.extend(to_create)
+                for (uid, chat_id), cmids in batch:
+                    for cmid in cmids - existing_map[_make_cache_key(uid, chat_id)]:
+                        to_create.append(
+                            ChatUserCMIDs(uid=uid, chat_id=chat_id, cmid=cmid)
+                        )
+
+                if to_create:
+                    await ChatUserCMIDs.bulk_create(to_create, batch_size=batch_size)
+        except Exception:
+            from loguru import logger
+
+            logger.exception("ChatUserCMIDs sync failed")
+            return
 
         async with self._lock:
-            self._dirty.difference_update(dirty)
+            self._dirty.difference_update(dirty_snapshot)
 
 
 class ChatUserCMIDsManager(BaseManager):
     def __init__(self):
         super().__init__()
-        self._items: List[ChatUserCMIDs] = []
-        self.repo: ChatUserCMIDsRepository = ChatUserCMIDsRepository(self._items)
-        self.cache: ChatUserCMIDsCache = ChatUserCMIDsCache(self.repo, self._items)
+        self._cache: Cache = {}
+        self.repo: ChatUserCMIDsRepository = ChatUserCMIDsRepository()
+        self.cache: ChatUserCMIDsCache = ChatUserCMIDsCache(self.repo, self._cache)
 
     async def initialize(self):
-        rows = await ChatUserCMIDs.all()
-        async with self._lock:
-            self._items.extend(rows)
         await self.cache.initialize()
 
-    def make_key(self, uid: int, chat_id: int) -> Tuple[int, int]:
-        return self.cache.make_cache_key(uid, chat_id)
-
     async def get_cmids(self, uid: int, chat_id: int) -> Tuple[int, ...]:
-        return await self.cache.get(self.make_key(uid, chat_id))
+        return await self.cache.get(_make_cache_key(uid, chat_id))
 
     async def append_cmid(self, uid: int, chat_id: int, cmid: int):
-        await self.cache.append(self.make_key(uid, chat_id), cmid)
+        await self.cache.append(_make_cache_key(uid, chat_id), cmid)
 
     async def sync(self):
         await self.cache.sync()

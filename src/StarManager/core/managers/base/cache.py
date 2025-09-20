@@ -10,10 +10,6 @@ class BaseCacheManager(ABC):
         self._lock = asyncio.Lock()
         self._sync_interval = sync_interval
         self._sync_task = None
-
-    @abstractmethod
-    def make_cache_key(self, *args, **kwargs):
-        pass
     
     @abstractmethod
     async def initialize(self):

@@ -1,129 +1,119 @@
-# tests/test_chatusercmids_manager.py
-import importlib
 import pytest
+import asyncio
 
-
-module = importlib.import_module(r"src.StarManager.core.managers.chatusercmids")
-pytest_plugins = ("pytest_asyncio",)
-
-
-class FakeModel:
-    """
-    Простая in-memory "модель", имитирует методы, которые использует код:
-    - all()
-    - filter(query)  (мы игнорируем Q и просто возвращаем все)
-    - bulk_create(objs)
-    Экземпляры: атрибуты uid, chat_id, cmid
-    """
-    storage = []
-
-    def __init__(self, uid, chat_id, cmid):
-        self.uid = uid
-        self.chat_id = chat_id
-        self.cmid = cmid
-
-    def __repr__(self):
-        return f"FakeModel(uid={self.uid}, chat_id={self.chat_id}, cmid={self.cmid})"
-
-    @classmethod
-    async def all(cls):
-        # возвращаем копию, чтобы тесты не могли нечаянно изменить storage напрямую
-        return list(cls.storage)
-
-    @classmethod
-    async def filter(cls, _query):
-        # игнорируем Q() — возвращаем все записи; код сам отфильтрует по uid/chat_id
-        return list(cls.storage)
-
-    @classmethod
-    async def bulk_create(cls, objs):
-        # вставляем объекты в storage (подразумевается, что objs — список инстансов)
-        cls.storage.extend(objs)
-
-
-@pytest.fixture(autouse=True)
-def clear_fake_model_storage():
-    FakeModel.storage.clear()
-    yield
-    FakeModel.storage.clear()
+from StarManager.core.managers.chatusercmids import ChatUserCMIDsManager
+from StarManager.core.tables import ChatUserCMIDs
 
 
 @pytest.mark.asyncio
-async def test_initialize_empty(monkeypatch):
-    # Подменяем модель в модуле с кодом
-    monkeypatch.setattr(module, "ChatUserCMIDs", FakeModel)
+async def test_basic_append_and_get(monkeypatch, db):
+    manager = ChatUserCMIDsManager()
+    await manager.initialize()
 
-    mgr = module.ChatUserCMIDsManager()
-    await mgr.initialize()
+    uid, chat_id = 1, 100
+    cmids = [10, 20, 30]
 
-    # пустой кэш
-    got = await mgr.get_cmids(1, 1)
-    assert got == ()
+    # append cmids
+    for cmid in cmids:
+        await manager.append_cmid(uid, chat_id, cmid)
 
-@pytest.mark.asyncio
-async def test_initialize_with_data(monkeypatch):
-    monkeypatch.setattr(module, "ChatUserCMIDs", FakeModel)
+    # check get_cmids
+    result = await manager.get_cmids(uid, chat_id)
+    assert set(result) == set(cmids)
 
-    # подготавливаем storage: несколько строк для одной пары и для другой
-    FakeModel.storage.extend([
-        FakeModel( uid=1, chat_id=10, cmid=100 ),
-        FakeModel( uid=1, chat_id=10, cmid=101 ),
-        FakeModel( uid=2, chat_id=20, cmid=200 ),
-        FakeModel( uid=1, chat_id=10, cmid=100 ),  # дубликат в хранилище
-    ])
+    # sync to DB
+    await manager.sync()
 
-    mgr = module.ChatUserCMIDsManager()
-    await mgr.initialize()
+    # check DB records
+    db_cmids = await ChatUserCMIDs.filter(uid=uid, chat_id=chat_id)
+    db_set = {row.cmid for row in db_cmids}
+    assert db_set == set(cmids)
 
-    got = await mgr.get_cmids(1, 10)
-    assert set(got) == {100, 101}
-    assert isinstance(got, tuple)
-
-    got2 = await mgr.get_cmids(2, 20)
-    assert got2 == (200,)
 
 @pytest.mark.asyncio
-async def test_append_and_sync_creates_new(monkeypatch):
-    monkeypatch.setattr(module, "ChatUserCMIDs", FakeModel)
+async def test_no_duplicate_on_append(monkeypatch, db):
+    manager = ChatUserCMIDsManager()
+    await manager.initialize()
 
-    mgr = module.ChatUserCMIDsManager()
-    await mgr.initialize()
+    uid, chat_id = 2, 200
+    cmid = 42
 
-    # append two cmid для пары (1,1)
-    await mgr.append_cmid(1, 1, 10)
-    await mgr.append_cmid(1, 1, 11)
+    # append the same cmid multiple times
+    for _ in range(3):
+        await manager.append_cmid(uid, chat_id, cmid)
 
-    # before sync: DB storage still empty
-    assert FakeModel.storage == []
+    result = await manager.get_cmids(uid, chat_id)
+    assert result == (cmid,)
 
-    await mgr.sync()
+    await manager.sync()
+    db_cmids = await ChatUserCMIDs.filter(uid=uid, chat_id=chat_id)
+    assert len(db_cmids) == 1
+    assert db_cmids[0].cmid == cmid
 
-    # После sync — в storage должны появиться 2 записи
-    assert len(FakeModel.storage) == 2
-    cmids_in_storage = { (r.uid, r.chat_id, r.cmid) for r in FakeModel.storage }
-    assert (1,1,10) in cmids_in_storage and (1,1,11) in cmids_in_storage
-
-    # get_cmids вернёт значения из кэша
-    got = await mgr.get_cmids(1,1)
-    assert set(got) >= {10, 11}
 
 @pytest.mark.asyncio
-async def test_no_duplicate_on_existing(monkeypatch):
-    monkeypatch.setattr(module, "ChatUserCMIDs", FakeModel)
+async def test_sync_multiple_users(db):
+    manager = ChatUserCMIDsManager()
+    await manager.initialize()
 
-    # уже есть запись 10
-    FakeModel.storage.append(FakeModel(1, 1, 10))
+    data = {
+        (1, 100): [1, 2, 3],
+        (2, 100): [4, 5],
+        (1, 101): [6],
+    }
 
-    mgr = module.ChatUserCMIDsManager()
-    await mgr.initialize()
+    # append cmids
+    for key, cmids in data.items():
+        uid, chat_id = key
+        for cmid in cmids:
+            await manager.append_cmid(uid, chat_id, cmid)
 
-    # append duplicate 10 -> не добавится в кэш
-    await mgr.append_cmid(1, 1, 10)
-    await mgr.append_cmid(1, 1, 11)
+    await manager.sync()
 
-    await mgr.sync()
+    # check DB
+    for key, cmids in data.items():
+        uid, chat_id = key
+        rows = await ChatUserCMIDs.filter(uid=uid, chat_id=chat_id)
+        assert set(row.cmid for row in rows) == set(cmids)
 
-    # storage должно содержать ровно 2 записи: 10 (старое) и 11 (новое)
-    assert len(FakeModel.storage) == 2
-    cmids = sorted([r.cmid for r in FakeModel.storage if r.uid == 1 and r.chat_id == 1])
-    assert cmids == [10, 11]
+
+@pytest.mark.asyncio
+async def test_concurrent_append_same_key(db):
+    manager = ChatUserCMIDsManager()
+    await manager.initialize()
+
+    uid, chat_id = 3, 300
+    cmids = list(range(10))
+
+    async def append_all():
+        for cmid in cmids:
+            await manager.append_cmid(uid, chat_id, cmid)
+
+    # run multiple appenders concurrently
+    await asyncio.gather(append_all(), append_all(), append_all())
+
+    result = await manager.get_cmids(uid, chat_id)
+    assert set(result) == set(cmids)
+
+    await manager.sync()
+    rows = await ChatUserCMIDs.filter(uid=uid, chat_id=chat_id)
+    assert set(row.cmid for row in rows) == set(cmids)
+    assert len(rows) == len(cmids)
+
+
+@pytest.mark.asyncio
+async def test_batch_sync_respects_batch_size(db):
+    manager = ChatUserCMIDsManager()
+    await manager.initialize()
+
+    uid, chat_id = 4, 400
+    cmids = list(range(50))
+
+    for cmid in cmids:
+        await manager.append_cmid(uid, chat_id, cmid)
+
+    # patch sync to small batch size
+    await manager.cache.sync(batch_size=10)
+
+    rows = await ChatUserCMIDs.filter(uid=uid, chat_id=chat_id)
+    assert set(row.cmid for row in rows) == set(cmids)
