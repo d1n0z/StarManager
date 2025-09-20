@@ -1,3 +1,4 @@
+from datetime import datetime
 import time
 
 from vkbottle_types.events.bot_events import MessageNew
@@ -49,6 +50,20 @@ async def action_handle(message: MessageNew) -> None:
         return
 
     if action.type.value in ("chat_invite_user_by_link", "chat_invite_user"):
+        if chat_id in settings.service.too_old_last_seen_in:
+            user = (await api.users.get(user_ids=uid, fields=["last_seen"]))[0]  # type: ignore
+            cutoff = datetime.now().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            if (
+                user.last_seen
+                and user.last_seen.time
+                and user.last_seen.time <= cutoff.timestamp()
+            ):
+                await utils.kick_user(uid, chat_id)
+                await utils.send_message(
+                    event.peer_id,
+                    f"🔴 Пользователь [id{uid}|{await utils.get_user_name(uid)}] не соответствует критериям беседы и его нельзя добавить в беседу.",
+                )
+                return
         async with (await pool()).acquire() as conn:
             raidmode = await conn.fetchrow(
                 "select trigger_status, limit_invites, limit_seconds, status from raidmode where chat_id=$1",

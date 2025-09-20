@@ -109,6 +109,7 @@ class ServiceSettings(BaseSettings):
     premium_bonus_post_id: int
     photo_not_found: str
     contact_admin: str
+    too_old_last_seen_in: List[int] = Field(default_factory=list)
 
 
 class DatabaseSettings(BaseSettings):
