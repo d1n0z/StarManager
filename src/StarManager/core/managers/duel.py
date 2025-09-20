@@ -1,9 +1,10 @@
 import asyncio
 import time
-import traceback
 from typing import Dict, Tuple
 
-from StarManager.core.config import settings, api
+from loguru import logger
+
+from StarManager.core.config import api, settings
 from StarManager.core.managers.base import BaseManager
 
 
@@ -68,23 +69,15 @@ class DuelLockManager(BaseManager):
     def _cache_key(self, chat_id: int, message_id: int):
         return (chat_id, message_id)
 
-    def get_context(self, chat_id: int, message_id: int):
+    async def get_context(self, chat_id: int, message_id: int):
         self._ensure_cleanup_task()
         key = self._cache_key(chat_id, message_id)
-        if key not in self._locks:
-            self._locks[key] = TimedAsyncLock()
-        else:
-            self._locks[key].last_used = time.time()
-        return DuelContext(self._locks[key])
-
-    def get_lock(self, chat_id: int, cmid: int):
-        self._ensure_cleanup_task()
-        key = self._cache_key(chat_id, cmid)
-        if key not in self._locks:
-            self._locks[key] = TimedAsyncLock()
-        else:
-            self._locks[key].last_used = time.time()
-        return self._locks[key]
+        async with self._lock:
+            if key not in self._locks:
+                self._locks[key] = TimedAsyncLock()
+            else:
+                self._locks[key].last_used = time.time()
+            return DuelContext(self._locks[key])
 
     async def _cleanup_loop(self):
         while True:
@@ -93,13 +86,13 @@ class DuelLockManager(BaseManager):
                 async with self._lock:
                     await self._cleanup()
             except Exception:
-                traceback.print_exc()
+                logger.exception("Duel manager cleanup failed:")
 
     async def _cleanup(self):
         now = time.time()
         to_delete = []
 
-        for key, lock in self._locks.items():
+        for key, lock in list(self._locks.items()):
             if lock.locked or now - lock.last_used <= self._ttl:
                 continue
 

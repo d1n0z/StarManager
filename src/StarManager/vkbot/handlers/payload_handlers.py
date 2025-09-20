@@ -159,7 +159,7 @@ async def duel(message: MessageEvent):
 
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
-    async with managers.duel_lock.get_context(
+    async with await managers.duel_lock.get_context(
         chat_id, message.conversation_message_id
     ) as ctx:
         if not ctx.allowed:
