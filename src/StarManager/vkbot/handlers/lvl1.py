@@ -101,17 +101,16 @@ async def mkick(message: Message):
             message, disable_mentions=1, message=await messages.mkick_error()
         )
 
-    names = await api.users.get(user_ids=ids)
     u_acc = await get_user_access_level(uid, chat_id)
     kick_res_count = 0
     msg = ""
-    for ind, id in enumerate(ids):
+    for id in ids:
         if u_acc <= await get_user_access_level(id, chat_id) or not await kick_user(
             id, chat_id
         ):
             continue
         ch_nickname = await get_user_nickname(id, chat_id)
-        msg += f"➖ [id{id}|{ch_nickname if ch_nickname else f'{names[ind].first_name} {names[ind].last_name}'}]\n"
+        msg += f"➖ [id{id}|{ch_nickname if ch_nickname else await get_user_name(id)}]\n"
         kick_res_count += 1
     if kick_res_count > 0:
         return await messagereply(
