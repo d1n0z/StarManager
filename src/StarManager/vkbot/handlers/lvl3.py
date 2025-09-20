@@ -1,6 +1,8 @@
+import asyncio
+import re
 import time
 from ast import literal_eval
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
@@ -8,7 +10,6 @@ from vkbottle.framework.labeler import BotLabeler
 from StarManager.core.config import api
 from StarManager.core.db import pool
 from StarManager.core.utils import (
-    search_id_in_message,
     get_silence,
     get_user_access_level,
     get_user_ban,
@@ -16,6 +17,7 @@ from StarManager.core.utils import (
     get_user_nickname,
     kick_user,
     messagereply,
+    search_id_in_message,
 )
 from StarManager.vkbot import keyboard, messages
 from StarManager.vkbot.rules import SearchCMD
@@ -39,36 +41,75 @@ async def inactive(message: Message):
     chat_id = message.peer_id - 2000000000
     uid = message.from_id
     data = message.text.split()
-    if len(data) != 2:
+    if len(data) != 3:
         return await messagereply(
             message, disable_mentions=1, message=await messages.inactive_hint()
         )
-    count = data[1]
-    if not count.isdigit() or (count := int(count)) <= 0:
+
+    mode, value, m = data[1].lower(), data[2], None
+    try:
+        cutoff = datetime.strptime(value, "%d.%m.%Y").timestamp()
+    except ValueError:
+        m = re.match(r"^(\d+)([dwm])$", (value if not value.isdigit() else value + 'd'))
+        if m:
+            num, unit = int(m.group(1)), m.group(2)
+            now = datetime.now()
+            if unit == "d":
+                cutoff = now - timedelta(days=num)
+            elif unit == "w":
+                cutoff = now - timedelta(weeks=num)
+            else:
+                cutoff = now - timedelta(days=30 * num)
+            cutoff = cutoff.timestamp()
+
+    if mode not in ("chat", "vk") or not m:
         return await messagereply(
             message, disable_mentions=1, message=await messages.inactive_hint()
         )
-    count = time.time() - count * 86400
-    async with (await pool()).acquire() as conn:
-        res = await conn.fetch(
-            "select uid from lastmessagedate where chat_id=$1 and uid>0 and last_message<$2",
-            chat_id,
-            count,
-        )
+
+    to_kick = []
+    chat_members = await api.messages.get_conversation_members(
+        message.peer_id,
+        fields=["last_seen"],  # type: ignore
+    )
+
+    if mode == "chat":
+        async with (await pool()).acquire() as conn:
+            res = await conn.fetch(
+                "select uid, last_message from lastmessagedate where chat_id=$1 and uid>0",
+                chat_id,
+            )
+
+        for row in res:
+            if row[1] < cutoff:
+                to_kick.append(row[0])
+    else:
+        if not chat_members or not chat_members.profiles:
+            return await messagereply(
+                message, disable_mentions=1, message=await messages.notadmin()
+            )
+        for member in chat_members.profiles:
+            if (
+                member.last_seen
+                and member.last_seen.time
+                and member.last_seen.time < cutoff
+            ):
+                to_kick.append(member.id)
+
     kicked = 0
-    if len(res) <= 0:
+    for user in to_kick:
+        try:
+            kicked += await kick_user(user, chat_id)
+        except Exception:
+            pass
+        else:
+            await asyncio.sleep(0.35)
+
+    if not kicked:
         return await messagereply(
             message, disable_mentions=1, message=await messages.inactive_no_results()
         )
-    members = await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)
-    members = [i.member_id for i in members.items if i.member_id > 0]
-    for i in res:
-        if i[0] in members:
-            try:
-                x = await kick_user(i[0], chat_id)
-                kicked += x
-            except Exception:
-                pass
+
     await messagereply(
         message,
         disable_mentions=1,
@@ -314,7 +355,8 @@ async def zov(message: Message):
             " ".join(data[1:]),
             (
                 await api.messages.get_conversation_members(
-                    peer_id=message.peer_id, fields=["deactivated"]  # type: ignore
+                    peer_id=message.peer_id,
+                    fields=["deactivated"],  # type: ignore
                 )
             ).items,
         ),

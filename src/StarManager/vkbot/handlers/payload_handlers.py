@@ -41,22 +41,37 @@ async def join(message: MessageEvent):
 
     if cmd == "join" or (cmd == "rejoin" and not payload["activate"]):
         try:
-            members = (
-                await api.messages.get_conversation_members(
-                    peer_id=chat_id + 2000000000
-                )
-            ).items
+            members = await api.messages.get_conversation_members(
+                peer_id=chat_id + 2000000000
+            )
+            if not members:
+                raise Exception
         except Exception:
             await utils.send_message(message.peer_id, await messages.notadmin())
             return
 
         bp = message.user_id
         if (
-            bp not in [i.member_id for i in members if i.is_admin or i.is_owner]
+            bp not in [i.member_id for i in members.items if i.is_admin or i.is_owner]
             and await utils.get_user_access_level(bp, chat_id) < 7
         ):
             return
         async with (await pool()).acquire() as conn:
+            for m in members.items:
+                if m.member_id <= 0:
+                    continue
+                exists = await conn.fetchval(
+                    "select 1 from lastmessagedate where chat_id=$1 and uid=$2",
+                    chat_id,
+                    m.member_id,
+                )
+                if not exists:
+                    await conn.execute(
+                        "insert into lastmessagedate (chat_id, uid, last_message) values ($1, $2, $3)",
+                        chat_id,
+                        m.member_id,
+                        int(time.time()),
+                    )
             for i in await conn.fetch(
                 "select uid from mute where chat_id=$1 and mute>$2",
                 chat_id,

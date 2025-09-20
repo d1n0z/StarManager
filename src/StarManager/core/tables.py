@@ -1,7 +1,6 @@
 import asyncio
 
 from tortoise import Tortoise, fields
-from tortoise.contrib.postgres.fields import ArrayField
 from tortoise.models import Model
 
 from StarManager.core.config import database_config

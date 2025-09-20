@@ -494,7 +494,7 @@ async def inactive_no_results():
 async def inactive(uid, name, nick, count):
     return (
         await get("inactive_no_active")
-        if int(count) <= 0
+        if not count
         else await get(
             "inactive",
             uid=uid,

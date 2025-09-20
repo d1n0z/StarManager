@@ -1,10 +1,17 @@
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, TypeAlias
 
 from tortoise.expressions import Q as Query
 
-from StarManager.core.managers.base import BaseCacheManager, BaseManager, BaseRepository, BaseCachedModel
+from StarManager.core.managers.base import (
+    BaseCachedModel,
+    BaseCacheManager,
+    BaseManager,
+    BaseRepository,
+)
 from StarManager.core.tables import AccessLevel
+
+CacheKey: TypeAlias = Tuple[int, int]
 
 
 @dataclass
@@ -35,7 +42,7 @@ class AccessLevelRepository(BaseRepository):
                 (i for i in self._items if i.uid == uid and i.chat_id == chat_id),
                 None,
             )
-    
+
     async def delete_record(self, uid: int, chat_id: int):
         async with self._lock:
             self._items = [
@@ -47,12 +54,12 @@ class AccessLevelRepository(BaseRepository):
 class AccessLevelCache(BaseCacheManager):
     def __init__(self, repo: AccessLevelRepository, items: List[AccessLevel]):
         super().__init__()
-        self._cache: Dict[Tuple[int, int], _CachedAccessLevel] = {}
-        self._dirty: Set[Tuple[int, int]] = set()
+        self._cache: Dict[CacheKey, _CachedAccessLevel] = {}
+        self._dirty: Set[CacheKey] = set()
         self.repo = repo
         self._items = items
 
-    def make_cache_key(self, uid: int, chat_id: int) -> Tuple[int, int]:
+    def make_cache_key(self, uid: int, chat_id: int) -> CacheKey:
         return (uid, chat_id)
 
     async def initialize(self):
@@ -63,7 +70,7 @@ class AccessLevelCache(BaseCacheManager):
         await super().initialize()
 
     async def _ensure_cached(
-        self, cache_key: Tuple[int, int], initial_data: Optional[Dict[str, Any]] = None
+        self, cache_key: CacheKey, initial_data: Optional[Dict[str, Any]] = None
     ):
         initial_data = initial_data or {"access_level": 0}
         async with self._lock:
@@ -71,26 +78,26 @@ class AccessLevelCache(BaseCacheManager):
                 return
 
         uid, chat_id = cache_key
-        model, created = await self.repo.ensure_record(uid, chat_id, defaults=initial_data)
+        model, created = await self.repo.ensure_record(
+            uid, chat_id, defaults=initial_data
+        )
         async with self._lock:
             self._cache[cache_key] = _CachedAccessLevel.from_model(model)
         return created
 
-    async def get(self, cache_key: Tuple[int, int]) -> int:
+    async def get(self, cache_key: CacheKey) -> int:
         async with self._lock:
             obj = self._cache.get(cache_key)
             return obj.access_level if obj else 0
 
-    async def edit(self, cache_key: Tuple[int, int], access_level: int):
+    async def edit(self, cache_key: CacheKey, access_level: int):
         created = await self._ensure_cached(cache_key, {"access_level": access_level})
-        if created:
-            self._dirty.add(cache_key)
-            return
         async with self._lock:
-            self._cache[cache_key].access_level = access_level
+            if not created:
+                self._cache[cache_key].access_level = access_level
             self._dirty.add(cache_key)
 
-    async def remove(self, cache_key: Tuple[int, int]):
+    async def remove(self, cache_key: CacheKey):
         async with self._lock:
             if cache_key in self._cache:
                 self._dirty.discard(cache_key)
@@ -122,7 +129,9 @@ class AccessLevelCache(BaseCacheManager):
                 row.access_level = access_level
                 to_update.append(row)
             else:
-                to_create.append(AccessLevel(uid=uid, chat_id=chat_id, access_level=access_level))
+                to_create.append(
+                    AccessLevel(uid=uid, chat_id=chat_id, access_level=access_level)
+                )
 
         if to_update:
             await AccessLevel.bulk_update(to_update, fields=["access_level"])
@@ -146,7 +155,7 @@ class AccessLevelManager(BaseManager):
             self._items.extend(rows)
         await self.cache.initialize()
 
-    def make_key(self, uid: int, chat_id: int) -> Tuple[int, int]:
+    def make_key(self, uid: int, chat_id: int) -> CacheKey:
         return self.cache.make_cache_key(uid, chat_id)
 
     async def get_access_level(self, uid: int, chat_id: int) -> int:
