@@ -49,6 +49,7 @@ async def inactive(message: Message):
     mode, value, m = data[1].lower(), data[2], None
     try:
         cutoff = datetime.strptime(value, "%d.%m.%Y").timestamp()
+        m = 1
     except ValueError:
         m = re.match(r"^(\d+)([dwm])$", (value if not value.isdigit() else value + 'd'))
         if m:
