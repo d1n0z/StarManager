@@ -375,7 +375,7 @@ async def clear(message: Message):
             )
         to_delete = [
             (delete_from, i)
-            for i in await managers.chat_user_cmids.get_cmids(uid, chat_id)
+            for i in await managers.chat_user_cmids.get_cmids(delete_from, chat_id)
         ]
     else:
         to_delete: list[tuple[int, int]] = []
