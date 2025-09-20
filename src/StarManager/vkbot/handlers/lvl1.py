@@ -145,7 +145,12 @@ async def mute(message: Message):
         )
 
     try:
-        if (mute_time := int(data[1 + (not message.reply_message)])) < 1:
+        if (
+            mute_time := min(
+                int(data[1 + (not message.reply_message)]),
+                int(2**64 - 1 - time.time()),
+            )
+        ) < 1:
             raise Exception
     except Exception:
         return await messagereply(
@@ -210,7 +215,7 @@ async def mute(message: Message):
         if not await conn.fetchval(
             "update mute set mute = $1, last_mutes_times = $2, last_mutes_causes = $3, last_mutes_names = $4, "
             "last_mutes_dates = $5 where chat_id=$6 and uid=$7 returning 1",
-            time.time() + mute_time,
+            int(time.time() + mute_time),
             f"{mute_times}",
             f"{mute_causes}",
             f"{mute_names}",
