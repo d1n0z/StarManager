@@ -1577,6 +1577,7 @@ async def get_raid_mode_active(chat_id):
 
 async def archive_report(
     message_ids,
+    user: aiogram.types.user.User,
     original_text: str,
     action,
     bot: aiogram.Bot,
@@ -1610,7 +1611,8 @@ async def archive_report(
             await api.messages.send(user_id=uid, random_id=0, message=message)
     except Exception:
         pass
-    new_text.insert(3, f"➡️ Статус: {action}")
+    new_text.insert(2, f'🛂 Ответил: <a href="tg://user?id={user.id}">{f"@{user.username}" if user.username else (user.full_name or user.id)}</a>')
+    new_text.insert(4, f"➡️ Статус: {action}")
     if action == "Закрыто":
         new_text.append(f"❇️ Ответ: {answer}")
     new_text = "\n".join(new_text)

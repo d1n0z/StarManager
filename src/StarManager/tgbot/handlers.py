@@ -348,7 +348,7 @@ async def report_callback_handler(
                 raise Exception("Unknown ReportCallback action")
     message_ids = json.loads(report[2])
     await archive_report(
-        message_ids, report[3], action, bot, callback_data.report_id, report[0]
+        message_ids, query.from_user, report[3], action, bot, callback_data.report_id, report[0]
     )
 
 
@@ -374,6 +374,7 @@ async def report_answer(message: Message, state: FSMContext, bot: Bot):
     message_ids = json.loads(report[2])
     await archive_report(
         message_ids,
+        message.from_user,
         report[1],
         "answer",
         bot,
