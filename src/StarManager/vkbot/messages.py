@@ -2522,13 +2522,14 @@ async def promocreate_alreadyexists(code):
     return await get("promocreate_alreadyexists", code=code)
 
 
-async def promocreate(code, amnt, usage, date, promo_type):
+async def promocreate(code, amnt, usage, date, promo_type, sub_needed):
     return await get(
         "promocreate",
         code=code,
         amnt=str(amnt) + (" опыта" if promo_type == "xp" else " монеток"),
         usage=f"\n🔘 Доступно использований: {usage}." if usage else "",
         date=f"\n🕒 Доступен до {date.strftime('%d.%m.%Y')}." if date else "",
+        sub="\n✅ Подписка " + ("обязательна." if sub_needed else "не обязательна."),
     )
 
 
@@ -2558,6 +2559,10 @@ async def promolist(promos):
 
 async def promo_hint():
     return await get("promo_hint")
+
+
+async def promo_not_member():
+    return await get("promo_not_member")
 
 
 async def promo_alreadyusedornotexists(uid, nick, name):

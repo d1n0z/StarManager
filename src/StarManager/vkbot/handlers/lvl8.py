@@ -806,9 +806,10 @@ async def linked(message: Message):
 async def promocreate(message: Message):
     data = message.text.split()
     if (
-        len(data) not in (5, 6)
+        len(data) not in (6, 7)
         or not data[2].isdigit()
         or data[3] not in ("xp", "coins")
+        or (len(data) == 7 and data[6] not in ("n", "y"))
     ):
         return await messagereply(message, await messages.promocreate_hint())
     usage, date, amnt, promo_type = None, None, int(data[2]), data[3]
@@ -828,15 +829,17 @@ async def promocreate(message: Message):
                 message, await messages.promocreate_alreadyexists(data[1])
             )
         await conn.execute(
-            "insert into promocodes (code, usage, date, amnt, type) values ($1, $2, $3, $4, $5)",
+            "insert into promocodes (code, usage, date, amnt, type, sub_needed) values ($1, $2, $3, $4, $5, $6)",
             data[1],
             usage,
             (date.timestamp() + 86399) if date else None,
             amnt,
             promo_type,
+            (sub_needed := (len(data) == 7 and data[6] == "y")),
         )
     await messagereply(
-        message, await messages.promocreate(data[1], amnt, usage, date, promo_type)
+        message,
+        await messages.promocreate(data[1], amnt, usage, date, promo_type, sub_needed),
     )
 
 

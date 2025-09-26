@@ -704,9 +704,21 @@ async def promo(message: Message):
     uid = message.from_id
     async with (await pool()).acquire() as conn:
         code = await conn.fetchrow(
-            "select code, date, usage, amnt, type from promocodes where code=$1",
+            "select code, date, usage, amnt, type, sub_needed from promocodes where code=$1",
             data[1],
         )
+        if (
+            code
+            and code[5]
+            and not (
+                await api.groups.is_member(
+                    group_id=settings.vk.group_id, user_ids=[uid]
+                )
+            )[0].member
+        ):
+            return await messagereply(
+                message, disable_mentions=1, message=await messages.promo_not_member()
+            )
         if code and (
             code[1]
             and time.time() > code[1]
