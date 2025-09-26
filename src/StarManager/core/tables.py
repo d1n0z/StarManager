@@ -587,7 +587,7 @@ class Promocodes(Model):
     date = fields.IntField(null=True)
     amnt = fields.IntField()
     type = fields.TextField(default="xp")
-    sub_needed = fields.BooleanField(default=0)
+    sub_needed = fields.BooleanField(default=False)
 
     class Meta:
         table = "promocodes"

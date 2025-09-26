@@ -1,4 +1,3 @@
-import asyncio
 from loguru import logger
 from vkbottle import GroupEventType, GroupTypes
 from vkbottle.framework.labeler import BotLabeler
