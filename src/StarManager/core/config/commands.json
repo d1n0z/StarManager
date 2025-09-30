@@ -155,7 +155,8 @@
         "prempromolist": 8,
         "bonuslist": 8,
         "rewardscount": 8,
-        "givecoins": 8
+        "givecoins": 8,
+        "setlig": 8
     },
     "pm": [
         "anon",
@@ -301,6 +302,7 @@
         "sudo": "/sudo - Отправить sudo-команду на сервер.",
         "givexp": "/givexp - Выдать монетки пользователю.",
         "givecoins": "/givecoins - Выдать Star-монетки пользователю.",
+        "setlig": "/setlig - Установить лигу пользователю.",
         "resetlvl": "/resetlvl - Сбросить прогресс(монетки, уровень и лигу) пользователя.",
         "getuserchats": "/getuserchats - Список бесед пользователя.",
         "helpdev": "/helpdev - Информация по dev-командам.",

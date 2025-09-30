@@ -8,27 +8,27 @@ from datetime import datetime
 from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 
+from StarManager.core.config import api, settings
+from StarManager.core.db import pool
+from StarManager.core.utils import (
+    add_user_coins,
+    add_user_xp,
+    chunks,
+    get_chat_name,
+    get_user_name,
+    get_user_nickname,
+    get_user_rep_banned,
+    kick_user,
+    messagereply,
+    point_words,
+    search_id_in_message,
+    send_message,
+    set_user_access_level,
+)
+from StarManager.scheduler import backup
 from StarManager.vkbot import keyboard, messages
 from StarManager.vkbot.checkers import getUInfBanned
 from StarManager.vkbot.rules import SearchCMD
-from StarManager.scheduler import backup
-from StarManager.core.utils import (
-    add_user_coins,
-    get_user_name,
-    search_id_in_message,
-    get_user_nickname,
-    send_message,
-    add_user_xp,
-    get_chat_name,
-    set_user_access_level,
-    point_words,
-    chunks,
-    get_user_rep_banned,
-    messagereply,
-    kick_user,
-)
-from StarManager.core.config import api, settings
-from StarManager.core.db import pool
 
 bl = BotLabeler()
 
@@ -963,4 +963,30 @@ async def rewardscount(message: Message):
     await messagereply(
         message,
         f"Число пользователей, активировавших /rewards: {len(users)}. Из них отписалось: {len([i for i in users if i[0]])}",
+    )
+
+
+@bl.chat_message(SearchCMD("setlig"))
+async def setlig(message: Message):
+    data = message.text.split()
+    if (
+        len(data) != 3
+        or not data[2].isdigit()
+        or not (id := await search_id_in_message(message.text, message.reply_message))
+        or int(data[2]) not in range(1, 7)
+    ):
+        return await messagereply(
+            message,
+            "🔔 Чтобы установить лигу пользователю, используйте /setlig <user> <league[1-6]> (пример: /setlig @VK. 1)",
+        )
+    async with (await pool()).acquire() as conn:
+        if not await conn.fetchval(
+            "update xp set league=$1 where uid=$2 returning 1", int(data[2]), id
+        ):
+            return await messagereply(
+                message, "❌ Пользователь не найден в базе данных."
+            )
+    await messagereply(
+        message,
+        f'✅ Вы успешно установили лигу "{settings.leagues.leagues[int(data[2]) - 1]}" пользователю [id{id}|{await get_user_name(id)}]',
     )
