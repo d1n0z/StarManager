@@ -1654,7 +1654,7 @@ async def top_math(message: MessageEvent):
         [
             (i, top.count(i))
             for i in set(top)
-            if i[0] not in users or users[i[0]].deactivated
+            if i not in users or users[i].deactivated
         ],
         key=lambda x: x[1],
         reverse=True,
