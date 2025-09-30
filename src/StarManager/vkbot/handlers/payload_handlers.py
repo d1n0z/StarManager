@@ -1361,7 +1361,8 @@ async def top_(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
     conv_members = await api.messages.get_conversation_members(
-        peer_id=peer_id, fields=["deactivated"]  # type: ignore
+        peer_id=peer_id,
+        fields=["deactivated"],  # type: ignore
     )
     if not conv_members:
         top = []
@@ -1400,10 +1401,13 @@ async def top_leagues(message: MessageEvent):
         "lvl",
         league=lg,
         users=[
-            i.member_id
+            i.id
             for i in (
-                await api.messages.get_conversation_members(peer_id=peer_id)
-            ).items
+                await api.messages.get_conversation_members(
+                    peer_id=peer_id, fields=["deactivated"]  # type: ignore
+                )
+            ).profiles
+            if i.deactivated
         ],
     )
     async with (await pool()).acquire() as conn:
