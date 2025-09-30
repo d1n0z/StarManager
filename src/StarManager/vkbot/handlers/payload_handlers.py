@@ -1646,7 +1646,7 @@ async def top_math(message: MessageEvent):
     users = {
         u.id: u
         for u in await api.users.get(
-            user_ids=[i[0] for i in top],
+            user_ids=[i for i in top],
             fields=["deactivated"],  # type: ignore
         )
     }
