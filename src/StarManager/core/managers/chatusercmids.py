@@ -2,15 +2,13 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set, Tuple, TypeAlias
 
-from tortoise.expressions import Q
-
 from StarManager.core.managers.base import (
     BaseCachedModel,
     BaseCacheManager,
     BaseManager,
     BaseRepository,
 )
-from StarManager.core.tables import ChatUserCMIDs, Tortoise
+from StarManager.core.tables import ChatUserCMIDs
 
 
 @dataclass
@@ -104,34 +102,17 @@ class ChatUserCMIDsCache(BaseCacheManager):
         if not payloads:
             return
 
+        items = list(payloads.items())
         try:
-            items = list(payloads.items())
-            keys = list(payloads.keys())
-            if not keys:
-                return
+            unique_uids = {uid for uid, _ in payloads.keys()}
+            rows = await ChatUserCMIDs.filter(uid__in=list(unique_uids)).all()
 
-            values_sql = ",".join(["(%s,%s)"] * len(keys))
-            params = []
-            for uid, chat_id in keys:
-                params.extend([uid, chat_id])
+            existing_map = defaultdict(set)
+            for row in rows:
+                key = (row.uid, row.chat_id)
+                if key in payloads:
+                    existing_map[key].add(row.cmid)
 
-            try:
-                table = ChatUserCMIDs._meta.db_table
-            except Exception:
-                table = "chat_user_cmids"
-
-            sql = f"""
-                SELECT uid, chat_id, cmid
-                FROM {table}
-                WHERE (uid, chat_id) IN ({values_sql})
-            """
-
-            conn = Tortoise.get_connection("default")
-            rows = await conn.execute_query_dict(sql, params)
-
-            existing_map: Dict[Tuple[int,int], Set[int]] = defaultdict(set)
-            for r in rows:
-                existing_map[(r["uid"], r["chat_id"])].add(r["cmid"])
             for i in range(0, len(items), batch_size):
                 batch, to_create = items[i : i + batch_size], []
 
