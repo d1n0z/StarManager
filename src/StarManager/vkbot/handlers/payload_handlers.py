@@ -1357,23 +1357,30 @@ async def giveowner(message: MessageEvent):
 
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["top"]))
-async def top(message: MessageEvent):
+async def top_(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
-    async with (await pool()).acquire() as conn:
-        res = await conn.fetch(
-            "select uid, messages from messages where uid>0 and messages>0 and chat_id=$1 and "
-            "uid=ANY($2) order by messages desc limit 10",
-            chat_id,
-            [
-                i.member_id
-                for i in (
-                    await api.messages.get_conversation_members(peer_id=peer_id)
-                ).items
-            ],
-        )
+    conv_members = await api.messages.get_conversation_members(
+        peer_id=peer_id, fields=["deactivated"]  # type: ignore
+    )
+    if not conv_members:
+        top = []
+    else:
+        async with (await pool()).acquire() as conn:
+            top = await conn.fetch(
+                "select uid, messages from messages where uid>0 and messages>0 and chat_id=$1 and "
+                "uid=ANY($2) and uid!=ALL($3) order by messages desc limit 10",
+                chat_id,
+                [
+                    i.member_id
+                    for i in (
+                        await api.messages.get_conversation_members(peer_id=peer_id)
+                    ).items
+                ],
+                [i.id for i in (conv_members.profiles or []) if i.deactivated],
+            )
     await utils.edit_message(
-        await messages.top(res),
+        await messages.top(top),
         peer_id,
         message.conversation_message_id,
         keyboard.top(chat_id, message.user_id),
@@ -1423,11 +1430,29 @@ async def top_leagues(message: MessageEvent):
 async def top_duels(message: MessageEvent):
     peer_id = message.object.peer_id
     async with (await pool()).acquire() as conn:
-        lvln = await conn.fetch(
+        top = await conn.fetch(
             "select uid, wins from duelwins where uid>0 order by wins desc limit 10"
         )
+    top = {i[0]: i for i in top}
+    users = {
+        u.id: u
+        for u in await api.users.get(
+            user_ids=[i for i in top.keys()],
+            fields=["deactivated"],  # type: ignore
+        )
+    }
     await utils.edit_message(
-        await messages.top_duels({i[0]: i[1] for i in lvln}),
+        await messages.top_duels(
+            sorted(
+                [
+                    i
+                    for uid, i in top.items()
+                    if uid in users and not users[uid].deactivated
+                ][:10],
+                key=lambda i: i[1],
+                reverse=True,
+            )
+        ),
         peer_id,
         message.conversation_message_id,
         keyboard.top_duels(peer_id - 2000000000, message.user_id),
@@ -1440,21 +1465,28 @@ async def top_duels(message: MessageEvent):
 async def top_duels_in_chat(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
-    async with (await pool()).acquire() as conn:
-        lvln = await conn.fetch(
-            "select uid, wins from duelwins where uid>0 and uid=ANY($1) order by wins desc limit 10",
-            [
-                i.member_id
-                for i in (
-                    await api.messages.get_conversation_members(
-                        peer_id=chat_id + 2000000000
-                    )
-                ).items
-            ],
-        )
-    lvln = {i[0]: i[1] for i in lvln}
+    conv_members = await api.messages.get_conversation_members(
+        peer_id=peer_id,
+        fields=["deactivated"],  # type: ignore
+    )
+    if not conv_members:
+        top = []
+    else:
+        async with (await pool()).acquire() as conn:
+            top = await conn.fetch(
+                "select uid, wins from duelwins where uid>0 and uid=ANY($1) and uid!=ALL($2) order by wins desc limit 10",
+                [
+                    i.member_id
+                    for i in (
+                        await api.messages.get_conversation_members(
+                            peer_id=chat_id + 2000000000
+                        )
+                    ).items
+                ],
+                [i.id for i in (conv_members.profiles or []) if i.deactivated],
+            )
     await utils.edit_message(
-        await messages.top_duels(lvln, "в беседе"),
+        await messages.top_duels(top, "в беседе"),
         peer_id,
         message.conversation_message_id,
         keyboard.top_duels_in_chat(chat_id, message.user_id),
@@ -1468,8 +1500,27 @@ async def top_rep(message: MessageEvent):
         top = await conn.fetch(
             "select uid, rep from reputation where uid>0 order by rep desc limit 10"
         )
+    top = {i[0]: i for i in top}
+    users = {
+        u.id: u
+        for u in await api.users.get(
+            user_ids=[i for i in top.keys()],
+            fields=["deactivated"],  # type: ignore
+        )
+    }
     await utils.edit_message(
-        await messages.top_rep(top, "общее | положительные"),
+        await messages.top_rep(
+            sorted(
+                [
+                    i
+                    for uid, i in top.items()
+                    if uid in users and not users[uid].deactivated
+                ][:10],
+                key=lambda i: i[1],
+                reverse=True,
+            ),
+            "общее | положительные",
+        ),
         peer_id,
         message.conversation_message_id,
         keyboard.top_rep(peer_id - 2000000000, message.user_id),
@@ -1485,8 +1536,26 @@ async def top_rep_neg(message: MessageEvent):
         top = await conn.fetch(
             "select uid, rep from reputation where uid>0 order by rep limit 10"
         )
+    top = {i[0]: i for i in top}
+    users = {
+        u.id: u
+        for u in await api.users.get(
+            user_ids=[i for i in top.keys()],
+            fields=["deactivated"],  # type: ignore
+        )
+    }
     await utils.edit_message(
-        await messages.top_rep(top, "общее | отрицательные"),
+        await messages.top_rep(
+            sorted(
+                [
+                    i
+                    for uid, i in top.items()
+                    if uid in users and not users[uid].deactivated
+                ][:10],
+                key=lambda i: i[1],
+            ),
+            "общее | отрицательные",
+        ),
         peer_id,
         message.conversation_message_id,
         keyboard.top_rep_neg(peer_id - 2000000000, message.user_id),
@@ -1498,16 +1567,24 @@ async def top_rep_neg(message: MessageEvent):
 )
 async def top_rep_in_chat(message: MessageEvent):
     peer_id = message.object.peer_id
-    async with (await pool()).acquire() as conn:
-        top = await conn.fetch(
-            "select uid, rep from reputation where uid>0 and uid=ANY($1) order by rep desc limit 10",
-            [
-                i.member_id
-                for i in (
-                    await api.messages.get_conversation_members(peer_id=peer_id)
-                ).items
-            ],
-        )
+    conv_members = await api.messages.get_conversation_members(
+        peer_id=peer_id,
+        fields=["deactivated"],  # type: ignore
+    )
+    if not conv_members:
+        top = []
+    else:
+        async with (await pool()).acquire() as conn:
+            top = await conn.fetch(
+                "select uid, rep from reputation where uid>0 and uid=ANY($1) and uid!=ALL($2) order by rep desc limit 10",
+                [
+                    i.member_id
+                    for i in (
+                        await api.messages.get_conversation_members(peer_id=peer_id)
+                    ).items
+                ],
+                [i.id for i in (conv_members.profiles or []) if i.deactivated],
+            )
     await utils.edit_message(
         await messages.top_rep(top, "в беседе | положительные"),
         peer_id,
@@ -1524,18 +1601,26 @@ async def top_rep_in_chat(message: MessageEvent):
 async def top_rep_in_chat_neg(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
-    async with (await pool()).acquire() as conn:
-        top = await conn.fetch(
-            "select uid, rep from reputation where uid>0 and uid=ANY($1) order by rep limit 10",
-            [
-                i.member_id
-                for i in (
-                    await api.messages.get_conversation_members(
-                        peer_id=chat_id + 2000000000
-                    )
-                ).items
-            ],
-        )
+    conv_members = await api.messages.get_conversation_members(
+        peer_id=peer_id,
+        fields=["deactivated"],  # type: ignore
+    )
+    if not conv_members:
+        top = []
+    else:
+        async with (await pool()).acquire() as conn:
+            top = await conn.fetch(
+                "select uid, rep from reputation where uid>0 and uid=ANY($1) and uid!=ALL($2) order by rep limit 10",
+                [
+                    i.member_id
+                    for i in (
+                        await api.messages.get_conversation_members(
+                            peer_id=chat_id + 2000000000
+                        )
+                    ).items
+                ],
+                [i.id for i in (conv_members.profiles or []) if i.deactivated],
+            )
     await utils.edit_message(
         await messages.top_rep(top, "в беседе | отрицательные"),
         peer_id,
@@ -1554,8 +1639,21 @@ async def top_math(message: MessageEvent):
             i[0]
             for i in await conn.fetch("select winner from mathgiveaway where winner>0")
         ]
+    users = {
+        u.id: u
+        for u in await api.users.get(
+            user_ids=[i[0] for i in top],
+            fields=["deactivated"],  # type: ignore
+        )
+    }
     top = sorted(
-        [(i, top.count(i)) for i in set(top)], key=lambda x: x[1], reverse=True
+        [
+            (i, top.count(i))
+            for i in set(top)
+            if i[0] not in users or users[i[0]].deactivated
+        ],
+        key=lambda x: x[1],
+        reverse=True,
     )[:10]
     await utils.edit_message(
         await messages.top_math(top),
@@ -1574,8 +1672,26 @@ async def top_bonus(message: MessageEvent):
         top = await conn.fetch(
             "select uid, streak from bonus order by streak desc limit 10"
         )
+    top = {i[0]: i for i in top}
+    users = {
+        u.id: u
+        for u in await api.users.get(
+            user_ids=[i for i in top.keys()],
+            fields=["deactivated"],  # type: ignore
+        )
+    }
     await utils.edit_message(
-        await messages.top_bonus(top),
+        await messages.top_bonus(
+            sorted(
+                [
+                    i
+                    for uid, i in top.items()
+                    if uid in users and not users[uid].deactivated
+                ][:10],
+                key=lambda i: i[1],
+                reverse=True,
+            )
+        ),
         peer_id,
         message.conversation_message_id,
         keyboard.top_bonus(peer_id - 2000000000, message.user_id),
@@ -1587,16 +1703,25 @@ async def top_bonus(message: MessageEvent):
 )
 async def top_bonus_in_chat(message: MessageEvent):
     peer_id = message.object.peer_id
-    async with (await pool()).acquire() as conn:
-        top = await conn.fetch(
-            "select uid, streak from bonus where uid=ANY($1) order by streak desc limit 10",
-            [
-                i.member_id
-                for i in (
-                    await api.messages.get_conversation_members(peer_id=peer_id)
-                ).items
-            ],
-        )
+
+    conv_members = await api.messages.get_conversation_members(
+        peer_id=peer_id,
+        fields=["deactivated"],  # type: ignore
+    )
+    if not conv_members:
+        top = []
+    else:
+        async with (await pool()).acquire() as conn:
+            top = await conn.fetch(
+                "select uid, streak from bonus where uid=ANY($1) and uid!=ALL($2) order by streak desc limit 10",
+                [
+                    i.member_id
+                    for i in (
+                        await api.messages.get_conversation_members(peer_id=peer_id)
+                    ).items
+                ],
+                [i.id for i in (conv_members.profiles or []) if i.deactivated],
+            )
     await utils.edit_message(
         await messages.top_bonus(top),
         peer_id,
@@ -1611,9 +1736,29 @@ async def top_bonus_in_chat(message: MessageEvent):
 async def top_coins(message: MessageEvent):
     peer_id = message.object.peer_id
     async with (await pool()).acquire() as conn:
-        top = await conn.fetch("select uid, coins from xp order by coins desc limit 10")
+        top = await conn.fetch(
+            "select uid, coins from xp order by coins desc limit 100"
+        )
+    top = {i[0]: i for i in top}
+    users = {
+        u.id: u
+        for u in await api.users.get(
+            user_ids=[i for i in top.keys()],
+            fields=["deactivated"],  # type: ignore
+        )
+    }
     await utils.edit_message(
-        await messages.top_coins(top),
+        await messages.top_coins(
+            sorted(
+                [
+                    i
+                    for uid, i in top.items()
+                    if uid in users and not users[uid].deactivated
+                ][:10],
+                key=lambda i: i[1],
+                reverse=True,
+            )
+        ),
         peer_id,
         message.conversation_message_id,
         keyboard.top_coins(peer_id - 2000000000, message.user_id),
@@ -1625,16 +1770,19 @@ async def top_coins(message: MessageEvent):
 )
 async def top_coins_in_chat(message: MessageEvent):
     peer_id = message.object.peer_id
-    async with (await pool()).acquire() as conn:
-        top = await conn.fetch(
-            "select uid, coins from xp where uid=ANY($1) order by coins desc limit 10",
-            [
-                i.member_id
-                for i in (
-                    await api.messages.get_conversation_members(peer_id=peer_id)
-                ).items
-            ],
-        )
+    conv_members = await api.messages.get_conversation_members(
+        peer_id=peer_id,
+        fields=["deactivated"],  # type: ignore
+    )
+    if not conv_members:
+        top = []
+    else:
+        async with (await pool()).acquire() as conn:
+            top = await conn.fetch(
+                "select uid, coins from xp where uid=ANY($1) and uid!=ALL($2) order by coins desc limit 10",
+                [i.member_id for i in conv_members.items],
+                [i.id for i in (conv_members.profiles or []) if i.deactivated],
+            )
     await utils.edit_message(
         await messages.top_coins(top),
         peer_id,

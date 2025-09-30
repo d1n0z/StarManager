@@ -1583,7 +1583,7 @@ async def top_lvls(top, chattop):
 
 async def top_duels(duels, category="общее"):
     msg = await get("top_duels", category=category)
-    for k, item in enumerate(duels.items()) if top else []:
+    for k, item in enumerate(duels) if duels else []:
         msg += f"{number_to_emoji(k + 1)} [id{item[0]}|{await get_user_name(item[0])}] - {item[1]} побед\n"
     return msg
 

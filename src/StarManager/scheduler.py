@@ -453,6 +453,7 @@ async def mathgiveaway(conn):
 
 async def everyday(conn):
     await conn.execute("UPDATE xp SET coins_limit=0")
+    await conn.execute("UPDATE shop SET limits='[0, 0, 0, 0, 0]'")
 
 
 def run(loop):
