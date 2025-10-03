@@ -465,66 +465,58 @@ async def everyday(conn):
 
 
 async def new_tg_giveaway(conn):
-    try:
-        msg = await tgbot.send_message(
-            chat_id=settings.telegram.public_chat_id,
-            message_thread_id=settings.telegram.public_giveaway_thread_id,
-            reply_markup=tgkeyboard.joingiveaway(0),
-            text=f"<b>🎁 Ежедневный конкурс на <code>999</code> опыта для <code>3</code> участников Telegram канала."
-            f"</b>\n\n<blockquote><b>💬 Для участия в конкурсе вы должны быть подписаны на данный канал, а так же "
-            f'привязать профиль ВК для получения приза (<a href="https://t.me/{settings.telegram.bot_username}?start=0">'
-            f'клик</a>). После выполнения всех условий нажмите кнопку "</b>Хочу участвовать<b>".</b></blockquote>'
-            f"\n\n<b>🕒 Окончание конкурса будет завтра в <code>09:00</code> по МСК</b>",
-        )
-        await conn.execute("insert into tggiveaways (mid) values ($1)", msg.message_id)
-    except Exception:
-        traceback.print_exc()
+    msg = await tgbot.send_message(
+        chat_id=settings.telegram.public_chat_id,
+        message_thread_id=settings.telegram.public_giveaway_thread_id,
+        reply_markup=tgkeyboard.joingiveaway(0),
+        text=f"<b>🎁 Ежедневный конкурс на <code>999</code> опыта для <code>3</code> участников Telegram канала."
+        f"</b>\n\n<blockquote><b>💬 Для участия в конкурсе вы должны быть подписаны на данный канал, а так же "
+        f'привязать профиль ВК для получения приза (<a href="https://t.me/{settings.telegram.bot_username}?start=0">'
+        f'клик</a>). После выполнения всех условий нажмите кнопку "</b>Хочу участвовать<b>".</b></blockquote>'
+        f"\n\n<b>🕒 Окончание конкурса будет завтра в <code>09:00</code> по МСК</b>",
+    )
+    await conn.execute("insert into tggiveaways (mid) values ($1)", msg.message_id)
 
 
 async def end_tg_giveaway(conn):
-    try:
-        winners = []
-        mid = await conn.fetchval("select mid from tggiveaways")
-        users = await conn.fetch("select tgid from tggiveawayusers")
-        await conn.execute("delete from tggiveaways")
-        await conn.execute("delete from tggiveawayusers")
-        random.shuffle(users)
-        for i in users:
-            user = await conn.fetchrow(
-                "select vkid, tgid from tglink where tgid=$1", i[0]
+    winners = []
+    mid = await conn.fetchval("select mid from tggiveaways")
+    users = await conn.fetch("select tgid from tggiveawayusers")
+    await conn.execute("delete from tggiveaways")
+    await conn.execute("delete from tggiveawayusers")
+    random.shuffle(users)
+    for i in users:
+        user = await conn.fetchrow("select vkid, tgid from tglink where tgid=$1", i[0])
+        if user and not await getULvlBanned(user[0]):
+            winners.append(user)
+            if len(winners) == 3:
+                break
+    for i in winners:
+        await add_user_xp(i[0], 999, False)
+        try:
+            await tgbot.send_message(
+                chat_id=i[1],
+                text="<b>🎁 Поздравляем, вы выиграли 999 опыта в последнем конкурсе.</b>",
             )
-            if user and not await getULvlBanned(user[0]):
-                winners.append(user)
-                if len(winners) == 3:
-                    break
-        for i in winners:
-            await add_user_xp(i[0], 999, False)
-            try:
-                await tgbot.send_message(
-                    chat_id=i[1],
-                    text="<b>🎁 Поздравляем, вы выиграли 999 опыта в последнем конкурсе.</b>",
-                )
-            except Exception:
-                pass
-        emoji = ["🥇", "🥈", "🥉"]
-        text = "<b>🏆 Итоги ежедневного конкурса</b>\n\n"
-        if winners:
-            text += "<blockquote><b>"
-            for k, i in enumerate(winners):
-                text += f'{emoji[k]} Победитель: <a href="https://vk.com/id{i[0]}">{await get_user_name(i[0])}</a>'
-                if k - 1 != len(winners):
-                    text += "\n"
-            text += (
-                "</b></blockquote>\n\n<b>💬 Призы в виде <code>999</code> опыта были начислены победителям на их "
-                "аккаунтах. Следующий конкурс в <code>10:00</code> МСК.</b>"
-            )
-        else:
-            text += "<b>⚠️ Никто не участвовал в этом конкурсе.</b>"
-        await tgbot.edit_message_text(
-            chat_id=settings.telegram.public_chat_id, message_id=mid, text=text
+        except Exception:
+            pass
+    emoji = ["🥇", "🥈", "🥉"]
+    text = "<b>🏆 Итоги ежедневного конкурса</b>\n\n"
+    if winners:
+        text += "<blockquote><b>"
+        for k, i in enumerate(winners):
+            text += f'{emoji[k]} Победитель: <a href="https://vk.com/id{i[0]}">{await get_user_name(i[0])}</a>'
+            if k - 1 != len(winners):
+                text += "\n"
+        text += (
+            "</b></blockquote>\n\n<b>💬 Призы в виде <code>999</code> опыта были начислены победителям на их "
+            "аккаунтах. Следующий конкурс в <code>10:00</code> МСК.</b>"
         )
-    except Exception:
-        traceback.print_exc()
+    else:
+        text += "<b>⚠️ Никто не участвовал в этом конкурсе.</b>"
+    await tgbot.edit_message_text(
+        chat_id=settings.telegram.public_chat_id, message_id=mid, text=text
+    )
 
 
 def run(loop):
