@@ -1,9 +1,6 @@
-
-import asyncio
-
 import aiogram
 
-from StarManager.tgbot import bot, handlers, middlewares, scheduler
+from StarManager.tgbot import bot, handlers, middlewares
 
 
 class Bot:
@@ -14,7 +11,6 @@ class Bot:
     async def run(self):
         self.dp.include_router(handlers.router)
         self.dp.update.middleware.register(middlewares.ContextMsgDeleteMiddleware())
-        scheduler.run(asyncio.get_event_loop())
         await self.bot.delete_webhook(drop_pending_updates=True)
         await self.dp.start_polling(self.bot)
         await self.bot.session.close()

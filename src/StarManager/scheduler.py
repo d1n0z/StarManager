@@ -17,6 +17,7 @@ from loguru import logger
 from StarManager.core.config import api, settings, vk_api_session
 from StarManager.core.db import pool
 from StarManager.core.utils import (
+    add_user_xp,
     chunks,
     delete_messages,
     generate_easy_problem,
@@ -26,8 +27,10 @@ from StarManager.core.utils import (
     punish,
     send_message,
 )
+from StarManager.tgbot import keyboard as tgkeyboard
 from StarManager.tgbot.bot import bot as tgbot
 from StarManager.vkbot import keyboard, messages
+from StarManager.vkbot.checkers import getULvlBanned
 
 task_locks = defaultdict(asyncio.Lock)
 
@@ -109,7 +112,7 @@ async def backup() -> None:
             timeout=36000,
         )
         link = await drive.get_download_link(f"/StarManager/backups/{filename}")
-    
+
     os.remove(filename)
     await tgbot.send_message(
         chat_id=settings.telegram.chat_id,
@@ -152,7 +155,12 @@ async def updateInfo(conn):
             result = vk_api_session.method("execute", {"code": code})
             updates = []
             for item in result["items"]:
-                if "peer" in item and "id" in item["peer"] and "chat_settings" in item["peer"] and "title" in item["peer"]["chat_settings"]:
+                if (
+                    "peer" in item
+                    and "id" in item["peer"]
+                    and "chat_settings" in item["peer"]
+                    and "title" in item["peer"]["chat_settings"]
+                ):
                     pid = item["peer"]["id"] - 2000000000
                     title = item["peer"]["chat_settings"]["title"]
                     updates.append((title, pid))
@@ -456,6 +464,69 @@ async def everyday(conn):
     await conn.execute("UPDATE shop SET limits='[0, 0, 0, 0, 0]'")
 
 
+async def new_tg_giveaway(conn):
+    try:
+        msg = await tgbot.send_message(
+            chat_id=settings.telegram.public_chat_id,
+            message_thread_id=settings.telegram.public_giveaway_thread_id,
+            reply_markup=tgkeyboard.joingiveaway(0),
+            text=f"<b>🎁 Ежедневный конкурс на <code>999</code> опыта для <code>3</code> участников Telegram канала."
+            f"</b>\n\n<blockquote><b>💬 Для участия в конкурсе вы должны быть подписаны на данный канал, а так же "
+            f'привязать профиль ВК для получения приза (<a href="https://t.me/{settings.telegram.bot_username}?start=0">'
+            f'клик</a>). После выполнения всех условий нажмите кнопку "</b>Хочу участвовать<b>".</b></blockquote>'
+            f"\n\n<b>🕒 Окончание конкурса будет завтра в <code>09:00</code> по МСК</b>",
+        )
+        await conn.execute("insert into tggiveaways (mid) values ($1)", msg.message_id)
+    except Exception:
+        traceback.print_exc()
+
+
+async def end_tg_giveaway(conn):
+    try:
+        winners = []
+        mid = await conn.fetchval("select mid from tggiveaways")
+        users = await conn.fetch("select tgid from tggiveawayusers")
+        await conn.execute("delete from tggiveaways")
+        await conn.execute("delete from tggiveawayusers")
+        random.shuffle(users)
+        for i in users:
+            user = await conn.fetchrow(
+                "select vkid, tgid from tglink where tgid=$1", i[0]
+            )
+            if user and not await getULvlBanned(user[0]):
+                winners.append(user)
+                if len(winners) == 3:
+                    break
+        for i in winners:
+            await add_user_xp(i[0], 999, False)
+            try:
+                await tgbot.send_message(
+                    chat_id=i[1],
+                    text="<b>🎁 Поздравляем, вы выиграли 999 опыта в последнем конкурсе.</b>",
+                )
+            except Exception:
+                pass
+        emoji = ["🥇", "🥈", "🥉"]
+        text = "<b>🏆 Итоги ежедневного конкурса</b>\n\n"
+        if winners:
+            text += "<blockquote><b>"
+            for k, i in enumerate(winners):
+                text += f'{emoji[k]} Победитель: <a href="https://vk.com/id{i[0]}">{await get_user_name(i[0])}</a>'
+                if k - 1 != len(winners):
+                    text += "\n"
+            text += (
+                "</b></blockquote>\n\n<b>💬 Призы в виде <code>999</code> опыта были начислены победителям на их "
+                "аккаунтах. Следующий конкурс в <code>10:00</code> МСК.</b>"
+            )
+        else:
+            text += "<b>⚠️ Никто не участвовал в этом конкурсе.</b>"
+        await tgbot.edit_message_text(
+            chat_id=settings.telegram.public_chat_id, message_id=mid, text=text
+        )
+    except Exception:
+        traceback.print_exc()
+
+
 def run(loop):
     scheduler = AsyncIOScheduler(timezone="Europe/Moscow", event_loop=loop)
 
@@ -480,5 +551,8 @@ def run(loop):
     scheduler.add_job(schedule(mathgiveaway), CronTrigger.from_crontab("*/15 * * * *"))
 
     scheduler.add_job(schedule(everyday), CronTrigger.from_crontab("0 0 * * *"))
+
+    scheduler.add_job(new_tg_giveaway, CronTrigger.from_crontab("0 10 * * *"))
+    scheduler.add_job(end_tg_giveaway, CronTrigger.from_crontab("0 9 * * *"))
 
     scheduler.start()
