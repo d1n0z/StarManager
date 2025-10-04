@@ -805,41 +805,62 @@ async def linked(message: Message):
 @bl.chat_message(SearchCMD("promocreate"))
 async def promocreate(message: Message):
     data = message.text.split()
+
+    if len(data) < 5 or len(data) > 7:
+        return await messagereply(message, await messages.promocreate_hint())
+
+    code = data[1]
+    amount = data[2]
+    promo_type = data[3]
+    counts = data[4]
+    date = None
+    sub_needed = False
+
     if (
-        len(data) not in (6, 7)
-        or not data[2].isdigit()
-        or data[3] not in ("xp", "coins")
-        or (len(data) == 7 and data[6] not in ("n", "y"))
+        not amount.isdigit()
+        or promo_type not in ("xp", "coins")
+        or not counts.isdigit()
     ):
         return await messagereply(message, await messages.promocreate_hint())
-    usage, date, amnt, promo_type = None, None, int(data[2]), data[3]
-    try:
-        if data[4].isdigit():
-            usage = int(data[4])
-            date = datetime.strptime(data[5], "%d.%m.%Y") if len(data) > 5 else None
-        else:
-            date = datetime.strptime(data[4], "%d.%m.%Y")
-    except ValueError:
-        return await messagereply(message, await messages.promocreate_hint())
+
+    amount = int(amount)
+    counts = int(counts)
+
+    if len(data) >= 6:
+        try:
+            date = datetime.strptime(data[5], "%d.%m.%Y")
+        except ValueError:
+            if data[5].lower() in ("y", "n"):
+                sub_needed = data[5].lower() == "y"
+            else:
+                return await messagereply(message, await messages.promocreate_hint())
+
+    if len(data) == 7:
+        if data[6].lower() not in ("y", "n"):
+            return await messagereply(message, await messages.promocreate_hint())
+        sub_needed = data[6].lower() == "y"
+
     async with (await pool()).acquire() as conn:
         if await conn.fetchval(
-            "select exists(select 1 from promocodes where code=$1)", data[1]
+            "select exists(select 1 from promocodes where code=$1)", code
         ):
             return await messagereply(
-                message, await messages.promocreate_alreadyexists(data[1])
+                message, await messages.promocreate_alreadyexists(code)
             )
+
         await conn.execute(
             "insert into promocodes (code, usage, date, amnt, type, sub_needed) values ($1, $2, $3, $4, $5, $6)",
-            data[1],
-            usage,
+            code,
+            counts,
             (date.timestamp() + 86399) if date else None,
-            amnt,
+            amount,
             promo_type,
-            (sub_needed := (len(data) == 7 and data[6] == "y")),
+            sub_needed,
         )
+
     await messagereply(
         message,
-        await messages.promocreate(data[1], amnt, usage, date, promo_type, sub_needed),
+        await messages.promocreate(code, amount, counts, date, promo_type, sub_needed),
     )
 
 
