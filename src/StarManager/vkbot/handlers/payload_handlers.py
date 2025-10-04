@@ -3828,11 +3828,11 @@ async def rps(message: MessageEvent):
         await messages.rps_play(
             creator,
             await utils.get_user_name(creator),
-            await utils.get_user_nickname(creator, message.peer_id - 2000000000),
+            None,
             (bet := message.payload["bet"]),
             (id := message.user_id),
             await utils.get_user_name(id),
-            await utils.get_user_nickname(id, message.peer_id - 2000000000),
+            None,
         ),
         message.object.peer_id,
         message.conversation_message_id,
@@ -3937,7 +3937,7 @@ async def rps_play(message: MessageEvent):
                 await messages.rps_end(
                     winid,
                     await utils.get_user_name(winid),
-                    await utils.get_user_nickname(winid, message.peer_id - 2000000000),
+                    None,
                     bet_w_comission,
                     win_pick,
                     com,
