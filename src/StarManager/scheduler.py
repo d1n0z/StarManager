@@ -387,10 +387,13 @@ async def run_notifications(conn):
                         chat_id + 2000000000,
                         await messages.notification_too_long_text(name),
                     )
+            next = int(ttime + (every * 60))
+            while next < time.time():
+                next += every * 60
             await conn.execute(
                 "UPDATE notifications SET status = $1, time = $2 WHERE id = $3",
                 0 if not every else 1,
-                int(ttime + (every * 60)) if every else ttime,
+                next if every else ttime,
                 id_,
             )
         except Exception:
