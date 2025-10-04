@@ -3802,7 +3802,7 @@ async def raid_trigger_set(message: MessageEvent):
 @bl.raw_event(
     GroupEventType.MESSAGE_EVENT,
     MessageEvent,
-    SearchPayloadCMD(["rps"], checksender=False),
+    SearchPayloadCMD(["rps"], checksender=False, answer=False),
 )
 async def rps(message: MessageEvent):
     if not message.payload or not message.conversation_message_id:
@@ -3817,6 +3817,12 @@ async def rps(message: MessageEvent):
             and message.user_id != message.payload["uid"]
         )
     ):
+        return
+    if await utils.get_user_coins(message.user_id) < message.payload["bet"]:
+        await message.show_snackbar("У вас не хватает монеток для участия.")
+        return
+    if await utils.get_user_coins(creator) < message.payload["bet"]:
+        await message.show_snackbar("У вашего оппонента недостаточно монеток.")
         return
     await utils.edit_message(
         await messages.rps_play(
@@ -3845,13 +3851,13 @@ async def rps_play(message: MessageEvent):
 
     bet = int(message.payload["bet"])
 
-    if await utils.get_user_coins(message.user_id) < bet:
-        await message.show_snackbar("У вас не хватает монеток для участия.")
-        return
-
-    waiting_for_opponent = False
-
     async with _rps_lock:  # one global lock is enough for this code
+        if await utils.get_user_coins(message.user_id) < bet:
+            await message.show_snackbar("У вас не хватает монеток для участия.")
+            return
+
+        waiting_for_opponent = False
+
         creator = managers.rps.get_creator_id(
             message.conversation_message_id, message.peer_id
         )

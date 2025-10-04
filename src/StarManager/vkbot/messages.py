@@ -3014,3 +3014,7 @@ async def rps_draw(bet, pick):
 
 async def rps_bet_limit():
     return await get("rps_bet_limit")
+
+
+async def rps_not_enough_coins():
+    return await get("rps_not_enough_coins")

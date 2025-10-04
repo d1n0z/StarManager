@@ -981,6 +981,12 @@ async def rps(message: Message):
                 await get_user_nickname(message.from_id, message.chat_id),
             ),
         )
+    if id and bet > await get_user_coins(id):
+        return await messagereply(
+            message,
+            disable_mentions=1,
+            message=await messages.rps_not_enough_coins(),
+        )
     msg = await messagereply(
         message,
         disable_mentions=1,

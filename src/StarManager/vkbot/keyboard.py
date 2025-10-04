@@ -2000,11 +2000,12 @@ def rps_play(uid, bet):
         KeyboardButtonColor.SECONDARY,
     )
     kb.add(
-        Callback("Ножницы", {"cmd": "rps_play", "pick": "s", "uid": uid, "bet": bet}),
+        Callback("Бумага", {"cmd": "rps_play", "pick": "p", "uid": uid, "bet": bet}),
         KeyboardButtonColor.SECONDARY,
     )
+    kb.row()
     kb.add(
-        Callback("Бумага", {"cmd": "rps_play", "pick": "p", "uid": uid, "bet": bet}),
+        Callback("Ножницы", {"cmd": "rps_play", "pick": "s", "uid": uid, "bet": bet}),
         KeyboardButtonColor.SECONDARY,
     )
 
