@@ -1839,8 +1839,8 @@ async def duel_hint():
     return await get("duel_hint")
 
 
-async def duel_ucoins_not_enough(uid, name, nick):
-    return await get("duel_ucoins_not_enough", uid=uid, n=nick or name)
+async def not_enough_coins(uid, name, nick):
+    return await get("not_enough_coins", uid=uid, n=nick or name)
 
 
 async def duel_coins_minimum():
@@ -2964,3 +2964,53 @@ async def raid_settings(trigger_status, trigger_invites, trigger_seconds):
 
 async def raid_trigger_set():
     return await get("raid_trigger_set")
+
+
+async def rps_hint():
+    return await get("rps_hint")
+
+
+async def rps(uid, uname, unick, bet, id=None, name=None, nick=None):
+    return await get(
+        "rps",
+        call=f"\n🔔 [id{uid}|{uname or unick}] вызвал сразиться пользователя — [id{id}|{name or nick}]\n" if id else "",
+        uid=uid,
+        uname=unick or uname,
+        bet=bet,
+    )
+
+
+async def rps_play(uid, uname, unick, bet, id, name, nick):
+    return await get(
+        "rps_play",
+        id=id,
+        name=nick or name,
+        uid=uid,
+        uname=unick or uname,
+        bet=bet,
+    )
+
+
+async def rps_end(win_id, win_name, win_nick, bet, win_pick, com):
+    return await get(
+        "rps_end",
+        win_id=win_id,
+        win_name=win_name,
+        win_nick=win_nick,
+        bet=bet,
+        win_pick={"r": "камень", "p": "бумагу", "s": "ножницы"}[win_pick],
+        lose_pick={"r": "ножницы", "p": "камень", "s": "бумагу"}[win_pick],
+        com=f" с учётом комиссии {com}%" if com else ""
+    )
+
+
+async def rps_draw(bet, pick):
+    return await get(
+        "rps_draw",
+        bet=bet,
+        pick={"r": "камень", "p": "бумагу", "s": "ножницы"}[pick],
+    )
+
+
+async def rps_bet_limit():
+    return await get("rps_bet_limit")

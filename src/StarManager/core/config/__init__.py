@@ -132,6 +132,7 @@ class TelegramSettings(BaseSettings):
     audio_thread_id: int
     bonus_thread_id: int
     duel_thread_id: int
+    rps_thread_id: int
     scheduler_thread_id: int
     reports_chat_id: int
     reports_new_thread_id: int

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import secrets
 import time
@@ -9,7 +10,7 @@ from vkbottle.bot import MessageEvent
 from vkbottle.framework.labeler import BotLabeler
 from vkbottle_types.events import GroupEventType
 
-from StarManager.core import managers, utils
+from StarManager.core import enums, managers, utils
 from StarManager.core.config import api, settings
 from StarManager.core.db import pool
 from StarManager.tgbot.bot import bot as tgbot
@@ -18,6 +19,8 @@ from StarManager.vkbot.checkers import getULvlBanned, haveAccess
 from StarManager.vkbot.rules import SearchPayloadCMD
 
 bl = BotLabeler()
+
+_rps_lock = asyncio.Lock()
 
 
 @bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["_"]))
@@ -190,7 +193,7 @@ async def duel(message: MessageEvent):
         com, duel_coins_com = 0, duelcoins
         has_comission = not (
             await utils.get_user_premium(winid)
-            or (await utils.get_user_shop_bonuses(uid))[1] > time.time()
+            or (await utils.get_user_shop_bonuses(winid))[1] > time.time()
         )
         if has_comission:
             duel_coins_com, com = int(duelcoins / 100 * 90), 10
@@ -1404,7 +1407,8 @@ async def top_leagues(message: MessageEvent):
             i.id
             for i in (
                 await api.messages.get_conversation_members(
-                    peer_id=peer_id, fields=["deactivated"]  # type: ignore
+                    peer_id=peer_id,
+                    fields=["deactivated"],  # type: ignore
                 )
             ).profiles
             if i.deactivated
@@ -1639,28 +1643,25 @@ async def top_rep_in_chat_neg(message: MessageEvent):
 async def top_math(message: MessageEvent):
     peer_id = message.object.peer_id
     async with (await pool()).acquire() as conn:
-        top = [
-            i[0]
-            for i in await conn.fetch("select winner from mathgiveaway where winner>0")
-        ]
+        top = await conn.fetch(
+            "select winner, count(*) as wins from mathgiveaway where winner>0 group by winner order by wins desc limit 30"
+        )
+    top = {i[0]: i for i in top}
     users = {
         u.id: u
         for u in await api.users.get(
-            user_ids=[i for i in top],
+            user_ids=[i for i in top.keys()],
             fields=["deactivated"],  # type: ignore
         )
     }
-    top = sorted(
-        [
-            (i, top.count(i))
-            for i in set(top)
-            if i not in users or users[i].deactivated
-        ],
-        key=lambda x: x[1],
-        reverse=True,
-    )[:10]
     await utils.edit_message(
-        await messages.top_math(top),
+        await messages.top_math(
+            sorted(
+                [i for i in set(top) if i not in users or users[i].deactivated],
+                key=lambda x: x[1],
+                reverse=True,
+            )[:10]
+        ),
         peer_id,
         message.conversation_message_id,
         keyboard.top_math(peer_id - 2000000000, message.user_id),
@@ -3796,3 +3797,162 @@ async def raid_trigger_set(message: MessageEvent):
         message.object.peer_id,
         message.conversation_message_id,
     )
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_EVENT,
+    MessageEvent,
+    SearchPayloadCMD(["rps"], checksender=False),
+)
+async def rps(message: MessageEvent):
+    if not message.payload or not message.conversation_message_id:
+        return
+    creator = managers.rps.get_creator_id(
+        message.conversation_message_id, message.peer_id
+    )
+    if not creator or (
+        creator == message.user_id
+        or (
+            message.payload["uid"] != creator
+            and message.user_id != message.payload["uid"]
+        )
+    ):
+        return
+    await utils.edit_message(
+        await messages.rps_play(
+            creator,
+            await utils.get_user_name(creator),
+            await utils.get_user_nickname(creator, message.peer_id - 2000000000),
+            (bet := message.payload["bet"]),
+            (id := message.user_id),
+            await utils.get_user_name(id),
+            await utils.get_user_nickname(id, message.peer_id - 2000000000),
+        ),
+        message.object.peer_id,
+        message.conversation_message_id,
+        keyboard.rps_play(f"{creator},{id}", bet),
+    )
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_EVENT,
+    MessageEvent,
+    SearchPayloadCMD(["rps_play"], answer=False),
+)
+async def rps_play(message: MessageEvent):
+    if not message.payload or not message.conversation_message_id:
+        return
+
+    bet = int(message.payload["bet"])
+
+    if await utils.get_user_coins(message.user_id) < bet:
+        await message.show_snackbar("У вас не хватает монеток для участия.")
+        return
+
+    waiting_for_opponent = False
+
+    async with _rps_lock:  # one global lock is enough for this code
+        creator = managers.rps.get_creator_id(
+            message.conversation_message_id, message.peer_id
+        )
+        if creator is None:
+            await message.show_snackbar(
+                "⚠️ Произошла непредвиденная ошибка. Пожалуйста, попробуйте создать новую игру."
+            )
+            return
+
+        picks = managers.rps.get_picks(message.conversation_message_id, message.peer_id)
+        is_first_player = message.user_id == creator
+
+        existing_pick = picks[0] if is_first_player else picks[1]
+        if existing_pick is not None:
+            await message.show_snackbar(
+                f"Вы уже сделали выбор - {getattr(enums.RPSPick, existing_pick).value}"
+            )
+            return
+
+        await managers.rps.set_pick(
+            message.conversation_message_id,
+            message.peer_id,
+            message.payload["pick"],
+            is_first_player,
+            None if is_first_player else message.user_id,
+        )
+
+        picks = managers.rps.get_picks(message.conversation_message_id, message.peer_id)
+        creator_pick, second_player_pick = picks
+        second_player_id = managers.rps.get_second_player_id(
+            message.conversation_message_id, message.peer_id
+        )
+
+        if creator_pick is None or second_player_pick is None:
+            waiting_for_opponent = True
+        else:
+            if creator_pick == second_player_pick:
+                await managers.rps.remove_game(
+                    message.conversation_message_id, message.peer_id
+                )
+                await utils.edit_message(
+                    await messages.rps_draw(bet, creator_pick),
+                    message.object.peer_id,
+                    message.conversation_message_id,
+                )
+                return
+
+            if second_player_id is None:
+                await message.show_snackbar(
+                    "⚠️ Произошла непредвиденная ошибка. Пожалуйста, попробуйте создать новую игру."
+                )
+                return
+
+            beats = {"r": "s", "p": "r", "s": "p"}
+
+            if beats[creator_pick] == second_player_pick:
+                winid, loseid, win_pick = creator, second_player_id, creator_pick
+            else:
+                winid, loseid, win_pick = second_player_id, creator, second_player_pick
+
+            bet_w_comission, com = bet, 0
+            has_comission = not (
+                await utils.get_user_premium(winid)
+                or (await utils.get_user_shop_bonuses(winid))[1] > time.time()
+            )
+            if has_comission:
+                bet_w_comission, com = int(bet / 100 * 90), 10
+
+            await utils.add_user_coins(loseid, -bet)
+            await utils.add_user_coins(winid, bet_w_comission)
+
+            await managers.rps.remove_game(
+                message.conversation_message_id, message.peer_id
+            )
+
+            await utils.edit_message(
+                await messages.rps_end(
+                    winid,
+                    (creator_name := await utils.get_user_name(winid)),
+                    await utils.get_user_nickname(winid, message.peer_id - 2000000000),
+                    bet_w_comission,
+                    win_pick,
+                    com,
+                ),
+                message.object.peer_id,
+                message.conversation_message_id,
+            )
+
+            try:
+                await tgbot.send_message(
+                    chat_id=settings.telegram.chat_id,
+                    message_thread_id=settings.telegram.rps_thread_id,
+                    text=f'{"W: " if creator == winid else "L: "}<a href="vk.com/id{creator}">{creator_name}</a> | {"W: " if second_player_id == winid else "L: "}<a href="vk.com/id{second_player_id}">{await utils.get_user_name(second_player_id)}</a> | {bet} | {com}% | {datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}',
+                    disable_web_page_preview=True,
+                    parse_mode="HTML",
+                )
+            except Exception:
+                pass
+            return
+
+    if waiting_for_opponent:
+        await message.show_snackbar(
+            f"✅ Вы сделали выбор - {getattr(enums.RPSPick, message.payload['pick']).value}. Ожидаем оппонента..."
+        )

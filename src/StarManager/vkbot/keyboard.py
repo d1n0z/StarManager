@@ -1979,3 +1979,33 @@ def raid_settings(uid, trigger_status: bool):
     )
 
     return kb.get_json()
+
+
+def rps(uid, bet, call_to):
+    kb = Keyboard(inline=True)
+
+    kb.add(
+        Callback("Сразиться", {"cmd": "rps", "uid": call_to or uid, "bet": bet}),
+        KeyboardButtonColor.SECONDARY,
+    )
+
+    return kb.get_json()
+
+
+def rps_play(uid, bet):
+    kb = Keyboard(inline=True)
+
+    kb.add(
+        Callback("Камень", {"cmd": "rps_play", "pick": "r", "uid": uid, "bet": bet}),
+        KeyboardButtonColor.SECONDARY,
+    )
+    kb.add(
+        Callback("Ножницы", {"cmd": "rps_play", "pick": "s", "uid": uid, "bet": bet}),
+        KeyboardButtonColor.SECONDARY,
+    )
+    kb.add(
+        Callback("Бумага", {"cmd": "rps_play", "pick": "p", "uid": uid, "bet": bet}),
+        KeyboardButtonColor.SECONDARY,
+    )
+
+    return kb.get_json()

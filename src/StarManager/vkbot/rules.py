@@ -57,10 +57,12 @@ class SearchPayloadCMD(ABCRule[Message]):
                     event.event_id, event.user_id, event.peer_id
                 )
             if self.checksender:
-                sender = (
+                allowed = (
                     event.payload["uid"] if "uid" in event.payload else event.user_id
                 )
-                if sender != event.user_id:
+                if isinstance(allowed, str) and str(event.user_id) not in allowed.split(','):
+                    return False
+                if isinstance(allowed, int) and allowed != event.user_id:
                     return False
             return True
         return False

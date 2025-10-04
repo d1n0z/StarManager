@@ -1,8 +1,8 @@
-from copy import deepcopy
 import random
 import re
 import time
 import traceback
+from copy import deepcopy
 from datetime import datetime
 
 from vkbottle import KeyboardButtonColor
@@ -11,19 +11,17 @@ from vkbottle.framework.labeler import BotLabeler
 from vkbottle_types.objects import UsersFields
 
 from StarManager.core import managers
-from StarManager.vkbot import keyboard
-from StarManager.vkbot import messages
-from StarManager.vkbot.checkers import getULvlBanned
-from StarManager.vkbot.rules import SearchCMD
-from StarManager.tgbot.bot import bot as tgbot
+from StarManager.core.config import api, settings
+from StarManager.core.db import pool
+from StarManager.core.media.stats.stats_img import createStatsImage
 from StarManager.core.utils import (
     add_user_coins,
     add_user_xp,
     chat_premium,
     delete_messages,
+    edit_message,
     get_chat_access_name,
     get_chat_settings,
-    search_id_in_message,
     get_reg_date,
     get_rep_top,
     get_user_access_level,
@@ -48,12 +46,14 @@ from StarManager.core.utils import (
     kick_user,
     messagereply,
     point_words,
+    search_id_in_message,
     set_user_access_level,
     upload_image,
 )
-from StarManager.core.config import settings, api
-from StarManager.core.db import pool
-from StarManager.core.media.stats.stats_img import createStatsImage
+from StarManager.tgbot.bot import bot as tgbot
+from StarManager.vkbot import keyboard, messages
+from StarManager.vkbot.checkers import getULvlBanned
+from StarManager.vkbot.rules import SearchCMD
 
 bl = BotLabeler()
 
@@ -492,7 +492,7 @@ async def duel(message: Message):
         return await messagereply(
             message,
             disable_mentions=1,
-            message=await messages.duel_ucoins_not_enough(
+            message=await messages.not_enough_coins(
                 uid, await get_user_name(uid), await get_user_nickname(uid, chat_id)
             ),
         )
@@ -948,3 +948,59 @@ async def shop(message: Message):
         message=await messages.shop(),
         keyboard=keyboard.shop(message.from_id),
     )
+
+
+@bl.chat_message(SearchCMD("rps"))
+async def rps(message: Message):
+    data = message.text.split()
+    if len(data) == 3:
+        id = await search_id_in_message(message.text, message.reply_message, 3)
+    else:
+        id = 0
+
+    if len(data) not in (2, 3) or not data[1].isdigit() or (len(data) == 3 and id <= 0):
+        return await messagereply(
+            message,
+            disable_mentions=1,
+            message=await messages.rps_hint(),
+        )
+    bet = int(data[1])
+    if bet not in range(25, 1001):
+        return await messagereply(
+            message,
+            disable_mentions=1,
+            message=await messages.rps_bet_limit(),
+        )
+    if bet > await get_user_coins(message.from_id):
+        return await messagereply(
+            message,
+            disable_mentions=1,
+            message=await messages.not_enough_coins(
+                message.from_id,
+                await get_user_name(message.from_id),
+                await get_user_nickname(message.from_id, message.chat_id),
+            ),
+        )
+    msg = await messagereply(
+        message,
+        disable_mentions=1,
+        message=await messages.rps(
+            message.from_id,
+            await get_user_name(message.from_id),
+            await get_user_nickname(message.from_id, message.chat_id),
+            bet,
+            *(
+                (
+                    id,
+                    await get_user_name(id),
+                    await get_user_nickname(id, message.chat_id),
+                )
+                if id
+                else (None,)
+            ),
+        ),
+        keyboard=keyboard.rps(message.from_id, bet, id),
+    )
+    if not msg.conversation_message_id:
+        return
+    await managers.rps.add_game(msg.conversation_message_id, message.peer_id, time.time(), message.from_id)

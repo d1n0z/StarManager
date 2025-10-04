@@ -1454,30 +1454,27 @@ def generate_hard_problem():
 
 async def messagereply(
     protectedmessage: Message, *args, **kwargs
-) -> MessagesSendUserIdsResponseItem | None:
-    try:
-        msg = await protectedmessage.reply(*args, **kwargs)
-        if (
-            msg.peer_id > 2000000000
-            and (await get_chat_settings((chatid := msg.peer_id - 2000000000)))["main"][
-                "autodelete"
-            ]
-        ):
-            async with (await pool()).acquire() as conn:
-                val = await conn.fetchval(
-                    "select value from settings where setting='autodelete' and chat_id=$1",
-                    chatid,
+) -> MessagesSendUserIdsResponseItem:
+    msg = await protectedmessage.reply(*args, **kwargs)
+    if (
+        msg.peer_id > 2000000000
+        and (await get_chat_settings((chatid := msg.peer_id - 2000000000)))["main"][
+            "autodelete"
+        ]
+    ):
+        async with (await pool()).acquire() as conn:
+            val = await conn.fetchval(
+                "select value from settings where setting='autodelete' and chat_id=$1",
+                chatid,
+            )
+            if val:
+                await conn.execute(
+                    "insert into todelete (peerid, cmid, delete_at) values ($1, $2, $3)",
+                    msg.peer_id,
+                    msg.conversation_message_id,
+                    time.time() + val,
                 )
-                if val:
-                    await conn.execute(
-                        "insert into todelete (peerid, cmid, delete_at) values ($1, $2, $3)",
-                        msg.peer_id,
-                        msg.conversation_message_id,
-                        time.time() + val,
-                    )
-        return msg
-    except Exception:
-        return
+    return msg
 
 
 async def create_payment(
@@ -1611,7 +1608,10 @@ async def archive_report(
             await api.messages.send(user_id=uid, random_id=0, message=message)
     except Exception:
         pass
-    new_text.insert(2, f'🛂 Ответил: <a href="tg://user?id={user.id}">{f"@{user.username}" if user.username else (user.full_name or user.id)}</a>')
+    new_text.insert(
+        2,
+        f'🛂 Ответил: <a href="tg://user?id={user.id}">{f"@{user.username}" if user.username else (user.full_name or user.id)}</a>',
+    )
     new_text.insert(4, f"➡️ Статус: {action}")
     if action == "Закрыто":
         new_text.append(f"❇️ Ответ: {answer}")
