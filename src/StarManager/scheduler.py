@@ -544,7 +544,7 @@ def run(loop):
 
     scheduler.add_job(schedule(everyday), CronTrigger.from_crontab("0 0 * * *"))
 
-    scheduler.add_job(new_tg_giveaway, CronTrigger.from_crontab("0 10 * * *"))
-    scheduler.add_job(end_tg_giveaway, CronTrigger.from_crontab("0 9 * * *"))
+    scheduler.add_job(schedule(new_tg_giveaway), CronTrigger.from_crontab("0 10 * * *"))
+    scheduler.add_job(schedule(end_tg_giveaway), CronTrigger.from_crontab("0 9 * * *"))
 
     scheduler.start()
