@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Tuple, TypeAlias
 
 from StarManager.core.managers.base import BaseCachedModel, BaseManager
-from StarManager.core.utils import api, settings
+from StarManager.core.config import api, settings
 
 CacheKey: TypeAlias = Tuple[int, int]
 
