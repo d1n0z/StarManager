@@ -1657,7 +1657,7 @@ async def top_math(message: MessageEvent):
     await utils.edit_message(
         await messages.top_math(
             sorted(
-                [i for i in set(top) if i in users and not users[i].deactivated],
+                [i for uid, i in top.items() if uid in users and not users[uid].deactivated],
                 key=lambda x: x[1],
                 reverse=True,
             )[:10]
