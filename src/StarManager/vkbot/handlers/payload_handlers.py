@@ -3930,7 +3930,7 @@ async def rps_play(message: MessageEvent):
             await utils.edit_message(
                 await messages.rps_end(
                     winid,
-                    (creator_name := await utils.get_user_name(winid)),
+                    await utils.get_user_name(winid),
                     await utils.get_user_nickname(winid, message.peer_id - 2000000000),
                     bet_w_comission,
                     win_pick,
@@ -3944,7 +3944,7 @@ async def rps_play(message: MessageEvent):
                 await tgbot.send_message(
                     chat_id=settings.telegram.chat_id,
                     message_thread_id=settings.telegram.rps_thread_id,
-                    text=f'{"W: " if creator == winid else "L: "}<a href="vk.com/id{creator}">{creator_name}</a> | {"W: " if second_player_id == winid else "L: "}<a href="vk.com/id{second_player_id}">{await utils.get_user_name(second_player_id)}</a> | {bet} | {com}% | {datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}',
+                    text=f'{"W: " if creator == winid else "L: "}<a href="vk.com/id{creator}">{await utils.get_user_name(creator)}</a> | {"W: " if second_player_id == winid else "L: "}<a href="vk.com/id{second_player_id}">{await utils.get_user_name(second_player_id)}</a> | {bet} | {com}% | {datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}',
                     disable_web_page_preview=True,
                     parse_mode="HTML",
                 )
