@@ -1041,17 +1041,17 @@ async def chats(message: Message):
         )
 
     chats = await managers.public_chats.get_sorted_premium_chats()
-    res = await managers.public_chats.get_chats_top(chats[:15])
+    res, minus_counter = await managers.public_chats.get_chats_top(chats)
     await messagereply(
         message,
         await messages.chats(
-            await managers.public_chats.count_regular_chats(),
-            res,
+            await managers.public_chats.count_regular_chats() + minus_counter,
+            res[:15],
             enums.ChatsMode.premium,
         ),
         keyboard=keyboard.chats(
             message.from_id,
-            await managers.public_chats.count_premium_chats(),
+            await managers.public_chats.count_premium_chats() + minus_counter,
             0,
             enums.ChatsMode.premium,
         ),

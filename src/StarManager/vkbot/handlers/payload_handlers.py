@@ -3972,10 +3972,10 @@ async def chats(message: MessageEvent):
     else:
         res = await managers.public_chats.get_regular_chats()
         res = sorted(res, key=lambda x: x[1].members_count, reverse=True)
-    res = await managers.public_chats.get_chats_top(res[page * 15 : page * 15 + 15])
+    res, minus_counter = await managers.public_chats.get_chats_top(res)
     await utils.edit_message(
         await messages.chats(
-            (reg_chats := await managers.public_chats.count_regular_chats()), res, mode
+            (reg_chats := (await managers.public_chats.count_regular_chats() + minus_counter)), res[page * 15 : page * 15 + 15], mode
         ),
         peer_id,
         message.conversation_message_id,

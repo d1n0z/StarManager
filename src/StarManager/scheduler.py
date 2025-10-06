@@ -144,40 +144,76 @@ async def updateUsers(conn):  # TODO: optimize
             logger.exception("Users update exception:")
 
 
-async def updateChats(conn):  # TODO: optimize
-    chat_rows = await conn.fetch("select chat_id from chatnames")
-    for i in range(0, len(chat_rows), 100):
-        batch = [r[0] for r in chat_rows[i : i + 100]]
-        peer_ids = ",".join(str(2000000000 + cid) for cid in batch)
-        code = f"""
-        var conv = API.messages.getConversationsById({{"peer_ids": "{peer_ids}"}});
-        return conv;
-        """
+async def updateChats(conn):
+    chatnames_ids = [i[0] for i in await conn.fetch("select chat_id from chatnames")]
+    publicchats_ids = [i[0] for i in await conn.fetch("select chat_id from publicchats")]
+    total_chat_ids = set(chatnames_ids + publicchats_ids)
+    if not total_chat_ids:
+        return
+
+    updates_chatnames = []
+    updates_publicchats = []
+
+    for chat_ids in chunks(total_chat_ids, 100) if total_chat_ids else []:
+        peer_ids = [2000000000 + cid for cid in chat_ids]
+
         try:
-            result = vk_api_session.method("execute", {"code": code})
-            updates_chatnames = []
-            updates_publicchats = []
-            for item in result["items"]:
-                if (
-                    "peer" in item
-                    and "id" in item["peer"]
-                    and "chat_settings" in item
-                    and "title" in item["chat_settings"]
-                    and "members_count" in item["chat_settings"]
-                ):
-                    pid = item["peer"]["id"] - 2000000000
-                    title = item["chat_settings"]["title"]
-                    members_count = item["chat_settings"]["members_count"]
-                    updates_chatnames.append((title, pid))
-                    updates_publicchats.append((members_count, pid))
-            await conn.executemany(
-                "update chatnames set name = $1 where chat_id = $2", updates_chatnames
-            )
-            await conn.executemany(
-                "update publicchats set members_count = $1 where chat_id = $2", updates_publicchats
-            )
+            conv = await api.messages.get_conversations_by_id(peer_ids=peer_ids)
         except Exception:
-            logger.exception("Chats update exception:")
+            logger.exception("getConversationsById failed:")
+            continue
+
+        members_cache = {}
+
+        for item in getattr(conv, "items", []):
+            try:
+                if not item.peer or not item.chat_settings:
+                    continue
+
+                chat_id = item.peer.id - 2000000000
+                title = item.chat_settings.title
+                members_count = item.chat_settings.members_count
+
+                if not members_count:
+                    try:
+                        members = await api.messages.get_conversation_members(
+                            peer_id=item.peer.id
+                        )
+                        members_count = len(members.items)
+                        members_cache[chat_id] = members_count
+                    except Exception:
+                        members_count = None
+
+                updates_chatnames.append((title, chat_id))
+                if members_count is not None:
+                    updates_publicchats.append((members_count, chat_id))
+
+            except Exception:
+                logger.exception(f"Error processing chat item {item}")
+                continue
+
+        missing = [
+            cid for cid in chat_ids if cid not in members_cache and cid not in [u[1] for u in updates_publicchats]
+        ]
+        for chat_id in missing:
+            try:
+                members = await api.messages.get_conversation_members(
+                    peer_id=2000000000 + chat_id
+                )
+                updates_publicchats.append((len(members.items), chat_id))
+            except Exception:
+                pass
+
+    if updates_chatnames:
+        await conn.executemany(
+            "update chatnames set name = $1 where chat_id = $2", updates_chatnames
+        )
+
+    if updates_publicchats:
+        await conn.executemany(
+            "update publicchats set members_count = $1 where chat_id = $2",
+            updates_publicchats,
+        )
 
 
 async def updateGroups(conn):  # TODO: optimize

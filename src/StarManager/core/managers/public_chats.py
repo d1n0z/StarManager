@@ -509,6 +509,7 @@ class PublicChatsManager(BaseManager):
     async def get_chats_top(
         self, chats: List[Tuple[int, _CachedPublicChatObject]]
     ):  # TODO: merge chatname and publicchats or add new cache
+        counter = 0
         res = []
         for chat in chats:
             try:
@@ -520,12 +521,15 @@ class PublicChatsManager(BaseManager):
                     )
                     chatname = chatname.items[0].chat_settings
                     if not chatname or not chatname.title:
+                        counter -= 1
                         continue
                     chatname = chatname.title
                     await ChatNames.create(chat_id=chat[0], name=chatname)
                 if not chatname:
+                    counter -= 1
                     continue
             except Exception:
+                counter -= 1
                 continue
             try:
                 if (
@@ -540,11 +544,12 @@ class PublicChatsManager(BaseManager):
                     )
                     or not invite_link.link
                 ):
+                    counter -= 1
                     continue
             except Exception:
                 continue
             res.append((invite_link.link, chat[1].members_count, chatname))
-        return res
+        return res, counter
 
     async def sync(self):
         await self.cache.sync()
