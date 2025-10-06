@@ -1045,12 +1045,15 @@ async def chats(message: Message):
     await messagereply(
         message,
         await messages.chats(
-            (total_chats := await managers.public_chats.count_regular_chats()),
+            await managers.public_chats.count_regular_chats(),
             res,
             enums.ChatsMode.premium,
         ),
         keyboard=keyboard.chats(
-            message.from_id, total_chats, 0, enums.ChatsMode.premium
+            message.from_id,
+            await managers.public_chats.count_premium_chats(),
+            0,
+            enums.ChatsMode.premium,
         ),
         disable_mentions=1,
     )

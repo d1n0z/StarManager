@@ -3975,13 +3975,9 @@ async def chats(message: MessageEvent):
     res = await managers.public_chats.get_chats_top(res[page * 15 : page * 15 + 15])
     await utils.edit_message(
         await messages.chats(
-            (
-                total_chats := (await managers.public_chats.count_regular_chats())
-            ),
-            res,
-            mode,
+            (reg_chats := await managers.public_chats.count_regular_chats()), res, mode
         ),
         peer_id,
         message.conversation_message_id,
-        keyboard.chats(message.user_id, total_chats, page, mode),
+        keyboard.chats(message.user_id, reg_chats if mode == enums.ChatsMode.premium else await managers.public_chats.count_premium_chats(), page, mode),
     )
