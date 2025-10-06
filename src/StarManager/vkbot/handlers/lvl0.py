@@ -10,7 +10,7 @@ from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 from vkbottle_types.objects import UsersFields
 
-from StarManager.core import managers
+from StarManager.core import enums, managers
 from StarManager.core.config import api, settings
 from StarManager.core.db import pool
 from StarManager.core.media.stats.stats_img import createStatsImage
@@ -19,7 +19,6 @@ from StarManager.core.utils import (
     add_user_xp,
     chat_premium,
     delete_messages,
-    edit_message,
     get_chat_access_name,
     get_chat_settings,
     get_reg_date,
@@ -642,13 +641,6 @@ async def deanon(message: Message):
     await messagereply(message, await messages.anon_not_pm(), disable_mentions=1)
 
 
-@bl.chat_message(SearchCMD("chats"))
-async def chats(message: Message):
-    await messagereply(
-        message, await messages.chats(), keyboard=keyboard.chats(), disable_mentions=1
-    )
-
-
 @bl.chat_message(SearchCMD("guess"))
 async def guess(message: Message):
     if not (await get_chat_settings(message.chat_id))["entertaining"]["allowGuess"]:
@@ -975,11 +967,7 @@ async def rps(message: Message):
         return await messagereply(
             message,
             disable_mentions=1,
-            message=await messages.not_enough_coins(
-                message.from_id,
-                await get_user_name(message.from_id),
-                None,
-            ),
+            message=await messages.rps_not_enough_coins(),
         )
     if id and bet > await get_user_coins(id):
         return await messagereply(
@@ -1009,4 +997,60 @@ async def rps(message: Message):
     )
     if not msg.conversation_message_id:
         return
-    await managers.rps.add_game(msg.conversation_message_id, message.peer_id, time.time(), message.from_id)
+    await managers.rps.add_game(
+        msg.conversation_message_id, message.peer_id, time.time(), message.from_id
+    )
+
+
+@bl.chat_message(SearchCMD("up"))
+async def up(message: Message):
+    if not (await get_chat_settings(message.peer_id - 2000000000))["entertaining"][
+        "allowChats"
+    ]:
+        return await messagereply(
+            message, disable_mentions=1, message=await messages.chats_not_allowed()
+        )
+    up_res, remaining = await managers.public_chats.do_up(
+        message.chat_id,
+        message.from_id,
+        message.date if hasattr(message, "date") and message.date else None,
+    )
+    if not up_res:
+        if remaining is not None:
+            return await messagereply(
+                message,
+                disable_mentions=1,
+                message=await messages.up_cooldown(remaining),
+            )
+        else:
+            return await messagereply(
+                message,
+                disable_mentions=1,
+                message=await messages.up_chat_is_not_premium(),
+            )
+    await messagereply(message, disable_mentions=1, message=await messages.up())
+
+
+@bl.chat_message(SearchCMD("chats"))
+async def chats(message: Message):
+    if not (await get_chat_settings(message.peer_id - 2000000000))["entertaining"][
+        "allowChats"
+    ]:
+        return await messagereply(
+            message, disable_mentions=1, message=await messages.chats_not_allowed()
+        )
+
+    chats = await managers.public_chats.get_sorted_premium_chats()
+    res = await managers.public_chats.get_chats_top(chats[:15])
+    await messagereply(
+        message,
+        await messages.chats(
+            (total_chats := await managers.public_chats.count_regular_chats()),
+            res,
+            enums.ChatsMode.premium,
+        ),
+        keyboard=keyboard.chats(
+            message.from_id, total_chats, 0, enums.ChatsMode.premium
+        ),
+        disable_mentions=1,
+    )

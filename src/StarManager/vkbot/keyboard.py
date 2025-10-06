@@ -1,5 +1,6 @@
 from vkbottle import Callback, Keyboard, KeyboardButtonColor, OpenLink
 
+from StarManager.core import enums
 from StarManager.core.config import settings
 
 NUMOJIS = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
@@ -1667,9 +1668,29 @@ def timeout_settings(uid, allowed):
     return kb.get_json()
 
 
-def chats():
+def chats(uid, total_chats: int, page: int, mode: enums.ChatsMode):
     kb = Keyboard(inline=True)
-    kb.add(OpenLink(label="Список бесед", link="https://star-manager.ru/chats/"))
+
+    if page != 0:
+        kb.add(
+            Callback(
+                "⏪", {"cmd": "chats", "page": page - 1, "uid": uid, "mode": mode.value}
+            )
+        )
+    kb.add(
+        Callback(
+            "Обычные" if mode == enums.ChatsMode.premium else "🏆 PREMIUM",
+            {"cmd": "chats", "uid": uid, "mode": mode.value, "page": 0},
+        ),
+        KeyboardButtonColor.SECONDARY if mode == enums.ChatsMode.all else None,
+    )
+    if total_chats > 15:
+        kb.add(
+            Callback(
+                "⏩", {"cmd": "chats", "page": page + 1, "uid": uid, "mode": mode.value}
+            )
+        )
+
     return kb.get_json()
 
 
@@ -1954,11 +1975,7 @@ def raid(uid, status: bool):
         ),
         KeyboardButtonColor.NEGATIVE if status else KeyboardButtonColor.POSITIVE,
     )
-    kb.add(
-        Callback(
-            "Настройки", {"cmd": "raid_settings", "uid": uid}
-        )
-    )
+    kb.add(Callback("Настройки", {"cmd": "raid_settings", "uid": uid}))
 
     return kb.get_json()
 
@@ -1968,15 +1985,14 @@ def raid_settings(uid, trigger_status: bool):
 
     kb.add(
         Callback(
-            "Выключить" if trigger_status else "Включить", {"cmd": "raid_trigger_turn", "uid": uid}
+            "Выключить" if trigger_status else "Включить",
+            {"cmd": "raid_trigger_turn", "uid": uid},
         ),
-        KeyboardButtonColor.NEGATIVE if trigger_status else KeyboardButtonColor.POSITIVE,
+        KeyboardButtonColor.NEGATIVE
+        if trigger_status
+        else KeyboardButtonColor.POSITIVE,
     )
-    kb.add(
-        Callback(
-            "Лимиты", {"cmd": "raid_trigger_set", "uid": uid}
-        )
-    )
+    kb.add(Callback("Лимиты", {"cmd": "raid_trigger_set", "uid": uid}))
 
     return kb.get_json()
 

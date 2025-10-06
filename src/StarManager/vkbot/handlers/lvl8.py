@@ -8,6 +8,7 @@ from datetime import datetime
 from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 
+from StarManager.core import managers
 from StarManager.core.config import api, settings
 from StarManager.core.db import pool
 from StarManager.core.utils import (
@@ -252,15 +253,8 @@ async def setprem(message: Message):
     chat_id = await search_id_in_message(message.text, message.reply_message)
     if chat_id <= 0:
         return await messagereply(message, await messages.setprem_hint())
-    async with (await pool()).acquire() as conn:
-        if not await conn.fetchval(
-            "update publicchats set premium = true where chat_id=$1 returning 1",
-            chat_id,
-        ):
-            await conn.execute(
-                "insert into publicchats (chat_id, premium, isopen) values ($1, true, false)",
-                chat_id,
-            )
+
+    await managers.public_chats.edit_premium(chat_id, make_premium=True)
 
     await messagereply(message, await messages.setprem(chat_id))
     await send_message(
@@ -273,17 +267,15 @@ async def delprem(message: Message):
     chat_id = await search_id_in_message(message.text, message.reply_message)
     if chat_id <= 0:
         return await messagereply(message, await messages.delprem_hint())
-    async with (await pool()).acquire() as conn:
-        await conn.execute(
-            "update publicchats set premium = false where chat_id=$1", chat_id
-        )
+
+    await managers.public_chats.edit_premium(chat_id, make_premium=False)
+
     await messagereply(message, await messages.delprem(chat_id))
 
 
 @bl.chat_message(SearchCMD("premlist"))
 async def permlist(message: Message):
-    async with (await pool()).acquire() as conn:
-        prem = await conn.fetch("select chat_id from publicchats where premium=true")
+    prem = [chat[0] for chat in await managers.public_chats.get_sorted_premium_chats()]
     await messagereply(message, await messages.premlist(prem))
 
 

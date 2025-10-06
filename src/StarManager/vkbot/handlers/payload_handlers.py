@@ -1657,7 +1657,11 @@ async def top_math(message: MessageEvent):
     await utils.edit_message(
         await messages.top_math(
             sorted(
-                [i for uid, i in top.items() if uid in users and not users[uid].deactivated],
+                [
+                    i
+                    for uid, i in top.items()
+                    if uid in users and not users[uid].deactivated
+                ],
                 key=lambda x: x[1],
                 reverse=True,
             )[:10]
@@ -2788,15 +2792,20 @@ async def timeout_settings_turn(message: MessageEvent):
 async def turnpublic(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
+    chat = await managers.public_chats.get_chat(chat_id)
+    if chat.premium if chat else False:
+        prem = "Есть"
+    else:
+        prem = "Отсутствует"
+    if not (chat.isopen if chat else False):
+        public = "Открытый"
+    else:
+        public = "Приватный"
+    await managers.public_chats.edit_chat(
+        chat_id, isopen=not chat.isopen if chat else True
+    )
+
     async with (await pool()).acquire() as conn:
-        if not await conn.fetchval(
-            "update publicchats set isopen=not isopen where chat_id=$1 returning 1",
-            chat_id,
-        ):
-            await conn.execute(
-                "insert into publicchats (chat_id, premium, isopen) values ($1, false, true)",
-                chat_id,
-            )
         chatgroup = (
             "Привязана"
             if await conn.fetchval(
@@ -2825,23 +2834,6 @@ async def turnpublic(message: MessageEvent):
             bjd = datetime.utcfromtimestamp(bjd).strftime("%d.%m.%Y %H:%M")
         else:
             bjd = "Невозможно определить"
-        if await conn.fetchval(
-            "select exists(select 1 from publicchats where chat_id=$1 and premium=true)",
-            chat_id,
-        ):
-            prem = "Есть"
-        else:
-            prem = "Отсутствует"
-        if await conn.fetchval(
-            "select exists(select 1 from publicchats where chat_id=$1 and isopen=true)",
-            chat_id,
-        ):
-            public = "Открытый"
-        else:
-            public = "Приватный"
-            await conn.execute(
-                "delete from publicchatssettings where chat_id=$1", chat_id
-            )
     members = (
         await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     ).items
@@ -3962,3 +3954,34 @@ async def rps_play(message: MessageEvent):
         await message.show_snackbar(
             f"✅ Вы сделали выбор - {getattr(enums.RPSPick, message.payload['pick']).value}. Ожидаем оппонента..."
         )
+
+
+@bl.raw_event(GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["chats"]))
+async def chats(message: MessageEvent):
+    if not message.payload:
+        return
+    peer_id = message.object.peer_id
+    page = message.payload["page"]
+    mode = {
+        enums.ChatsMode.all: enums.ChatsMode.premium,
+        enums.ChatsMode.premium: enums.ChatsMode.all,
+    }[enums.ChatsMode(message.payload["mode"])]
+
+    if mode == enums.ChatsMode.premium:
+        res = await managers.public_chats.get_sorted_premium_chats()
+    else:
+        res = await managers.public_chats.get_regular_chats()
+        res = sorted(res, key=lambda x: x[1].members_count, reverse=True)
+    res = await managers.public_chats.get_chats_top(res[page * 15 : page * 15 + 15])
+    await utils.edit_message(
+        await messages.chats(
+            (
+                total_chats := (await managers.public_chats.count_regular_chats())
+            ),
+            res,
+            mode,
+        ),
+        peer_id,
+        message.conversation_message_id,
+        keyboard.chats(message.user_id, total_chats, page, mode),
+    )

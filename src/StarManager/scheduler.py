@@ -153,19 +153,26 @@ async def updateInfo(conn):
         """
         try:
             result = vk_api_session.method("execute", {"code": code})
-            updates = []
+            updates_chatnames = []
+            updates_publicchats = []
             for item in result["items"]:
                 if (
                     "peer" in item
                     and "id" in item["peer"]
-                    and "chat_settings" in item["peer"]
-                    and "title" in item["peer"]["chat_settings"]
+                    and "chat_settings" in item
+                    and "title" in item["chat_settings"]
+                    and "members_count" in item["chat_settings"]
                 ):
                     pid = item["peer"]["id"] - 2000000000
-                    title = item["peer"]["chat_settings"]["title"]
-                    updates.append((title, pid))
+                    title = item["chat_settings"]["title"]
+                    members_count = item["chat_settings"]["members_count"]
+                    updates_chatnames.append((title, pid))
+                    updates_publicchats.append((members_count, pid))
             await conn.executemany(
-                "update chatnames set name = $1 where chat_id = $2", updates
+                "update chatnames set name = $1 where chat_id = $2", updates_chatnames
+            )
+            await conn.executemany(
+                "update publicchats set members_count = $1 where chat_id = $2", updates_publicchats
             )
         except Exception:
             logger.exception("Chats update exception:")
@@ -541,7 +548,8 @@ def run(loop):
         schedule(backup, use_db=False), CronTrigger.from_crontab("0 6,18 * * *")
     )
 
-    scheduler.add_job(schedule(updateInfo), CronTrigger.from_crontab("0 */3 * * *"))
+    # scheduler.add_job(schedule(updateInfo), CronTrigger.from_crontab("0 */3 * * *"))
+    scheduler.add_job(schedule(updateInfo), CronTrigger.from_crontab("55 17 * * *"))
 
     scheduler.add_job(schedule(mathgiveaway), CronTrigger.from_crontab("*/15 * * * *"))
 

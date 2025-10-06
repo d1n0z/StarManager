@@ -211,7 +211,7 @@ async def edit_message(
 
 
 @AsyncTTL(time_to_live=300, maxsize=0)
-async def get_chat_name(chat_id: int) -> str:
+async def get_chat_name(chat_id: int, none: Any = "UNKNOWN"):
     async with (await pool()).acquire() as conn:
         if name := await conn.fetchval(
             "select name from chatnames where chat_id=$1", chat_id
@@ -222,9 +222,9 @@ async def get_chat_name(chat_id: int) -> str:
                 peer_ids=[chat_id + 2000000000], group_id=settings.vk.group_id
             )
             chatname = chatname.items[0].chat_settings
-            chatname = chatname.title if chatname else "UNKNOWN"
+            chatname = chatname.title if chatname else none
         except Exception:
-            chatname = "UNKNOWN"
+            chatname = none
         await conn.execute(
             "insert into chatnames (chat_id, name) values ($1, $2)", chat_id, chatname
         )
@@ -1264,13 +1264,8 @@ def hex_to_rgb(value):
 
 
 async def chat_premium(chat_id, none=False):
-    async with (await pool()).acquire() as conn:
-        return (
-            await conn.fetchval(
-                "select premium from publicchats where chat_id=$1", chat_id
-            )
-            or none
-        )
+    chat = await managers.public_chats.get_chat(chat_id)
+    return none if not chat else chat.premium
 
 
 @AsyncTTL(time_to_live=300, maxsize=0)

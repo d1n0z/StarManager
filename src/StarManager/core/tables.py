@@ -510,22 +510,12 @@ class Captcha(Model):
 class PublicChats(Model):
     chat_id = fields.IntField(index=True, unique=True)
     premium = fields.BooleanField()
+    last_up = fields.BigIntField(default=0)
     isopen = fields.BooleanField(default=False)
+    members_count = fields.IntField(default=0)
 
     class Meta:
         table = "publicchats"
-
-
-class PublicChatsSettings(Model):
-    chat_id = fields.IntField(index=True, unique=True)
-    link = fields.TextField()
-    photo = fields.TextField()
-    name = fields.TextField()
-    members = fields.IntField()
-    last_update = fields.BigIntField()
-
-    class Meta:
-        table = "publicchatssettings"
 
 
 class TelegramLink(Model):
@@ -762,6 +752,15 @@ class ChatUserCMIDs(Model):  # questionable solution, looking for a new one
 
     class Meta:
         table = "chatusercmids"
+
+
+class UpCommandLogs(Model):
+    chat_id = fields.IntField()
+    uid = fields.IntField()
+    timestamp = fields.BigIntField()
+
+    class Meta:
+        table = "upcommandlogs"
 
 
 async def init():

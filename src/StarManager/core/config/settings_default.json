@@ -16,7 +16,8 @@
             "allowDuel": 1,
             "allowGuess": 1,
             "allowTransfer": 1,
-            "allowAnon": 1
+            "allowAnon": 1,
+            "allowChats": 1
         },
         "antispam": {
             "messagesPerMinute": 0,

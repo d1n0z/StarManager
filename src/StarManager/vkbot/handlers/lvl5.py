@@ -5,6 +5,7 @@ from datetime import datetime
 from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 
+from StarManager.core import managers
 from StarManager.vkbot import keyboard, messages
 from StarManager.vkbot.checkers import haveAccess
 from StarManager.vkbot.rules import SearchCMD
@@ -595,21 +596,15 @@ async def chat(message: Message):
         else:
             bjd = "Невозможно определить"
 
-        if await conn.fetchval(
-            "select exists(select 1 from publicchats where chat_id=$1 and isopen=true)",
-            chat_id,
-        ):
-            public = "Открытый"
-        else:
-            public = "Приватный"
+    if (chat := await managers.public_chats.get_chat(chat_id)) and chat.isopen:
+        public = "Открытый"
+    else:
+        public = "Приватный"
 
-        if await conn.fetchval(
-            "select exists(select 1 from publicchats where chat_id=$1 and premium=true)",
-            chat_id,
-        ):
-            prem = "Есть"
-        else:
-            prem = "Отсутствует"
+    if chat and chat.premium:
+        prem = "Есть"
+    else:
+        prem = "Отсутствует"
 
     await messagereply(
         message,

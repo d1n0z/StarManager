@@ -27,6 +27,7 @@
         "short": 0,
         "rewards": 0,
         "rps": 0,
+        "up": 0,
         "shop": 0,
         "kick": 1,
         "mute": 1,
@@ -335,7 +336,8 @@
         "prempromodel": "/prempromodel - Удалить промокод на сайте.",
         "prempromolist": "/prempromolist - Список промокодов на сайте.",
         "bonuslist": "/bonuslist - Статистика команды /bonus.",
-        "rps": "/rps - Игра камень, ножницы, бумага."
+        "rps": "/rps - Игра камень, ножницы, бумага.",
+        "chats": "/chats - Топ чатов."
     },
     "prefix": [
         "/",

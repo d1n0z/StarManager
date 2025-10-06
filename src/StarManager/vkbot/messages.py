@@ -6,7 +6,7 @@ from typing import Dict
 
 from cache.async_lru import AsyncLRU
 
-from StarManager.core import tables
+from StarManager.core import enums, tables
 from StarManager.core.config import settings
 from StarManager.core.db import pool
 from StarManager.core.utils import (
@@ -2415,8 +2415,18 @@ async def timeout_settings():
     return await get("timeout_settings")
 
 
-async def chats():
-    return await get("chats")
+async def chats(chats_count, res, mode: enums.ChatsMode):
+    def shorten(text, length=20):
+        return text if len(text) <= length else text[: length - 3] + "..."
+    return await get(
+        "chats",
+        chats_count=chats_count,
+        type="🏆 PREMIUM" if mode == enums.ChatsMode.premium else "Обычные",
+        chats="\n".join(
+            f"[{k}]. [{chat[0].replace('https://', '')}|Чат ({chat[1]} уч.)] | {shorten(chat[2])}"
+            for k, chat in enumerate(res, start=1)
+        ),
+    )
 
 
 async def setprem(id):
@@ -2973,7 +2983,9 @@ async def rps_hint():
 async def rps(uid, uname, unick, bet, id=None, name=None, nick=None):
     return await get(
         "rps",
-        call=f"\n🔔 [id{uid}|{uname or unick}] вызвал сразиться пользователя — [id{id}|{name or nick}]\n" if id else "",
+        call=f"\n🔔 [id{uid}|{uname or unick}] вызвал сразиться пользователя — [id{id}|{name or nick}]\n"
+        if id
+        else "",
         uid=uid,
         uname=unick or uname,
         bet=bet,
@@ -3000,7 +3012,7 @@ async def rps_end(win_id, win_name, win_nick, bet, win_pick, com):
         bet=bet,
         win_pick={"r": "камень", "p": "бумагу", "s": "ножницы"}[win_pick],
         lose_pick={"r": "ножницы", "p": "камень", "s": "бумагу"}[win_pick],
-        com=f" с учётом комиссии {com}%" if com else ""
+        com=f" с учётом комиссии {com}%" if com else "",
     )
 
 
@@ -3018,3 +3030,23 @@ async def rps_bet_limit():
 
 async def rps_not_enough_coins():
     return await get("rps_not_enough_coins")
+
+
+async def up_cooldown(remaining):
+    return await get(
+        "up_cooldown",
+        hours=point_hours(hours := ((remaining // 3600) * 3600)),
+        minutes=point_minutes(remaining - hours),
+    )
+
+
+async def up_chat_is_not_premium():
+    return await get("up_chat_is_not_premium")
+
+
+async def up():
+    return await get("up")
+
+
+async def chats_not_allowed():
+    return await get("chats_not_allowed")

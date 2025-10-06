@@ -14,7 +14,7 @@ from starlette.responses import JSONResponse
 from vkbottle_types.objects import UsersFields
 from yookassa import Configuration, Payment
 
-from StarManager.core import utils
+from StarManager.core import managers, utils
 from StarManager.core.config import api as vkapi
 from StarManager.core.config import settings, sitedata
 from StarManager.core.db import smallpool as pool
@@ -278,13 +278,11 @@ async def create_payment(request: Request, data: models.Item):
     elif data.type == "chat":
         cost = origcost = sitedata["premiumchat"]
         chat_id: int = data.data.chat_id  # type: ignore
-        async with (await pool()).acquire() as conn:
-            if await conn.fetchval(
-                "select premium from publicchats where chat_id=$1", chat_id
-            ):
-                raise HTTPException(
-                    status_code=400, detail="У этой беседы уже есть Premium-статус."
-                )
+        chat = await managers.public_chats.get_chat(chat_id)
+        if chat and chat.premium:
+            raise HTTPException(
+                status_code=400, detail="У этой беседы уже есть Premium-статус."
+            )
         try:
             chat = await vkapi.messages.get_conversation_members(
                 peer_id=2000000000 + chat_id
@@ -403,14 +401,7 @@ ID беседы: <code>{payment.chat_id}</code>\n"""
 
     async with (await pool()).acquire() as conn:
         if payment.chat_id:
-            if not await conn.fetchval(
-                "update publicchats set premium=true where chat_id=$1 returning 1",
-                payment.chat_id,
-            ):
-                await conn.execute(
-                    "insert into publicchats (chat_id, premium, isopen) values ($1, true, false)",
-                    payment.chat_id,
-                )
+            await managers.public_chats.edit_premium(payment.chat_id, make_premium=True)
         elif payment.coins:
             await utils.add_user_coins(payment.to_id, payment.coins)
         else:
