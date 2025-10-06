@@ -122,7 +122,7 @@ async def backup() -> None:
     )
 
 
-async def updateInfo(conn):  # TODO: optimize
+async def updateUsers(conn):  # TODO: optimize
     user_rows = await conn.fetch("select uid from usernames")
     for i in range(0, len(user_rows), 25):
         batch = [r[0] for r in user_rows[i : i + 25]]
@@ -143,6 +143,8 @@ async def updateInfo(conn):  # TODO: optimize
         except Exception:
             logger.exception("Users update exception:")
 
+
+async def updateChats(conn):  # TODO: optimize
     chat_rows = await conn.fetch("select chat_id from chatnames")
     for i in range(0, len(chat_rows), 100):
         batch = [r[0] for r in chat_rows[i : i + 100]]
@@ -177,6 +179,8 @@ async def updateInfo(conn):  # TODO: optimize
         except Exception:
             logger.exception("Chats update exception:")
 
+
+async def updateGroups(conn):  # TODO: optimize
     group_rows = await conn.fetch("select group_id from groupnames")
     for i in range(0, len(group_rows), 500):
         batch = [r[0] for r in group_rows[i : i + 500]]
@@ -548,7 +552,9 @@ def run(loop):
         schedule(backup, use_db=False), CronTrigger.from_crontab("0 6,18 * * *")
     )
 
-    scheduler.add_job(schedule(updateInfo), CronTrigger.from_crontab("0 */3 * * *"))
+    scheduler.add_job(schedule(updateChats), CronTrigger.from_crontab("0 0/3 * * *"))
+    scheduler.add_job(schedule(updateGroups), CronTrigger.from_crontab("0 1/3 * * *"))
+    scheduler.add_job(schedule(updateUsers), CronTrigger.from_crontab("0 2/3 * * *"))
 
     scheduler.add_job(schedule(mathgiveaway), CronTrigger.from_crontab("*/15 * * * *"))
 
