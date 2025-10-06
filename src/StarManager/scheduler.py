@@ -548,8 +548,7 @@ def run(loop):
         schedule(backup, use_db=False), CronTrigger.from_crontab("0 6,18 * * *")
     )
 
-    # scheduler.add_job(schedule(updateInfo), CronTrigger.from_crontab("0 */3 * * *"))
-    scheduler.add_job(schedule(updateInfo), CronTrigger.from_crontab("55 17 * * *"))
+    scheduler.add_job(schedule(updateInfo), CronTrigger.from_crontab("0 */3 * * *"))
 
     scheduler.add_job(schedule(mathgiveaway), CronTrigger.from_crontab("*/15 * * * *"))
 
