@@ -122,7 +122,7 @@ async def backup() -> None:
     )
 
 
-async def updateInfo(conn):
+async def updateInfo(conn):  # TODO: optimize
     user_rows = await conn.fetch("select uid from usernames")
     for i in range(0, len(user_rows), 25):
         batch = [r[0] for r in user_rows[i : i + 25]]
