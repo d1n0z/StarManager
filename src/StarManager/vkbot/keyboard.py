@@ -1693,7 +1693,7 @@ def chats(uid, total_chats: int, page: int, mode: enums.ChatsMode):
         ),
         KeyboardButtonColor.SECONDARY if mode == enums.ChatsMode.all else None,
     )
-    if total_chats > 15:
+    if total_chats > 15 * (page + 1):
         kb.add(
             Callback(
                 "⏩", {"cmd": "chats", "page": page + 1, "uid": uid, "mode": mode.value}
