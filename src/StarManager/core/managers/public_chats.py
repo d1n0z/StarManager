@@ -60,12 +60,7 @@ class PublicChatsRepository(BaseRepository):
     async def ensure_record(
         self, chat_id: int, defaults: Optional[Dict[str, Any]] = None
     ) -> Tuple[PublicChats, bool]:
-        defaults = defaults or {
-            "premium": False,
-            "last_up": 0,
-            "isopen": False,
-            "members_count": 0,
-        }
+        defaults = defaults or {}
         obj, created = await PublicChats.get_or_create(
             chat_id=chat_id,
             defaults=(
@@ -521,17 +516,11 @@ class PublicChatsManager(BaseManager):
                     )
                     chatname = chatname.items[0].chat_settings
                     if not chatname or not chatname.title:
-                        counter -= 1
-                        continue
+                        raise ValueError
                     chatname = chatname.title
                     await ChatNames.create(chat_id=chat[0], name=chatname)
                 if not chatname:
-                    counter -= 1
-                    continue
-            except Exception:
-                counter -= 1
-                continue
-            try:
+                    raise ValueError
                 if (
                     not (
                         invite_link := (
@@ -544,9 +533,9 @@ class PublicChatsManager(BaseManager):
                     )
                     or not invite_link.link
                 ):
-                    counter -= 1
-                    continue
+                    raise ValueError
             except Exception:
+                counter -= 1
                 continue
             res.append((invite_link.link, chat[1].members_count, chatname))
         return res, counter
