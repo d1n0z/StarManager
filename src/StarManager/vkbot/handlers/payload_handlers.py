@@ -1411,17 +1411,10 @@ async def top_leagues(message: MessageEvent):
                     fields=["deactivated"],  # type: ignore
                 )
             ).profiles
-            if i.deactivated
+            if not i.deactivated
         ],
     )
-    async with (await pool()).acquire() as conn:
-        availableleagues = [
-            k
-            for k, _ in enumerate(settings.leagues.leagues)
-            if await conn.fetchval(
-                "select exists(select 1 from xp where league=$1)", k + 1
-            )
-        ]
+    availableleagues = [i - 1 for i in await managers.xp.get_not_empty_leagues()]
     await utils.edit_message(
         await messages.top_lvls(top, chattop),
         peer_id,
@@ -1744,30 +1737,8 @@ async def top_bonus_in_chat(message: MessageEvent):
 )
 async def top_coins(message: MessageEvent):
     peer_id = message.object.peer_id
-    async with (await pool()).acquire() as conn:
-        top = await conn.fetch(
-            "select uid, coins from xp order by coins desc limit 100"
-        )
-    top = {i[0]: i for i in top}
-    users = {
-        u.id: u
-        for u in await api.users.get(
-            user_ids=[i for i in top.keys()],
-            fields=["deactivated"],  # type: ignore
-        )
-    }
     await utils.edit_message(
-        await messages.top_coins(
-            sorted(
-                [
-                    i
-                    for uid, i in top.items()
-                    if uid in users and not users[uid].deactivated
-                ][:10],
-                key=lambda i: i[1],
-                reverse=True,
-            )
-        ),
+        await messages.top_coins(await managers.xp.get_coins_top()),
         peer_id,
         message.conversation_message_id,
         keyboard.top_coins(peer_id - 2000000000, message.user_id),
@@ -1786,12 +1757,7 @@ async def top_coins_in_chat(message: MessageEvent):
     if not conv_members:
         top = []
     else:
-        async with (await pool()).acquire() as conn:
-            top = await conn.fetch(
-                "select uid, coins from xp where uid=ANY($1) and uid!=ALL($2) order by coins desc limit 10",
-                [i.member_id for i in conv_members.items],
-                [i.id for i in (conv_members.profiles or []) if i.deactivated],
-            )
+        top = await managers.xp.get_coins_top(in_uids=[i.member_id for i in conv_members.items])
     await utils.edit_message(
         await messages.top_coins(top),
         peer_id,
@@ -3967,10 +3933,14 @@ async def chats(message: MessageEvent):
     all_chats = await managers.public_chats.get_regular_chats()
     all_chats = sorted(all_chats, key=lambda x: x[1].members_count, reverse=True)
     all_chats = await managers.public_chats.get_chats_top(all_chats)
-    res = all_chats if mode == enums.ChatsMode.all else await managers.public_chats.sort_premium_chats(all_chats)
+    res = (
+        all_chats
+        if mode == enums.ChatsMode.all
+        else await managers.public_chats.sort_premium_chats(all_chats)
+    )
     await utils.edit_message(
         await messages.chats(
-            len(all_chats), res[page * 15 : page * 15 + 15], mode
+            len(all_chats), res[page * 15 : page * 15 + 15], mode, page
         ),
         peer_id,
         message.conversation_message_id,

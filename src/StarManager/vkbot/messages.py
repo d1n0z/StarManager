@@ -2415,16 +2415,17 @@ async def timeout_settings():
     return await get("timeout_settings")
 
 
-async def chats(chats_count, res, mode: enums.ChatsMode):
+async def chats(chats_count, res, mode: enums.ChatsMode, page=0):
     def shorten(text, length=20):
         return text if len(text) <= length else text[: length - 3] + "..."
+
     return await get(
         "chats",
         chats_count=chats_count,
         type="🏆 PREMIUM" if mode == enums.ChatsMode.premium else "Обычные",
         chats="\n".join(
             f"[{k}]. [{chat[0].replace('https://', '')}|Чат ({chat[1][1].members_count} уч.)] | {shorten(chat[2])}"
-            for k, chat in enumerate(res, start=1)
+            for k, chat in enumerate(res, start=1 + page * 15)
         ),
     )
 

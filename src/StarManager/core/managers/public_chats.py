@@ -474,6 +474,14 @@ class PublicChatsManager(BaseManager):
                 if item.chat.isopen
             ]
 
+    async def get_premium_chats(self) -> List[Tuple[int, _CachedPublicChatObject]]:
+        async with self.cache._lock:
+            return [
+                (cid, copy.deepcopy(item.chat))
+                for cid, item in self._cache.items()
+                if item.chat.premium
+            ]
+
     async def count_regular_chats(self) -> int:
         async with self.cache._lock:
             return sum(1 for data in self._cache.values() if data.chat.isopen)
@@ -482,9 +490,7 @@ class PublicChatsManager(BaseManager):
         self, chats: List[Tuple[str, Tuple[int, _CachedPublicChatObject], str]]
     ) -> List[Tuple[str, Tuple[int, _CachedPublicChatObject], str]]:
         premium_chats = [
-            item
-            for item in chats
-            if item[1][1].isopen and item[1][1].premium
+            item for item in chats if item[1][1].isopen and item[1][1].premium
         ]
         return sorted(premium_chats, key=lambda x: x[1][1].last_up, reverse=True)
 
@@ -502,7 +508,9 @@ class PublicChatsManager(BaseManager):
 
     async def get_chats_top(
         self, chats: List[Tuple[int, _CachedPublicChatObject]]
-    ) -> List[Tuple[str, Tuple[int, _CachedPublicChatObject], str]]:  # TODO: merge chatname and publicchats or add new cache, <b>OPTIMIZE</b> with dataclasses or something
+    ) -> List[
+        Tuple[str, Tuple[int, _CachedPublicChatObject], str]
+    ]:  # TODO: merge chatname and publicchats or add new cache, <b>OPTIMIZE</b> with dataclasses or something
         res = []
         for chat in chats:
             try:

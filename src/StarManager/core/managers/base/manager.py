@@ -7,7 +7,11 @@ from StarManager.core.managers.base.repository import BaseRepository
 
 
 class BaseManager(ABC):
-    def __init__(self, repo: Optional[BaseRepository] = None, cache: Optional[BaseCacheManager] = None):
+    def __init__(
+        self,
+        repo: Optional[BaseRepository] = None,
+        cache: Optional[BaseCacheManager] = None,
+    ):
         self._lock = asyncio.Lock()
         self._cache: Dict[Any, Any] = {}
         self.repo = repo
@@ -17,6 +21,9 @@ class BaseManager(ABC):
         if self.cache is not None:
             await self.cache.close()
 
+    async def sync(self):
+        if self.cache is not None:
+            await self.cache.sync()
 
-class BaseEmptyManager(ABC):
-    ...
+
+class BaseEmptyManager(ABC): ...

@@ -459,24 +459,20 @@ async def get_user_ban_info(uid, chat_id, none=None) -> dict:
     return none
 
 
-async def get_user_xp(uid, none=0) -> int:
-    async with (await pool()).acquire() as conn:
-        return await conn.fetchval("select xp from xp where uid=$1", uid) or none
+async def get_user_xp(uid, none=0):
+    return await managers.xp.get(uid, "xp") or none
 
 
-async def get_user_coins(uid, none=0) -> int:
-    async with (await pool()).acquire() as conn:
-        return await conn.fetchval("select coins from xp where uid=$1", uid) or none
+async def get_user_coins(uid, none=0):
+    return await managers.xp.get(uid, "coins") or none
 
 
-async def get_user_league(uid, none=1) -> int:
-    async with (await pool()).acquire() as conn:
-        return await conn.fetchval("select league from xp where uid=$1", uid) or none
+async def get_user_league(uid, none=1):
+    return await managers.xp.get(uid, "league") or none
 
 
-async def get_user_level(uid, none=0) -> int:
-    async with (await pool()).acquire() as conn:
-        return await conn.fetchval("select lvl from xp where uid=$1", uid) or none
+async def get_user_level(uid, none=0):
+    return await managers.xp.get(uid, "lvl") or none
 
 
 @AsyncLRU(maxsize=0)
@@ -487,27 +483,12 @@ async def get_user_needed_xp(xp):
 @AsyncTTL(time_to_live=120, maxsize=0)
 async def get_xp_top(
     returnval="count", limit: int = 10, league: int = 1, users: Union[List, None] = None
-) -> dict:
-    async with (await pool()).acquire() as conn:
-        if users is not None:
-            top = await conn.fetch(
-                "select uid, lvl, xp from xp where uid>0 and league=$1 and uid=ANY($2) order by lvl desc, xp desc "
-                "limit $3",
-                league,
-                users,
-                limit,
-            )
-        else:
-            top = await conn.fetch(
-                "select uid, lvl, xp from xp where uid>0 and league=$1 order by lvl desc, "
-                "xp desc limit $2",
-                league,
-                limit,
-            )
+) -> Dict[int, int]:
+    top = await managers.xp.get_xp_top(league, users, limit)
     if returnval == "count":
-        return {i[0]: k + 1 for k, i in enumerate(top)}
+        return {i[0]: k for k, i in enumerate(top, start=1)}
     elif returnval == "lvl":
-        return {i[0]: i[1] for k, i in enumerate(top)}
+        return {i[0]: i[1].lvl for i in top}
     else:
         raise Exception('returnval must be "count" or "lvl"')
 
@@ -588,37 +569,11 @@ async def add_user_xp(uid, addxp, checklvlbanned=True):
                 "select exists(select 1 from blocked where uid=$1 and type='user')", uid
             ):
                 return
-        if u := await conn.fetchrow(
-            "select id, xp, lvl, league from xp where uid=$1", uid
-        ):
-            uxp, ulvl, ulg = u[1] + addxp, u[2], u[3]
-            ulvl += uxp // 1000
-            uxp %= 1000
-            if (
-                ulg != len(settings.leagues.required_level)
-                and ulvl >= settings.leagues.required_level[ulg]
-            ):
-                await conn.execute(
-                    "update xp set xp = 0, league = $1, lvl = 1 where id=$2",
-                    ulg + 1,
-                    u[0],
-                )
-                return
-            await conn.execute(
-                "update xp set xp = $1, lvl = $2 where id=$3", uxp, ulvl, u[0]
-            )
-        else:
-            await conn.execute(
-                "insert into xp (uid, xp, lm, lvm, lsm, league, lvl) values ($1, $2, $3, $3, $3, 1, "
-                "1)",
-                uid,
-                addxp,
-                time.time(),
-            )
+    await managers.xp.add_user_xp(uid, addxp)
 
 
 async def add_user_coins(
-    uid, addcoins, checklvlbanned=True, addlimit=False, bonus_peer_id=None
+    uid, addcoins, checklvlbanned=True, addlimit=False, bonus_peer_id=0
 ) -> None:
     async with (await pool()).acquire() as conn:
         if checklvlbanned:
@@ -628,38 +583,16 @@ async def add_user_coins(
                 "select exists(select 1 from blocked where uid=$1 and type='user')", uid
             ):
                 return
-
-        xp_row = await conn.fetchrow(
-            "select id, coins, coins_limit from xp where uid=$1", uid
-        )
-        if not xp_row:
-            return await conn.execute(
-                "insert into xp (uid, xp, coins, coins_limit, lm, lvm, lsm, league, lvl) values ($1, 0, $2, $3, $4, $4, $4, 1, 1)",
-                uid,
-                addcoins,
-                addcoins if addlimit else 0,
-                time.time(),
-            )
-
-        u_limit = 1600 if await get_user_premium(uid) else 800
-        if addlimit and xp_row[2] > u_limit:
-            return
-
-        if addlimit and (xp_row[2] + addcoins > u_limit):
-            if bonus_peer_id:
-                await send_message(
-                    bonus_peer_id,
-                    f"🎁 [id{uid}|{await get_user_name(uid)}], вы получили +100 монеток за достижение дневного лимита в {u_limit} монеток.",
-                )
-            bonus_coins = 100
-        else:
-            bonus_coins = 0
-
-        await conn.execute(
-            "update xp set coins = $1, coins_limit = coins_limit + $2 where id=$3",
-            xp_row[1] + addcoins + bonus_coins,
-            addcoins if addlimit else 0,
-            xp_row[0],
+    needed_message = await managers.xp.add_user_coins(
+        uid,
+        addcoins,
+        (u_limit := 1600 if await get_user_premium(uid) else 800),
+        addlimit,
+    )
+    if needed_message == "bonus" and bonus_peer_id:
+        await send_message(
+            bonus_peer_id,
+            f"🎁 [id{uid}|{await get_user_name(uid)}], вы получили +100 монеток за достижение дневного лимита в {u_limit} монеток.",
         )
 
 

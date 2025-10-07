@@ -6,6 +6,7 @@ from StarManager.core.managers.duel import DuelLockManager
 from StarManager.core.managers.raid import RaidManager
 from StarManager.core.managers.rps import RPSManager
 from StarManager.core.managers.public_chats import PublicChatsManager
+from StarManager.core.managers.xp import XPManager
 
 antispam = AntispamMessagesManager()
 commands_cooldown = CommandsCooldownManager()
@@ -15,9 +16,10 @@ chat_user_cmids = ChatUserCMIDsManager()
 access_level = AccessLevelManager()
 rps = RPSManager()
 public_chats = PublicChatsManager()
+xp = XPManager()
 
 
-to_init = [chat_user_cmids, access_level, rps, public_chats]
+to_init = [chat_user_cmids, access_level, rps, public_chats, xp]
 
 
 async def initialize():

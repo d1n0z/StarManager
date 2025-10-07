@@ -275,7 +275,7 @@ async def delprem(message: Message):
 
 @bl.chat_message(SearchCMD("premlist"))
 async def permlist(message: Message):
-    prem = [chat[0] for chat in await managers.public_chats.get_sorted_premium_chats()]
+    prem = [chat[0] for chat in await managers.public_chats.get_premium_chats()]
     await messagereply(message, await messages.premlist(prem))
 
 
@@ -316,8 +316,7 @@ async def resetlvl(message: Message):
     id = await search_id_in_message(message.text, message.reply_message)
     if not id:
         return await messagereply(message, "🔶 Пользователь не найден")
-    async with (await pool()).acquire() as conn:
-        await conn.execute("update xp set xp=0, lvl=0, league=1 where uid=$1", id)
+    await managers.xp.edit(id, xp=0, lvl=0, league=1)
     u_name = await get_user_name(id)
     msgsent = await messages.resetlvlcomplete(id, u_name)
     if (
@@ -346,7 +345,7 @@ async def block(message: Message):
                 reason,
             )
             if data[1] != "chat":
-                await conn.execute("delete from xp where uid=$1", id)
+                await managers.xp.remove(id)
                 await conn.execute("delete from premium where uid=$1", id)
                 chats = (
                     set(
@@ -992,13 +991,7 @@ async def setlig(message: Message):
             message,
             "🔔 Чтобы установить лигу пользователю, используйте /setlig <user> <league[1-6]> (пример: /setlig @VK. 1)",
         )
-    async with (await pool()).acquire() as conn:
-        if not await conn.fetchval(
-            "update xp set league=$1 where uid=$2 returning 1", int(data[2]), id
-        ):
-            return await messagereply(
-                message, "❌ Пользователь не найден в базе данных."
-            )
+    await managers.xp.edit(id, league=int(data[2]))
     await messagereply(
         message,
         f'✅ Вы успешно установили лигу "{settings.leagues.leagues[int(data[2]) - 1]}" пользователю [id{id}|{await get_user_name(id)}]',

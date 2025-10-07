@@ -137,7 +137,9 @@ class AccessLevelCache(BaseCacheManager):
                         )
 
                 if to_update:
-                    await AccessLevel.bulk_update(to_update, fields=["access_level"], batch_size=batch_size)
+                    await AccessLevel.bulk_update(
+                        to_update, fields=["access_level"], batch_size=batch_size
+                    )
                 if to_create:
                     await AccessLevel.bulk_create(to_create, batch_size=batch_size)
         except Exception:
