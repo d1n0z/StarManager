@@ -147,7 +147,7 @@ async def updateUsers(conn):  # TODO: optimize
 async def updateChats(conn):
     chatnames_ids = [i[0] for i in await conn.fetch("select chat_id from chatnames")]
     publicchats_ids = [i[0] for i in await conn.fetch("select chat_id from publicchats")]
-    total_chat_ids = set(chatnames_ids + publicchats_ids)
+    total_chat_ids = list(set(chatnames_ids + publicchats_ids))
     if not total_chat_ids:
         return
 
