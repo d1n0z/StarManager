@@ -3962,22 +3962,17 @@ async def chats(message: MessageEvent):
         return
     peer_id = message.object.peer_id
     page = message.payload["page"]
-    mode = {
-        enums.ChatsMode.all: enums.ChatsMode.premium,
-        enums.ChatsMode.premium: enums.ChatsMode.all,
-    }[enums.ChatsMode(message.payload["mode"])]
+    mode = enums.ChatsMode(message.payload["mode"])
 
-    if mode == enums.ChatsMode.premium:
-        res = await managers.public_chats.get_sorted_premium_chats()
-    else:
-        res = await managers.public_chats.get_regular_chats()
-        res = sorted(res, key=lambda x: x[1].members_count, reverse=True)
-    res, minus_counter = await managers.public_chats.get_chats_top(res)
+    all_chats = await managers.public_chats.get_regular_chats()
+    all_chats = sorted(all_chats, key=lambda x: x[1].members_count, reverse=True)
+    all_chats = await managers.public_chats.get_chats_top(all_chats)
+    res = all_chats if mode == enums.ChatsMode.all else await managers.public_chats.sort_premium_chats(all_chats)
     await utils.edit_message(
         await messages.chats(
-            (reg_chats := (await managers.public_chats.count_regular_chats() + minus_counter)), res[page * 15 : page * 15 + 15], mode
+            len(all_chats), res[page * 15 : page * 15 + 15], mode
         ),
         peer_id,
         message.conversation_message_id,
-        keyboard.chats(message.user_id, reg_chats if mode == enums.ChatsMode.premium else await managers.public_chats.count_premium_chats(), page, mode),
+        keyboard.chats(message.user_id, len(res), page, mode),
     )

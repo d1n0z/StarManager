@@ -1680,7 +1680,7 @@ def chats(uid, total_chats: int, page: int, mode: enums.ChatsMode):
     kb.add(
         Callback(
             "Обычные" if mode == enums.ChatsMode.premium else "🏆 PREMIUM",
-            {"cmd": "chats", "uid": uid, "mode": mode.value, "page": 0},
+            {"cmd": "chats", "uid": uid, "mode": (enums.ChatsMode.premium if mode == enums.ChatsMode.all else enums.ChatsMode.all).value, "page": 0},
         ),
         KeyboardButtonColor.SECONDARY if mode == enums.ChatsMode.all else None,
     )

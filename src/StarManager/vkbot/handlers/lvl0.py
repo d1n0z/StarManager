@@ -1040,18 +1040,20 @@ async def chats(message: Message):
             message, disable_mentions=1, message=await messages.chats_not_allowed()
         )
 
-    chats = await managers.public_chats.get_sorted_premium_chats()
-    res, minus_counter = await managers.public_chats.get_chats_top(chats)
+    all_chats = await managers.public_chats.get_regular_chats()
+    all_chats = sorted(all_chats, key=lambda x: x[1].members_count, reverse=True)
+    all_chats = await managers.public_chats.get_chats_top(all_chats)
+    res = await managers.public_chats.sort_premium_chats(all_chats)
     await messagereply(
         message,
         await messages.chats(
-            await managers.public_chats.count_regular_chats() + minus_counter,
+            len(all_chats),
             res[:15],
             enums.ChatsMode.premium,
         ),
         keyboard=keyboard.chats(
             message.from_id,
-            await managers.public_chats.count_premium_chats() + minus_counter,
+            len(res),
             0,
             enums.ChatsMode.premium,
         ),

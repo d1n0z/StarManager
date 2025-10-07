@@ -2423,7 +2423,7 @@ async def chats(chats_count, res, mode: enums.ChatsMode):
         chats_count=chats_count,
         type="🏆 PREMIUM" if mode == enums.ChatsMode.premium else "Обычные",
         chats="\n".join(
-            f"[{k}]. [{chat[0].replace('https://', '')}|Чат ({chat[1]} уч.)] | {shorten(chat[2])}"
+            f"[{k}]. [{chat[0].replace('https://', '')}|Чат ({chat[1][1].members_count} уч.)] | {shorten(chat[2])}"
             for k, chat in enumerate(res, start=1)
         ),
     )

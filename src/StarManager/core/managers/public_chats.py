@@ -478,16 +478,15 @@ class PublicChatsManager(BaseManager):
         async with self.cache._lock:
             return sum(1 for data in self._cache.values() if data.chat.isopen)
 
-    async def get_sorted_premium_chats(
-        self,
-    ) -> List[Tuple[int, _CachedPublicChatObject]]:
-        async with self.cache._lock:
-            premium_chats = [
-                (cid, copy.deepcopy(item.chat))
-                for cid, item in self._cache.items()
-                if item.chat.isopen and item.chat.premium
-            ]
-        return sorted(premium_chats, key=lambda x: x[1].last_up, reverse=True)
+    async def sort_premium_chats(
+        self, chats: List[Tuple[str, Tuple[int, _CachedPublicChatObject], str]]
+    ) -> List[Tuple[str, Tuple[int, _CachedPublicChatObject], str]]:
+        premium_chats = [
+            item
+            for item in chats
+            if item[1][1].isopen and item[1][1].premium
+        ]
+        return sorted(premium_chats, key=lambda x: x[1][1].last_up, reverse=True)
 
     async def count_premium_chats(self) -> int:
         async with self.cache._lock:
@@ -503,8 +502,7 @@ class PublicChatsManager(BaseManager):
 
     async def get_chats_top(
         self, chats: List[Tuple[int, _CachedPublicChatObject]]
-    ):  # TODO: merge chatname and publicchats or add new cache
-        counter = 0
+    ) -> List[Tuple[str, Tuple[int, _CachedPublicChatObject], str]]:  # TODO: merge chatname and publicchats or add new cache, <b>OPTIMIZE</b> with dataclasses or something
         res = []
         for chat in chats:
             try:
@@ -516,11 +514,11 @@ class PublicChatsManager(BaseManager):
                     )
                     chatname = chatname.items[0].chat_settings
                     if not chatname or not chatname.title:
-                        raise ValueError
+                        continue
                     chatname = chatname.title
                     await ChatNames.create(chat_id=chat[0], name=chatname)
                 if not chatname:
-                    raise ValueError
+                    continue
                 if (
                     not (
                         invite_link := (
@@ -533,12 +531,11 @@ class PublicChatsManager(BaseManager):
                     )
                     or not invite_link.link
                 ):
-                    raise ValueError
+                    continue
             except Exception:
-                counter -= 1
                 continue
-            res.append((invite_link.link, chat[1].members_count, chatname))
-        return res, counter
+            res.append((invite_link.link, chat, chatname))
+        return res
 
     async def sync(self):
         await self.cache.sync()
