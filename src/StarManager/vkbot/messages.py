@@ -1612,7 +1612,7 @@ async def top_bonus(top):
 async def top_coins(top):
     msg = await get("top_coins")
     for k, item in enumerate(top[:10]) if top else []:
-        msg += f"{number_to_emoji(k + 1)} [id{item[0]}|{await get_user_name(item[0])}] - {point_words(item[1], ('монетка', 'монетки', 'монет'))}\n"
+        msg += f"{number_to_emoji(k + 1)} [id{item[0]}|{await get_user_name(item[0])}] - {point_words(item[1].coins, ('монетка', 'монетки', 'монет'))}\n"
     return msg
 
 

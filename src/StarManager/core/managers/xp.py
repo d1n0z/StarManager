@@ -273,8 +273,8 @@ class XPManager(BaseManager):
             )
         }
         return sorted(
-            [copy.deepcopy(i) for uid, i in top if uids is None or (uid in uids and not uids[uid].deactivated)],
-            key=lambda i: i.coins,
+            [(uid, copy.deepcopy(i)) for uid, i in top if uids is None or (uid in uids and not uids[uid].deactivated)],
+            key=lambda i: i[1].coins,
             reverse=True,
         )[:limit]
 
