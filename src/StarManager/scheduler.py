@@ -175,6 +175,7 @@ async def updateChats(conn):
                 members_count = item.chat_settings.members_count
 
                 if not members_count:
+                    await asyncio.sleep(0.34)
                     try:
                         members = await api.messages.get_conversation_members(
                             peer_id=item.peer.id
