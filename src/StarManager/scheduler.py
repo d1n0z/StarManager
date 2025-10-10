@@ -438,9 +438,8 @@ async def run_notifications(conn):
                         await messages.notification_too_long_text(name),
                     )
             next = int(ttime + (every * 60))
-            if every > 0:
-                while next < time.time():
-                    next += every * 60
+            while next < time.time() and every > 0:
+                next += every * 60
             await conn.execute(
                 "UPDATE notifications SET status = $1, time = $2 WHERE id = $3",
                 0 if not every else 1,
