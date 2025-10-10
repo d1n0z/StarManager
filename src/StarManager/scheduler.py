@@ -283,7 +283,10 @@ async def every10min(conn):
                 ),
                 keyboard.premium_expire(promo),
             )
-        )[0].conversation_message_id  # type: ignore
+        )
+        if not isinstance(cmid, list):
+            continue
+        cmid = cmid[0].conversation_message_id
         await conn.execute(
             "INSERT INTO premiumexpirenotified (uid, date, cmid) VALUES ($1, $2, $3)",
             uid,
