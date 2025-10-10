@@ -502,7 +502,10 @@ async def mathgiveaway(conn):
             settings.service.mathgiveaways_to + 2000000000,
             await messages.math_problem(math, level, xp),
         )
-    )[0].conversation_message_id  # type: ignore
+    )
+    if not isinstance(cmid, list):
+        return mathgiveaway(conn)
+    cmid = cmid[0].conversation_message_id
     await conn.execute(
         "INSERT INTO mathgiveaway (math, level, cmid, xp, ans, winner, finished) VALUES ($1, $2, $3, $4, $5, NULL, false)",
         math,
