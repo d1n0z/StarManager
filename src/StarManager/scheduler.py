@@ -146,7 +146,9 @@ async def updateUsers(conn):  # TODO: optimize
 
 async def updateChats(conn):
     chatnames_ids = [i[0] for i in await conn.fetch("select chat_id from chatnames")]
-    publicchats_ids = [i[0] for i in await conn.fetch("select chat_id from publicchats")]
+    publicchats_ids = [
+        i[0] for i in await conn.fetch("select chat_id from publicchats")
+    ]
     total_chat_ids = list(set(chatnames_ids + publicchats_ids))
     if not total_chat_ids:
         return
@@ -194,7 +196,10 @@ async def updateChats(conn):
                 continue
 
         missing = [
-            cid for cid in chat_ids if cid not in members_cache and cid not in [u[1] for u in updates_publicchats]
+            cid
+            for cid in chat_ids
+            if cid not in members_cache
+            and cid not in [u[1] for u in updates_publicchats]
         ]
         for chat_id in missing:
             try:
@@ -276,14 +281,12 @@ async def every10min(conn):
             exp.replace(hour=0, minute=0).timestamp(),
             uid,
         )
-        cmid = (
-            await send_message(
-                uid,
-                await messages.premium_expire(
-                    uid, await get_user_name(uid), exp.strftime("%d.%m.%Y / 00:00")
-                ),
-                keyboard.premium_expire(promo),
-            )
+        cmid = await send_message(
+            uid,
+            await messages.premium_expire(
+                uid, await get_user_name(uid), exp.strftime("%d.%m.%Y / 00:00")
+            ),
+            keyboard.premium_expire(promo),
         )
         if not isinstance(cmid, list):
             continue
@@ -497,11 +500,9 @@ async def mathgiveaway(conn):
     if old:
         await delete_messages(old, settings.service.mathgiveaways_to)
     await conn.execute("UPDATE mathgiveaway SET finished = true WHERE finished = false")
-    cmid = (
-        await send_message(
-            settings.service.mathgiveaways_to + 2000000000,
-            await messages.math_problem(math, level, xp),
-        )
+    cmid = await send_message(
+        settings.service.mathgiveaways_to + 2000000000,
+        await messages.math_problem(math, level, xp),
     )
     if not isinstance(cmid, list):
         return mathgiveaway(conn)
