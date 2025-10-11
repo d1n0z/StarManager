@@ -88,6 +88,7 @@ async def checkCMD(
     except Exception:
         return False
 
+    print(211)
     async with (await pool()).acquire() as conn:
         if text[:1] in settings.commands.prefix:
             prefix = text[:1]
@@ -114,6 +115,7 @@ async def checkCMD(
                 if raw in settings.commands.pm and message.peer_id >= 2000000000:
                     await messagereply(message, await messages.pmcmd())
                 return False
+    print(212)
 
     if raw in settings.commands.pm:
         if message.peer_id >= 2000000000:
@@ -137,6 +139,7 @@ async def checkCMD(
             ),
         )
         return False
+    print(213)
 
     u_acc = await get_user_access_level(uid, chat_id)
     u_prem = await get_user_premium(uid)
@@ -155,10 +158,12 @@ async def checkCMD(
         )
     ):
         return False
+    print(214)
 
     if cmd in settings.commands.lvlbanned and await getULvlBanned(uid):
         await messagereply(message, await messages.lvlbanned())
         return False
+    print(215)
 
     chat_settings = await get_chat_settings(chat_id)
     if chat_settings["main"]["captcha"]:
@@ -169,6 +174,7 @@ async def checkCMD(
                 uid,
             ):
                 return False
+    print(216)
 
     if returncmd:
         return cmd

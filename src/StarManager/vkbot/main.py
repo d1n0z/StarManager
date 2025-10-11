@@ -25,16 +25,13 @@ def main(run=False):
         GroupEventType.MESSAGE_NEW, dataclass=GroupTypes.MessageNew, blocking=False
     )
     async def new_message(event: GroupTypes.MessageNew):
-        print(1)
         if (message := event.object.message) and (message.peer_id - 2000000000 > 0):
             await managers.chat_user_cmids.append_cmid(
                 message.from_id,
                 message.peer_id - 2000000000,
                 message.conversation_message_id,
             )
-        print(2)
         await message_handle(event)
-        print(3)
 
     @labeler.raw_event(GroupEventType.WALL_REPLY_NEW, dataclass=GroupTypes.WallReplyNew)
     async def new_wall_reply(event: GroupTypes.WallReplyNew):

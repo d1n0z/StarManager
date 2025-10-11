@@ -16,6 +16,7 @@ from StarManager.core.config import settings
 from StarManager.site.routes import router
 from StarManager.tgbot.main import Bot as TgBot
 from StarManager.vkbot import load_messages
+from StarManager.vkbot.main import main as load_vkbot
 
 logger.remove()
 logger.add(sys.stderr, level="INFO")
@@ -31,6 +32,8 @@ async def lifespan(app: FastAPI):
     scheduler.add_jobs(app.state.scheduler)
     app.state.scheduler.start()
     logger.info("Scheduler started")
+
+    load_vkbot()
 
     app.state.bg_tasks = []
 

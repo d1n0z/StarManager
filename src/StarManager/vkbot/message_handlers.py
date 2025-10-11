@@ -66,14 +66,12 @@ async def message_handle(event: MessageNew) -> Any:
                 kbd=keyboard.pm_market(event.object.message.from_id),
             )
     
-    print(11)
     uid = event.object.message.from_id
     msgtime = event.object.message.date
     chat_id = event.object.message.peer_id - 2000000000
     chat_settings = await get_chat_settings(chat_id)
     uacc = await get_user_access_level(uid, chat_id) if uid > 0 else 0
 
-    print(12)
     if chat_settings["main"]["nightmode"] and uacc <= 6:
         async with (await pool()).acquire() as conn:
             chatsetting = await conn.fetchrow(
@@ -110,7 +108,6 @@ async def message_handle(event: MessageNew) -> Any:
     if uid in settings.service.admins:
         print(f"{uid}({chat_id}): {msg}")
 
-    print(13)
     filterdata, pnt = msg.lower().replace(" ", ""), -1
     async with (await pool()).acquire() as conn:
         await conn.execute(
@@ -261,7 +258,6 @@ async def message_handle(event: MessageNew) -> Any:
             ),
         )
 
-    print(14)
     data = event.object.message.text.split()
     if not any(
         event.object.message.text.startswith(i)
@@ -392,7 +388,6 @@ async def message_handle(event: MessageNew) -> Any:
     except Exception:
         sticker = False
 
-    print(15)
     if chat_settings["antispam"]["messagesPerMinute"]:
         async with (await pool()).acquire() as conn:
             if await conn.fetchval(
@@ -462,6 +457,4 @@ async def message_handle(event: MessageNew) -> Any:
                         math[4],
                     ),
                 )
-    print(16)
     await add_msg_counter(chat_id, uid, audio, sticker)
-    print(17)
