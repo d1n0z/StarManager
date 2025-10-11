@@ -38,6 +38,9 @@ class ChatUserCMIDsRepository(BaseRepository):
             for row in await ChatUserCMIDs.filter(uid=uid, chat_id=chat_id).all()
         }
 
+    async def clear(self):
+        await ChatUserCMIDs.all().delete()
+
 
 class ChatUserCMIDsCache(BaseCacheManager):
     def __init__(self, repo: ChatUserCMIDsRepository, cache: Cache):
@@ -87,6 +90,13 @@ class ChatUserCMIDsCache(BaseCacheManager):
                 return
             lst.append(cmid)
             self._dirty.add(cache_key)
+
+
+    async def clear(self):
+        async with self._lock:
+            self._cache.clear()
+            self._dirty.clear()
+        await self.repo.clear()
 
     async def sync(self, batch_size: int = 1000):
         async with self._lock:
@@ -140,6 +150,8 @@ class ChatUserCMIDsManager(BaseManager):
         self._cache: Cache = {}
         self.repo: ChatUserCMIDsRepository = ChatUserCMIDsRepository()
         self.cache: ChatUserCMIDsCache = ChatUserCMIDsCache(self.repo, self._cache)
+
+        self.clear = self.cache.clear
 
     async def initialize(self):
         await self.cache.initialize()

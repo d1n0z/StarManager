@@ -13,6 +13,7 @@ import yadisk
 from apscheduler.triggers.cron import CronTrigger
 from loguru import logger
 
+from StarManager.core import managers
 from StarManager.core.config import api, settings, vk_api_session
 from StarManager.core.db import pool
 from StarManager.core.utils import (
@@ -517,8 +518,9 @@ async def mathgiveaway(conn):
 
 
 async def everyday(conn):
-    await conn.execute("UPDATE xp SET coins_limit=0")
     await conn.execute("UPDATE shop SET limits='[0, 0, 0, 0, 0]'")
+    await managers.xp.nullify_xp_limit()
+    await managers.chat_user_cmids.clear()
 
 
 async def new_tg_giveaway(conn):

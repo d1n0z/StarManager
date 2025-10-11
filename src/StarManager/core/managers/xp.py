@@ -77,6 +77,8 @@ class XPRepository(BaseRepository):
     async def delete_record(self, uid: int):
         await XP.filter(uid=uid).delete()
 
+    async def nullify_xp_limit(self):
+        await XP.all().update(coins_limit=0)
 
 class XPCache(BaseCacheManager):
     def __init__(
@@ -168,6 +170,12 @@ class XPCache(BaseCacheManager):
             self._cache.clear()
             self._cache.update(new_cache)
 
+    async def nullify_xp_limit(self):
+        await self.repo.nullify_xp_limit()
+        async with self._lock:
+            for obj in self._cache.values():
+                obj.coins_limit = 0
+
     async def sync(self, batch_size: int = 1000):
         async with self._lock:
             if not self._dirty:
@@ -240,6 +248,7 @@ class XPManager(BaseManager):
         self.get = self.cache.get
         self.edit = self.cache.edit
         self.remove = self.cache.remove
+        self.nullify_xp_limit = self.cache.nullify_xp_limit
 
     async def initialize(self):
         await self.cache.initialize()
