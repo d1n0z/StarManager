@@ -1,4 +1,3 @@
-# src/StarManager/app.py
 import asyncio
 import sys
 from contextlib import asynccontextmanager
@@ -16,15 +15,17 @@ from StarManager.core import managers, tables
 from StarManager.core.config import settings
 from StarManager.site.routes import router
 from StarManager.tgbot.main import Bot as TgBot
+from StarManager.vkbot.bot import bot as vkbot
 from StarManager.vkbot import load_messages
 from StarManager.vkbot import main as vkbot_module
 
 logger.remove()
-logger.add(sys.stderr, level="INFO")
+logger.add(sys.stderr, level="DEBUG")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    vkbot.loop_wrapper.loop = asyncio.get_event_loop()
     logger.info("Lifespan startup: init DB and objects")
     await tables.init()
     await managers.initialize()
@@ -38,12 +39,14 @@ async def lifespan(app: FastAPI):
 
     await load_messages.load()
 
+    vk_task = asyncio.create_task(vkbot_module.main().run_polling(), name="vkbot")
+    app.state.bg_tasks.append((vk_task, None))
+
     tg_bot = TgBot()
     tg_task = asyncio.create_task(tg_bot.run(), name="tgbot")
     app.state.bg_tasks.append((tg_task, tg_bot.bot))
 
     try:
-        await vkbot_module.main().run_polling()
         yield
     finally:
         logger.info("Lifespan shutdown: stopping bg tasks and scheduler")

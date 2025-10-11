@@ -763,7 +763,7 @@ class UpCommandLogs(Model):
         table = "upcommandlogs"
 
 
-async def init():
+async def init() -> None:
     await Tortoise.init(config=database_config)
     await Tortoise.generate_schemas()
 
