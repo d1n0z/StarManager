@@ -36,10 +36,9 @@ async def lifespan(app: FastAPI):
 
     app.state.bg_tasks = []
 
-    task = asyncio.create_task(load_messages.load(), name="load_messages")
-    app.state.bg_tasks.append((task, None))
+    await load_messages.load()
 
-    vk_task = asyncio.create_task(vkbot_module.run_bot(), name="vkbot")
+    vk_task = asyncio.create_task(vkbot_module.main().run_polling(), name="vkbot")
     app.state.bg_tasks.append((vk_task, None))
 
     tg_bot = TgBot()
