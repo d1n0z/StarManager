@@ -573,7 +573,7 @@ async def leaderboard():
     return "unexpected request"
 
 
-@router.get("/api/listener/vk")
+@router.post("/api/listener/vk")
 async def vk(request: Request):
     data = await request.json()
 
