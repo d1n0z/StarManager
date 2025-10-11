@@ -20,7 +20,7 @@ from StarManager.vkbot import load_messages
 from StarManager.vkbot import main as vkbot_module
 
 logger.remove()
-logger.add(sys.stderr, level="DEBUG")
+logger.add(sys.stderr, level="INFO")
 
 
 @asynccontextmanager
