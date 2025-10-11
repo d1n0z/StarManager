@@ -8,7 +8,7 @@ import httpx
 import pydantic
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.responses import JSONResponse
 from vkbottle_types.objects import UsersFields
@@ -570,7 +570,7 @@ async def get_leaderboard(
 
 @router.get("/leaderboard")
 async def leaderboard():
-    return "unexpected request"
+    return PlainTextResponse("unexpected request")
 
 
 @router.post("/api/listener/vk")
@@ -578,11 +578,11 @@ async def vk(request: Request):
     data = await request.json()
 
     if (data_type := data.get("type")) is None:
-        return 'Error: no "type" field.'
+        return PlainTextResponse('Error: no "type" field.')
     if data_type == "confirmation":
-        return "22ddb7f2"
+        return PlainTextResponse("22ddb7f2")
     if data.get("secret") != settings.vk.callback_secret:
-        return 'Error: wrong "secret" key.'
+        return PlainTextResponse('Error: wrong "secret" key.')
 
     await vkbot.process_event(data)
-    return "ok"
+    return PlainTextResponse("ok")
