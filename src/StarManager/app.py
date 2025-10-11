@@ -17,7 +17,6 @@ from StarManager.site.routes import router
 from StarManager.tgbot.main import Bot as TgBot
 from StarManager.vkbot.bot import bot as vkbot
 from StarManager.vkbot import load_messages
-from StarManager.vkbot import main as vkbot_module
 
 logger.remove()
 logger.add(sys.stderr, level="INFO")
@@ -38,9 +37,6 @@ async def lifespan(app: FastAPI):
     app.state.bg_tasks = []
 
     await load_messages.load()
-
-    vk_task = asyncio.create_task(vkbot_module.main().run_polling(), name="vkbot")
-    app.state.bg_tasks.append((vk_task, None))
 
     tg_bot = TgBot()
     tg_task = asyncio.create_task(tg_bot.run(), name="tgbot")

@@ -435,7 +435,7 @@ async def run_notifications(conn):
                     pass
             if call:
                 if not await send_message(
-                    chat_id + 2000000000, await messages.send_notification(text, call)
+                    chat_id + 2000000000, await messages.send_notification(text, call), disable_mentions=False
                 ):
                     await send_message(
                         chat_id + 2000000000,

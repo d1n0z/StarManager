@@ -361,6 +361,7 @@ async def zov(message: Message):
                 )
             ).items,
         ),
+        disable_mentions=0
     )
 
 

@@ -96,6 +96,7 @@ class VKSettings(BaseSettings):
     group_id: int
     app_id: int
     app_secret: str
+    callback_secret: str
 
 
 class ServiceSettings(BaseSettings):

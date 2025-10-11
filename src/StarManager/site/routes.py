@@ -19,6 +19,7 @@ from StarManager.core.config import api as vkapi
 from StarManager.core.config import settings, sitedata
 from StarManager.core.db import smallpool as pool
 from StarManager.site import enums, models
+from StarManager.vkbot.bot import bot as vkbot
 
 router = APIRouter()
 
@@ -570,3 +571,18 @@ async def get_leaderboard(
 @router.get("/leaderboard")
 async def leaderboard():
     return "unexpected request"
+
+
+@router.get("/api/listener/vk")
+async def vk(request: Request):
+    data = await request.json()
+
+    if (data_type := data.get("type")) is None:
+        return 'Error: no "type" field.'
+    if data_type == "confirmation":
+        return "22ddb7f2"
+    if data.get("secret") != settings.vk.callback_secret:
+        return 'Error: wrong "secret" key.'
+
+    await vkbot.process_event(data)
+    return "ok"
