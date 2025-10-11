@@ -38,14 +38,12 @@ async def lifespan(app: FastAPI):
 
     await load_messages.load()
 
-    vk_task = asyncio.create_task(vkbot_module.main().run_polling(), name="vkbot")
-    app.state.bg_tasks.append((vk_task, None))
-
     tg_bot = TgBot()
     tg_task = asyncio.create_task(tg_bot.run(), name="tgbot")
     app.state.bg_tasks.append((tg_task, tg_bot.bot))
 
     try:
+        await vkbot_module.main().run_polling()
         yield
     finally:
         logger.info("Lifespan shutdown: stopping bg tasks and scheduler")
