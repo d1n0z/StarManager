@@ -1,43 +1,34 @@
+# ./main.py
 import sys
 from argparse import ArgumentParser
 from pathlib import Path
+from loguru import logger
+import uvicorn
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-
 argparser = ArgumentParser()
-argparser.add_argument("-t", "--tests", action="store_true")
-argparser.add_argument("-o", "--only-vkbot", action="store_true")
-argparser.add_argument("-nsc", "--no-scheduler", action="store_true")
-argparser.add_argument("-sc", "--scheduler", action="store_true")
-argparser.add_argument("-ntg", "--no-telegram", action="store_true")
-argparser.add_argument("-tg", "--telegram", action="store_true")
-argparser.add_argument("-nst", "--no-site", action="store_true")
-argparser.add_argument("-st", "--site", action="store_true")
-
+argparser.add_argument("-t", "--tests", action="store_true", help="Run tests and exit")
+argparser.add_argument("-ur", "--uvicorn-reload", action="store_true", help="Run in autoreload mode (development purposes)")
 
 def main():
     args = argparser.parse_args()
+
     if args.tests:
         from tests import main as run_tests
-
         return run_tests()
-    if args.scheduler:
-        from StarManager.runscheduler import main as run_scheduler
 
-        return run_scheduler()
-    if args.telegram:
-        from StarManager.runtg import main as run_tgbot
-
-        return run_tgbot()
-    if args.site:
-        from StarManager.runsite import main as run_site
-
-        return run_site()
-    from StarManager.main import main as run_vkbot
-    
-    return run_vkbot(args)
-
+    logger.info("Starting unified StarManager app...")
+    import StarManager.app  # noqa: F401
+    uvicorn.run(
+        "StarManager.app:app",
+        host="127.0.0.1",
+        port=5000,
+        reload=args.uvicorn_reload,
+        log_level="info",
+        access_log=False
+    )
+    return
 
 if __name__ == "__main__":
     main()

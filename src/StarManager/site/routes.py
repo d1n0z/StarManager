@@ -149,10 +149,10 @@ async def profile(request: Request):
     )
     if not user:
         return RedirectResponse(url="/login")
+    lvl, xp = await managers.xp.get(user.id, ("lvl", "xp"))
+    if lvl is None or xp is None:
+        lvl, xp = 1, 0
     async with (await pool()).acquire() as conn:
-        lvl, xp = await conn.fetchrow(
-            "select lvl, xp from xp where uid=$1", user.id
-        ) or (1, 0)
         chats = await conn.fetchval(
             "select count(*) as c from userjoineddate where uid=$1", user.id
         )

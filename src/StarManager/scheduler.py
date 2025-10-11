@@ -10,7 +10,6 @@ from collections import defaultdict
 from datetime import datetime
 
 import yadisk
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from loguru import logger
 
@@ -577,10 +576,8 @@ async def end_tg_giveaway(conn):
     )
 
 
-def run(loop):
-    scheduler = AsyncIOScheduler(timezone="Europe/Moscow", event_loop=loop)
-
-    logger.info("loading tasks")
+def add_jobs(scheduler):
+    logger.info("Loading scheduler tasks...")
 
     scheduler.add_job(
         schedule(run_notifications), CronTrigger.from_crontab("*/1 * * * *")
@@ -606,5 +603,3 @@ def run(loop):
 
     scheduler.add_job(schedule(new_tg_giveaway), CronTrigger.from_crontab("0 10 * * *"))
     scheduler.add_job(schedule(end_tg_giveaway), CronTrigger.from_crontab("0 9 * * *"))
-
-    scheduler.start()
