@@ -26,7 +26,8 @@ def main():
         port=5000,
         reload=args.uvicorn_reload,
         log_level="info",
-        access_log=False
+        access_log=False,
+        workers=8
     )
     return
 

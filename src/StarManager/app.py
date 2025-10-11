@@ -15,9 +15,7 @@ from StarManager.core import managers, tables
 from StarManager.core.config import settings
 from StarManager.site.routes import router
 from StarManager.tgbot.main import Bot as TgBot
-from StarManager.vkbot.bot import bot as vkbot
 from StarManager.vkbot import load_messages
-from StarManager.vkbot import main as vkbot_module
 
 logger.remove()
 logger.add(sys.stderr, level="INFO")

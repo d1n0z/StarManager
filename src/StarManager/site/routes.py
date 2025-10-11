@@ -1,3 +1,4 @@
+import asyncio
 import time
 import traceback
 from datetime import datetime
@@ -584,5 +585,5 @@ async def vk(request: Request):
     if data.get("secret") != settings.vk.callback_secret:
         return PlainTextResponse('Error: wrong "secret" key.')
 
-    await vkbot.process_event(data)
+    asyncio.create_task(vkbot.process_event(data))
     return PlainTextResponse("ok")
