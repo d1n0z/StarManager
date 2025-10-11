@@ -27,7 +27,7 @@ def main():
         reload=args.uvicorn_reload,
         log_level="info",
         access_log=False,
-        workers=8
+        workers=4
     )
     return
 
