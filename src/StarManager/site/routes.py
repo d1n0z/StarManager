@@ -581,7 +581,7 @@ async def vk(request: Request):
     if (data_type := data.get("type")) is None:
         return PlainTextResponse('Error: no "type" field.')
     if data_type == "confirmation":
-        return PlainTextResponse("22ddb7f2")
+        return PlainTextResponse(settings.vk.callback_confirmation_code)
     if data.get("secret") != settings.vk.callback_secret:
         return PlainTextResponse('Error: wrong "secret" key.')
 

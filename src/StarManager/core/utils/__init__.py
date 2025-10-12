@@ -1383,7 +1383,7 @@ def generate_hard_problem():
 
 async def messagereply(
     protectedmessage: Message, *args, **kwargs
-) -> MessagesSendUserIdsResponseItem:
+) -> MessagesSendUserIdsResponseItem | None:
     try:
         msg = await protectedmessage.reply(*args, **kwargs)
         if (

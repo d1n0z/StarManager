@@ -97,6 +97,7 @@ class VKSettings(BaseSettings):
     app_id: int
     app_secret: str
     callback_secret: str
+    callback_confirmation_code: str
 
 
 class ServiceSettings(BaseSettings):
