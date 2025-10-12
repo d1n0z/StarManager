@@ -42,6 +42,15 @@ async def lifespan(app: FastAPI):
     tg_bot = TgBot()
     tg_task = asyncio.create_task(tg_bot.run(), name="tgbot")
     app.state.bg_tasks.append((tg_task, tg_bot.bot))
+    
+    async def _monitor_tasks():
+        while True:
+            await asyncio.sleep(60)
+            from StarManager.site.routes import _vk_tasks
+            logger.info(f"Active VK tasks: {len(_vk_tasks)}")
+    
+    monitor_task = asyncio.create_task(_monitor_tasks(), name="monitor")
+    app.state.bg_tasks.append((monitor_task, None))
 
     try:
         yield
@@ -58,8 +67,13 @@ async def lifespan(app: FastAPI):
         except asyncio.TimeoutError:
             logger.warning("Managers sync timeout, forcing close")
 
+        from StarManager.site.routes import _vk_tasks
+        logger.info(f"Cancelling {len(_vk_tasks)} pending VK tasks")
+        for task in list(_vk_tasks):
+            task.cancel()
+        
         for t, obj in list(app.state.bg_tasks):
-            if hasattr(obj, "close"):
+            if obj and hasattr(obj, "close"):
                 try:
                     await asyncio.wait_for(obj.close(), timeout=5)
                 except asyncio.TimeoutError:

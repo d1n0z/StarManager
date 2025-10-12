@@ -15,8 +15,10 @@ async def pool():
             min_size=10, 
             max_size=150,
             max_inactive_connection_lifetime=60,
-            timeout=60, 
-            command_timeout=120
+            timeout=30, 
+            command_timeout=60,
+            max_queries=50000,
+            max_cached_statement_lifetime=300
         )
     return _pool
 

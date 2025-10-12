@@ -575,7 +575,50 @@ async def leaderboard():
     return PlainTextResponse("unexpected request")
 
 
-_vk_semaphore = asyncio.Semaphore(25)
+@router.get("/health")
+async def health():
+    import time
+    import psutil
+    import os
+    
+    start = time.time()
+    try:
+        db_pool = await pool()
+        async with db_pool.acquire() as conn:
+            await asyncio.wait_for(conn.fetchval("SELECT 1"), timeout=2)
+        db_ok = True
+        db_time = time.time() - start
+        db_pool_size = db_pool.get_size()
+        db_pool_free = db_pool.get_idle_size()
+    except Exception:
+        db_ok = False
+        db_time = -1
+        db_pool_size = -1
+        db_pool_free = -1
+    
+    process = psutil.Process(os.getpid())
+    
+    return JSONResponse({
+        "status": "ok" if db_ok else "degraded",
+        "timestamp": time.time(),
+        "vk_tasks": len(_vk_tasks),
+        "db": {
+            "ok": db_ok,
+            "response_time": round(db_time, 3),
+            "pool_size": db_pool_size,
+            "pool_free": db_pool_free,
+            "pool_used": db_pool_size - db_pool_free if db_pool_size > 0 else -1
+        },
+        "system": {
+            "memory_mb": round(process.memory_info().rss / 1024 / 1024, 1),
+            "cpu_percent": process.cpu_percent(),
+            "threads": process.num_threads()
+        }
+    })
+
+
+_vk_semaphore = asyncio.Semaphore(75)
+_vk_tasks = set()
 
 
 @router.post("/api/listener/vk")
@@ -592,9 +635,13 @@ async def vk(request: Request):
     async def _process_with_limit():
         async with _vk_semaphore:
             try:
-                await vkbot.process_event(data)
+                await asyncio.wait_for(vkbot.process_event(data), timeout=30)
+            except asyncio.TimeoutError:
+                logger.warning(f"VK event processing timeout: {data_type}")
             except Exception:
                 logger.exception("VK event processing failed")
 
-    asyncio.create_task(_process_with_limit())
+    task = asyncio.create_task(_process_with_limit())
+    _vk_tasks.add(task)
+    task.add_done_callback(_vk_tasks.discard)
     return PlainTextResponse("ok")
