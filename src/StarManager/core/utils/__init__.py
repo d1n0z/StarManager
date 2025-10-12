@@ -1,5 +1,6 @@
 import asyncio
 import locale
+from math import e
 import os
 import random
 import re
@@ -24,7 +25,7 @@ from loguru import logger
 from memoization import cached
 from multicolorcaptcha import CaptchaGenerator
 from nudenet import NudeDetector
-from vkbottle import PhotoMessageUploader
+from vkbottle import PhotoMessageUploader, VKAPIError
 from vkbottle.bot import Message
 from vkbottle.tools.mini_types.bot.foreign_message import ForeignMessageMin
 from vkbottle_types.codegen.objects import MessagesDeleteFullResponseItem
@@ -1383,26 +1384,31 @@ def generate_hard_problem():
 async def messagereply(
     protectedmessage: Message, *args, **kwargs
 ) -> MessagesSendUserIdsResponseItem:
-    msg = await protectedmessage.reply(*args, **kwargs)
-    if (
-        msg.peer_id > 2000000000
-        and (await get_chat_settings((chatid := msg.peer_id - 2000000000)))["main"][
-            "autodelete"
-        ]
-    ):
-        async with (await pool()).acquire() as conn:
-            val = await conn.fetchval(
-                "select value from settings where setting='autodelete' and chat_id=$1",
-                chatid,
-            )
-            if val:
-                await conn.execute(
-                    "insert into todelete (peerid, cmid, delete_at) values ($1, $2, $3)",
-                    msg.peer_id,
-                    msg.conversation_message_id,
-                    time.time() + val,
+    try:
+        msg = await protectedmessage.reply(*args, **kwargs)
+        if (
+            msg.peer_id > 2000000000
+            and (await get_chat_settings((chatid := msg.peer_id - 2000000000)))["main"][
+                "autodelete"
+            ]
+        ):
+            async with (await pool()).acquire() as conn:
+                val = await conn.fetchval(
+                    "select value from settings where setting='autodelete' and chat_id=$1",
+                    chatid,
                 )
-    return msg
+                if val:
+                    await conn.execute(
+                        "insert into todelete (peerid, cmid, delete_at) values ($1, $2, $3)",
+                        msg.peer_id,
+                        msg.conversation_message_id,
+                        time.time() + val,
+                    )
+        return msg
+    except VKAPIError[100]:
+        pass
+    except Exception as exc:
+        raise Exception('Failed to reply to message') from exc
 
 
 async def create_payment(
