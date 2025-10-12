@@ -642,14 +642,21 @@ async def vk(request: Request):
         return PlainTextResponse("ok")
     
     async def _process_with_limit():
+        start = time.time()
         try:
             async with asyncio.timeout(15):
                 async with _vk_semaphore:
                     await vkbot.process_event(data)
+            elapsed = time.time() - start
+            if elapsed > 5:
+                logger.warning(f"Slow event {data_type}: {elapsed:.2f}s")
         except asyncio.TimeoutError:
-            logger.error(f"Timeout {data_type}")
+            logger.error(f"Timeout {data_type} after {time.time() - start:.2f}s")
+        except asyncio.CancelledError:
+            logger.warning(f"Cancelled {data_type}")
+            raise
         except Exception:
-            logger.exception("Event failed")
+            logger.exception(f"Event failed {data_type}")
 
     task = asyncio.create_task(_process_with_limit())
     _vk_tasks.add(task)

@@ -16,9 +16,13 @@ async def pool():
             max_size=200,
             max_inactive_connection_lifetime=60,
             timeout=30, 
-            command_timeout=60,
+            command_timeout=30,
             max_queries=50000,
-            max_cached_statement_lifetime=300
+            max_cached_statement_lifetime=300,
+            server_settings={
+                'statement_timeout': '30000',
+                'idle_in_transaction_session_timeout': '60000'
+            }
         )
     return _pool
 

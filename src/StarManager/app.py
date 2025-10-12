@@ -46,8 +46,14 @@ async def lifespan(app: FastAPI):
     async def _monitor_tasks():
         while True:
             await asyncio.sleep(60)
-            from StarManager.site.routes import _vk_tasks
-            logger.info(f"Active VK tasks: {len(_vk_tasks)}")
+            from StarManager.site.routes import _vk_tasks, _dropped_events
+            from StarManager.core.db import pool as get_pool
+            try:
+                db_pool = await get_pool()
+                pool_info = f"DB: {db_pool.get_size() - db_pool.get_idle_size()}/{db_pool.get_size()}"
+            except Exception:
+                pool_info = "DB: ?"
+            logger.info(f"VK tasks: {len(_vk_tasks)} | Dropped: {_dropped_events} | {pool_info}")
     
     monitor_task = asyncio.create_task(_monitor_tasks(), name="monitor")
     app.state.bg_tasks.append((monitor_task, None))
@@ -68,9 +74,10 @@ async def lifespan(app: FastAPI):
             logger.warning("Managers sync timeout, forcing close")
 
         from StarManager.site.routes import _vk_tasks
-        logger.info(f"Cancelling {len(_vk_tasks)} pending VK tasks")
-        for task in list(_vk_tasks):
-            task.cancel()
+        if _vk_tasks:
+            logger.warning(f"Cancelling {len(_vk_tasks)} pending VK tasks")
+            for task in list(_vk_tasks):
+                task.cancel()
         
         for t, obj in list(app.state.bg_tasks):
             if obj and hasattr(obj, "close"):
