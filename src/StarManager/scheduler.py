@@ -244,7 +244,12 @@ async def updateGroups(conn):  # TODO: optimize
 
 
 async def every10min(conn):
+    os.system(
+        rf"find {settings.service.path}src/StarManager/core/media/temp/ -mtime +1 -exec rm {{}} \;"
+    )
     now = time.time()
+    await conn.execute('DELETE FROM prempromo WHERE "end" < $1', now)
+    await conn.execute("DELETE FROM premium WHERE time < $1", now)
     expired = await conn.fetch(
         "SELECT uid, cmid FROM premiumexpirenotified WHERE date < $1",
         now - 86400 * 2,
@@ -340,10 +345,6 @@ async def every10min(conn):
 
 async def everyminute(conn):
     now = time.time()
-    os.system(
-        rf"find {settings.service.path}src/StarManager/core/media/temp/ -mtime +1 -exec rm {{}} \;"
-    )
-    await conn.execute("DELETE FROM premium WHERE time < $1", now)
 
     captchas = await conn.fetch(
         "SELECT uid, chat_id FROM captcha WHERE exptime < $1", now
@@ -369,7 +370,6 @@ async def everyminute(conn):
             )
 
     await conn.execute("DELETE FROM captcha WHERE exptime < $1", now)
-    await conn.execute('DELETE FROM prempromo WHERE "end" < $1', now)
 
     todelete = await conn.fetch(
         "SELECT peerid, cmid FROM todelete WHERE delete_at < $1", now
@@ -382,19 +382,11 @@ async def everyminute(conn):
 
 
 async def run_notifications(conn):
-    rows = await conn.fetch(
-        "SELECT id, chat_id, tag, every, time, name, text FROM notifications WHERE status = 1 AND every != -1"
-    )
+    now = int(time.time())
+    rows = await conn.fetch("select id, chat_id, tag, every, time, name, text from notifications where status = 1 and every != -1 and time < $1 and not exists (select 1 from blocked where uid = notifications.chat_id and type = 'chat')", now)
     for row in rows:
         id_, chat_id, tag, every, ttime, name, text = row
         try:
-            if await conn.fetchval(
-                "SELECT EXISTS(SELECT 1 FROM blocked WHERE uid = $1 AND type = 'chat')",
-                chat_id,
-            ):
-                continue
-            if ttime >= time.time():
-                continue
             call = False
             if tag == 1:
                 call = True
@@ -582,10 +574,10 @@ def add_jobs(scheduler):
     logger.info("Loading scheduler tasks...")
 
     scheduler.add_job(
-        schedule(run_notifications), CronTrigger.from_crontab("*/1 * * * *")
+        schedule(run_notifications), CronTrigger.from_crontab("1/3 * * * *")
     )
     scheduler.add_job(
-        schedule(run_nightmode_notifications), CronTrigger.from_crontab("*/1 * * * *")
+        schedule(run_nightmode_notifications), CronTrigger.from_crontab("0/3 * * * *")
     )
     scheduler.add_job(schedule(everyminute), CronTrigger.from_crontab("*/1 * * * *"))
 
