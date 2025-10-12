@@ -11,6 +11,7 @@ from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from loguru import logger
 from starlette.responses import JSONResponse
 from vkbottle_types.objects import UsersFields
 from yookassa import Configuration, Payment
@@ -574,6 +575,9 @@ async def leaderboard():
     return PlainTextResponse("unexpected request")
 
 
+_vk_semaphore = asyncio.Semaphore(25)
+
+
 @router.post("/api/listener/vk")
 async def vk(request: Request):
     data = await request.json()
@@ -585,5 +589,12 @@ async def vk(request: Request):
     if data.get("secret") != settings.vk.callback_secret:
         return PlainTextResponse('Error: wrong "secret" key.')
 
-    asyncio.create_task(vkbot.process_event(data))
+    async def _process_with_limit():
+        async with _vk_semaphore:
+            try:
+                await vkbot.process_event(data)
+            except Exception:
+                logger.exception("VK event processing failed")
+
+    asyncio.create_task(_process_with_limit())
     return PlainTextResponse("ok")

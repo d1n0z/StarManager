@@ -47,21 +47,36 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         logger.info("Lifespan shutdown: stopping bg tasks and scheduler")
-        app.state.scheduler.shutdown(wait=False)
 
-        await managers.close()
+        app.state.scheduler.shutdown(wait=False)
+        logger.info("Scheduler stopped")
+
+        logger.info("Syncing managers...")
+        try:
+            await asyncio.wait_for(managers.close(), timeout=30)
+            logger.info("Managers synced and closed")
+        except asyncio.TimeoutError:
+            logger.warning("Managers sync timeout, forcing close")
 
         for t, obj in list(app.state.bg_tasks):
             if hasattr(obj, "close"):
-                await obj.close()
+                try:
+                    await asyncio.wait_for(obj.close(), timeout=5)
+                except asyncio.TimeoutError:
+                    logger.warning(f"Object close timeout: {obj}")
             if not t.done():
                 t.cancel()
-        for t in list(app.state.bg_tasks):
+        
+        for t, _ in list(app.state.bg_tasks):
             try:
-                await asyncio.wait_for(t, timeout=5)
+                await asyncio.wait_for(t, timeout=10)
             except asyncio.TimeoutError:
                 logger.warning(f"Task {t.get_name()} did not stop in time")
                 t.cancel()
+            except asyncio.CancelledError:
+                pass
+        
+        logger.info("Shutdown complete")
 
 
 app = FastAPI(title="StarManager", lifespan=lifespan)
