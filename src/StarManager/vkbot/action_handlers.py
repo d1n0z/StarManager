@@ -19,31 +19,11 @@ async def action_handle(message: MessageNew) -> None:
         await utils.get_raid_mode_active(chat_id)
         or chat_settings["main"]["kickInvitedByLink"]
     ):
-        async with (await pool()).acquire() as conn:
-            in_chat = [
-                i[0]
-                for i in await conn.fetch(
-                    "select uid from userjoineddate where chat_id=$1", chat_id
-                )
-            ]
-            in_chat.extend(
-                [
-                    i[0]
-                    for i in await conn.fetch(
-                        "select uid from messages where chat_id=$1", chat_id
-                    )
-                ]
+        if await utils.kick_user(event.from_id, chat_id=chat_id):
+            await utils.send_message(
+                event.peer_id,
+                f"⛔️ [id{event.from_id}|{await utils.get_user_name(event.from_id)}], был(-a) исключен(-на) из беседы. Вход по пригласительным ссылкам в беседе отключен.",
             )
-        users = (
-            await api.messages.get_conversation_members(peer_id=event.peer_id)
-        ).items
-        for user in users:
-            if user.member_id not in in_chat and user.member_id > 0:
-                await utils.kick_user(user.member_id, chat_id=chat_id)
-                await utils.send_message(
-                    event.peer_id,
-                    f"⛔️ [id{user.member_id}|{await utils.get_user_name(user.member_id)}], был(-a) исключен(-на) из беседы. Вход по пригласительным ссылкам в беседе отключен.",
-                )
         return
 
     if (uid := action.member_id) is None:
