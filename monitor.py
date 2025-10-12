@@ -38,15 +38,16 @@ def check_health():
             return False, "HTTP error", None
         
         data = resp.json()
+        db_data = data.get('db', {})
         
         if data.get("vk_tasks", 0) > MAX_VK_TASKS:
             return False, f"Too many VK tasks: {data['vk_tasks']}", data
         
-        if not data.get("db_ok"):
+        if not db_data.get("ok"):
             return False, "DB not responding", data
         
-        if data.get("db_response_time", 0) > 2:
-            return False, f"DB slow: {data['db_response_time']}s", data
+        if db_data.get("response_time", 0) > 2:
+            return False, f"DB slow: {db_data['response_time']}s", data
         
         return True, "OK", data
     except requests.Timeout:
@@ -58,7 +59,8 @@ if __name__ == "__main__":
     ok, msg, data = check_health()
     
     if ok and data:
-        log(f"✓ Health: {msg} | VK tasks: {data.get('vk_tasks', '?')} | DB: {data.get('db_response_time', '?')}s")
+        db_time = data.get('db', {}).get('response_time', '?')
+        log(f"✓ Health: {msg} | VK tasks: {data.get('vk_tasks', '?')} | DB: {db_time}s")
     else:
         log(f"✗ Health: {msg}")
         if data:

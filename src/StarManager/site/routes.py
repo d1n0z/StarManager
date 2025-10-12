@@ -617,7 +617,7 @@ async def health():
     })
 
 
-_vk_semaphore = asyncio.Semaphore(75)
+_vk_semaphore = asyncio.Semaphore(30)
 _vk_tasks = set()
 
 
@@ -632,14 +632,19 @@ async def vk(request: Request):
     if data.get("secret") != settings.vk.callback_secret:
         return PlainTextResponse('Error: wrong "secret" key.')
 
+    if len(_vk_tasks) > 100:
+        logger.error(f"Dropping event, tasks: {len(_vk_tasks)}")
+        return PlainTextResponse("ok")
+    
     async def _process_with_limit():
-        async with _vk_semaphore:
-            try:
-                await asyncio.wait_for(vkbot.process_event(data), timeout=30)
-            except asyncio.TimeoutError:
-                logger.warning(f"VK event processing timeout: {data_type}")
-            except Exception:
-                logger.exception("VK event processing failed")
+        try:
+            async with asyncio.timeout(10):
+                async with _vk_semaphore:
+                    await vkbot.process_event(data)
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout {data_type}")
+        except Exception:
+            logger.exception("Event failed")
 
     task = asyncio.create_task(_process_with_limit())
     _vk_tasks.add(task)
