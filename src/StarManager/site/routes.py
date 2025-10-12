@@ -602,6 +602,7 @@ async def health():
         "status": "ok" if db_ok else "degraded",
         "timestamp": time.time(),
         "vk_tasks": len(_vk_tasks),
+        "vk_dropped": _dropped_events,
         "db": {
             "ok": db_ok,
             "response_time": round(db_time, 3),
@@ -617,12 +618,14 @@ async def health():
     })
 
 
-_vk_semaphore = asyncio.Semaphore(30)
+_vk_semaphore = asyncio.Semaphore(50)
 _vk_tasks = set()
+_dropped_events = 0
 
 
 @router.post("/api/listener/vk")
 async def vk(request: Request):
+    global _dropped_events
     data = await request.json()
 
     if (data_type := data.get("type")) is None:
@@ -632,13 +635,15 @@ async def vk(request: Request):
     if data.get("secret") != settings.vk.callback_secret:
         return PlainTextResponse('Error: wrong "secret" key.')
 
-    if len(_vk_tasks) > 100:
-        logger.error(f"Dropping event, tasks: {len(_vk_tasks)}")
+    if len(_vk_tasks) > 200:
+        _dropped_events += 1
+        if _dropped_events % 100 == 0:
+            logger.warning(f"Dropped {_dropped_events} events, tasks: {len(_vk_tasks)}")
         return PlainTextResponse("ok")
     
     async def _process_with_limit():
         try:
-            async with asyncio.timeout(10):
+            async with asyncio.timeout(15):
                 async with _vk_semaphore:
                     await vkbot.process_event(data)
         except asyncio.TimeoutError:
