@@ -47,19 +47,23 @@ def restart_service():
     log("🔄 Restarting service...")
     try:
         if IS_LINUX:
-            result = subprocess.run("systemctl restart starmanager", 
-                                  shell=True, capture_output=True, text=True)
-            if result.returncode == 0:
-                log("✅ Service restarted (systemd)")
-                return True
-            else:
-                log(f"❌ Systemd restart failed: {result.stderr}")
-                log("Trying pkill...")
-                subprocess.run("pkill -f 'python.*main.py'", shell=True)
-                time.sleep(2)
-                subprocess.Popen(RESTART_COMMAND, shell=True, cwd=Path(__file__).parent)
-                log("✅ Service restarted (manual)")
-                return True
+            script_dir = Path(__file__).parent
+            log("Killing tmux session 'bot'...")
+            subprocess.run("tmux kill-session -t bot", shell=True, capture_output=True)
+            time.sleep(2)
+            
+            log("Starting new tmux session...")
+            subprocess.run("tmux new -s bot -d", shell=True)
+            subprocess.run(f"tmux send-keys -t bot 'cd {script_dir}' ENTER", shell=True)
+            
+            venv_path = script_dir / "venv" / "bin" / "activate"
+            if venv_path.exists():
+                subprocess.run(f"tmux send-keys -t bot '. {venv_path}' ENTER", shell=True)
+                time.sleep(1)
+            
+            subprocess.run("tmux send-keys -t bot 'python main.py' ENTER", shell=True)
+            log("✅ Service restarted (tmux)")
+            return True
         else:
             subprocess.run("taskkill /F /IM python.exe /FI \"WINDOWTITLE eq StarManager*\"", 
                           shell=True, capture_output=True)
