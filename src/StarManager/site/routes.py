@@ -1,4 +1,5 @@
 import asyncio
+import json
 import time
 import traceback
 from datetime import datetime
@@ -577,10 +578,11 @@ async def leaderboard():
 
 @router.get("/health")
 async def health():
-    import time
-    import psutil
     import os
-    
+    import time
+
+    import psutil
+
     start = time.time()
     try:
         db_pool = await pool()
@@ -595,27 +597,29 @@ async def health():
         db_time = -1
         db_pool_size = -1
         db_pool_free = -1
-    
+
     process = psutil.Process(os.getpid())
-    
-    return JSONResponse({
-        "status": "ok" if db_ok else "degraded",
-        "timestamp": time.time(),
-        "vk_tasks": len(_vk_tasks),
-        "vk_dropped": _dropped_events,
-        "db": {
-            "ok": db_ok,
-            "response_time": round(db_time, 3),
-            "pool_size": db_pool_size,
-            "pool_free": db_pool_free,
-            "pool_used": db_pool_size - db_pool_free if db_pool_size > 0 else -1
-        },
-        "system": {
-            "memory_mb": round(process.memory_info().rss / 1024 / 1024, 1),
-            "cpu_percent": process.cpu_percent(),
-            "threads": process.num_threads()
+
+    return JSONResponse(
+        {
+            "status": "ok" if db_ok else "degraded",
+            "timestamp": time.time(),
+            "vk_tasks": len(_vk_tasks),
+            "vk_dropped": _dropped_events,
+            "db": {
+                "ok": db_ok,
+                "response_time": round(db_time, 3),
+                "pool_size": db_pool_size,
+                "pool_free": db_pool_free,
+                "pool_used": db_pool_size - db_pool_free if db_pool_size > 0 else -1,
+            },
+            "system": {
+                "memory_mb": round(process.memory_info().rss / 1024 / 1024, 1),
+                "cpu_percent": process.cpu_percent(),
+                "threads": process.num_threads(),
+            },
         }
-    })
+    )
 
 
 _vk_semaphore = asyncio.Semaphore(50)
@@ -640,23 +644,31 @@ async def vk(request: Request):
         if _dropped_events % 100 == 0:
             logger.warning(f"Dropped {_dropped_events} events, tasks: {len(_vk_tasks)}")
         return PlainTextResponse("ok")
-    
+
     async def _process_with_limit():
         start = time.time()
+        event_info = f"{data_type}"
+        if data_type == "message_new" and "object" in data:
+            msg = data.get("object", {}).get("message", {})
+            text = msg.get("text", "")[:50]
+            event_info = f"message_new text='{text}'"
+
         try:
             async with asyncio.timeout(15):
                 async with _vk_semaphore:
                     await vkbot.process_event(data)
             elapsed = time.time() - start
             if elapsed > 5:
-                logger.warning(f"Slow event {data_type}: {elapsed:.2f}s")
+                logger.warning(f"Slow event: {event_info} took {elapsed:.2f}s")
         except asyncio.TimeoutError:
-            logger.error(f"Timeout {data_type} after {time.time() - start:.2f}s")
+            elapsed = time.time() - start
+            logger.error(f"TIMEOUT after {elapsed:.2f}s: {event_info}")
+            logger.error(f"Event data: {json.dumps(data, ensure_ascii=False)[:500]}")
         except asyncio.CancelledError:
-            logger.warning(f"Cancelled {data_type}")
+            logger.warning(f"Cancelled: {event_info}")
             raise
         except Exception:
-            logger.exception(f"Event failed {data_type}")
+            logger.exception(f"Failed: {event_info}")
 
     task = asyncio.create_task(_process_with_limit())
     _vk_tasks.add(task)
