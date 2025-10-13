@@ -654,7 +654,9 @@ async def vk(request: Request):
             event_info = f"message_new text='{text}'"
 
         try:
-            async with asyncio.timeout(15):
+            async with asyncio.timeout(
+                100 if text.startswith("/stats") else 20
+            ):  # first /stats command in a new run can load for a minute or so
                 async with _vk_semaphore:
                     await vkbot.process_event(data)
             elapsed = time.time() - start
