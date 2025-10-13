@@ -96,12 +96,16 @@ def schedule(coro_func, *, use_db: bool = True):
 async def backup() -> None:
     now = datetime.now().isoformat(timespec="seconds")
     filename = f"{settings.database.name}-{now}.sql.gz"
-    os.system(
+    
+    await asyncio.to_thread(
+        os.system,
         f"sudo rm {settings.service.path}{settings.database.name}*.sql.gz > /dev/null 2>&1"
     )
-    subprocess.run(
+    
+    await asyncio.to_thread(
+        subprocess.run,
         f'PGPASSWORD="{settings.database.password}" pg_dump -h localhost -U {settings.database.name} {settings.database.name} | gzip > {filename}',
-        shell=True,
+        shell=True
     )
 
     drive = yadisk.AsyncClient(token=settings.yandex.token)
@@ -113,7 +117,7 @@ async def backup() -> None:
         )
         link = await drive.get_download_link(f"/StarManager/backups/{filename}")
 
-    os.remove(filename)
+    await asyncio.to_thread(os.remove, filename)
     await tgbot.send_message(
         chat_id=settings.telegram.chat_id,
         message_thread_id=settings.telegram.backup_thread_id,
@@ -131,7 +135,7 @@ async def updateUsers(conn):  # TODO: optimize
         return users;
         """
         try:
-            result = vk_api_session.method("execute", {"code": code})
+            result = await asyncio.to_thread(vk_api_session.method, "execute", {"code": code})
             updates = []
             for u in result:
                 full_name = f"{u['first_name']} {u['last_name']}"
@@ -231,7 +235,7 @@ async def updateGroups(conn):  # TODO: optimize
         return grp;
         """
         try:
-            result = vk_api_session.method("execute", {"code": code})
+            result = await asyncio.to_thread(vk_api_session.method, "execute", {"code": code})
             updates = []
             for g in result["groups"]:
                 gid = -abs(g["id"])
@@ -244,7 +248,8 @@ async def updateGroups(conn):  # TODO: optimize
 
 
 async def every10min(conn):
-    os.system(
+    await asyncio.to_thread(
+        os.system,
         rf"find {settings.service.path}src/StarManager/core/media/temp/ -mtime +1 -exec rm {{}} \;"
     )
     now = time.time()
