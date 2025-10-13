@@ -648,6 +648,7 @@ async def vk(request: Request):
     async def _process_with_limit():
         start = time.time()
         event_info = f"{data_type}"
+        text = ""
         if data_type == "message_new" and "object" in data:
             msg = data.get("object", {}).get("message", {})
             text = msg.get("text", "")[:50]
