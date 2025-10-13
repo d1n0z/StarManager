@@ -1,3 +1,4 @@
+import asyncio
 import time
 from typing import Any
 
@@ -45,13 +46,12 @@ async def comment_handle(event: GroupTypes.WallReplyNew) -> Any:
             message=await messages.farm(await get_user_name(uid), uid),
             reply_to_comment=event.object.id,
         )
-    if (
-        time.time()
-        - service_vk_api_session.method(
-            "wall.getById", {"posts": f"-{settings.vk.group_id}_{event.object.post_id}"}
-        )["items"][0]["date"]
-        < 86400 * 7
-    ):
+    post_data = await asyncio.to_thread(
+        service_vk_api_session.method,
+        "wall.getById",
+        {"posts": f"-{settings.vk.group_id}_{event.object.post_id}"},
+    )
+    if time.time() - post_data["items"][0]["date"] < 86400 * 7:
         async with (await pool()).acquire() as conn:
             if await conn.fetchval(
                 "select exists(select 1 from newpostcomments where uid=$1 and pid=$2)",

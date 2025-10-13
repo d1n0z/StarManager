@@ -1,6 +1,5 @@
 import asyncio
 import locale
-from math import e
 import os
 import random
 import re
@@ -302,11 +301,14 @@ async def set_chat_mute(
             }
             if mute_time is not None and mute_time < 2676000:
                 payload["for"] = int(mute_time)
-            return vk_api_session.method(
-                "messages.changeConversationMemberRestrictions", payload
+            return await asyncio.to_thread(
+                vk_api_session.method,
+                "messages.changeConversationMemberRestrictions",
+                payload,
             )
         else:
-            return vk_api_session.method(
+            return await asyncio.to_thread(
+                vk_api_session.method,
                 "messages.changeConversationMemberRestrictions",
                 {"peer_id": chat_id + 2000000000, "member_ids": uid, "action": "rw"},
             )
@@ -342,10 +344,7 @@ async def upload_image(
         raise e
 
 
-@AsyncLRU(maxsize=0)
-async def get_reg_date(
-    id: int, format: str = "%d %B %Y", none: Any = "Не удалось определить"
-) -> str | Any:
+def _get_reg_date_sync(id: int, format: str) -> str | None:
     try:
         urlmanager = urllib3.PoolManager()
         response = urlmanager.request("GET", f"https://vk.com/foaf.php?id={id}")
@@ -366,7 +365,15 @@ async def get_reg_date(
         data = date(year=int(data[0]), month=int(data[1]), day=int(data[2]))
         return data.strftime(format)
     except Exception:
-        return none
+        return None
+
+
+@AsyncLRU(maxsize=0)
+async def get_reg_date(
+    id: int, format: str = "%d %B %Y", none: Any = "Не удалось определить"
+) -> str | Any:
+    result = await asyncio.to_thread(_get_reg_date_sync, id, format)
+    return result if result is not None else none
 
 
 @AsyncTTL(time_to_live=2, maxsize=0)
@@ -696,7 +703,7 @@ async def is_chat_member(uid, chat_id):
         return False
 
 
-async def NSFW_detector(pic_path):
+def _nsfw_detector_sync(pic_path):
     detector = NudeDetector()
     with open(pic_path, "rb") as f:
         image_data = f.read()
@@ -711,6 +718,10 @@ async def NSFW_detector(pic_path):
             if i["score"] > 0.3:
                 return True
     return False
+
+
+async def NSFW_detector(pic_path):
+    return await asyncio.to_thread(_nsfw_detector_sync, pic_path)
 
 
 def whoiscached(text):
@@ -797,17 +808,20 @@ async def antispam_checker(
             for y in i.photo.sizes:
                 if y.width > photo.width:
                     photo = y
-            if not photo.url:
+            if not photo or not photo.url:
                 continue
-            r = requests.get(photo.url)
-            filename = (
-                settings.service.path
-                + f"src/StarManager/core/media/temp/{time.time()}.jpg"
-            )
-            with open(filename, "wb") as f:
-                f.write(r.content)
-                f.close()
-            r.close()
+
+            def download_and_save():
+                r = requests.get(photo.url)  # type: ignore
+                filename = (
+                    settings.service.path
+                    + f"src/StarManager/core/media/temp/{time.time()}.jpg"
+                )
+                with open(filename, "wb") as f:
+                    f.write(r.content)
+                return filename
+
+            filename = await asyncio.to_thread(download_and_save)
             isNSFW = await NSFW_detector(filename)
             if isNSFW:
                 return "disallowNSFW"
@@ -936,17 +950,21 @@ async def get_user_rep_banned(uid) -> bool:
 
 
 async def generate_captcha(uid, chat_id, exp):
-    gen = CaptchaGenerator()
-    image = gen.gen_math_captcha_image(difficult_level=2, multicolor=True)
-    name = f"{settings.service.path}src/StarManager/core/media/temp/captcha{uid}_{chat_id}.png"
-    image.image.save(name, "png")
+    def gen_captcha():
+        gen = CaptchaGenerator()
+        image = gen.gen_math_captcha_image(difficult_level=2, multicolor=True)
+        name = f"{settings.service.path}src/StarManager/core/media/temp/captcha{uid}_{chat_id}.png"
+        image.image.save(name, "png")
+        return name, str(image.equation_result)
+
+    name, result = await asyncio.to_thread(gen_captcha)
     async with (await pool()).acquire() as conn:
         c = await conn.fetchval(
             "insert into captcha (chat_id, uid, exptime, result) values ($1, $2, $3, $4) returning id",
             chat_id,
             uid,
             time.time() + exp * 60,
-            str(image.equation_result),
+            result,
         )
     return name, c
 
@@ -1408,7 +1426,7 @@ async def messagereply(
     except VKAPIError[100]:
         pass
     except Exception as exc:
-        raise Exception('Failed to reply to message') from exc
+        raise Exception("Failed to reply to message") from exc
 
 
 async def create_payment(

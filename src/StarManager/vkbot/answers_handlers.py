@@ -1,7 +1,7 @@
+import asyncio
 import datetime
 import re
 import time
-import traceback
 from ast import literal_eval
 
 import requests
@@ -13,10 +13,10 @@ from StarManager.core.db import pool
 from StarManager.core.utils import (
     delete_messages,
     edit_message,
-    search_id_in_message,
     get_user_name,
     get_user_nickname,
     hex_to_rgb,
+    search_id_in_message,
     send_message,
     upload_image,
     whoiscachedurl,
@@ -356,12 +356,15 @@ async def queue_handler(event: MessageNew):
                         ),
                     )
 
-                r = requests.get(attachment[0].photo.sizes[-1].url)
-                with open(
-                    f"{settings.service.path}src/StarManager/core/media/temp/{uid}welcome.jpg",
-                    "wb",
-                ) as f:
-                    f.write(r.content)
+                r = await asyncio.to_thread(
+                    requests.get, attachment[0].photo.sizes[-1].url
+                )
+                await asyncio.to_thread(
+                    lambda: open(
+                        f"{settings.service.path}src/StarManager/core/media/temp/{uid}welcome.jpg",
+                        "wb",
+                    ).write(r.content)
+                )
                 photo = await upload_image(
                     f"{settings.service.path}src/StarManager/core/media/temp/{uid}welcome.jpg"
                 )

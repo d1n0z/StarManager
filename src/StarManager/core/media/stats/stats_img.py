@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw, ImageFont
 from StarManager.core.config import settings
 
 
-async def createStatsImage(
+def createStatsImage(
     warns,
     messages,
     uid,
@@ -279,28 +279,24 @@ async def createStatsImage(
 
 
 if __name__ == "__main__":
-    import asyncio
-
-    asyncio.run(
-        createStatsImage(
-            0,
-            123,
-            746110579,
-            8,
-            "test",
-            123,
-            123,
-            time.time() + 123 * 86400,
-            123,
-            123,
-            123,
-            123,
-            "Копытов Илья",
-            0,
-            0,
-            "dev",
-            750,
-            None,
-            1,
-        )
+    createStatsImage(
+        0,
+        123,
+        746110579,
+        8,
+        "test",
+        123,
+        123,
+        time.time() + 123 * 86400,
+        123,
+        123,
+        123,
+        123,
+        "Копытов Илья",
+        0,
+        0,
+        "dev",
+        750,
+        None,
+        1,
     )

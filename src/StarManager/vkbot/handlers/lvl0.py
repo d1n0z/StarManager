@@ -1,3 +1,4 @@
+import asyncio
 import random
 import re
 import time
@@ -184,41 +185,44 @@ async def stats(message: Message):
     if not url:
         return
     r = await api.http_client.request_content(url)
-    with open(
-        settings.service.path + f"src/StarManager/core/media/temp/{id}ava.jpg", "wb"
-    ) as f:
-        f.write(r)
+    file_path = settings.service.path + f"src/StarManager/core/media/temp/{id}ava.jpg"
+    
+    def write_file():
+        with open(file_path, "wb") as f:
+            f.write(r)
+    
+    await asyncio.to_thread(write_file)
 
     lvl_name = await get_chat_access_name(chat_id, acc)
     xp = int(await get_user_xp(id))
     lvl = await get_user_level(id) or 1
     try:
+        stats_image = await asyncio.to_thread(
+            createStatsImage,
+            await get_user_warns(id, chat_id),
+            await get_user_messages(id, chat_id),
+            id,
+            await get_user_access_level(id, chat_id),
+            await get_user_nickname(id, chat_id),
+            await get_user_coins(id),
+            last_message,
+            await get_user_premium(id),
+            min(xp, 99999999),
+            min(lvl, 999),
+            await get_user_rep(id),
+            await get_rep_top(id),
+            await get_user_name(id),
+            await get_user_mute(id, chat_id),
+            await get_user_ban(id, chat_id),
+            lvl_name or settings.lvl_names[acc],
+            await get_user_needed_xp(xp) if lvl < 999 else 0,
+            await get_user_premmenu_setting(id, "border_color", False),
+            await get_user_league(id),
+        )
         await messagereply(
             message,
             disable_mentions=1,
-            attachment=await upload_image(
-                await createStatsImage(
-                    await get_user_warns(id, chat_id),
-                    await get_user_messages(id, chat_id),
-                    id,
-                    await get_user_access_level(id, chat_id),
-                    await get_user_nickname(id, chat_id),
-                    await get_user_coins(id),
-                    last_message,
-                    await get_user_premium(id),
-                    min(xp, 99999999),
-                    min(lvl, 999),
-                    await get_user_rep(id),
-                    await get_rep_top(id),
-                    await get_user_name(id),
-                    await get_user_mute(id, chat_id),
-                    await get_user_ban(id, chat_id),
-                    lvl_name or settings.lvl_names[acc],
-                    await get_user_needed_xp(xp) if lvl < 999 else 0,
-                    await get_user_premmenu_setting(id, "border_color", False),
-                    await get_user_league(id),
-                )
-            ),
+            attachment=await upload_image(stats_image),
         )
     except Exception as e:
         if message.from_id in settings.service.devs:
@@ -995,7 +999,7 @@ async def rps(message: Message):
         ),
         keyboard=keyboard.rps(message.from_id, bet, id),
     )
-    if not msg.conversation_message_id:
+    if not msg or not msg.conversation_message_id:
         return
     await managers.rps.add_game(
         msg.conversation_message_id, message.peer_id, time.time(), message.from_id

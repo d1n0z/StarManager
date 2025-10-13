@@ -50,6 +50,7 @@ htmlcov/
 *.ntvs*
 *.njsproj
 *.sln
+.amazonq
 
 # macOS / Linux
 .DS_Store

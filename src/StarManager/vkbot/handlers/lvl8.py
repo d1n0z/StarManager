@@ -570,7 +570,7 @@ async def reboot(message: Message):
             time.time(),
         )
     await messagereply(message, await messages.reboot())
-    os.system(settings.service.path + "startup.sh")  # noqa
+    await asyncio.to_thread(os.system, settings.service.path + "startup.sh")
 
 
 @bl.chat_message(SearchCMD("sudo"))
@@ -582,9 +582,10 @@ async def sudo(message: Message):
                 message.chat_id,
                 time.time(),
             )
-    await messagereply(
-        message, os.popen(f"sudo {' '.join(message.text.split()[1:])}").read()
+    result = await asyncio.to_thread(
+        lambda: os.popen(f"sudo {' '.join(message.text.split()[1:])}").read()
     )
+    await messagereply(message, result)
 
 
 @bl.chat_message(SearchCMD("getuserchats"))

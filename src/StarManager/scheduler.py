@@ -14,7 +14,7 @@ from apscheduler.triggers.cron import CronTrigger
 from loguru import logger
 
 from StarManager.core import managers
-from StarManager.core.config import api, settings, vk_api_session
+from StarManager.core.config import api, settings
 from StarManager.core.db import pool
 from StarManager.core.utils import (
     add_user_xp,
@@ -135,7 +135,7 @@ async def updateUsers(conn):  # TODO: optimize
         return users;
         """
         try:
-            result = await asyncio.to_thread(vk_api_session.method, "execute", {"code": code})
+            result = await api.execute(code)
             updates = []
             for u in result:
                 full_name = f"{u['first_name']} {u['last_name']}"
@@ -235,7 +235,7 @@ async def updateGroups(conn):  # TODO: optimize
         return grp;
         """
         try:
-            result = await asyncio.to_thread(vk_api_session.method, "execute", {"code": code})
+            result = await api.execute(code)
             updates = []
             for g in result["groups"]:
                 gid = -abs(g["id"])

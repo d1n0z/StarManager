@@ -1,3 +1,4 @@
+import asyncio
 import time
 from ast import literal_eval
 from datetime import datetime
@@ -706,21 +707,17 @@ async def scan(message: Message):
         return await messagereply(
             message, disable_mentions=1, message=await messages.scan_hint()
         )
+    scan_results = []
+    for link in links:
+        malware = await asyncio.to_thread(scan_url_for_malware, link)
+        redirect = await asyncio.to_thread(scan_url_for_redirect, link)
+        shortened = await asyncio.to_thread(scan_url_is_shortened, link)
+        scan_results.append(await messages.scan(link, malware, redirect, shortened) + "\n\n")
+    
     await messagereply(
         message,
         disable_mentions=1,
-        message="".join(
-            [
-                await messages.scan(
-                    i,
-                    scan_url_for_malware(i),
-                    scan_url_for_redirect(i),
-                    scan_url_is_shortened(i),
-                )
-                + "\n\n"
-                for i in links
-            ]
-        ),
+        message="".join(scan_results),
     )
 
 
