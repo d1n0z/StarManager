@@ -713,7 +713,7 @@ async def scan(message: Message):
         redirect = await asyncio.to_thread(scan_url_for_redirect, link)
         shortened = await asyncio.to_thread(scan_url_is_shortened, link)
         scan_results.append(await messages.scan(link, malware, redirect, shortened) + "\n\n")
-    
+
     await messagereply(
         message,
         disable_mentions=1,
