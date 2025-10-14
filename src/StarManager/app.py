@@ -25,10 +25,15 @@ logger.add(sys.stderr, level="INFO")
 
 def _log_active_tasks(signum, frame):
     logger.warning(f"Signal {signum} received, logging active tasks:")
-    tasks = asyncio.all_tasks()
-    logger.warning(f"Total active tasks: {len(tasks)}")
-    for task in tasks:
-        logger.warning(f"  - {task.get_name()}: {task}")
+    try:
+        loop = asyncio.get_event_loop()
+        tasks = asyncio.all_tasks(loop)
+        logger.warning(f"Total active tasks: {len(tasks)}")
+        for task in tasks:
+            coro = task.get_coro()
+            logger.warning(f"  - {task.get_name()}: {coro.__qualname__ if hasattr(coro, '__qualname__') else coro}")
+    except Exception as e:
+        logger.error(f"Failed to log tasks: {e}")
 
 
 signal.signal(signal.SIGINT, _log_active_tasks)
