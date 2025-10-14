@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 import aiogram
+from aiogram.exceptions import TelegramBadRequest
 import httpx
 import pydantic
 from authlib.integrations.starlette_client import OAuth
@@ -684,5 +685,12 @@ async def vk(request: Request):
 async def tg_webhook(request: Request):
     data = await request.json()
     tg_bot = request.app.state.tg_bot
-    await tg_bot.dp.feed_update(tg_bot.bot, aiogram.types.Update(**data))
+    try:
+        await tg_bot.dp.feed_update(tg_bot.bot, aiogram.types.Update(**data))
+    except TelegramBadRequest as e:
+        if "query is too old" in str(e) or "query ID is invalid" in str(e):
+            return PlainTextResponse("ok")
+        logger.exception("Telegram webhook error")
+    except Exception:
+        logger.exception("Telegram webhook error")
     return PlainTextResponse("ok")
