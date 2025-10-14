@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+import aiogram
 import httpx
 import pydantic
 from authlib.integrations.starlette_client import OAuth
@@ -676,4 +677,12 @@ async def vk(request: Request):
     task = asyncio.create_task(_process_with_limit())
     _vk_tasks.add(task)
     task.add_done_callback(_vk_tasks.discard)
+    return PlainTextResponse("ok")
+
+
+@router.post("/api/listener/tg")
+async def tg_webhook(request: Request):
+    data = await request.json()
+    tg_bot = request.app.state.tg_bot
+    await tg_bot.dp.feed_update(tg_bot.bot, aiogram.types.Update(**data))
     return PlainTextResponse("ok")

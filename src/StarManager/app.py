@@ -40,8 +40,8 @@ async def lifespan(app: FastAPI):
     await load_messages.load()
 
     tg_bot = TgBot()
-    tg_task = asyncio.create_task(tg_bot.run(), name="tgbot")
-    app.state.bg_tasks.append((tg_task, tg_bot.bot))
+    await tg_bot.setup(settings.telegram.webhook_url)
+    app.state.tg_bot = tg_bot
 
     async def _monitor_tasks():
         try:
@@ -99,6 +99,12 @@ async def lifespan(app: FastAPI):
                 t.cancel()
 
         await asyncio.sleep(0.1)
+
+        if hasattr(app.state, 'tg_bot'):
+            try:
+                await asyncio.wait_for(app.state.tg_bot.close(), timeout=2)
+            except Exception as e:
+                logger.warning(f"TG bot close failed: {e}")
 
         for t, obj in list(app.state.bg_tasks):
             if obj and hasattr(obj, "close"):

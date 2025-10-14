@@ -143,6 +143,7 @@ class TelegramSettings(BaseSettings):
     public_giveaway_thread_id: int
     api_hash: str
     api_id: int
+    webhook_url: str
     admins: List[int] = Field(default_factory=list)
 
 

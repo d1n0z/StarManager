@@ -1,5 +1,3 @@
-import asyncio
-
 import aiogram
 
 from StarManager.tgbot import bot, handlers, middlewares
@@ -10,13 +8,13 @@ class Bot:
         self.bot = bot.bot
         self.dp = aiogram.Dispatcher()
 
-    async def run(self):
+    async def setup(self, webhook_url: str):
         self.dp.include_router(handlers.router)
         self.dp.update.middleware.register(middlewares.ContextMsgDeleteMiddleware())
-        await self.bot.delete_webhook(drop_pending_updates=True)
-        try:
-            await self.dp.start_polling(self.bot)
-        except asyncio.CancelledError:
-            pass
-        finally:
-            await self.bot.session.close()
+        if webhook_url:
+            await self.bot.set_webhook(webhook_url)
+        else:
+            await self.bot.delete_webhook(drop_pending_updates=True)
+
+    async def close(self):
+        await self.bot.session.close()
