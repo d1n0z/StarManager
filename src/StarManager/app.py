@@ -70,10 +70,6 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         logger.info("Lifespan shutdown: stopping bg tasks and scheduler")
-        tasks = asyncio.all_tasks()
-        logger.warning(f"Active tasks at shutdown start: {len(tasks)}")
-        for task in list(tasks)[:10]:
-            logger.warning(f"  - {task.get_name()}")
 
         app.state.scheduler.shutdown(wait=False)
         logger.info("Scheduler stopped")
