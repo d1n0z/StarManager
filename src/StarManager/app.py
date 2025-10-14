@@ -1,5 +1,4 @@
 import asyncio
-import signal
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -21,23 +20,6 @@ from StarManager.vkbot.main import main as load_vkbot
 
 logger.remove()
 logger.add(sys.stderr, level="INFO")
-
-
-def _log_active_tasks(signum, frame):
-    logger.warning(f"Signal {signum} received, logging active tasks:")
-    try:
-        loop = asyncio.get_event_loop()
-        tasks = asyncio.all_tasks(loop)
-        logger.warning(f"Total active tasks: {len(tasks)}")
-        for task in tasks:
-            coro = task.get_coro()
-            logger.warning(f"  - {task.get_name()}: {coro.__qualname__ if hasattr(coro, '__qualname__') else coro}")
-    except Exception as e:
-        logger.error(f"Failed to log tasks: {e}")
-
-
-signal.signal(signal.SIGINT, _log_active_tasks)
-signal.signal(signal.SIGTERM, _log_active_tasks)
 
 
 @asynccontextmanager
@@ -83,10 +65,15 @@ async def lifespan(app: FastAPI):
     monitor_task = asyncio.create_task(_monitor_tasks(), name="monitor")
     app.state.bg_tasks.append((monitor_task, None))
 
+    logger.info("Lifespan startup complete, entering yield")
     try:
         yield
     finally:
         logger.info("Lifespan shutdown: stopping bg tasks and scheduler")
+        tasks = asyncio.all_tasks()
+        logger.warning(f"Active tasks at shutdown start: {len(tasks)}")
+        for task in list(tasks)[:10]:
+            logger.warning(f"  - {task.get_name()}")
 
         app.state.scheduler.shutdown(wait=False)
         logger.info("Scheduler stopped")
@@ -129,6 +116,8 @@ async def lifespan(app: FastAPI):
                 logger.warning(f"Task wait error: {e}")
 
         logger.info("Shutdown complete")
+        tasks = asyncio.all_tasks()
+        logger.warning(f"Active tasks at shutdown end: {len(tasks)}")
 
 
 app = FastAPI(title="StarManager", lifespan=lifespan)
