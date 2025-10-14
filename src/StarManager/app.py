@@ -1,4 +1,5 @@
 import asyncio
+import signal
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -22,6 +23,18 @@ logger.remove()
 logger.add(sys.stderr, level="INFO")
 
 
+def _log_active_tasks(signum, frame):
+    logger.warning(f"Signal {signum} received, logging active tasks:")
+    tasks = asyncio.all_tasks()
+    logger.warning(f"Total active tasks: {len(tasks)}")
+    for task in tasks:
+        logger.warning(f"  - {task.get_name()}: {task}")
+
+
+signal.signal(signal.SIGINT, _log_active_tasks)
+signal.signal(signal.SIGTERM, _log_active_tasks)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Lifespan startup: init DB and objects")
@@ -42,19 +55,26 @@ async def lifespan(app: FastAPI):
     tg_bot = TgBot()
     tg_task = asyncio.create_task(tg_bot.run(), name="tgbot")
     app.state.bg_tasks.append((tg_task, tg_bot.bot))
-    
+
     async def _monitor_tasks():
-        while True:
-            await asyncio.sleep(60)
-            from StarManager.site.routes import _vk_tasks, _dropped_events
-            from StarManager.core.db import pool as get_pool
-            try:
-                db_pool = await get_pool()
-                pool_info = f"DB: {db_pool.get_size() - db_pool.get_idle_size()}/{db_pool.get_size()}"
-            except Exception:
-                pool_info = "DB: ?"
-            logger.info(f"VK tasks: {len(_vk_tasks)} | Dropped: {_dropped_events} | {pool_info}")
-    
+        try:
+            while True:
+                await asyncio.sleep(60)
+                from StarManager.core.db import pool as get_pool
+                from StarManager.site.routes import _dropped_events, _vk_tasks
+
+                try:
+                    db_pool = await get_pool()
+                    pool_info = f"DB: {db_pool.get_size() - db_pool.get_idle_size()}/{db_pool.get_size()}"
+                except Exception:
+                    pool_info = "DB: ?"
+                logger.info(
+                    f"VK tasks: {len(_vk_tasks)} | Dropped: {_dropped_events} | {pool_info}"
+                )
+        except asyncio.CancelledError:
+            logger.info("Monitor task cancelled")
+            raise
+
     monitor_task = asyncio.create_task(_monitor_tasks(), name="monitor")
     app.state.bg_tasks.append((monitor_task, None))
 
@@ -68,35 +88,41 @@ async def lifespan(app: FastAPI):
 
         logger.info("Syncing managers...")
         try:
-            await asyncio.wait_for(managers.close(), timeout=30)
+            await asyncio.wait_for(managers.close(), timeout=5)
             logger.info("Managers synced and closed")
         except asyncio.TimeoutError:
             logger.warning("Managers sync timeout, forcing close")
+        except Exception as e:
+            logger.error(f"Managers close error: {e}")
 
         from StarManager.site.routes import _vk_tasks
+
         if _vk_tasks:
             logger.warning(f"Cancelling {len(_vk_tasks)} pending VK tasks")
             for task in list(_vk_tasks):
                 task.cancel()
-        
+
+        for t, obj in list(app.state.bg_tasks):
+            if not t.done():
+                t.cancel()
+
+        await asyncio.sleep(0.1)
+
         for t, obj in list(app.state.bg_tasks):
             if obj and hasattr(obj, "close"):
                 try:
-                    await asyncio.wait_for(obj.close(), timeout=5)
-                except asyncio.TimeoutError:
-                    logger.warning(f"Object close timeout: {obj}")
-            if not t.done():
-                t.cancel()
-        
+                    await asyncio.wait_for(obj.close(), timeout=2)
+                except (asyncio.TimeoutError, Exception) as e:
+                    logger.warning(f"Object close failed: {e}")
+
         for t, _ in list(app.state.bg_tasks):
             try:
-                await asyncio.wait_for(t, timeout=10)
-            except asyncio.TimeoutError:
-                logger.warning(f"Task {t.get_name()} did not stop in time")
-                t.cancel()
-            except asyncio.CancelledError:
+                await asyncio.wait_for(t, timeout=3)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
                 pass
-        
+            except Exception as e:
+                logger.warning(f"Task wait error: {e}")
+
         logger.info("Shutdown complete")
 
 
