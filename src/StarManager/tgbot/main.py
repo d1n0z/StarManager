@@ -19,7 +19,7 @@ class Bot:
             logger.info(f"Webhook set: {info.url}")
         else:
             logger.info("No webhook URL, deleting webhook")
-            await self.bot.delete_webhook(drop_pending_updates=True)
+            await self.bot.delete_webhook()
 
     async def close(self):
         await self.bot.session.close()
