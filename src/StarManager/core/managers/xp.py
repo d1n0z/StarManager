@@ -267,11 +267,16 @@ class XPManager(BaseManager):
 
     async def get_coins_top(self, in_uids: List[int] | None = None, limit: int = 10):
         async with self._lock:
-            top = [
-                (uid, obj)
-                for uid, obj in self.cache._cache.items()
-                if uid > 0 and (in_uids is None or uid in in_uids)
-            ][:100]
+            top = sorted(
+                self.cache._cache.items(),
+                key=lambda i: i[1].coins,
+                reverse=True,
+            )
+        top = [
+            (uid, obj)
+            for uid, obj in top
+            if uid > 0 and (in_uids is None or uid in in_uids)
+        ][:100]
         if not top:
             return []
         uids = {
@@ -281,11 +286,7 @@ class XPManager(BaseManager):
                 fields=["deactivated"],  # type: ignore
             )
         }
-        return sorted(
-            [(uid, copy.deepcopy(i)) for uid, i in top if uids is None or (uid in uids and not uids[uid].deactivated)],
-            key=lambda i: i[1].coins,
-            reverse=True,
-        )[:limit]
+        return [(uid, copy.deepcopy(i)) for uid, i in top if uids is None or (uid in uids and not uids[uid].deactivated)][:limit]
 
     async def add_user_xp(self, uid: int, addxp: float):
         uxp, ulvl, ulg = await self.cache.get(uid, ["xp", "lvl", "league"])
