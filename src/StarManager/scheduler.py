@@ -130,17 +130,13 @@ async def updateUsers(conn):  # TODO: optimize
     user_rows = await conn.fetch("select uid from usernames")
     for i in range(0, len(user_rows), 25):
         batch = [r[0] for r in user_rows[i : i + 25]]
-        code = f"""
-        var users = API.users.get({{"user_ids": "{",".join(map(str, batch))}", "fields": "domain"}});
-        return users;
-        """
         try:
-            result = await api.execute(code)
+            users = await api.users.get(user_ids=batch, fields=["domain"])  # type: ignore
             updates = []
-            for u in result:
-                full_name = f"{u['first_name']} {u['last_name']}"
-                domain = u.get("domain", f"id{u['id']}")
-                updates.append((full_name, domain, u["id"]))
+            for u in users:
+                full_name = f"{u.first_name} {u.last_name}" if u.first_name and u.last_name else "Unknown"
+                domain = u.domain or f"id{u.id}"
+                updates.append((full_name, domain, u.id))
             await conn.executemany(
                 "update usernames set name = $1, domain = $2 where uid = $3", updates
             )
