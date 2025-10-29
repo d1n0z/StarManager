@@ -180,8 +180,8 @@ async def stats(message: Message):
     if isinstance(last_message, int):
         last_message = datetime.fromtimestamp(last_message).strftime("%d.%m.%Y")
     url = (
-        await api.users.get(user_ids=[id], fields=[UsersFields.PHOTO_MAX_ORIG.value])
-    )[0].photo_max_orig
+        await api.users.get(user_ids=[id], fields=[UsersFields.PHOTO_MAX.value])
+    )[0].photo_max
     if not url:
         return
     r = await api.http_client.request_content(url)
@@ -233,6 +233,7 @@ async def stats(message: Message):
             message,
             disable_mentions=1,
             message="❌ Ошибка. Пожалуйста, попробуйте позже.",
+            raise_exceptions=True
         )
         raise e
     else:
