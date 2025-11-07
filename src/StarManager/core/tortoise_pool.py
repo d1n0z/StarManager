@@ -16,3 +16,6 @@ class DBClient(AsyncpgDBClient):
     
     async def close(self) -> None:
         pass
+
+
+client_class = DBClient
