@@ -579,11 +579,13 @@ async def leaderboard():
 
 
 @router.get("/health")
-async def health():
+async def health(request: Request):
     import os
     import time
 
     import psutil
+    from StarManager.core.scheduler_monitor import scheduler_monitor
+    from StarManager.core.event_loop_monitor import event_loop_monitor
 
     start = time.time()
     try:
@@ -600,11 +602,17 @@ async def health():
         db_pool_size = -1
         db_pool_free = -1
 
+    scheduler_ok, scheduler_msg = scheduler_monitor.is_healthy(max_delay=300)
+    scheduler_jobs = scheduler_monitor.get_all_jobs()
+    scheduler_running = hasattr(request.app.state, 'scheduler') and request.app.state.scheduler.running
+    
+    loop_stats = event_loop_monitor.get_stats()
+
     process = psutil.Process(os.getpid())
 
     return JSONResponse(
         {
-            "status": "ok" if db_ok else "degraded",
+            "status": "ok" if (db_ok and scheduler_ok) else "degraded",
             "timestamp": time.time(),
             "vk_tasks": len(_vk_tasks),
             "vk_dropped": _dropped_events,
@@ -615,6 +623,13 @@ async def health():
                 "pool_free": db_pool_free,
                 "pool_used": db_pool_size - db_pool_free if db_pool_size > 0 else -1,
             },
+            "scheduler": {
+                "ok": scheduler_ok,
+                "running": scheduler_running,
+                "message": scheduler_msg,
+                "jobs": {name: int(time.time() - last_run) for name, last_run in scheduler_jobs.items()},
+            },
+            "event_loop": loop_stats,
             "system": {
                 "memory_mb": round(process.memory_info().rss / 1024 / 1024, 1),
                 "cpu_percent": process.cpu_percent(),

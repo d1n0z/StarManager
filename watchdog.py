@@ -28,7 +28,16 @@ def check_alive():
         resp = requests.get(HEALTH_URL, timeout=TIMEOUT)
         if resp.status_code == 200:
             data = resp.json()
-            log(f"✓ Alive | VK tasks: {data.get('vk_tasks', '?')} | DB pool: {data.get('db', {}).get('pool_used', '?')}/{data.get('db', {}).get('pool_size', '?')}")
+            scheduler_data = data.get('scheduler', {})
+            scheduler_ok = scheduler_data.get('ok', False)
+            scheduler_running = scheduler_data.get('running', False)
+            
+            log(f"✓ Alive | VK tasks: {data.get('vk_tasks', '?')} | DB pool: {data.get('db', {}).get('pool_used', '?')}/{data.get('db', {}).get('pool_size', '?')} | Scheduler: {scheduler_ok}/{scheduler_running}")
+            
+            if not scheduler_ok or not scheduler_running:
+                log(f"⚠️ Scheduler issue: {scheduler_data.get('message', 'unknown')}")
+                return False
+            
             return True
         else:
             log(f"✗ HTTP {resp.status_code}")

@@ -16,6 +16,7 @@ from loguru import logger
 from StarManager.core import managers
 from StarManager.core.config import api, settings
 from StarManager.core.db import pool
+from StarManager.core.scheduler_monitor import scheduler_monitor
 from StarManager.core.utils import (
     add_user_xp,
     chunks,
@@ -62,17 +63,28 @@ def format_exception_for_telegram(exc: BaseException) -> str:
     return full_message
 
 
-async def with_lock(func, use_db=True):
+async def with_lock(func, use_db=True, timeout=300):
     lock = task_locks[func.__name__]
     if lock.locked():
+        logger.warning(f"Task {func.__name__} is already running, skipping")
         return
     async with lock:
         try:
-            if use_db:
-                async with (await pool()).acquire() as conn:
-                    await func(conn)
-            else:
-                await func()
+            async with asyncio.timeout(timeout):
+                if use_db:
+                    async with (await pool()).acquire() as conn:
+                        await func(conn)
+                else:
+                    await func()
+            scheduler_monitor.mark_run(func.__name__)
+        except asyncio.TimeoutError:
+            logger.error(f"Task {func.__name__} timed out after {timeout}s")
+            await tgbot.send_message(
+                chat_id=settings.telegram.chat_id,
+                message_thread_id=int(settings.telegram.scheduler_thread_id),
+                text=f"⚠️ Scheduler task <code>{func.__name__}</code> timed out after {timeout}s",
+                parse_mode="HTML",
+            )
         except Exception as e:
             logger.exception("Exception traceback:")
             await tgbot.send_message(
@@ -83,10 +95,10 @@ async def with_lock(func, use_db=True):
             )
 
 
-def schedule(coro_func, *, use_db: bool = True):
+def schedule(coro_func, *, use_db: bool = True, timeout: int = 300):
     async def _runner():
         try:
-            await with_lock(coro_func, use_db=use_db)
+            await with_lock(coro_func, use_db=use_db, timeout=timeout)
         except Exception:
             pass
 
@@ -575,26 +587,28 @@ def add_jobs(scheduler):
     logger.info("Loading scheduler tasks...")
 
     scheduler.add_job(
-        schedule(run_notifications), CronTrigger.from_crontab("1/3 * * * *")
+        schedule(run_notifications), CronTrigger.from_crontab("1/3 * * * *"), id="run_notifications"
     )
     scheduler.add_job(
-        schedule(run_nightmode_notifications), CronTrigger.from_crontab("0/3 * * * *")
+        schedule(run_nightmode_notifications), CronTrigger.from_crontab("0/3 * * * *"), id="run_nightmode_notifications"
     )
-    scheduler.add_job(schedule(everyminute), CronTrigger.from_crontab("*/1 * * * *"))
+    scheduler.add_job(schedule(everyminute), CronTrigger.from_crontab("*/1 * * * *"), id="everyminute")
 
-    scheduler.add_job(schedule(every10min), CronTrigger.from_crontab("*/10 * * * *"))
+    scheduler.add_job(schedule(every10min), CronTrigger.from_crontab("*/10 * * * *"), id="every10min")
 
     scheduler.add_job(
-        schedule(backup, use_db=False), CronTrigger.from_crontab("0 6,18 * * *")
+        schedule(backup, use_db=False, timeout=600), CronTrigger.from_crontab("0 6,18 * * *"), id="backup"
     )
 
-    scheduler.add_job(schedule(updateChats), CronTrigger.from_crontab("0 0/3 * * *"))
-    scheduler.add_job(schedule(updateGroups), CronTrigger.from_crontab("0 1/3 * * *"))
-    scheduler.add_job(schedule(updateUsers), CronTrigger.from_crontab("0 2/3 * * *"))
+    scheduler.add_job(schedule(updateChats, timeout=600), CronTrigger.from_crontab("0 0/3 * * *"), id="updateChats")
+    scheduler.add_job(schedule(updateGroups, timeout=600), CronTrigger.from_crontab("0 1/3 * * *"), id="updateGroups")
+    scheduler.add_job(schedule(updateUsers, timeout=600), CronTrigger.from_crontab("0 2/3 * * *"), id="updateUsers")
 
-    scheduler.add_job(schedule(mathgiveaway), CronTrigger.from_crontab("*/15 * * * *"))
+    scheduler.add_job(schedule(mathgiveaway), CronTrigger.from_crontab("*/15 * * * *"), id="mathgiveaway")
 
-    scheduler.add_job(schedule(everyday), CronTrigger.from_crontab("0 0 * * *"))
+    scheduler.add_job(schedule(everyday), CronTrigger.from_crontab("0 0 * * *"), id="everyday")
 
-    scheduler.add_job(schedule(new_tg_giveaway), CronTrigger.from_crontab("0 10 * * *"))
-    scheduler.add_job(schedule(end_tg_giveaway), CronTrigger.from_crontab("0 9 * * *"))
+    scheduler.add_job(schedule(new_tg_giveaway), CronTrigger.from_crontab("0 10 * * *"), id="new_tg_giveaway")
+    scheduler.add_job(schedule(end_tg_giveaway), CronTrigger.from_crontab("0 9 * * *"), id="end_tg_giveaway")
+    
+    logger.info(f"Loaded {len(scheduler.get_jobs())} scheduler jobs")

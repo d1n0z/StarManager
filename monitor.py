@@ -39,6 +39,7 @@ def check_health():
         
         data = resp.json()
         db_data = data.get('db', {})
+        scheduler_data = data.get('scheduler', {})
         
         if data.get("vk_tasks", 0) > MAX_VK_TASKS:
             return False, f"Too many VK tasks: {data['vk_tasks']}", data
@@ -48,6 +49,12 @@ def check_health():
         
         if db_data.get("response_time", 0) > 2:
             return False, f"DB slow: {db_data['response_time']}s", data
+        
+        if not scheduler_data.get("ok"):
+            return False, f"Scheduler issue: {scheduler_data.get('message', 'unknown')}", data
+        
+        if not scheduler_data.get("running"):
+            return False, "Scheduler not running", data
         
         return True, "OK", data
     except requests.Timeout:
@@ -60,7 +67,8 @@ if __name__ == "__main__":
     
     if ok and data:
         db_time = data.get('db', {}).get('response_time', '?')
-        log(f"✓ Health: {msg} | VK tasks: {data.get('vk_tasks', '?')} | DB: {db_time}s")
+        scheduler_ok = data.get('scheduler', {}).get('ok', '?')
+        log(f"✓ Health: {msg} | VK tasks: {data.get('vk_tasks', '?')} | DB: {db_time}s | Scheduler: {scheduler_ok}")
     else:
         log(f"✗ Health: {msg}")
         if data:

@@ -29,6 +29,13 @@ async def lifespan(app: FastAPI):
     await managers.initialize()
 
     app.state.scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
+    
+    def scheduler_error_listener(event):
+        if event.exception:
+            logger.error(f"Scheduler job error: {event.job_id} - {event.exception}")
+    
+    app.state.scheduler.add_listener(scheduler_error_listener, mask=0b111)
+    
     scheduler.add_jobs(app.state.scheduler)
     app.state.scheduler.start()
     logger.info("Scheduler started")
@@ -64,6 +71,11 @@ async def lifespan(app: FastAPI):
 
     monitor_task = asyncio.create_task(_monitor_tasks(), name="monitor")
     app.state.bg_tasks.append((monitor_task, None))
+    
+    from StarManager.core.event_loop_monitor import event_loop_monitor
+    loop_monitor_task = asyncio.create_task(event_loop_monitor.monitor(), name="loop_monitor")
+    app.state.bg_tasks.append((loop_monitor_task, None))
+    logger.info("Event loop monitor started")
 
     logger.info("Lifespan startup complete, entering yield")
     try:
