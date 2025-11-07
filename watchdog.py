@@ -97,7 +97,6 @@ def save_state(failures):
         json.dump({'consecutive_failures': failures}, f)
 
 if __name__ == "__main__":
-    log("=" * 60)
     consecutive_failures = load_state()
     
     if check_alive():
