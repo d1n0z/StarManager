@@ -236,7 +236,7 @@ sitedata = {
 }
 
 database_config = {
-    "connections": {"default": DATABASE_STR},
+    "connections": {"default": {"engine": "StarManager.core.tortoise_pool.CustomPoolAsyncpgDBClient", "credentials": {"database": settings.database.name}}},
     "apps": {
         "models": {
             "models": ["StarManager.core.tables", "aerich.models"],
