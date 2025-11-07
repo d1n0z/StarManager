@@ -7,6 +7,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from vk_api import vk_api
 from vkbottle import API
 
+from StarManager.core.tortoise_pool import CustomPoolAsyncpgDBClient
+
 settings_path = Path(__file__).parent
 
 
@@ -236,7 +238,7 @@ sitedata = {
 }
 
 database_config = {
-    "connections": {"default": {"engine": "src.StarManager.core.tortoise_pool.CustomPoolAsyncpgDBClient", "credentials": {"database": settings.database.name}}},
+    "connections": {"default": {"engine": CustomPoolAsyncpgDBClient, "credentials": {"database": settings.database.name}}},
     "apps": {
         "models": {
             "models": ["StarManager.core.tables", "aerich.models"],
