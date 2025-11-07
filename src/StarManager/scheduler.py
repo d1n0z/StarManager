@@ -3,13 +3,12 @@ import html
 import os
 import random
 import string
-import subprocess
 import time
 import traceback
 from collections import defaultdict
 from datetime import datetime
+from typing import Optional
 
-import yadisk
 from apscheduler.triggers.cron import CronTrigger
 from loguru import logger
 
@@ -63,19 +62,30 @@ def format_exception_for_telegram(exc: BaseException) -> str:
     return full_message
 
 
-async def with_lock(func, use_db=True, timeout=300):
+async def with_lock(func, use_db=True, timeout: Optional[int] = 300):
     lock = task_locks[func.__name__]
     if lock.locked():
         logger.warning(f"Task {func.__name__} is already running, skipping")
         return
     async with lock:
+        start = time.time()
         try:
-            async with asyncio.timeout(timeout):
+            if timeout is None:
                 if use_db:
                     async with (await pool()).acquire() as conn:
                         await func(conn)
                 else:
                     await func()
+            else:
+                async with asyncio.timeout(timeout):
+                    if use_db:
+                        async with (await pool()).acquire() as conn:
+                            await func(conn)
+                    else:
+                        await func()
+            elapsed = time.time() - start
+            if elapsed > 60:
+                logger.warning(f"Task {func.__name__} took {elapsed:.1f}s")
             scheduler_monitor.mark_run(func.__name__)
         except asyncio.TimeoutError:
             logger.error(f"Task {func.__name__} timed out after {timeout}s")
@@ -95,7 +105,10 @@ async def with_lock(func, use_db=True, timeout=300):
             )
 
 
-def schedule(coro_func, *, use_db: bool = True, timeout: int = 300):
+def schedule(coro_func, *, use_db: bool = True, timeout: Optional[int] = 300):
+    if timeout is not None:
+        scheduler_monitor.register_job(coro_func.__name__, timeout)
+    
     async def _runner():
         try:
             await with_lock(coro_func, use_db=use_db, timeout=timeout)
@@ -106,36 +119,8 @@ def schedule(coro_func, *, use_db: bool = True, timeout: int = 300):
 
 
 async def backup() -> None:
-    now = datetime.now().isoformat(timespec="seconds")
-    filename = f"{settings.database.name}-{now}.sql.gz"
-    
-    await asyncio.to_thread(
-        os.system,
-        f"sudo rm {settings.service.path}{settings.database.name}*.sql.gz > /dev/null 2>&1"
-    )
-    
-    await asyncio.to_thread(
-        subprocess.run,
-        f'PGPASSWORD="{settings.database.password}" pg_dump -h localhost -U {settings.database.name} {settings.database.name} | gzip > {filename}',
-        shell=True
-    )
-
-    drive = yadisk.AsyncClient(token=settings.yandex.token)
-    async with drive:
-        await drive.upload(
-            filename,
-            f"/StarManager/backups/{filename}",
-            timeout=36000,
-        )
-        link = await drive.get_download_link(f"/StarManager/backups/{filename}")
-
-    await asyncio.to_thread(os.remove, filename)
-    await tgbot.send_message(
-        chat_id=settings.telegram.chat_id,
-        message_thread_id=settings.telegram.backup_thread_id,
-        text=f"<a href='{link}'>{filename}</a>",
-        parse_mode="HTML",
-    )
+    from StarManager.backup_service import backup_service
+    await backup_service.create_backup()
 
 
 async def updateUsers(conn):  # TODO: optimize
@@ -268,7 +253,7 @@ async def every10min(conn):
         now - 86400 * 2,
     )
     if expired:
-        await asyncio.gather(*(delete_messages(cmid, uid) for uid, cmid in expired))
+        await asyncio.gather(*(delete_messages(cmid, uid) for uid, cmid in expired), return_exceptions=True)
         await conn.execute(
             "DELETE FROM premiumexpirenotified WHERE date < $1", now - 86400 * 2
         )
@@ -389,7 +374,8 @@ async def everyminute(conn):
     )
     if todelete:
         await asyncio.gather(
-            *(delete_messages(cmid, peerid - 2000000000) for peerid, cmid in todelete)
+            *(delete_messages(cmid, peerid - 2000000000) for peerid, cmid in todelete),
+            return_exceptions=True
         )
         await conn.execute("DELETE FROM todelete WHERE delete_at < $1", now)
 
@@ -505,12 +491,20 @@ async def mathgiveaway(conn):
     if old:
         await delete_messages(old, settings.service.mathgiveaways_to)
     await conn.execute("UPDATE mathgiveaway SET finished = true WHERE finished = false")
-    cmid = await send_message(
-        settings.service.mathgiveaways_to + 2000000000,
-        await messages.math_problem(math, level, xp),
-    )
-    if not isinstance(cmid, list):
-        return mathgiveaway(conn)
+    
+    for attempt in range(3):
+        cmid = await send_message(
+            settings.service.mathgiveaways_to + 2000000000,
+            await messages.math_problem(math, level, xp),
+        )
+        if isinstance(cmid, list):
+            break
+        logger.warning(f"mathgiveaway send_message failed, attempt {attempt + 1}/3")
+        await asyncio.sleep(1)
+    else:
+        logger.error("mathgiveaway failed to send message after 3 attempts")
+        return
+    
     cmid = cmid[0].conversation_message_id
     await conn.execute(
         "INSERT INTO mathgiveaway (math, level, cmid, xp, ans, winner, finished) VALUES ($1, $2, $3, $4, $5, NULL, false)",
@@ -597,7 +591,7 @@ def add_jobs(scheduler):
     scheduler.add_job(schedule(every10min), CronTrigger.from_crontab("*/10 * * * *"), id="every10min")
 
     scheduler.add_job(
-        schedule(backup, use_db=False, timeout=600), CronTrigger.from_crontab("0 6,18 * * *"), id="backup"
+        schedule(backup, use_db=False, timeout=None), CronTrigger.from_crontab("0 6,18 * * *"), id="backup"
     )
 
     scheduler.add_job(schedule(updateChats, timeout=600), CronTrigger.from_crontab("0 0/3 * * *"), id="updateChats")
