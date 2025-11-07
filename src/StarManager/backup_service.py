@@ -53,7 +53,7 @@ class BackupService:
                 await tgbot.send_message(
                     chat_id=settings.telegram.chat_id,
                     message_thread_id=settings.telegram.backup_thread_id,
-                    text=f"✅ <a href='{link}'>{filename}</a>",
+                    text=f"<a href='{link}'>{filename}</a>",
                     parse_mode="HTML",
                 )
                 logger.info(f"Backup completed: {filename}")
@@ -62,12 +62,6 @@ class BackupService:
                 logger.exception("Backup failed")
                 if backup_path.exists():
                     backup_path.unlink()
-                await tgbot.send_message(
-                    chat_id=settings.telegram.chat_id,
-                    message_thread_id=settings.telegram.backup_thread_id,
-                    text=f"❌ Backup failed: {str(e)[:100]}",
-                    parse_mode="HTML",
-                )
 
     async def _cleanup_old_backups(self) -> None:
         try:
