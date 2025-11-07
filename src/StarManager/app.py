@@ -3,6 +3,7 @@ import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from apscheduler.events import EVENT_JOB_ERROR
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
@@ -29,13 +30,13 @@ async def lifespan(app: FastAPI):
     await managers.initialize()
 
     app.state.scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
-    
+
     def scheduler_error_listener(event):
-        if event.exception:
+        if hasattr(event, "exception") and event.exception:
             logger.error(f"Scheduler job error: {event.job_id} - {event.exception}")
-    
-    app.state.scheduler.add_listener(scheduler_error_listener, mask=0b111)
-    
+
+    app.state.scheduler.add_listener(scheduler_error_listener, EVENT_JOB_ERROR)
+
     scheduler.add_jobs(app.state.scheduler)
     app.state.scheduler.start()
     logger.info("Scheduler started")
@@ -71,9 +72,12 @@ async def lifespan(app: FastAPI):
 
     monitor_task = asyncio.create_task(_monitor_tasks(), name="monitor")
     app.state.bg_tasks.append((monitor_task, None))
-    
+
     from StarManager.core.event_loop_monitor import event_loop_monitor
-    loop_monitor_task = asyncio.create_task(event_loop_monitor.monitor(), name="loop_monitor")
+
+    loop_monitor_task = asyncio.create_task(
+        event_loop_monitor.monitor(), name="loop_monitor"
+    )
     app.state.bg_tasks.append((loop_monitor_task, None))
     logger.info("Event loop monitor started")
 
@@ -108,7 +112,7 @@ async def lifespan(app: FastAPI):
 
         await asyncio.sleep(0.1)
 
-        if hasattr(app.state, 'tg_bot'):
+        if hasattr(app.state, "tg_bot"):
             try:
                 await asyncio.wait_for(app.state.tg_bot.close(), timeout=2)
             except Exception as e:
