@@ -3,7 +3,7 @@ from tortoise.backends.asyncpg.client import AsyncpgDBClient
 from StarManager.core.db import pool
 
 
-class CustomPoolAsyncpgDBClient(AsyncpgDBClient):
+class DBClient(AsyncpgDBClient):
     async def create_connection(self, with_db: bool) -> None:
         self._pool = await self.create_pool()
         self._connection = None
