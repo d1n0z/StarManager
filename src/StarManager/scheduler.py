@@ -580,29 +580,30 @@ async def end_tg_giveaway(conn):
 def add_jobs(scheduler):
     logger.info("Loading scheduler tasks...")
 
+    # timeouts are calculated based on task execution intervals to prevent overlapping
     scheduler.add_job(
-        schedule(run_notifications), CronTrigger.from_crontab("1/3 * * * *"), id="run_notifications"
+        schedule(run_notifications, timeout=10800), CronTrigger.from_crontab("1/3 * * * *"), id="run_notifications"
     )
     scheduler.add_job(
-        schedule(run_nightmode_notifications), CronTrigger.from_crontab("0/3 * * * *"), id="run_nightmode_notifications"
+        schedule(run_nightmode_notifications, timeout=10800), CronTrigger.from_crontab("0/3 * * * *"), id="run_nightmode_notifications"
     )
-    scheduler.add_job(schedule(everyminute), CronTrigger.from_crontab("*/1 * * * *"), id="everyminute")
+    scheduler.add_job(schedule(everyminute, timeout=60), CronTrigger.from_crontab("*/1 * * * *"), id="everyminute")
 
-    scheduler.add_job(schedule(every10min), CronTrigger.from_crontab("*/10 * * * *"), id="every10min")
+    scheduler.add_job(schedule(every10min, timeout=600), CronTrigger.from_crontab("*/10 * * * *"), id="every10min")
 
     scheduler.add_job(
         schedule(backup, use_db=False, timeout=None), CronTrigger.from_crontab("0 6,18 * * *"), id="backup"
     )
 
-    scheduler.add_job(schedule(updateChats, timeout=600), CronTrigger.from_crontab("0 0/3 * * *"), id="updateChats")
-    scheduler.add_job(schedule(updateGroups, timeout=600), CronTrigger.from_crontab("0 1/3 * * *"), id="updateGroups")
-    scheduler.add_job(schedule(updateUsers, timeout=600), CronTrigger.from_crontab("0 2/3 * * *"), id="updateUsers")
+    scheduler.add_job(schedule(updateChats, timeout=10800), CronTrigger.from_crontab("0 0/3 * * *"), id="updateChats")
+    scheduler.add_job(schedule(updateGroups, timeout=10800), CronTrigger.from_crontab("0 1/3 * * *"), id="updateGroups")
+    scheduler.add_job(schedule(updateUsers, timeout=10800), CronTrigger.from_crontab("0 2/3 * * *"), id="updateUsers")
 
-    scheduler.add_job(schedule(mathgiveaway), CronTrigger.from_crontab("*/15 * * * *"), id="mathgiveaway")
+    scheduler.add_job(schedule(mathgiveaway, timeout=900), CronTrigger.from_crontab("*/15 * * * *"), id="mathgiveaway")
 
-    scheduler.add_job(schedule(everyday), CronTrigger.from_crontab("0 0 * * *"), id="everyday")
+    scheduler.add_job(schedule(everyday, timeout=86400), CronTrigger.from_crontab("0 0 * * *"), id="everyday")
 
-    scheduler.add_job(schedule(new_tg_giveaway), CronTrigger.from_crontab("0 10 * * *"), id="new_tg_giveaway")
-    scheduler.add_job(schedule(end_tg_giveaway), CronTrigger.from_crontab("0 9 * * *"), id="end_tg_giveaway")
+    scheduler.add_job(schedule(new_tg_giveaway, timeout=86400), CronTrigger.from_crontab("0 10 * * *"), id="new_tg_giveaway")
+    scheduler.add_job(schedule(end_tg_giveaway, timeout=86400), CronTrigger.from_crontab("0 9 * * *"), id="end_tg_giveaway")
     
     logger.info(f"Loaded {len(scheduler.get_jobs())} scheduler jobs")
