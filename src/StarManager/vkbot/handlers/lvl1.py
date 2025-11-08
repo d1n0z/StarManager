@@ -111,7 +111,9 @@ async def mkick(message: Message):
         ):
             continue
         ch_nickname = await get_user_nickname(id, chat_id)
-        msg += f"➖ [id{id}|{ch_nickname if ch_nickname else await get_user_name(id)}]\n"
+        msg += (
+            f"➖ [id{id}|{ch_nickname if ch_nickname else await get_user_name(id)}]\n"
+        )
         kick_res_count += 1
     if kick_res_count > 0:
         return await messagereply(
@@ -145,12 +147,7 @@ async def mute(message: Message):
         )
 
     try:
-        if (
-            mute_time := min(
-                int(data[1 + (not message.reply_message)]),
-                int(2**64 - 1 - time.time()),
-            )
-        ) < 1:
+        if (mute_time := int(data[1 + (not message.reply_message)])) < 1:
             raise Exception
     except Exception:
         return await messagereply(
@@ -205,6 +202,7 @@ async def mute(message: Message):
         mute_date = "Дата неизвестна"
 
     mute_time *= 60
+    mute_time = min(int(time.time() + mute_time), int(time.time() + 365 * 24 * 60 * 60 * 1000))
     mute_times.append(mute_time)
     mute_causes.append(mute_cause)
     u_name = await get_user_name(uid)
@@ -215,7 +213,7 @@ async def mute(message: Message):
         if not await conn.fetchval(
             "update mute set mute = $1, last_mutes_times = $2, last_mutes_causes = $3, last_mutes_names = $4, "
             "last_mutes_dates = $5 where chat_id=$6 and uid=$7 returning 1",
-            int(time.time() + mute_time),
+            mute_time,
             f"{mute_times}",
             f"{mute_causes}",
             f"{mute_names}",
@@ -228,7 +226,7 @@ async def mute(message: Message):
                 "last_mutes_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)",
                 id,
                 chat_id,
-                time.time() + mute_time,
+                mute_time,
                 f"{mute_times}",
                 f"{mute_causes}",
                 f"{mute_names}",
@@ -712,7 +710,9 @@ async def scan(message: Message):
         malware = await asyncio.to_thread(scan_url_for_malware, link)
         redirect = await asyncio.to_thread(scan_url_for_redirect, link)
         shortened = await asyncio.to_thread(scan_url_is_shortened, link)
-        scan_results.append(await messages.scan(link, malware, redirect, shortened) + "\n\n")
+        scan_results.append(
+            await messages.scan(link, malware, redirect, shortened) + "\n\n"
+        )
 
     await messagereply(
         message,
