@@ -855,7 +855,7 @@ async def antispam_checker(
         async with (await pool()).acquire() as conn:
             for i in msgs:
                 for atchmnt in i:
-                    if not atchmnt.wall:
+                    if not hasattr(atchmnt, "wall") or not atchmnt.wall:
                         continue
                     if not await conn.fetchval(
                         "select exists(select 1 from forwardedsexceptions where chat_id=$1 and exc_id=$2)",
