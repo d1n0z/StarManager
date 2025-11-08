@@ -294,7 +294,7 @@ async def test_get_coins_top_respects_deactivated(monkeypatch, manager):
     # Call get_coins_top — it will use our stubbed api and won't make network calls.
     coins_top = await manager.get_coins_top(in_uids=None, limit=10)
 
-    coins_values = [obj.coins for obj in coins_top]
+    coins_values = [obj[1].coins for obj in coins_top]
 
     # 1) ensure returned list sorted by coins descending
     assert coins_values == sorted(coins_values, reverse=True)
@@ -566,5 +566,5 @@ async def test_get_coins_top_respects_in_uids_filter(monkeypatch, manager):
     # verify the actual returned list contains objects only corresponding to provided uids
     # (we cannot access uid directly from returned objects in current implementation,
     # but we can assert the coin values correspond to those uids)
-    coin_vals = [o.coins for o in coins_top]
+    coin_vals = [o[1].coins for o in coins_top]
     assert set(coin_vals).issubset({100, 300})

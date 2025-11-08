@@ -8,7 +8,7 @@ from StarManager.core.config import database_config
 
 class AccessLevel(Model):
     uid = fields.IntField(default=0)
-    chat_id = fields.IntField(default=0, index=True)
+    chat_id = fields.IntField(default=0, db_index=True)
     access_level = fields.IntField(default=0)
 
     class Meta:
@@ -17,7 +17,7 @@ class AccessLevel(Model):
 
 class Warn(Model):
     uid = fields.IntField(default=0)
-    chat_id = fields.IntField(default=0, index=True)
+    chat_id = fields.IntField(default=0, db_index=True)
     warns = fields.IntField(default=0)
     last_warns_times = fields.TextField(null=True)
     last_warns_names = fields.TextField(null=True)
@@ -30,7 +30,7 @@ class Warn(Model):
 
 class Mute(Model):
     uid = fields.IntField(default=0)
-    chat_id = fields.IntField(default=0, index=True)
+    chat_id = fields.IntField(default=0, db_index=True)
     mute = fields.IntField(default=0)
     last_mutes_times = fields.TextField(null=True)
     last_mutes_causes = fields.TextField(null=True)
@@ -43,7 +43,7 @@ class Mute(Model):
 
 class Ban(Model):
     uid = fields.IntField(default=0)
-    chat_id = fields.IntField(default=0, index=True)
+    chat_id = fields.IntField(default=0, db_index=True)
     ban = fields.BigIntField(default=0)
     last_bans_times = fields.TextField(null=True)
     last_bans_causes = fields.TextField(null=True)
@@ -56,7 +56,7 @@ class Ban(Model):
 
 class Messages(Model):
     uid = fields.IntField(default=0)
-    chat_id = fields.IntField(default=0, index=True)
+    chat_id = fields.IntField(default=0, db_index=True)
     messages = fields.IntField(default=0)
 
     class Meta:
@@ -65,7 +65,7 @@ class Messages(Model):
 
 class Nickname(Model):
     uid = fields.IntField(default=0)
-    chat_id = fields.IntField(default=0, index=True)
+    chat_id = fields.IntField(default=0, db_index=True)
     nickname = fields.TextField(null=True)
 
     class Meta:
@@ -74,7 +74,7 @@ class Nickname(Model):
 
 class LastMessageDate(Model):
     uid = fields.IntField(default=0)
-    chat_id = fields.IntField(default=0, index=True)
+    chat_id = fields.IntField(default=0, db_index=True)
     last_message = fields.IntField(default=0)
 
     class Meta:
@@ -82,7 +82,7 @@ class LastMessageDate(Model):
 
 
 class SilenceMode(Model):
-    chat_id = fields.IntField(default=0, index=True, unique=True)
+    chat_id = fields.IntField(default=0, db_index=True, unique=True)
     activated = fields.BooleanField(default=False)
     allowed = fields.TextField(default="[]")
 
@@ -91,7 +91,7 @@ class SilenceMode(Model):
 
 
 class GPool(Model):
-    uid = fields.IntField(default=0, index=True)
+    uid = fields.IntField(default=0, db_index=True)
     chat_id = fields.IntField(default=0, unique=True)
 
     class Meta:
@@ -99,7 +99,7 @@ class GPool(Model):
 
 
 class ChatGroups(Model):
-    uid = fields.IntField(default=0, index=True)
+    uid = fields.IntField(default=0, db_index=True)
     group = fields.TextField(null=True)
     chat_id = fields.IntField(default=0)
 
@@ -126,7 +126,7 @@ class FilterExceptions(Model):
 
 
 class FilterSettings(Model):
-    chat_id = fields.IntField(default=0, index=True)
+    chat_id = fields.IntField(default=0, db_index=True)
     punishment = fields.IntField(default=0)
 
     class Meta:
@@ -134,7 +134,7 @@ class FilterSettings(Model):
 
 
 class CMDLevels(Model):
-    chat_id = fields.IntField(default=0, index=True)
+    chat_id = fields.IntField(default=0, db_index=True)
     cmd = fields.TextField(null=True)
     lvl = fields.IntField(default=0)
 
@@ -143,14 +143,14 @@ class CMDLevels(Model):
 
 
 class Blacklist(Model):
-    uid = fields.IntField(default=0, unique=True, index=True)
+    uid = fields.IntField(default=0, unique=True, db_index=True)
 
     class Meta:
         table = "blacklist"
 
 
 class Premium(Model):
-    uid = fields.IntField(default=0, unique=True, index=True)
+    uid = fields.IntField(default=0, unique=True, db_index=True)
     time = fields.BigIntField(default=0)
 
     class Meta:
@@ -158,7 +158,7 @@ class Premium(Model):
 
 
 class Bonus(Model):
-    uid = fields.IntField(default=0, unique=True, index=True)
+    uid = fields.IntField(default=0, unique=True, db_index=True)
     time = fields.BigIntField(default=0)
     streak = fields.IntField(default=0)
 
@@ -167,7 +167,7 @@ class Bonus(Model):
 
 
 class Settings(Model):
-    chat_id = fields.IntField(default=0, index=True)
+    chat_id = fields.IntField(default=0, db_index=True)
     setting = fields.TextField(null=True)
     pos = fields.BooleanField(null=True)
     pos2 = fields.BooleanField(null=True)
@@ -180,7 +180,7 @@ class Settings(Model):
 
 
 class Welcome(Model):
-    chat_id = fields.IntField(default=0, index=True, unique=True)
+    chat_id = fields.IntField(default=0, db_index=True, unique=True)
     msg = fields.TextField(null=True)
     photo = fields.TextField(null=True)
     url = fields.TextField(null=True)
@@ -191,7 +191,7 @@ class Welcome(Model):
 
 
 class WelcomeHistory(Model):
-    chat_id = fields.IntField(default=0, index=True, unique=True)
+    chat_id = fields.IntField(default=0, db_index=True, unique=True)
     cmid = fields.IntField()
     time = fields.BigIntField()
 
@@ -200,7 +200,7 @@ class WelcomeHistory(Model):
 
 
 class JoinedDate(Model):
-    chat_id = fields.IntField(default=0, index=True, unique=True)
+    chat_id = fields.IntField(default=0, db_index=True, unique=True)
     time = fields.BigIntField(default=0)
 
     class Meta:
@@ -208,7 +208,7 @@ class JoinedDate(Model):
 
 
 class UserJoinedDate(Model):
-    chat_id = fields.IntField(default=0, index=True)
+    chat_id = fields.IntField(default=0, db_index=True)
     uid = fields.IntField(default=0)
     time = fields.BigIntField(default=0)
 
@@ -217,7 +217,7 @@ class UserJoinedDate(Model):
 
 
 class XP(Model):
-    uid = fields.IntField(default=0, unique=True, index=True)
+    uid = fields.IntField(default=0, unique=True, db_index=True)
     xp = fields.FloatField(default=0)
     coins = fields.IntField(default=0)
     coins_limit = fields.IntField(default=0)
@@ -232,7 +232,7 @@ class XP(Model):
 
 
 class PremMenu(Model):
-    uid = fields.IntField(default=0, index=True)
+    uid = fields.IntField(default=0, db_index=True)
     setting = fields.TextField(null=True)
     pos = fields.IntField(null=True)
     value = fields.TextField(null=True)
@@ -242,7 +242,7 @@ class PremMenu(Model):
 
 
 class Prefixes(Model):
-    uid = fields.IntField(default=0, index=True)
+    uid = fields.IntField(default=0, db_index=True)
     prefix = fields.TextField(null=True)
 
     class Meta:
@@ -250,7 +250,7 @@ class Prefixes(Model):
 
 
 class AccessNames(Model):
-    chat_id = fields.IntField(default=0, index=True)
+    chat_id = fields.IntField(default=0, db_index=True)
     lvl = fields.IntField(default=0)
     name = fields.TextField(null=True)
 
@@ -259,7 +259,7 @@ class AccessNames(Model):
 
 
 class Ignore(Model):
-    chat_id = fields.IntField(default=0, index=True)
+    chat_id = fields.IntField(default=0, db_index=True)
     uid = fields.IntField(default=0)
 
     class Meta:
@@ -267,7 +267,7 @@ class Ignore(Model):
 
 
 class ChatLimit(Model):
-    chat_id = fields.IntField(default=0, unique=True, index=True)
+    chat_id = fields.IntField(default=0, unique=True, db_index=True)
     time = fields.BigIntField(default=0)
 
     class Meta:
@@ -276,7 +276,7 @@ class ChatLimit(Model):
 
 class Payments(Model):
     uid = fields.IntField(default=0)
-    id = fields.IntField(default=0, index=True, unique=True, pk=True)
+    id = fields.IntField(default=0, db_index=True, unique=True, primary_key=True)
     success = fields.IntField(default=0)
 
     class Meta:
@@ -284,7 +284,7 @@ class Payments(Model):
 
 
 class CMDNames(Model):
-    uid = fields.IntField(default=0, index=True)
+    uid = fields.IntField(default=0, db_index=True)
     cmd = fields.TextField(null=True)
     name = fields.TextField(null=True)
 
@@ -293,7 +293,7 @@ class CMDNames(Model):
 
 
 class DuelWins(Model):
-    uid = fields.IntField(default=0, index=True, unique=True)
+    uid = fields.IntField(default=0, db_index=True, unique=True)
     wins = fields.IntField(default=0)
 
     class Meta:
@@ -302,7 +302,7 @@ class DuelWins(Model):
 
 class Referral(Model):
     chat_id = fields.IntField(default=0)
-    uid = fields.IntField(default=0, index=True)
+    uid = fields.IntField(default=0, db_index=True)
     from_id = fields.IntField(default=0)
 
     class Meta:
@@ -310,7 +310,7 @@ class Referral(Model):
 
 
 class GlobalWarns(Model):
-    uid = fields.IntField(default=0, unique=True, index=True)
+    uid = fields.IntField(default=0, unique=True, db_index=True)
     warns = fields.IntField(default=0)
     time = fields.IntField(default=0)
 
@@ -319,8 +319,8 @@ class GlobalWarns(Model):
 
 
 class Reports(Model):
-    uid = fields.IntField(default=0, index=True)
-    id = fields.IntField(default=0, pk=True)
+    uid = fields.IntField(default=0, db_index=True)
+    id = fields.IntField(default=0, primary_key=True)
     time = fields.BigIntField(default=0)
     report_message_ids = fields.TextField()
     report_text = fields.TextField()
@@ -331,7 +331,7 @@ class Reports(Model):
 
 
 class Comments(Model):
-    uid = fields.IntField(default=0, index=True)
+    uid = fields.IntField(default=0, db_index=True)
     time = fields.BigIntField(default=0)
 
     class Meta:
@@ -339,7 +339,7 @@ class Comments(Model):
 
 
 class Likes(Model):
-    uid = fields.IntField(default=0, index=True)
+    uid = fields.IntField(default=0, db_index=True)
     post_id = fields.IntField(default=0)
 
     class Meta:
@@ -347,7 +347,7 @@ class Likes(Model):
 
 
 class Blocked(Model):
-    uid = fields.IntField(default=0, index=True)
+    uid = fields.IntField(default=0, db_index=True)
     type = fields.TextField()
     reason = fields.TextField(null=True)
 
@@ -356,7 +356,7 @@ class Blocked(Model):
 
 
 class Notifs(Model):
-    chat_id = fields.IntField(default=0, index=True)
+    chat_id = fields.IntField(default=0, db_index=True)
     tag = fields.IntField(default=0)
     every = fields.IntField(default=0)
     status = fields.IntField(default=0)
@@ -371,7 +371,7 @@ class Notifs(Model):
 
 class TypeQueue(Model):
     chat_id = fields.IntField(default=0)
-    uid = fields.IntField(default=0, index=True)
+    uid = fields.IntField(default=0, db_index=True)
     type = fields.TextField(null=True)
     additional = fields.TextField(null=True)
 
@@ -380,7 +380,7 @@ class TypeQueue(Model):
 
 
 class ReportBans(Model):
-    uid = fields.IntField(default=0, unique=True, index=True)
+    uid = fields.IntField(default=0, unique=True, db_index=True)
     time = fields.BigIntField(null=True)
 
     class Meta:
@@ -388,7 +388,7 @@ class ReportBans(Model):
 
 
 class Reboot(Model):
-    chat_id = fields.IntField(default=0, index=True)
+    chat_id = fields.IntField(default=0, db_index=True)
     time = fields.BigIntField(default=0)
     sended = fields.BooleanField(default=0)
 
@@ -397,14 +397,14 @@ class Reboot(Model):
 
 
 class AllChats(Model):
-    chat_id = fields.IntField(default=0, index=True, unique=True)
+    chat_id = fields.IntField(default=0, db_index=True, unique=True)
 
     class Meta:
         table = "allchats"
 
 
 class AllUsers(Model):
-    uid = fields.IntField(default=0, index=True, unique=True)
+    uid = fields.IntField(default=0, db_index=True, unique=True)
     is_last_hidden_album = fields.BooleanField(default=False)
 
     class Meta:
@@ -412,7 +412,7 @@ class AllUsers(Model):
 
 
 class UserNames(Model):
-    uid = fields.IntField(default=0, index=True, unique=True)
+    uid = fields.IntField(default=0, db_index=True, unique=True)
     name = fields.TextField()
     domain = fields.TextField(null=True)
 
@@ -421,7 +421,7 @@ class UserNames(Model):
 
 
 class ChatNames(Model):
-    chat_id = fields.IntField(default=0, index=True, unique=True)
+    chat_id = fields.IntField(default=0, db_index=True, unique=True)
     name = fields.TextField()
 
     class Meta:
@@ -429,7 +429,7 @@ class ChatNames(Model):
 
 
 class GroupNames(Model):
-    group_id = fields.IntField(default=0, index=True, unique=True)
+    group_id = fields.IntField(default=0, db_index=True, unique=True)
     name = fields.TextField()
 
     class Meta:
@@ -437,7 +437,7 @@ class GroupNames(Model):
 
 
 class TransferHistory(Model):
-    to_id = fields.IntField(default=0, index=True)
+    to_id = fields.IntField(default=0, db_index=True)
     from_id = fields.IntField(default=0)
     time = fields.BigIntField(default=0)
     amount = fields.IntField(default=0)
@@ -448,14 +448,14 @@ class TransferHistory(Model):
 
 
 class LvlBanned(Model):
-    uid = fields.IntField(default=0, unique=True, index=True)
+    uid = fields.IntField(default=0, unique=True, db_index=True)
 
     class Meta:
         table = "lvlbanned"
 
 
 class BotMessages(Model):
-    key = fields.CharField(100, unique=True, index=True)
+    key = fields.CharField(100, unique=True, db_index=True)
     text = fields.TextField()
 
     class Meta:
@@ -497,7 +497,7 @@ class MessagesStatistics(Model):
 
 
 class Captcha(Model):
-    chat_id = fields.IntField(index=True)
+    chat_id = fields.IntField(db_index=True)
     uid = fields.IntField()
     result = fields.TextField(null=True)
     exptime = fields.BigIntField()
@@ -508,7 +508,7 @@ class Captcha(Model):
 
 
 class PublicChats(Model):
-    chat_id = fields.IntField(index=True, unique=True)
+    chat_id = fields.IntField(db_index=True, unique=True)
     premium = fields.BooleanField()
     last_up = fields.BigIntField(default=0)
     isopen = fields.BooleanField(default=False)
@@ -519,7 +519,7 @@ class PublicChats(Model):
 
 
 class TelegramLink(Model):
-    tgid = fields.BigIntField(index=True, unique=True, null=True)
+    tgid = fields.BigIntField(db_index=True, unique=True, null=True)
     vkid = fields.IntField()
     code = fields.TextField()
 
@@ -542,7 +542,7 @@ class TGGiveawayUsers(Model):
 
 
 class TGReferrals(Model):
-    fromtgid = fields.BigIntField(index=True)
+    fromtgid = fields.BigIntField(db_index=True)
     tgid = fields.BigIntField()
 
     class Meta:
@@ -550,7 +550,7 @@ class TGReferrals(Model):
 
 
 class TGWaitingForSubscription(Model):
-    tgid = fields.BigIntField(index=True, unique=True)
+    tgid = fields.BigIntField(db_index=True, unique=True)
 
     class Meta:
         table = "tgwaitingforsubscription"
@@ -572,7 +572,7 @@ class HiddenAlbumServerInternalError(Model):
 
 
 class Promocodes(Model):
-    code = fields.CharField(255, unique=True, index=True)
+    code = fields.CharField(255, unique=True, db_index=True)
     usage = fields.IntField(null=True)
     date = fields.IntField(null=True)
     amnt = fields.IntField()
@@ -622,7 +622,7 @@ class Reputation(Model):
 
 class RepHistory(Model):
     uid = fields.IntField()
-    id = fields.IntField(pk=True)
+    id = fields.IntField(primary_key=True)
     time = fields.BigIntField()
 
     class Meta:
@@ -630,7 +630,7 @@ class RepHistory(Model):
 
 
 class ReferralBonus(Model):
-    chat_id = fields.IntField(index=True, unique=True)
+    chat_id = fields.IntField(db_index=True, unique=True)
 
     class Meta:
         table = "referralbonus"
@@ -700,7 +700,7 @@ class ToDelete(Model):
 
 
 class VkLinksExceptions(Model):
-    chat_id = fields.IntField(index=True)
+    chat_id = fields.IntField(db_index=True)
     url = fields.TextField()
 
     class Meta:
@@ -708,7 +708,7 @@ class VkLinksExceptions(Model):
 
 
 class ForwardedsExceptions(Model):
-    chat_id = fields.IntField(index=True)
+    chat_id = fields.IntField(db_index=True)
     exc_id = fields.IntField()
 
     class Meta:
