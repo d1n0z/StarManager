@@ -202,7 +202,6 @@ async def mute(message: Message):
         mute_date = "Дата неизвестна"
 
     mute_time *= 60
-    mute_time = min(int(time.time() + mute_time), int(time.time() + 365 * 24 * 60 * 60 * 1000))
     mute_times.append(mute_time)
     mute_causes.append(mute_cause)
     u_name = await get_user_name(uid)
@@ -213,7 +212,7 @@ async def mute(message: Message):
         if not await conn.fetchval(
             "update mute set mute = $1, last_mutes_times = $2, last_mutes_causes = $3, last_mutes_names = $4, "
             "last_mutes_dates = $5 where chat_id=$6 and uid=$7 returning 1",
-            mute_time,
+            min(int(time.time() + mute_time), int(time.time() + 365 * 24 * 60 * 60 * 1000)),
             f"{mute_times}",
             f"{mute_causes}",
             f"{mute_names}",
@@ -226,7 +225,7 @@ async def mute(message: Message):
                 "last_mutes_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)",
                 id,
                 chat_id,
-                mute_time,
+                min(int(time.time() + mute_time), int(time.time() + 365 * 24 * 60 * 60 * 1000)),
                 f"{mute_times}",
                 f"{mute_causes}",
                 f"{mute_names}",
