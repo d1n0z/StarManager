@@ -45,18 +45,38 @@ async def lifespan(app: FastAPI):
 
     app.state.bg_tasks = []
 
+    from StarManager.core.event_queue import event_queue
+
+    await event_queue.load_from_disk()
+
     await load_messages.load()
 
     tg_bot = TgBot()
     await tg_bot.setup(settings.telegram.webhook_url)
     app.state.tg_bot = tg_bot
 
+    async def _process_queued_events():
+        from StarManager.core.event_queue import event_queue
+        from StarManager.site.routes import _vk_tasks, process_vk_event
+
+        try:
+            while True:
+                if len(_vk_tasks) < 150 and event_queue.qsize() > 0:
+                    data = await event_queue.get()
+                    await process_vk_event(data, data.get("type"))
+                else:
+                    await asyncio.sleep(5)
+        except asyncio.CancelledError:
+            logger.info("Queue processor cancelled")
+            raise
+
     async def _monitor_tasks():
         try:
             while True:
                 await asyncio.sleep(60)
                 from StarManager.core.db import pool as get_pool
-                from StarManager.site.routes import _dropped_events, _vk_tasks
+                from StarManager.core.event_queue import event_queue
+                from StarManager.site.routes import _vk_tasks
 
                 try:
                     db_pool = await get_pool()
@@ -64,11 +84,16 @@ async def lifespan(app: FastAPI):
                 except Exception:
                     pool_info = "DB: ?"
                 logger.info(
-                    f"VK tasks: {len(_vk_tasks)} | Dropped: {_dropped_events} | {pool_info}"
+                    f"VK tasks: {len(_vk_tasks)} | Queued: {event_queue.qsize()} | {pool_info}"
                 )
         except asyncio.CancelledError:
             logger.info("Monitor task cancelled")
             raise
+
+    queue_processor = asyncio.create_task(
+        _process_queued_events(), name="queue_processor"
+    )
+    app.state.bg_tasks.append((queue_processor, None))
 
     monitor_task = asyncio.create_task(_monitor_tasks(), name="monitor")
     app.state.bg_tasks.append((monitor_task, None))
@@ -99,7 +124,11 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"Managers close error: {e}")
 
+        from StarManager.core.event_queue import event_queue
         from StarManager.site.routes import _vk_tasks
+
+        logger.info("Saving pending events to disk...")
+        await event_queue.save_to_disk()
 
         if _vk_tasks:
             logger.warning(f"Cancelling {len(_vk_tasks)} pending VK tasks")

@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Optional
 
 import aiogram
-from aiogram.exceptions import TelegramBadRequest
 import httpx
 import pydantic
+from aiogram.exceptions import TelegramBadRequest
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
@@ -23,6 +23,7 @@ from StarManager.core import managers, utils
 from StarManager.core.config import api as vkapi
 from StarManager.core.config import settings, sitedata
 from StarManager.core.db import smallpool as pool
+from StarManager.core.event_queue import event_queue
 from StarManager.site import enums, models
 from StarManager.vkbot.bot import bot as vkbot
 
@@ -584,8 +585,9 @@ async def health(request: Request):
     import time
 
     import psutil
-    from StarManager.core.scheduler_monitor import scheduler_monitor
+
     from StarManager.core.event_loop_monitor import event_loop_monitor
+    from StarManager.core.scheduler_monitor import scheduler_monitor
 
     start = time.time()
     try:
@@ -604,8 +606,10 @@ async def health(request: Request):
 
     scheduler_ok, scheduler_msg = scheduler_monitor.is_healthy(max_delay=300)
     scheduler_jobs = scheduler_monitor.get_all_jobs()
-    scheduler_running = hasattr(request.app.state, 'scheduler') and request.app.state.scheduler.running
-    
+    scheduler_running = (
+        hasattr(request.app.state, "scheduler") and request.app.state.scheduler.running
+    )
+
     loop_stats = event_loop_monitor.get_stats()
 
     process = psutil.Process(os.getpid())
@@ -615,7 +619,7 @@ async def health(request: Request):
             "status": "ok" if (db_ok and scheduler_ok) else "degraded",
             "timestamp": time.time(),
             "vk_tasks": len(_vk_tasks),
-            "vk_dropped": _dropped_events,
+            "vk_dropped": event_queue.qsize(),
             "db": {
                 "ok": db_ok,
                 "response_time": round(db_time, 3),
@@ -627,7 +631,10 @@ async def health(request: Request):
                 "ok": scheduler_ok,
                 "running": scheduler_running,
                 "message": scheduler_msg,
-                "jobs": {name: int(time.time() - last_run) for name, last_run in scheduler_jobs.items()},
+                "jobs": {
+                    name: int(time.time() - last_run)
+                    for name, last_run in scheduler_jobs.items()
+                },
             },
             "event_loop": loop_stats,
             "system": {
@@ -641,27 +648,9 @@ async def health(request: Request):
 
 _vk_semaphore = asyncio.Semaphore(50)
 _vk_tasks = set()
-_dropped_events = 0
 
 
-@router.post("/api/listener/vk")
-async def vk(request: Request):
-    global _dropped_events
-    data = await request.json()
-
-    if (data_type := data.get("type")) is None:
-        return PlainTextResponse('Error: no "type" field.')
-    if data_type == "confirmation":
-        return PlainTextResponse(settings.vk.callback_confirmation_code)
-    if data.get("secret") != settings.vk.callback_secret:
-        return PlainTextResponse('Error: wrong "secret" key.')
-
-    if len(_vk_tasks) > 200:
-        _dropped_events += 1
-        if _dropped_events % 100 == 0:
-            logger.warning(f"Dropped {_dropped_events} events, tasks: {len(_vk_tasks)}")
-        return PlainTextResponse("ok")
-
+async def process_vk_event(data, data_type):
     async def _process_with_limit():
         start = time.time()
         event_info = f"{data_type}"
@@ -693,6 +682,29 @@ async def vk(request: Request):
     task = asyncio.create_task(_process_with_limit())
     _vk_tasks.add(task)
     task.add_done_callback(_vk_tasks.discard)
+
+
+@router.post("/api/listener/vk")
+async def vk(request: Request):
+    data = await request.json()
+
+    if (data_type := data.get("type")) is None:
+        return PlainTextResponse('Error: no "type" field.')
+    if data_type == "confirmation":
+        return PlainTextResponse(settings.vk.callback_confirmation_code)
+    if data.get("secret") != settings.vk.callback_secret:
+        return PlainTextResponse('Error: wrong "secret" key.')
+
+    if len(_vk_tasks) > 200:
+        await event_queue.put(data)
+
+        queued_events = event_queue.qsize()
+        if queued_events % 100 == 0:
+            logger.warning(f"Queued {queued_events} events, tasks: {len(_vk_tasks)}")
+
+        return PlainTextResponse("ok")
+
+    await process_vk_event(data, data_type)
     return PlainTextResponse("ok")
 
 
