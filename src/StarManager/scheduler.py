@@ -68,7 +68,7 @@ async def with_lock(func, use_db=True, timeout: Optional[int] = 300):
         logger.warning(f"Task {func.__name__} is already running, skipping")
         return
     async with lock:
-        start = time.time()
+        scheduler_monitor.mark_run(func.__name__)
         try:
             if timeout is None:
                 if use_db:
@@ -83,10 +83,6 @@ async def with_lock(func, use_db=True, timeout: Optional[int] = 300):
                             await func(conn)
                     else:
                         await func()
-            elapsed = time.time() - start
-            if elapsed > 60:
-                logger.warning(f"Task {func.__name__} took {elapsed:.1f}s")
-            scheduler_monitor.mark_run(func.__name__)
         except asyncio.TimeoutError:
             logger.error(f"Task {func.__name__} timed out after {timeout}s")
             await tgbot.send_message(

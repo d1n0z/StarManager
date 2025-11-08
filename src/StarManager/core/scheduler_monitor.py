@@ -32,7 +32,7 @@ class SchedulerMonitor:
             
             for job_name, last_run in self._last_run.items():
                 job_timeout = self._timeouts.get(job_name)
-                if job_timeout is not None and now - last_run > job_timeout + 60:
+                if job_timeout is not None and now - last_run > job_timeout * 2:
                     return False, f"Job '{job_name}' not running (last: {int(now - last_run)}s ago)"
             
             return True, "OK"
