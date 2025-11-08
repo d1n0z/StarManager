@@ -115,7 +115,7 @@ def schedule(coro_func, *, use_db: bool = True, timeout: Optional[int] = 300):
 
 
 async def backup() -> None:
-    from StarManager.backup_service import backup_service
+    from StarManager.scheduler.backup_service import backup_service
     await backup_service.create_backup()
 
 
