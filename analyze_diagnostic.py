@@ -30,7 +30,7 @@ def analyze():
         last = items[-1]
         if last['health_data']:
             data = last['health_data']
-            print(f"  VK tasks: {data.get('vk_tasks', '?')}")
+            print(f"  VK tasks: {data.get('vk_tasks', '?')} | Queued: {data.get('vk_queued', 0)}")
             if 'db' in data:
                 db = data['db']
                 print(f"  DB pool: {db.get('pool_used', '?')}/{db.get('pool_size', '?')}")

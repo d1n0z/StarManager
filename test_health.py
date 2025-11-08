@@ -43,7 +43,7 @@ def test_health():
         
         print("\n🔵 VK:")
         print(f"  Active tasks: {data.get('vk_tasks', '?')}")
-        print(f"  Dropped events: {data.get('vk_dropped', '?')}")
+        print(f"  Queued events: {data.get('vk_queued', '?')}")
         
         event_loop = data.get('event_loop', {})
         if event_loop:

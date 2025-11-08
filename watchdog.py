@@ -32,7 +32,7 @@ def check_alive():
             scheduler_ok = scheduler_data.get('ok', False)
             scheduler_running = scheduler_data.get('running', False)
             
-            log(f"✓ Alive | VK tasks: {data.get('vk_tasks', '?')} | DB pool: {data.get('db', {}).get('pool_used', '?')}/{data.get('db', {}).get('pool_size', '?')} | Scheduler: {scheduler_ok}/{scheduler_running}")
+            log(f"✓ Alive | VK tasks: {data.get('vk_tasks', '?')} | Queued: {data.get('vk_queued', 0)} | DB pool: {data.get('db', {}).get('pool_used', '?')}/{data.get('db', {}).get('pool_size', '?')} | Scheduler: {scheduler_ok}/{scheduler_running}")
             
             if not scheduler_ok or not scheduler_running:
                 log(f"⚠️ Scheduler issue: {scheduler_data.get('message', 'unknown')}")

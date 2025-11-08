@@ -619,7 +619,7 @@ async def health(request: Request):
             "status": "ok" if (db_ok and scheduler_ok) else "degraded",
             "timestamp": time.time(),
             "vk_tasks": len(_vk_tasks),
-            "vk_dropped": event_queue.qsize(),
+            "vk_queued": event_queue.qsize(),
             "db": {
                 "ok": db_ok,
                 "response_time": round(db_time, 3),

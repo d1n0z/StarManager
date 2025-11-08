@@ -68,7 +68,7 @@ if __name__ == "__main__":
     if ok and data:
         db_time = data.get('db', {}).get('response_time', '?')
         scheduler_ok = data.get('scheduler', {}).get('ok', '?')
-        log(f"✓ Health: {msg} | VK tasks: {data.get('vk_tasks', '?')} | DB: {db_time}s | Scheduler: {scheduler_ok}")
+        log(f"✓ Health: {msg} | VK tasks: {data.get('vk_tasks', '?')} | Queued: {data.get('vk_queued', 0)} | DB: {db_time}s | Scheduler: {scheduler_ok}")
     else:
         log(f"✗ Health: {msg}")
         if data:
