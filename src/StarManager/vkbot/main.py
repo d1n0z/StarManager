@@ -12,7 +12,7 @@ from StarManager.vkbot.middlewares import CommandMiddleware
 from StarManager.vkbot.reaction_handlers import reaction_handle
 
 
-def main(run=False):
+def main():
     labeler = BotLabeler()
 
     @labeler.raw_event(
@@ -47,8 +47,4 @@ def main(run=False):
     bot.labeler.message_view.register_middleware(CommandMiddleware)
 
     logger.info("Loaded. Starting the bot...")
-    if run:
-        bot.loop_wrapper.add_task(managers.initialize())
-        bot.run_forever()
-    else:
-        return bot
+    return bot
