@@ -258,7 +258,7 @@ async def setprem(message: Message):
 
     await messagereply(message, await messages.setprem(chat_id))
     await send_message(
-        message.peer_id, await messages.premchat(uid, await get_user_name(uid))
+        chat_id + 2000000000, await messages.premchat(uid, await get_user_name(uid))
     )
 
 
