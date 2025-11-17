@@ -1,5 +1,4 @@
 import asyncio
-import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -14,13 +13,13 @@ from starlette.middleware.sessions import SessionMiddleware
 from StarManager import scheduler
 from StarManager.core import managers, tables
 from StarManager.core.config import settings
+from StarManager.core.logging import setup_logs
 from StarManager.site.routes import router
 from StarManager.tgbot.main import Bot as TgBot
 from StarManager.vkbot import load_messages
 from StarManager.vkbot.main import main as load_vkbot
 
-logger.remove()
-logger.add(sys.stderr, level="INFO")
+setup_logs()
 
 
 @asynccontextmanager

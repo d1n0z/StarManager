@@ -308,7 +308,6 @@ async def set_chat_mute(
                 {"peer_id": chat_id + 2000000000, "member_ids": uid, "action": "rw"},
             )
     except Exception:
-        logger.exception("setChatMute exception:")
         return
 
 
