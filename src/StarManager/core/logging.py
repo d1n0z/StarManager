@@ -1,6 +1,6 @@
 import logging
 import sys
-from loguru import Level, logger
+from loguru import logger
 
 
 class InterceptHandler(logging.Handler):
@@ -8,7 +8,7 @@ class InterceptHandler(logging.Handler):
         try:
             level = logger.level(record.levelname).name
         except Exception:
-            level = Level.no
+            level = "INFO"
         logger.opt(depth=6, exception=record.exc_info).log(level, record.getMessage())
 
 
