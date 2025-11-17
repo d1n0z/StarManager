@@ -387,7 +387,7 @@ async def message_handle(event: MessageNew) -> Any:
         sticker = False
 
     if chat_settings["antispam"]["messagesPerMinute"]:
-        if managers.chat_settings.get(chat_id, "messagesPerMinute", "value"):
+        if await managers.chat_settings.get(chat_id, "messagesPerMinute", "value"):
             managers.antispam.add_message(chat_id, uid, event.object.message.date)
 
     if uacc < 5 and (
