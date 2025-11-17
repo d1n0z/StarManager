@@ -16,6 +16,10 @@ class BaseManager(ABC):
         self._cache: Dict[Any, Any] = {}
         self.repo = repo
         self.cache = cache
+    
+    async def initialize(self):
+        if self.cache is not None:
+            await self.cache.initialize()
 
     async def close(self):
         if self.cache is not None:

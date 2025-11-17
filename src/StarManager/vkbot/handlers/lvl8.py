@@ -768,13 +768,8 @@ async def repbanlist(message: Message):
 
 @bl.chat_message(SearchCMD("chatsstats"))
 async def chatsstats(message: Message):
-    async with (await pool()).acquire() as conn:
-        nm = await conn.fetchval(
-            "select count(*) as c from settings where setting='nightmode' and pos=true"
-        )
-        c = await conn.fetchval(
-            "select count(*) as c from settings where setting='captcha' and pos=true"
-        )
+    nm = len(await managers.chat_settings.get_by_field(setting="nightmode", pos=True))
+    c = len(await managers.chat_settings.get_by_field(setting="captcha", pos=True))
     msg = (
         f"🌓 Ночной режим включен в: {point_words(nm or 0, ['беседе', 'беседах', 'беседах'])}\n"
         f"🔢 Капча включена в: {point_words(c or 0, ['беседе', 'беседах', 'беседах'])}"

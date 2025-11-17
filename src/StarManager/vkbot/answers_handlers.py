@@ -8,6 +8,7 @@ import requests
 from vkbottle_types.events.bot_events import MessageNew
 from vkbottle_types.objects import MessagesMessageAttachmentType
 
+from StarManager.core import managers
 from StarManager.core.config import settings
 from StarManager.core.db import pool
 from StarManager.core.utils import (
@@ -196,13 +197,7 @@ async def queue_handler(event: MessageNew):
                     ),
                 )
                 return
-            async with (await pool()).acquire() as conn:
-                await conn.execute(
-                    "update settings set value = $1 where chat_id=$2 and setting=$3",
-                    itime,
-                    chat_id,
-                    setting,
-                )
+            await managers.chat_settings.edit(chat_id, setting, value=itime)
             await edit_message(
                 await messages.settings_change_autodelete_done(itime),
                 event.object.message.peer_id,
@@ -232,13 +227,7 @@ async def queue_handler(event: MessageNew):
                         kb,
                     )
                     return
-                async with (await pool()).acquire() as conn:
-                    await conn.execute(
-                        "update settings set value = $1 where chat_id=$2 and setting=$3",
-                        int(text),
-                        chat_id,
-                        setting,
-                    )
+                await managers.chat_settings.edit(chat_id, setting, value=int(text))
             else:
                 if setting == "nightmode":
                     try:
@@ -268,13 +257,7 @@ async def queue_handler(event: MessageNew):
                     )
                     val += f"0{end.hour}:" if end.hour < 10 else f"{end.hour}:"
                     val += f"0{end.minute}" if end.minute < 10 else f"{end.minute}"
-                    async with (await pool()).acquire() as conn:
-                        await conn.execute(
-                            "update settings set value2 = $1 where chat_id=$2 and setting=$3",
-                            val,
-                            chat_id,
-                            setting,
-                        )
+                    await managers.chat_settings.edit(chat_id, setting, value2=val)
             await edit_message(
                 await messages.settings_change_countable_done(setting, text),
                 event.object.message.peer_id,
@@ -301,13 +284,7 @@ async def queue_handler(event: MessageNew):
             pnshtime = (
                 int(text) if text != "0" else (3650 if action == "ban" else 1000000)
             )
-            async with (await pool()).acquire() as conn:
-                await conn.execute(
-                    "update settings set punishment = $1 where chat_id=$2 and setting=$3",
-                    f"{action}|{pnshtime}",
-                    chat_id,
-                    setting,
-                )
+            await managers.chat_settings.edit(chat_id, setting, punishment=f"{action}|{pnshtime}")
             await edit_message(
                 await messages.settings_set_punishment(action, int(pnshtime)),
                 event.object.message.peer_id,
@@ -669,13 +646,11 @@ async def queue_handler(event: MessageNew):
                 uid, name, datetime.datetime.now().strftime("%H:%M:%S %Y.%m.%d")
             ),
         )
+        
+        s = await managers.chat_settings.get(chat_id, "welcome", "pos")
         async with (await pool()).acquire() as conn:
             await conn.execute(
                 "delete from typequeue where chat_id=$1 and uid=$2", chat_id, uid
-            )
-            s = await conn.fetchrow(
-                "select pos from settings where chat_id=$1 and setting='welcome'",
-                chat_id,
             )
             welcome = await conn.fetchrow(
                 "select msg, url, button_label, photo from welcome where chat_id=$1",
@@ -687,7 +662,7 @@ async def queue_handler(event: MessageNew):
             await conn.execute(
                 "delete from captcha where chat_id=$1 and uid=$2", chat_id, uid
             )
-        if s and s[0] and welcome:
+        if s and welcome:
             await send_message(
                 event.object.message.peer_id,
                 welcome[0].replace("%name%", f"[id{uid}|{name}]"),

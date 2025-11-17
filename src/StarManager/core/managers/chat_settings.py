@@ -31,6 +31,7 @@ DEFAULTS = {
 
 @dataclass
 class _CachedChatSettings(BaseCachedModel):
+    id: int
     pos: Optional[bool] = None
     pos2: Optional[bool] = None
     value: Optional[int] = None
@@ -78,7 +79,7 @@ class ChatSettingsCache(BaseCacheManager):
     ):
         super().__init__()
         self._cache: Cache = cache
-        self._dirty: Set[CacheKey]
+        self._dirty: Set[CacheKey] = set()
         self.repo = repo
 
     async def initialize(self):
@@ -102,6 +103,28 @@ class ChatSettingsCache(BaseCacheManager):
         async with self._lock:
             self._cache[cache_key] = _CachedChatSettings.from_model(model)
         return created
+
+    async def get_by_id(self, id: int) -> CacheKey:
+        async with self._lock:
+            return next((k for k, v in self._cache.items() if v.id == id))
+
+    async def get_by_field(self, **fields):
+        async with self._lock:
+            return tuple(
+                [
+                    k
+                    for k, r in self._cache.items()
+                    if all(
+                        (  # get from key(chat_id, setting) or from model
+                            (k[f == "setting"] == v)
+                            if f in ("chat_id", "setting")
+                            else (getattr(r, f, None) == v)
+                            # every field is None by default, so getattr with None as default is not a problem (i hope so...)
+                        )
+                        for f, v in fields.items()
+                    )
+                ]
+            )
 
     @overload
     async def get(self, chat_id: int, setting: str, fields: str) -> Any: ...
@@ -134,13 +157,23 @@ class ChatSettingsCache(BaseCacheManager):
                     setattr(self._cache[cache_key], field, value)
             self._dirty.add(cache_key)
 
-    async def remove(self, chat_id: int, setting: str):
-        cache_key = _make_cache_key(chat_id, setting)
+    async def remove(self, chat_id: int, setting: Optional[str] = None):
+        if setting:
+            cache_key = _make_cache_key(chat_id, setting)
+            async with self._lock:
+                if cache_key in self._cache:
+                    self._dirty.discard(cache_key)
+                    del self._cache[cache_key]
+            await self.repo.delete_record(*cache_key)
+            return
+        
         async with self._lock:
-            if cache_key in self._cache:
+            keys = [k for k in self._cache.keys() if k[0] == chat_id]
+            for cache_key in keys:
                 self._dirty.discard(cache_key)
                 del self._cache[cache_key]
-        await self.repo.delete_record(*cache_key)
+        for cache_key in keys:
+            await self.repo.delete_record(*cache_key)
 
     async def sync(self, batch_size: int = 1000):
         async with self._lock:
@@ -162,7 +195,9 @@ class ChatSettingsCache(BaseCacheManager):
                 batch = items[i : i + batch_size]
                 chat_ids = list({ck[0] for ck, _ in batch})
                 existing_rows = await ChatSettings.filter(chat_id__in=chat_ids)
-                existing_map = {(row.chat_id, getattr(row, "setting")): row for row in existing_rows}
+                existing_map = {
+                    (row.chat_id, getattr(row, "setting")): row for row in existing_rows
+                }
 
                 to_update, to_create = [], []
                 for cache_key, cached in batch:
@@ -182,8 +217,12 @@ class ChatSettingsCache(BaseCacheManager):
                         to_create.append(ChatSettings(**data))
 
                 if to_update:
-                    update_fields = list(_CachedChatSettings.__dataclass_fields__.keys())
-                    update_fields = [f for f in update_fields if f not in ("chat_id", "setting")]
+                    update_fields = list(
+                        _CachedChatSettings.__dataclass_fields__.keys()
+                    )
+                    update_fields = [
+                        f for f in update_fields if f not in ("chat_id", "setting")
+                    ]
                     if update_fields and to_update:
                         await ChatSettings.bulk_update(
                             to_update, fields=update_fields, batch_size=batch_size
@@ -194,6 +233,7 @@ class ChatSettingsCache(BaseCacheManager):
 
         except Exception:
             from loguru import logger
+
             logger.exception("ChatSettings sync failed")
             return
 
@@ -215,6 +255,8 @@ class ChatSettingsManager(BaseManager):
         self.cache: ChatSettingsCache = ChatSettingsCache(self.repo, self._cache)
 
         self.get = self.cache.get
+        self.get_by_id = self.cache.get_by_id
+        self.get_by_field = self.cache.get_by_field
         self.edit = self.cache.edit
         self.remove = self.cache.remove
 

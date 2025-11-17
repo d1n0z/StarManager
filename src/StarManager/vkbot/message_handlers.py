@@ -73,16 +73,11 @@ async def message_handle(event: MessageNew) -> Any:
     uacc = await get_user_access_level(uid, chat_id) if uid > 0 else 0
 
     if chat_settings["main"]["nightmode"] and uacc <= 6:
-        async with (await pool()).acquire() as conn:
-            chatsetting = await conn.fetchrow(
-                "select value2 from settings where chat_id=$1 and setting='nightmode'",
-                chat_id,
-            )
-        if chatsetting and (setting := chatsetting[0]):
+        if setting := await managers.chat_settings.get(chat_id, "nightmode", "value2"):
             setting = setting.split("-")
             now = datetime.now()
-            start = datetime.strptime(setting[0], "%H:%M").replace(year=now.year)
-            end = datetime.strptime(setting[1], "%H:%M").replace(year=now.year)
+            start = datetime.strptime(setting[0], "%H:%M")
+            end = datetime.strptime(setting[1], "%H:%M")
             if not (
                 now.hour < start.hour
                 or now.hour > end.hour
@@ -392,24 +387,15 @@ async def message_handle(event: MessageNew) -> Any:
         sticker = False
 
     if chat_settings["antispam"]["messagesPerMinute"]:
-        async with (await pool()).acquire() as conn:
-            if await conn.fetchval(
-                "select \"value\" from settings where chat_id=$1 and setting='messagesPerMinute'",
-                chat_id,
-            ):
-                managers.antispam.add_message(chat_id, uid, event.object.message.date)
+        if managers.chat_settings.get(chat_id, "messagesPerMinute", "value"):
+            managers.antispam.add_message(chat_id, uid, event.object.message.date)
 
     if uacc < 5 and (
-        setting := await antispam_checker(
+        setting_key := await antispam_checker(
             chat_id, uid, event.object.message, chat_settings
         )
     ):
-        async with (await pool()).acquire() as conn:
-            setting = await conn.fetchrow(
-                'select id, setting, "value", pos2 from settings where chat_id=$1 and setting=$2',
-                chat_id,
-                setting,
-            )
+        setting = await managers.chat_settings.get(chat_id, setting_key, ("id", "value", "pos2"))
         if punishment := await punish(uid, chat_id, setting[0]):
             if punishment != "del":
                 await send_message(
@@ -418,22 +404,22 @@ async def message_handle(event: MessageNew) -> Any:
                         uid,
                         await get_user_name(uid),
                         await get_user_nickname(uid, chat_id),
-                        setting[1],
+                        setting_key,
                         punishment[0],
-                        setting[2],
+                        setting[1],
                         punishment[1] if len(punishment) > 1 else 0,
                     ),
                 )
         if (
-            setting[1] in settings.settings_meta.alt_to_delete
+            setting_key in settings.settings_meta.alt_to_delete
             and (
-                setting[3]
+                setting[2]
                 or (
-                    setting[3] is None
-                    and settings.settings_alt.defaults["antispam"][setting[1]]
+                    setting[2] is None
+                    and settings.settings_alt.defaults["antispam"][setting_key]
                 )
             )
-        ) or (setting[1] not in settings.settings_meta.alt_to_delete and punishment):
+        ) or (setting_key not in settings.settings_meta.alt_to_delete and punishment):
             await delete_messages(event.object.message.conversation_message_id, chat_id)
 
     if chat_id == settings.service.mathgiveaways_to and msg.replace("-", "").isdigit():

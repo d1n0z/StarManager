@@ -87,7 +87,6 @@ async def join(message: MessageEvent):
             for id in x:
                 await utils.set_chat_mute(id[0], chat_id, 0)
             await conn.execute("delete from nickname where chat_id=$1", chat_id)
-            await conn.execute("delete from settings where chat_id=$1", chat_id)
             await conn.execute("delete from welcome where chat_id=$1", chat_id)
             await conn.execute("delete from welcomehistory where chat_id=$1", chat_id)
             await conn.execute("delete from accessnames where chat_id=$1", chat_id)
@@ -114,6 +113,7 @@ async def join(message: MessageEvent):
                 chat_id,
                 time.time(),
             )
+        await managers.chat_settings.remove(chat_id)
 
         await managers.access_level.edit_access_level(bp, chat_id, 7)
 
@@ -377,10 +377,14 @@ async def settings_menu_antispam(message: MessageEvent):
     async with (await pool()).acquire() as conn:
         chat_settings = {
             i[0]: i[:3] + (punishments[i[3].split("|")[0]] if i[3] else None,) + i[4:]
-            for i in await conn.fetch(
-                "select setting, pos, value, punishment, pos2 from settings where chat_id=$1",
-                message.peer_id - 2000000000,
-            )
+            for i in [
+                await managers.chat_settings.get(
+                    *i, ("setting", "pos", "value", "punishment", "pos2")
+                )
+                for i in await managers.chat_settings.get_by_field(
+                    chat_id=message.peer_id - 2000000000
+                )
+            ]
         }
 
     if payload["setting"] == "msgs":
@@ -424,6 +428,12 @@ async def settings_menu_antispam(message: MessageEvent):
             chat_settings.get(i, (i, None, None, None, None))
             for i in ("vkLinks", "forwardeds", "disallowLinks")
         ]
+        types = fwds[2] or 0
+        if isinstance(types, str):
+            if types.isdigit():
+                types = int(types)
+            else:
+                types = 0
         msg = f"""🚷 Спам-фильтры\nНастройте защиту от нежелательного контента.\n
 1️⃣ Ссылки на ВК
 • Статус: {"вкл." if vkls[1] else "выкл."}
@@ -434,7 +444,7 @@ async def settings_menu_antispam(message: MessageEvent):
 2️⃣ Пересылки
 • Статус: {"вкл." if fwds[1] else "выкл."}
 • Наказание: {fwds[3] or "нет"}
-• Типы: {["все", "пользователи", "сообщества"][fwds[2] or 0]}
+• Типы: {["все", "пользователи", "сообщества"][types]}
 • Удаление сообщений: {"да" if fwds[4] else "нет"}
 • Исключения: {fwdexcs} шт.
 
@@ -501,13 +511,9 @@ async def chat_settings(message: MessageEvent):
             keyboard.settings_category(uid, category, chat_settings[category]),
         )
         return
-    async with (await pool()).acquire() as conn:
-        chatsetting = await conn.fetchrow(
-            'select "value", value2, punishment from settings where chat_id=$1 and '
-            "setting=$2",
-            chat_id,
-            setting,
-        )
+    chatsetting = await managers.chat_settings.get(
+        chat_id, setting, ("value", "value2", "punishment")
+    )
     await utils.edit_message(
         await messages.settings_change_countable(
             chat_id,
@@ -568,13 +574,9 @@ async def settings_change_countable(message: MessageEvent):
         await utils.turn_chat_setting(
             chat_id, category, setting, alt=action == "turnalt"
         )
-        async with (await pool()).acquire() as conn:
-            chatsetting = await conn.fetchrow(
-                'select "value", value2, punishment, pos, pos2 from settings where '
-                "chat_id=$1 and setting=$2",
-                chat_id,
-                setting,
-            )
+        chatsetting = await managers.chat_settings.get(
+            chat_id, setting, ("value", "value2", "punishment", "pos", "pos2")
+        )
         await utils.edit_message(
             await messages.settings_change_countable(
                 chat_id,
@@ -641,17 +643,12 @@ async def settings_change_countable(message: MessageEvent):
         )
         return
     elif action == "setPreset":
-        async with (await pool()).acquire() as conn:
-            chatsetting = await conn.fetchrow(
-                'select "value" from settings where chat_id=$1 and setting=$2',
-                chat_id,
-                setting,
-            )
+        chatsetting = await managers.chat_settings.get(chat_id, setting, "value")
         await utils.edit_message(
             await messages.settings_set_preset(category, setting),
             peer_id,
             message.conversation_message_id,
-            keyboard.settings_set_preset(uid, category, setting, chatsetting[0]),
+            keyboard.settings_set_preset(uid, category, setting, chatsetting),
         )
         return
     elif action in ("setWhitelist", "setBlacklist"):
@@ -684,18 +681,12 @@ async def settings_set_preset(message: MessageEvent):
     data = payload["data"]
 
     if action == "setValue":
-        async with (await pool()).acquire() as conn:
-            val = await conn.fetchval(
-                "update settings set value=$3 where chat_id=$1 and setting=$2 returning value",
-                chat_id,
-                setting,
-                data["value"],
-            )
+        await managers.chat_settings.edit(chat_id, setting, value=data["value"])
         await utils.edit_message(
             await messages.settings_set_preset(category, setting),
             peer_id,
             message.conversation_message_id,
-            keyboard.settings_set_preset(uid, category, setting, val),
+            keyboard.settings_set_preset(uid, category, setting, data["value"]),
         )
         return
 
@@ -727,13 +718,7 @@ async def settings_set_punishment(message: MessageEvent):
         )
         return
     if action in ["deletemessage", "kick", "", "warn"]:
-        async with (await pool()).acquire() as conn:
-            await conn.execute(
-                "update settings set punishment = $1 where chat_id=$2 and setting=$3",
-                action or None,
-                chat_id,
-                setting,
-            )
+        await managers.chat_settings.edit(chat_id, setting, punishment=action or None)
         await utils.edit_message(
             await messages.settings_set_punishment(action),
             peer_id,
@@ -1757,7 +1742,9 @@ async def top_coins_in_chat(message: MessageEvent):
     if not conv_members:
         top = []
     else:
-        top = await managers.xp.get_coins_top(in_uids=[i.member_id for i in conv_members.items])
+        top = await managers.xp.get_coins_top(
+            in_uids=[i.member_id for i in conv_members.items]
+        )
     await utils.edit_message(
         await messages.top_coins(top),
         peer_id,
@@ -2973,23 +2960,11 @@ async def import_start(message: MessageEvent):
                         chatid,
                         *i,
                     )
-            for i in await conn.fetch(
-                'select setting, pos, "value", punishment, value2, pos2 from settings where chat_id=$1',
-                importchatid,
-            ):
-                if not await conn.fetchval(
-                    "update settings set pos = $1, value = $2, punishment = $3, value2 = $4, "
-                    "pos2 = $5 where chat_id=$6 and setting=$7 returning 1",
-                    *i[1:],
-                    chatid,
-                    i[0],
-                ):
-                    await conn.execute(
-                        "insert into settings (chat_id, setting, pos, value, punishment, value2, pos2) "
-                        "values ($1, $2, $3, $4, $5, $6, $7)",
-                        chatid,
-                        *i,
-                    )
+            for k in await managers.chat_settings.get_by_field(chat_id=importchatid):
+                i = await managers.chat_settings.get(
+                    *k, ("setting", "pos", "value", "punishment", "value2", "pos2")
+                )
+                await managers.chat_settings.edit(chatid, setting=i[0], pos=i[1], value=i[2], punishment=i[3], value2=i[4], pos2=i[5])
             if i := await conn.fetchrow(
                 "select msg, url, photo, button_label from welcome where chat_id=$1",
                 importchatid,

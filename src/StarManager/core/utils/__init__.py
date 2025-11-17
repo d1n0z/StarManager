@@ -170,19 +170,14 @@ async def send_message(
         )  # type: ignore
     except Exception:
         return False
-    if (
-        isinstance(peer_ids, int)
-        and peer_ids > 2000000000
-        and (await get_chat_settings((chatid := peer_ids - 2000000000)))["main"][
-            "autodelete"
-        ]
-    ):
-        async with (await pool()).acquire() as conn:
-            val = await conn.fetchval(
-                "select value from settings where setting='autodelete' and chat_id=$1",
-                chatid,
-            )
-            if val:
+
+    if isinstance(peer_ids, int) and peer_ids > 2000000000:
+        chatid = peer_ids - 2000000000
+        val, pos = await managers.chat_settings.get(
+            chatid, "autodelete", ("value", "pos")
+        )
+        if pos and val:
+            async with (await pool()).acquire() as conn:
                 await conn.execute(
                     "insert into todelete (peerid, cmid, delete_at) values ($1, $2, $3)",
                     msgs[0].peer_id,
@@ -606,74 +601,48 @@ async def add_user_coins(
 
 @AsyncTTL(time_to_live=5, maxsize=0)
 async def get_chat_settings(chat_id) -> Dict[str, Dict[str, int]]:
-    async with (await pool()).acquire() as conn:
-        dbchatsettings = {
-            i[0]: i[1]
-            for i in await conn.fetch(
-                "select setting, pos from settings where chat_id=$1", chat_id
-            )
-        }
     chatsettings = deepcopy(settings.settings_default.defaults)
     for cat, chat in chatsettings.items():
         for setting, _ in chat.items():
-            if setting not in dbchatsettings:
-                continue
-            chatsettings[cat][setting] = dbchatsettings[setting]
+            pos = await managers.chat_settings.get(chat_id, setting, "pos")
+            if pos is not None:
+                chatsettings[cat][setting] = pos
     return chatsettings
 
 
 @AsyncTTL(time_to_live=5, maxsize=0)
 async def get_chat_setting_value(chat_id, setting):
-    async with (await pool()).acquire() as conn:
-        return await conn.fetchval(
-            "select value from settings where chat_id=$1 and setting=$2",
-            chat_id,
-            setting,
-        )
+    return await managers.chat_settings.get(chat_id, setting, "value")
 
 
 @AsyncTTL(time_to_live=5, maxsize=0)
 async def get_chat_alt_settings(chat_id):
     chatsettings = deepcopy(settings.settings_alt.defaults)
-    async with (await pool()).acquire() as conn:
-        for cat, chat in chatsettings.items():
-            for setting, _ in chat.items():
-                chatsetting = await conn.fetchval(
-                    "select pos2 from settings where chat_id=$1 and setting=$2",
-                    chat_id,
-                    setting,
-                )
-                if chatsetting is None:
-                    continue
+    for cat, chat in chatsettings.items():
+        for setting, _ in chat.items():
+            chatsetting = await managers.chat_settings.get(chat_id, setting, "pos2")
+            if chatsetting is not None:
                 chatsettings[cat][setting] = chatsetting
     return chatsettings
 
 
-async def turn_chat_setting(chat_id, category, setting, alt=False):
-    async with (await pool()).acquire() as conn:
-        if not await conn.fetchval(
-            "update settings set "
-            + (
-                f"pos2 = NOT COALESCE(pos2, {str(bool(settings.settings_alt.defaults[category][setting]))})"
-                if alt
-                else "pos=not pos"
-            )
-            + " where chat_id=$1 and setting=$2 returning 1",
-            chat_id,
-            setting,
-        ):
-            await conn.execute(
-                "insert into settings (chat_id, setting, "
-                + ("pos2" if alt else "pos")
-                + ") values ($1, $2, $3)",
-                chat_id,
-                setting,
-                not (
+async def turn_chat_setting(chat_id, category, setting, alt=False) -> None:
+    pos = await managers.chat_settings.get(chat_id, setting, "pos2" if alt else "pos")
+    await managers.chat_settings.edit(
+        chat_id,
+        setting,
+        **{
+            "pos2" if alt else "pos": not (
+                (
                     settings.settings_meta.defaults[setting]["pos"]
                     if setting in settings.settings_meta.defaults
                     else settings.settings_default.defaults[category][setting]
-                ),
+                )
+                if pos is None
+                else pos
             )
+        },
+    )
 
 
 async def set_user_access_level(uid, chat_id, access_level):
@@ -757,24 +726,18 @@ async def antispam_checker(
     chat_id, uid, message: MessagesMessage, chat_settings
 ) -> str | Literal[False]:
     if chat_settings["antispam"]["messagesPerMinute"]:
-        async with (await pool()).acquire() as conn:
-            setting = await conn.fetchrow(
-                'select "value" from settings where chat_id=$1 and '
-                "setting='messagesPerMinute'",
-                chat_id,
-            )
-            if setting is not None and setting[0] is not None:
-                if managers.antispam.get_count(chat_id, uid) >= setting[0]:
-                    return "messagesPerMinute"
+        setting = await managers.chat_settings.get(
+            chat_id, "messagesPerMinute", "value"
+        )
+        if setting is not None and managers.antispam.get_count(chat_id, uid) >= setting:
+            return "messagesPerMinute"
+
     if chat_settings["antispam"]["maximumCharsInMessage"]:
-        async with (await pool()).acquire() as conn:
-            setting = await conn.fetchrow(
-                "select \"value\" from settings where chat_id=$1 and setting='maximumCharsInMessage'",
-                chat_id,
-            )
-        if setting and setting[0] is not None:
-            if len(message.text) >= setting[0]:
-                return "maximumCharsInMessage"
+        setting = await managers.chat_settings.get(
+            chat_id, "maximumCharsInMessage", "value"
+        )
+        if setting is not None and len(message.text) >= setting:
+            return "maximumCharsInMessage"
     if chat_settings["antispam"]["disallowLinks"] and not any(
         message.text.startswith(i)
         for i in await get_user_prefixes(await get_user_premium(uid), uid)
@@ -970,10 +933,8 @@ async def generate_captcha(uid, chat_id, exp):
 
 
 async def punish(uid, chat_id, setting_id):
-    async with (await pool()).acquire() as conn:
-        setting, name = await conn.fetchrow(
-            "select punishment, setting from settings where id=$1", setting_id
-        )
+    key = await managers.chat_settings.get_by_id(setting_id)
+    setting, name = await managers.chat_settings.get(*key, ("punishment", "setting"))
     if setting is None:
         return False
     punishment = list(setting.split("|"))
@@ -1404,18 +1365,13 @@ async def messagereply(
 ) -> MessagesSendUserIdsResponseItem | None:
     try:
         msg = await protectedmessage.reply(*args, **kwargs)
-        if (
-            msg.peer_id > 2000000000
-            and (await get_chat_settings((chatid := msg.peer_id - 2000000000)))["main"][
-                "autodelete"
-            ]
-        ):
-            async with (await pool()).acquire() as conn:
-                val = await conn.fetchval(
-                    "select value from settings where setting='autodelete' and chat_id=$1",
-                    chatid,
-                )
-                if val:
+        if msg.peer_id > 2000000000:
+            chatid = msg.peer_id - 2000000000
+            val, pos = await managers.chat_settings.get(
+                chatid, "autodelete", ("value", "pos")
+            )
+            if pos and val:
+                async with (await pool()).acquire() as conn:
                     await conn.execute(
                         "insert into todelete (peerid, cmid, delete_at) values ($1, $2, $3)",
                         msg.peer_id,

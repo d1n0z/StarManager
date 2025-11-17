@@ -222,10 +222,7 @@ async def action_handle(message: MessageNew) -> None:
                         await utils.get_user_nickname(uid, chat_id),
                     ),
                 )
-            if s := await conn.fetchrow(
-                "select pos, \"value\", punishment from settings where chat_id=$1 and setting='captcha'",
-                chat_id,
-            ):
+            if s := await managers.chat_settings.get(chat_id, "captcha", ("pos", "value", "punishment")):
                 if s[0] and s[1] and s[2]:
                     captcha = await utils.generate_captcha(uid, chat_id, s[1])
                     m = await utils.send_message(
@@ -248,10 +245,7 @@ async def action_handle(message: MessageNew) -> None:
                             uid,
                         )
                         return
-            if s := await conn.fetchrow(
-                "select pos, pos2 from settings where chat_id=$1 and setting='welcome'",
-                chat_id,
-            ):
+            if s := await managers.chat_settings.get(chat_id, "welcome", ("pos", "pos2")):
                 welcome = await conn.fetchrow(
                     "select msg, url, button_label, photo from welcome where chat_id=$1",
                     chat_id,

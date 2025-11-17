@@ -351,11 +351,8 @@ async def everyminute(conn: asyncpg.Connection):
             uid,
         ):
             unique.add((uid, chat_id))
-            s = await conn.fetchrow(
-                "SELECT id, punishment FROM settings WHERE chat_id = $1 AND setting = 'captcha'",
-                chat_id,
-            )
-            if s:
+
+            if s := await managers.chat_settings.get(chat_id, "captcha", ("id", "punishment")):
                 await punish(uid, chat_id, s[0])
                 await send_message(
                     chat_id + 2000000000,
@@ -445,16 +442,12 @@ async def run_notifications(conn: asyncpg.Connection):
             traceback.print_exc()
 
 
-async def run_nightmode_notifications(conn: asyncpg.Connection):
-    rows = await conn.fetch(
-        "SELECT chat_id, value2 FROM settings WHERE setting = 'nightmode' AND pos = true AND value2 IS NOT NULL"
-    )
+async def run_nightmode_notifications():
     now = datetime.now()
-    for chat_id, value in rows:
-        if await conn.fetchval(
-            "SELECT EXISTS(SELECT 1 FROM blocked WHERE uid = $1 AND type = 'chat')",
-            chat_id,
-        ):
+    rows = await managers.chat_settings.get_by_field(setting="nightmode", pos=True)
+    for chat_id, _ in rows:
+        value = await managers.chat_settings.get(chat_id, "nightmode", "value2")
+        if value is None:
             continue
         start_str, end_str = value.split("-")
         start = datetime.strptime(start_str, "%H:%M").replace(year=2024)
@@ -582,13 +575,13 @@ def add_jobs(scheduler):
 
     # timeouts are calculated based on task execution intervals to prevent overlapping
     scheduler.add_job(
-        schedule(run_notifications, timeout=10800),
+        schedule(run_notifications, timeout=180),
         CronTrigger.from_crontab("1/3 * * * *"),
         id="run_notifications",
     )
     scheduler.add_job(
-        schedule(run_nightmode_notifications, timeout=10800),
-        CronTrigger.from_crontab("0/3 * * * *"),
+        schedule(run_nightmode_notifications, use_db=False, timeout=180),
+        CronTrigger.from_crontab("*/1 * * * *"),
         id="run_nightmode_notifications",
     )
     scheduler.add_job(
