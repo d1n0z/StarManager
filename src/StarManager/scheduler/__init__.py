@@ -227,20 +227,15 @@ async def updateChats(conn: asyncpg.Connection):
 
 async def updateGroups(conn: asyncpg.Connection):  # TODO: optimize
     group_rows = await conn.fetch("select group_id from groupnames")
-    for i in range(0, len(group_rows), 500):
-        batch = [r[0] for r in group_rows[i : i + 500]]
-        code = f"""
-        var grp = API.groups.getById({{"group_ids": "{",".join(map(str, map(abs, batch)))}"}});
-        return grp;
-        """
+    for i in range(0, len(group_rows), 499):
+        batch = [abs(r[0]) for r in group_rows[i : i + 499]]
         try:
             if i:
                 await asyncio.sleep(0.5)
-            result = await api.execute(code)
-            updates = []
-            for g in result["groups"]:
-                gid = -abs(g["id"])
-                updates.append((g["name"], gid))
+            result = await api.groups.get_by_id(group_ids=batch)
+            if not result or not result.groups:
+                continue
+            updates = [(g.name, -abs(g.id)) for g in result.groups]
             await conn.executemany(
                 "update groupnames set name = $1 where group_id = $2", updates
             )
