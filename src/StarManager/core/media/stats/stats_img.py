@@ -74,12 +74,12 @@ def createStatsImage(
             anchor="ma",
         )
 
-    if color:
+    if color and prem:
         try:
             color = literal_eval(color)
         except Exception as _:
             color = False
-    if not color:
+    else:
         if access_level == 1:
             color = (37, 72, 161)
         elif access_level == 2:

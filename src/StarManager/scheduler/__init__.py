@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Optional
 
 from apscheduler.triggers.cron import CronTrigger
+import asyncpg
 from loguru import logger
 
 from StarManager.core import managers
@@ -104,7 +105,7 @@ async def with_lock(func, use_db=True, timeout: Optional[int] = 300):
 def schedule(coro_func, *, use_db: bool = True, timeout: Optional[int] = 300):
     if timeout is not None:
         scheduler_monitor.register_job(coro_func.__name__, timeout)
-    
+
     async def _runner():
         try:
             await with_lock(coro_func, use_db=use_db, timeout=timeout)
@@ -116,10 +117,11 @@ def schedule(coro_func, *, use_db: bool = True, timeout: Optional[int] = 300):
 
 async def backup() -> None:
     from StarManager.scheduler.backup_service import backup_service
+
     await backup_service.create_backup()
 
 
-async def updateUsers(conn):  # TODO: optimize
+async def updateUsers(conn: asyncpg.Connection):  # TODO: optimize
     user_rows = await conn.fetch("select uid from usernames")
     for i in range(0, len(user_rows), 25):
         batch = [r[0] for r in user_rows[i : i + 25]]
@@ -127,7 +129,11 @@ async def updateUsers(conn):  # TODO: optimize
             users = await api.users.get(user_ids=batch, fields=["domain"])  # type: ignore
             updates = []
             for u in users:
-                full_name = f"{u.first_name} {u.last_name}" if u.first_name and u.last_name else "Unknown"
+                full_name = (
+                    f"{u.first_name} {u.last_name}"
+                    if u.first_name and u.last_name
+                    else "Unknown"
+                )
                 domain = u.domain or f"id{u.id}"
                 updates.append((full_name, domain, u.id))
             await conn.executemany(
@@ -137,7 +143,7 @@ async def updateUsers(conn):  # TODO: optimize
             logger.exception("Users update exception:")
 
 
-async def updateChats(conn):
+async def updateChats(conn: asyncpg.Connection):
     chatnames_ids = [i[0] for i in await conn.fetch("select chat_id from chatnames")]
     publicchats_ids = [
         i[0] for i in await conn.fetch("select chat_id from publicchats")
@@ -215,7 +221,7 @@ async def updateChats(conn):
         )
 
 
-async def updateGroups(conn):  # TODO: optimize
+async def updateGroups(conn: asyncpg.Connection):  # TODO: optimize
     group_rows = await conn.fetch("select group_id from groupnames")
     for i in range(0, len(group_rows), 500):
         batch = [r[0] for r in group_rows[i : i + 500]]
@@ -236,10 +242,10 @@ async def updateGroups(conn):  # TODO: optimize
             logger.exception("Groups update exception:")
 
 
-async def every10min(conn):
+async def every10min(conn: asyncpg.Connection):
     await asyncio.to_thread(
         os.system,
-        rf"find {settings.service.path}src/StarManager/core/media/temp/ -mtime +1 -exec rm {{}} \;"
+        rf"find {settings.service.path}src/StarManager/core/media/temp/ -mtime +1 -exec rm {{}} \;",
     )
     now = time.time()
     await conn.execute('DELETE FROM prempromo WHERE "end" < $1', now)
@@ -249,7 +255,10 @@ async def every10min(conn):
         now - 86400 * 2,
     )
     if expired:
-        await asyncio.gather(*(delete_messages(cmid, uid) for uid, cmid in expired), return_exceptions=True)
+        await asyncio.gather(
+            *(delete_messages(cmid, uid) for uid, cmid in expired),
+            return_exceptions=True,
+        )
         await conn.execute(
             "DELETE FROM premiumexpirenotified WHERE date < $1", now - 86400 * 2
         )
@@ -297,27 +306,16 @@ async def every10min(conn):
             cmid,
         )
 
-    await conn.execute(
-        """
-                    WITH affected AS (
-                        SELECT b.id, b.streak
-                        FROM bonus b
-                        WHERE b.time < $1
-                        AND NOT EXISTS (SELECT 1 FROM premium p WHERE p.uid = b.uid)
-                        FOR UPDATE SKIP LOCKED
-                    ),
-                    updated AS (
-                        UPDATE bonus
-                        SET streak = streak - 2, time = $2
-                        WHERE id IN (SELECT id FROM affected WHERE streak >= 2)
-                        RETURNING id
-                    )
-                    DELETE FROM bonus
-                    WHERE id IN (SELECT id FROM affected WHERE streak < 2);
-                    """,
-        now - 172800,
-        now - 86400,
-    )
+    deletes, updates = [], []
+    for row in await conn.fetch("SELECT id, time, streak from bonus WHERE time < $1 FOR UPDATE SKIP LOCKED", now - 86400 * 2):
+        if row[2] <= 2:
+            deletes.append((row[0],))
+            continue
+        updates.append((row[0],))
+    if updates:
+        await conn.executemany("UPDATE bonus SET time=time+86400, streak=streak-2 where id=$1", updates)
+    if deletes:
+        await conn.executemany("DELETE FROM bonus WHERE id=$1", deletes)
 
     for chunk in chunks(
         await conn.fetch("SELECT uid FROM rewardscollected WHERE deactivated = false"),
@@ -337,7 +335,7 @@ async def every10min(conn):
             pass
 
 
-async def everyminute(conn):
+async def everyminute(conn: asyncpg.Connection):
     now = time.time()
 
     captchas = await conn.fetch(
@@ -357,11 +355,12 @@ async def everyminute(conn):
                 "SELECT id, punishment FROM settings WHERE chat_id = $1 AND setting = 'captcha'",
                 chat_id,
             )
-            await punish(uid, chat_id, s[0])
-            await send_message(
-                chat_id + 2000000000,
-                await messages.captcha_punish(uid, await get_user_name(uid), s[1]),
-            )
+            if s:
+                await punish(uid, chat_id, s[0])
+                await send_message(
+                    chat_id + 2000000000,
+                    await messages.captcha_punish(uid, await get_user_name(uid), s[1]),
+                )
 
     await conn.execute("DELETE FROM captcha WHERE exptime < $1", now)
 
@@ -371,14 +370,17 @@ async def everyminute(conn):
     if todelete:
         await asyncio.gather(
             *(delete_messages(cmid, peerid - 2000000000) for peerid, cmid in todelete),
-            return_exceptions=True
+            return_exceptions=True,
         )
         await conn.execute("DELETE FROM todelete WHERE delete_at < $1", now)
 
 
-async def run_notifications(conn):
+async def run_notifications(conn: asyncpg.Connection):
     now = int(time.time())
-    rows = await conn.fetch("select id, chat_id, tag, every, time, name, text from notifications where status = 1 and every != -1 and time < $1 and not exists (select 1 from blocked where uid = notifications.chat_id and type = 'chat')", now)
+    rows = await conn.fetch(
+        "select id, chat_id, tag, every, time, name, text from notifications where status = 1 and every != -1 and time < $1 and not exists (select 1 from blocked where uid = notifications.chat_id and type = 'chat')",
+        now,
+    )
     for row in rows:
         id_, chat_id, tag, every, ttime, name, text = row
         try:
@@ -422,7 +424,9 @@ async def run_notifications(conn):
                     pass
             if call:
                 if not await send_message(
-                    chat_id + 2000000000, await messages.send_notification(text, call), disable_mentions=False
+                    chat_id + 2000000000,
+                    await messages.send_notification(text, call),
+                    disable_mentions=False,
                 ):
                     await send_message(
                         chat_id + 2000000000,
@@ -441,7 +445,7 @@ async def run_notifications(conn):
             traceback.print_exc()
 
 
-async def run_nightmode_notifications(conn):
+async def run_nightmode_notifications(conn: asyncpg.Connection):
     rows = await conn.fetch(
         "SELECT chat_id, value2 FROM settings WHERE setting = 'nightmode' AND pos = true AND value2 IS NOT NULL"
     )
@@ -466,7 +470,7 @@ async def run_nightmode_notifications(conn):
             await send_message(chat_id + 2000000000, await messages.nightmode_end())
 
 
-async def mathgiveaway(conn):
+async def mathgiveaway(conn: asyncpg.Connection):
     now = datetime.now()
     if now.hour in (9, 21) and now.minute < 15:
         math, ans = generate_hard_problem()
@@ -487,7 +491,7 @@ async def mathgiveaway(conn):
     if old:
         await delete_messages(old, settings.service.mathgiveaways_to)
     await conn.execute("UPDATE mathgiveaway SET finished = true WHERE finished = false")
-    
+
     for attempt in range(3):
         cmid = await send_message(
             settings.service.mathgiveaways_to + 2000000000,
@@ -500,7 +504,7 @@ async def mathgiveaway(conn):
     else:
         logger.error("mathgiveaway failed to send message after 3 attempts")
         return
-    
+
     cmid = cmid[0].conversation_message_id
     await conn.execute(
         "INSERT INTO mathgiveaway (math, level, cmid, xp, ans, winner, finished) VALUES ($1, $2, $3, $4, $5, NULL, false)",
@@ -512,13 +516,13 @@ async def mathgiveaway(conn):
     )
 
 
-async def everyday(conn):
+async def everyday(conn: asyncpg.Connection):
     await conn.execute("UPDATE shop SET limits='[0, 0, 0, 0, 0]'")
     await managers.xp.nullify_xp_limit()
     await managers.chat_user_cmids.clear()
 
 
-async def new_tg_giveaway(conn):
+async def new_tg_giveaway(conn: asyncpg.Connection):
     msg = await tgbot.send_message(
         chat_id=settings.telegram.public_chat_id,
         message_thread_id=settings.telegram.public_giveaway_thread_id,
@@ -532,7 +536,7 @@ async def new_tg_giveaway(conn):
     await conn.execute("insert into tggiveaways (mid) values ($1)", msg.message_id)
 
 
-async def end_tg_giveaway(conn):
+async def end_tg_giveaway(conn: asyncpg.Connection):
     winners = []
     mid = await conn.fetchval("select mid from tggiveaways")
     users = await conn.fetch("select tgid from tggiveawayusers")
@@ -578,28 +582,70 @@ def add_jobs(scheduler):
 
     # timeouts are calculated based on task execution intervals to prevent overlapping
     scheduler.add_job(
-        schedule(run_notifications, timeout=10800), CronTrigger.from_crontab("1/3 * * * *"), id="run_notifications"
+        schedule(run_notifications, timeout=10800),
+        CronTrigger.from_crontab("1/3 * * * *"),
+        id="run_notifications",
     )
     scheduler.add_job(
-        schedule(run_nightmode_notifications, timeout=10800), CronTrigger.from_crontab("0/3 * * * *"), id="run_nightmode_notifications"
+        schedule(run_nightmode_notifications, timeout=10800),
+        CronTrigger.from_crontab("0/3 * * * *"),
+        id="run_nightmode_notifications",
     )
-    scheduler.add_job(schedule(everyminute, timeout=60), CronTrigger.from_crontab("*/1 * * * *"), id="everyminute")
-
-    scheduler.add_job(schedule(every10min, timeout=600), CronTrigger.from_crontab("*/10 * * * *"), id="every10min")
+    scheduler.add_job(
+        schedule(everyminute, timeout=60),
+        CronTrigger.from_crontab("*/1 * * * *"),
+        id="everyminute",
+    )
 
     scheduler.add_job(
-        schedule(backup, use_db=False, timeout=None), CronTrigger.from_crontab("0 6,18 * * *"), id="backup"
+        schedule(every10min, timeout=600),
+        CronTrigger.from_crontab("*/10 * * * *"),
+        id="every10min",
     )
 
-    scheduler.add_job(schedule(updateChats, timeout=10800), CronTrigger.from_crontab("0 0/3 * * *"), id="updateChats")
-    scheduler.add_job(schedule(updateGroups, timeout=10800), CronTrigger.from_crontab("0 1/3 * * *"), id="updateGroups")
-    scheduler.add_job(schedule(updateUsers, timeout=10800), CronTrigger.from_crontab("0 2/3 * * *"), id="updateUsers")
+    scheduler.add_job(
+        schedule(backup, use_db=False, timeout=None),
+        CronTrigger.from_crontab("0 6,18 * * *"),
+        id="backup",
+    )
 
-    scheduler.add_job(schedule(mathgiveaway, timeout=900), CronTrigger.from_crontab("*/15 * * * *"), id="mathgiveaway")
+    scheduler.add_job(
+        schedule(updateChats, timeout=10800),
+        CronTrigger.from_crontab("0 0/3 * * *"),
+        id="updateChats",
+    )
+    scheduler.add_job(
+        schedule(updateGroups, timeout=10800),
+        CronTrigger.from_crontab("0 1/3 * * *"),
+        id="updateGroups",
+    )
+    scheduler.add_job(
+        schedule(updateUsers, timeout=10800),
+        CronTrigger.from_crontab("0 2/3 * * *"),
+        id="updateUsers",
+    )
 
-    scheduler.add_job(schedule(everyday, timeout=86400), CronTrigger.from_crontab("0 0 * * *"), id="everyday")
+    scheduler.add_job(
+        schedule(mathgiveaway, timeout=900),
+        CronTrigger.from_crontab("*/15 * * * *"),
+        id="mathgiveaway",
+    )
 
-    scheduler.add_job(schedule(new_tg_giveaway, timeout=86400), CronTrigger.from_crontab("0 10 * * *"), id="new_tg_giveaway")
-    scheduler.add_job(schedule(end_tg_giveaway, timeout=86400), CronTrigger.from_crontab("0 9 * * *"), id="end_tg_giveaway")
-    
+    scheduler.add_job(
+        schedule(everyday, timeout=86400),
+        CronTrigger.from_crontab("0 0 * * *"),
+        id="everyday",
+    )
+
+    scheduler.add_job(
+        schedule(new_tg_giveaway, timeout=86400),
+        CronTrigger.from_crontab("0 10 * * *"),
+        id="new_tg_giveaway",
+    )
+    scheduler.add_job(
+        schedule(end_tg_giveaway, timeout=86400),
+        CronTrigger.from_crontab("0 9 * * *"),
+        id="end_tg_giveaway",
+    )
+
     logger.info(f"Loaded {len(scheduler.get_jobs())} scheduler jobs")

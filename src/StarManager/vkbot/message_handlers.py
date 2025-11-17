@@ -65,7 +65,7 @@ async def message_handle(event: MessageNew) -> Any:
                 await messages.pm_market(),
                 kbd=keyboard.pm_market(event.object.message.from_id),
             )
-    
+
     uid = event.object.message.from_id
     msgtime = event.object.message.date
     chat_id = event.object.message.peer_id - 2000000000
@@ -92,7 +92,7 @@ async def message_handle(event: MessageNew) -> Any:
                 return await delete_messages(
                     event.object.message.conversation_message_id, chat_id
                 )
-    
+
     if (
         await get_silence(chat_id) and uacc not in await get_silence_allowed(chat_id)
     ) or await get_user_mute(uid, chat_id) > int(msgtime):
@@ -258,10 +258,11 @@ async def message_handle(event: MessageNew) -> Any:
             ),
         )
 
+    uprem = await get_user_premium(uid)
     data = event.object.message.text.split()
     if not any(
         event.object.message.text.startswith(i)
-        for i in await get_user_prefixes(await get_user_premium(uid), uid)
+        for i in await get_user_prefixes(uprem, uid)
     ) and (
         pinged := [
             i
@@ -300,11 +301,13 @@ async def message_handle(event: MessageNew) -> Any:
                         await get_user_name(uid),
                     ),
                 )
-        if tonotif := [
-            i
-            for i in pinged
-            if await get_user_premmenu_setting(i[0], "tagnotif", False)
-        ]:
+        if uprem and (
+            tonotif := [
+                i
+                for i in pinged
+                if await get_user_premmenu_setting(i[0], "tagnotif", False)
+            ]
+        ):
             for i in tonotif:
                 if not await send_message(
                     i[0],
