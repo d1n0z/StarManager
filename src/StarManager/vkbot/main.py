@@ -1,5 +1,5 @@
 from loguru import logger
-from vkbottle import GroupEventType, GroupTypes
+from vkbottle import GroupEventType, GroupTypes, VKAPIError
 from vkbottle.framework.labeler import BotLabeler
 
 from StarManager.core import managers
@@ -40,6 +40,10 @@ def main():
     @labeler.raw_event(GroupEventType.LIKE_ADD, dataclass=GroupTypes.LikeAdd)
     async def like_add(event: GroupTypes.LikeAdd):
         await like_handle(event)
+    
+    @bot.error_handler.register_error_handler(VKAPIError[100], VKAPIError[917])
+    async def unwanted_tracebacks_handler(e: VKAPIError):
+        pass
 
     bot.labeler.load(labeler)
     for labeler in found_labelers:
