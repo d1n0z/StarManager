@@ -126,6 +126,8 @@ async def updateUsers(conn: asyncpg.Connection):  # TODO: optimize
     for i in range(0, len(user_rows), 25):
         batch = [r[0] for r in user_rows[i : i + 25]]
         try:
+            if i:
+                await asyncio.sleep(0.5)
             users = await api.users.get(user_ids=batch, fields=["domain"])  # type: ignore
             updates = []
             for u in users:
@@ -159,6 +161,7 @@ async def updateChats(conn: asyncpg.Connection):
         peer_ids = [2000000000 + cid for cid in chat_ids]
 
         try:
+            await asyncio.sleep(0.5)
             conv = await api.messages.get_conversations_by_id(peer_ids=peer_ids)
         except Exception:
             logger.exception("getConversationsById failed:")
@@ -176,7 +179,7 @@ async def updateChats(conn: asyncpg.Connection):
                 members_count = item.chat_settings.members_count
 
                 if not members_count:
-                    await asyncio.sleep(0.34)
+                    await asyncio.sleep(0.5)
                     try:
                         members = await api.messages.get_conversation_members(
                             peer_id=item.peer.id
@@ -202,6 +205,7 @@ async def updateChats(conn: asyncpg.Connection):
         ]
         for chat_id in missing:
             try:
+                await asyncio.sleep(0.5)
                 members = await api.messages.get_conversation_members(
                     peer_id=2000000000 + chat_id
                 )
@@ -230,6 +234,8 @@ async def updateGroups(conn: asyncpg.Connection):  # TODO: optimize
         return grp;
         """
         try:
+            if i:
+                await asyncio.sleep(0.5)
             result = await api.execute(code)
             updates = []
             for g in result["groups"]:
@@ -322,6 +328,7 @@ async def every10min(conn: asyncpg.Connection):
         499,
     ):
         try:
+            await asyncio.sleep(0.5)
             members = await api.groups.is_member(
                 group_id=settings.vk.group_id, user_ids=[row[0] for row in chunk]
             )
@@ -386,6 +393,7 @@ async def run_notifications(conn: asyncpg.Connection):
                 call = True
             elif tag == 2:
                 try:
+                    await asyncio.sleep(0.34)
                     members = await api.messages.get_conversation_members(
                         chat_id + 2000000000
                     )
@@ -409,6 +417,7 @@ async def run_notifications(conn: asyncpg.Connection):
                 )
                 excluded = {a[0] for a in ac}
                 try:
+                    await asyncio.sleep(0.34)
                     members = await api.messages.get_conversation_members(
                         chat_id + 2000000000
                     )
