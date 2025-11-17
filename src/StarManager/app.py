@@ -82,7 +82,7 @@ async def lifespan(app: FastAPI):
                     pool_info = f"DB: {db_pool.get_size() - db_pool.get_idle_size()}/{db_pool.get_size()}"
                 except Exception:
                     pool_info = "DB: ?"
-                logger.info(
+                logger.debug(
                     f"VK tasks: {len(_vk_tasks)} | Queued: {event_queue.qsize()} | {pool_info}"
                 )
         except asyncio.CancelledError:

@@ -15,6 +15,8 @@ class InterceptHandler(logging.Handler):
 def setup_logs():
     logger.remove()
 
+    logging.getLogger("apscheduler").setLevel(logging.WARNING)
+
     def filter_vk_api_error_spam(record):
         msg = record["message"]
         if "API error(s) in response wasn't handled" in msg:
