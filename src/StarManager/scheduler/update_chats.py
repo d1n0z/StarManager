@@ -195,7 +195,7 @@ async def process_chunk(
         return updates_chatnames, updates_publicchats_filtered
 
 
-async def update_chats(conn):
+async def updateChats(conn):
     rows = await conn.fetch("SELECT chat_id FROM chatnames")
     chatnames_ids = [r["chat_id"] for r in rows]
     rows = await conn.fetch("SELECT chat_id, members_count FROM publicchats")

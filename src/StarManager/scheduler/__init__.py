@@ -28,7 +28,7 @@ from StarManager.core.utils import (
     punish,
     send_message,
 )
-from StarManager.scheduler import updateChats
+from StarManager.scheduler.update_chats import updateChats
 from StarManager.tgbot import keyboard as tgkeyboard
 from StarManager.tgbot.bot import bot as tgbot
 from StarManager.vkbot import keyboard, messages
