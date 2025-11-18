@@ -9,8 +9,8 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Optional
 
-from apscheduler.triggers.cron import CronTrigger
 import asyncpg
+from apscheduler.triggers.cron import CronTrigger
 from loguru import logger
 
 from StarManager.core import managers
@@ -28,6 +28,7 @@ from StarManager.core.utils import (
     punish,
     send_message,
 )
+from StarManager.scheduler import updateChats
 from StarManager.tgbot import keyboard as tgkeyboard
 from StarManager.tgbot.bot import bot as tgbot
 from StarManager.vkbot import keyboard, messages
@@ -145,86 +146,6 @@ async def updateUsers(conn: asyncpg.Connection):  # TODO: optimize
             logger.exception("Users update exception:")
 
 
-async def updateChats(conn: asyncpg.Connection):
-    chatnames_ids = [i[0] for i in await conn.fetch("select chat_id from chatnames")]
-    publicchats_ids = [
-        i[0] for i in await conn.fetch("select chat_id from publicchats")
-    ]
-    total_chat_ids = list(set(chatnames_ids + publicchats_ids))
-    if not total_chat_ids:
-        return
-
-    updates_chatnames = []
-    updates_publicchats = []
-
-    for chat_ids in chunks(total_chat_ids, 100) if total_chat_ids else []:
-        peer_ids = [2000000000 + cid for cid in chat_ids]
-
-        try:
-            await asyncio.sleep(0.5)
-            conv = await api.messages.get_conversations_by_id(peer_ids=peer_ids)
-        except Exception:
-            logger.exception("getConversationsById failed:")
-            continue
-
-        members_cache = {}
-
-        for item in getattr(conv, "items", []):
-            try:
-                if not item.peer or not item.chat_settings:
-                    continue
-
-                chat_id = item.peer.id - 2000000000
-                title = item.chat_settings.title
-                members_count = item.chat_settings.members_count
-
-                if not members_count:
-                    await asyncio.sleep(0.5)
-                    try:
-                        members = await api.messages.get_conversation_members(
-                            peer_id=item.peer.id
-                        )
-                        members_count = len(members.items)
-                        members_cache[chat_id] = members_count
-                    except Exception:
-                        members_count = None
-
-                updates_chatnames.append((title, chat_id))
-                if members_count is not None:
-                    updates_publicchats.append((members_count, chat_id))
-
-            except Exception:
-                logger.exception(f"Error processing chat item {item}")
-                continue
-
-        missing = [
-            cid
-            for cid in chat_ids
-            if cid not in members_cache
-            and cid not in [u[1] for u in updates_publicchats]
-        ]
-        for chat_id in missing:
-            try:
-                await asyncio.sleep(0.5)
-                members = await api.messages.get_conversation_members(
-                    peer_id=2000000000 + chat_id
-                )
-                updates_publicchats.append((len(members.items), chat_id))
-            except Exception:
-                pass
-
-    if updates_chatnames:
-        await conn.executemany(
-            "update chatnames set name = $1 where chat_id = $2", updates_chatnames
-        )
-
-    if updates_publicchats:
-        await conn.executemany(
-            "update publicchats set members_count = $1 where chat_id = $2",
-            updates_publicchats,
-        )
-
-
 async def updateGroups(conn: asyncpg.Connection):  # TODO: optimize
     group_rows = await conn.fetch("select group_id from groupnames")
     for i in range(0, len(group_rows), 499):
@@ -308,13 +229,18 @@ async def every10min(conn: asyncpg.Connection):
         )
 
     deletes, updates = [], []
-    for row in await conn.fetch("SELECT id, time, streak from bonus WHERE time < $1 FOR UPDATE SKIP LOCKED", now - 86400 * 2):
+    for row in await conn.fetch(
+        "SELECT id, time, streak from bonus WHERE time < $1 FOR UPDATE SKIP LOCKED",
+        now - 86400 * 2,
+    ):
         if row[2] <= 2:
             deletes.append((row[0],))
             continue
         updates.append((row[0],))
     if updates:
-        await conn.executemany("UPDATE bonus SET time=time+86400, streak=streak-2 where id=$1", updates)
+        await conn.executemany(
+            "UPDATE bonus SET time=time+86400, streak=streak-2 where id=$1", updates
+        )
     if deletes:
         await conn.executemany("DELETE FROM bonus WHERE id=$1", deletes)
 
@@ -354,7 +280,9 @@ async def everyminute(conn: asyncpg.Connection):
         ):
             unique.add((uid, chat_id))
 
-            if s := await managers.chat_settings.get(chat_id, "captcha", ("id", "punishment")):
+            if s := await managers.chat_settings.get(
+                chat_id, "captcha", ("id", "punishment")
+            ):
                 await punish(uid, chat_id, s[0])
                 await send_message(
                     chat_id + 2000000000,
