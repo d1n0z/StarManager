@@ -63,7 +63,7 @@ async def updateChats(conn):
         }
 
         convs = await vk_execute(build_get_conversations_code(peer_ids))
-        for item in convs or []:
+        for _, item in convs or []:
             pid = item.peer.id
             cid = local_map.get(pid)
             if not cid:
@@ -73,7 +73,7 @@ async def updateChats(conn):
                 to_update_names.append((title, cid))
 
         members_raw = await vk_execute(build_get_members_code(peer_ids))
-        for item in members_raw or []:
+        for _, item in members_raw or []:
             pid = getattr(item, "peer_id", None) or item.get("peer_id")
             cid = local_map.get(pid)
             if not cid:
