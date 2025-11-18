@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 dependencies = [
     "aerich>=0.9.1",
     "aiogram>=3.22.0",
+    "aiolimiter>=1.2.1",
     "apscheduler>=3.11.0",
     "async-cache>=1.1.1",
     "asyncpg>=0.30.0",
