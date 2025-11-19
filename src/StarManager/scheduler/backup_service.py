@@ -56,9 +56,7 @@ class BackupService:
                     text=f"<a href='{link}'>{filename}</a>",
                     parse_mode="HTML",
                 )
-                logger.info(f"Backup completed: {filename}")
-
-            except Exception as e:
+            except Exception:
                 logger.exception("Backup failed")
                 if backup_path.exists():
                     backup_path.unlink()

@@ -137,11 +137,9 @@ async def updateChats(conn):
                     "UPDATE chatnames SET name = $1 WHERE chat_id = $2",
                     to_update_names[i : i + 500],
                 )
-            logger.info(f"updated {len(to_update_names)} chat names")
         if to_update_counts:
             for i in range(0, len(to_update_counts), 500):
                 await conn.executemany(
                     "UPDATE publicchats SET members_count = $1 WHERE chat_id = $2",
                     to_update_counts[i : i + 500],
                 )
-            logger.info(f"updated {len(to_update_counts)} chat counts")

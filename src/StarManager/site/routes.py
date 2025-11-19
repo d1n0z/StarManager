@@ -666,9 +666,6 @@ async def process_vk_event(data, data_type):
             ):  # first /stats command in a new run can load for a minute or so
                 async with _vk_semaphore:
                     await vkbot.process_event(data)
-            elapsed = time.time() - start
-            if elapsed > 20:
-                logger.warning(f"Slow event: {event_info} took {elapsed:.2f}s")
         except asyncio.TimeoutError:
             elapsed = time.time() - start
             logger.error(f"TIMEOUT after {elapsed:.2f}s: {event_info}")

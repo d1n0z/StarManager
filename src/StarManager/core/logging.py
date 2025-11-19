@@ -16,6 +16,9 @@ def setup_logs():
     logger.remove()
 
     logging.getLogger("apscheduler").setLevel(logging.WARNING)
+    logging.getLogger("aiogram").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("yadisk").setLevel(logging.WARNING)
 
     def filter_vk_api_error_spam(record):
         msg = record["message"]
