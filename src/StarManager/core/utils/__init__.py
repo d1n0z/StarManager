@@ -312,7 +312,7 @@ async def set_chat_mute(
 
 
 async def upload_image(
-    file: str, uid: int | None = None, count: int = 0, delay: float = 1
+    file: str, uid: int | None = None, retry: int = 0
 ) -> str | None:
     if not uid:
         uid = await get_hidden_album_user()
@@ -330,11 +330,9 @@ async def upload_image(
             global _hiddenalbumuid
             _hiddenalbumuid = None
             uid = await get_hidden_album_user()
-        if "too many" in str(e).lower():
-            await asyncio.sleep(1)
-        if count != 2:
-            await asyncio.sleep(delay)
-            return await upload_image(file, uid, count + 1, delay + 1)
+        if retry < 6 or "too many" in str(e).lower():
+            await asyncio.sleep((2 ** retry) / 2)
+            return await upload_image(file, uid, retry + 1)
         raise e
 
 
@@ -1191,9 +1189,6 @@ async def is_messages_from_group_allowed(uid):
 
 async def get_hidden_album_user():
     global _hiddenalbumuid
-
-    if _hiddenalbumuid:
-        return _hiddenalbumuid
     async with _hiddenalbumlock:
         if _hiddenalbumuid:
             return _hiddenalbumuid
