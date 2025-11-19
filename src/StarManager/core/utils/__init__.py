@@ -56,12 +56,15 @@ async def get_user_name(uid: int) -> str:
         name = await api.users.get(user_ids=[uid], fields=[UsersFields.DOMAIN.value])  # type: ignore
         if not name:
             return "UNKNOWN"
-        await conn.execute(
-            "insert into usernames (uid, name, domain) values ($1, $2, $3)",
-            uid,
-            f"{name[0].first_name} {name[0].last_name}",
-            name[0].domain or f"id{name[0].id}",
-        )
+        try:
+            await conn.execute(
+                "insert into usernames (uid, name, domain) values ($1, $2, $3)",
+                uid,
+                f"{name[0].first_name} {name[0].last_name}",
+                name[0].domain or f"id{name[0].id}",
+            )
+        except Exception:
+            pass  # i guess it's not so important
         return f"{name[0].first_name} {name[0].last_name}"
 
 
@@ -680,7 +683,10 @@ def _nsfw_detector_sync(pic_path):
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
         temp_file.write(image_data)
         temp_file_path = temp_file.name
-    result = detector.detect(temp_file_path)
+    try:
+        result = detector.detect(temp_file_path)
+    except Exception:
+        return False
     os.unlink(temp_file_path)
     for i in result:
         if i["class"] in settings.nsfw_categories.categories:
