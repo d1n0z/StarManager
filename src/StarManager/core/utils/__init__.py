@@ -333,6 +333,9 @@ async def upload_image(
         if retry < 6 or "too many" in str(e).lower():
             await asyncio.sleep((2 ** retry) / 2)
             return await upload_image(file, uid, retry + 1)
+        if "internal" in str(e).lower():
+            logger.error("Failed to find an appropriate hidden album!!")
+            return
         raise e
 
 

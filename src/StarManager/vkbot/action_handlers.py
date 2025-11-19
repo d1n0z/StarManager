@@ -225,26 +225,28 @@ async def action_handle(message: MessageNew) -> None:
             if s := await managers.chat_settings.get(chat_id, "captcha", ("pos", "value", "punishment")):
                 if s[0] and s[1] and s[2]:
                     captcha = await utils.generate_captcha(uid, chat_id, s[1])
-                    m = await utils.send_message(
-                        event.peer_id,
-                        await messages.captcha(
-                            uid, await utils.get_user_name(uid), s[1], s[2]
-                        ),
-                        photo=await utils.upload_image(captcha[0]),
-                    )
-                    if m and not isinstance(m, (int, bool)):
-                        await conn.execute(
-                            "update captcha set cmid = $1 where id=$2",
-                            m[0].conversation_message_id,
-                            captcha[1],
+                    photo = await utils.upload_image(captcha[0])
+                    if photo:
+                        m = await utils.send_message(
+                            event.peer_id,
+                            await messages.captcha(
+                                uid, await utils.get_user_name(uid), s[1], s[2]
+                            ),
+                            photo=photo,
                         )
-                        await conn.execute(
-                            'insert into typequeue (chat_id, uid, "type", additional) '
-                            "values ($1, $2, 'captcha', '{}')",
-                            chat_id,
-                            uid,
-                        )
-                        return
+                        if m and not isinstance(m, (int, bool)):
+                            await conn.execute(
+                                "update captcha set cmid = $1 where id=$2",
+                                m[0].conversation_message_id,
+                                captcha[1],
+                            )
+                            await conn.execute(
+                                'insert into typequeue (chat_id, uid, "type", additional) '
+                                "values ($1, $2, 'captcha', '{}')",
+                                chat_id,
+                                uid,
+                            )
+                            return
             if s := await managers.chat_settings.get(chat_id, "welcome", ("pos", "pos2")):
                 welcome = await conn.fetchrow(
                     "select msg, url, button_label, photo from welcome where chat_id=$1",

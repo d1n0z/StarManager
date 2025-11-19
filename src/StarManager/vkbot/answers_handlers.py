@@ -345,6 +345,14 @@ async def queue_handler(event: MessageNew):
                 photo = await upload_image(
                     f"{settings.service.path}src/StarManager/core/media/temp/{uid}welcome.jpg"
                 )
+                if not photo:
+                    return await send_message(
+                        chat_id + 2000000000,
+                        "⚠️ Неизвестная ошибка. Пожалуйста, попробуйте позже.",
+                        keyboard.settings_change_countable(
+                            uid, "main", "welcome", onlybackbutton=True
+                        ),
+                    )
                 async with (await pool()).acquire() as conn:
                     if not await conn.fetchval(
                         "update welcome set photo = $1 where chat_id=$2 returning 1",

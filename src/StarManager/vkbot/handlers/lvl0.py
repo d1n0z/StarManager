@@ -219,10 +219,13 @@ async def stats(message: Message):
             await get_user_premmenu_setting(id, "border_color", False),
             await get_user_league(id),
         )
+        photo = await upload_image(stats_image),
+        if not photo:
+            raise Exception("Failed to upload image")
         await messagereply(
             message,
             disable_mentions=1,
-            attachment=await upload_image(stats_image),
+            attachment=photo
         )
     except Exception as e:
         if message.from_id in settings.service.devs:
@@ -235,7 +238,8 @@ async def stats(message: Message):
             message="❌ Ошибка. Пожалуйста, попробуйте позже.",
             raise_exceptions=True
         )
-        raise e
+        if "Failed to upload image" not in str(e):
+            raise e
     else:
         if reply and reply.conversation_message_id:
             await delete_messages(reply.conversation_message_id, chat_id)
