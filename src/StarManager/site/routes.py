@@ -94,7 +94,7 @@ async def auth_vk_callback(request: Request):
     if not code:
         return HTMLResponse("Ошибка: отсутствует код авторизации", status_code=400)
 
-    redirect_uri = str(request.url_for("auth_vk_callback"))
+    redirect_uri = str(request.url_for("auth_vk_callback")).replace("http", "https", 1)
 
     params = {
         "client_id": settings.vk.app_id,
