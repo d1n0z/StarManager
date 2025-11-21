@@ -338,6 +338,7 @@ async def create_payment(request: Request, data: models.Item):
 
 
 @router.post("/api/listener/yookassa")
+@router.post("/api/listener/yookassa/")
 async def yookassa(request: Request):
     try:
         if request.method != "POST":
