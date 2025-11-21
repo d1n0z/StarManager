@@ -84,7 +84,7 @@ async def payment(request: Request, promo: str | None = None):
 @router.get("/login")
 async def login(request: Request):
     return await oauth.vk.authorize_redirect(  # type: ignore
-        request, request.url_for("auth_vk_callback")
+        request, str(request.url_for("auth_vk_callback")).replace("http", "https", 1)
     )
 
 
@@ -116,7 +116,6 @@ async def auth_vk_callback(request: Request):
     user_id = token_data["user_id"]
     email = token_data.get("email")
 
-    # Получим данные о пользователе
     async with httpx.AsyncClient() as client:
         user_resp = await client.get(
             "https://api.vk.com/method/users.get",
