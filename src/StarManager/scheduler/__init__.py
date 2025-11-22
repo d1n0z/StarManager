@@ -442,9 +442,15 @@ async def mathgiveaway(conn: asyncpg.Connection):
 
 
 async def everyday(conn: asyncpg.Connection):
-    await conn.execute("UPDATE shop SET limits='[0, 0, 0, 0, 0]'")
-    await managers.xp.nullify_xp_limit()
-    await managers.chat_user_cmids.clear()
+    for attempt in range(12):
+        try:
+            await conn.execute("UPDATE shop SET limits='[0, 0, 0, 0, 0]'")
+            await managers.xp.nullify_xp_limit()
+            await managers.chat_user_cmids.clear()
+        except asyncpg.exceptions.DeadlockDetectedError:
+            if attempt == 12 - 1:
+                raise
+            await asyncio.sleep(0.1 * min(2 ** attempt, 256))
 
 
 async def new_tg_giveaway(conn: asyncpg.Connection):
