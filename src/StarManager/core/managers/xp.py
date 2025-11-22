@@ -78,7 +78,7 @@ class XPRepository(BaseRepository):
         await XP.filter(uid=uid).delete()
 
     async def nullify_xp_limit(self):
-        await XP.all().update(coins_limit=0)
+        await XP.filter(coins_limit__gt=0).update(coins_limit=0)
 
 class XPCache(BaseCacheManager):
     def __init__(
