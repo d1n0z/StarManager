@@ -18,7 +18,7 @@ class InterceptHandler(logging.Handler):
 
 
 def filter_vkbot_debug(record):
-    if record["level"].name == "DEBUG" and record["name"].startswith("vkbottle.dispatch.views.abc.message"):
+    if record["level"].name == "DEBUG" and record["name"].startswith("vkbottle"):
         return False
     return True
 
@@ -31,7 +31,6 @@ def setup_logs():
     logging.getLogger("aiogram").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("yadisk").setLevel(logging.WARNING)
-    logging.getLogger("vkbottle.dispatch.views.abc.message").setLevel(logging.INFO)
 
     def filter_vk_api_error_spam(record):
         if "API error(s) in response wasn't handled" in record["message"]:
