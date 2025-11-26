@@ -10,6 +10,7 @@ from pathlib import Path
 HEALTH_URL = "http://127.0.0.1:5000/health"
 TIMEOUT = 10
 MAX_FAILURES = 3
+MAX_TASKS_TIMEDOUT = 100
 RESTART_COMMAND = "python main.py"
 LOG_FILE = Path(__file__).parent / "logs" / "watchdog.log"
 STATE_FILE = Path(__file__).parent / "watchdog_state.json"
@@ -35,6 +36,10 @@ def check_alive():
             log(f"✓ Alive | VK tasks: {data.get('vk_tasks', '?')} | Queued: {data.get('vk_queued', 0)} | DB pool: {data.get('db', {}).get('pool_used', '?')}/{data.get('db', {}).get('pool_size', '?')} | Scheduler: {scheduler_ok}/{scheduler_running}")
             
             if not scheduler_ok or not scheduler_running:
+                log(f"⚠️ Scheduler issue: {scheduler_data.get('message', 'unknown')}")
+                return False
+            
+            if data.get("_vk_tasks_timeouts", 0) > MAX_TASKS_TIMEDOUT:
                 log(f"⚠️ Scheduler issue: {scheduler_data.get('message', 'unknown')}")
                 return False
             
@@ -113,8 +118,8 @@ if __name__ == "__main__":
         if consecutive_failures >= MAX_FAILURES:
             log("⚠️ Max failures reached, initiating restart...")
             if restart_service():
-                log("Waiting 60s for service to start...")
-                time.sleep(60)
+                log("Waiting 120s for service to start...")
+                time.sleep(120)
                 if check_alive():
                     log("✅ Service is back online")
                 else:

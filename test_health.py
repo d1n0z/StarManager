@@ -44,6 +44,7 @@ def test_health():
         print("\n🔵 VK:")
         print(f"  Active tasks: {data.get('vk_tasks', '?')}")
         print(f"  Queued events: {data.get('vk_queued', '?')}")
+        print(f"  Timed out events: {data.get('vk_tasks_timedout', '?')}")
         
         event_loop = data.get('event_loop', {})
         if event_loop:

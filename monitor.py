@@ -8,6 +8,7 @@ from pathlib import Path
 HEALTH_URL = "http://127.0.0.1:5000/health"
 TIMEOUT = 5
 MAX_VK_TASKS = 100
+MAX_VK_TASKS_TIMEDOUT = 100
 LOG_FILE = Path(__file__).parent / "logs" / "monitor.log"
 DIAGNOSTIC_FILE = Path(__file__).parent / "logs" / "diagnostic.jsonl"
 
@@ -42,6 +43,9 @@ def check_health():
         scheduler_data = data.get('scheduler', {})
         
         if data.get("vk_tasks", 0) > MAX_VK_TASKS:
+            return False, f"Too many VK tasks: {data['vk_tasks']}", data
+        
+        if data.get("vk_tasks_timedout", 0) > MAX_VK_TASKS_TIMEDOUT:
             return False, f"Too many VK tasks: {data['vk_tasks']}", data
         
         if not db_data.get("ok"):

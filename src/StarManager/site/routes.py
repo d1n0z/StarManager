@@ -25,6 +25,7 @@ from StarManager.core.config import settings, sitedata
 from StarManager.core.db import smallpool as pool
 from StarManager.core.event_queue import event_queue
 from StarManager.site import enums, models
+from StarManager.site.utils import get_vk_timeouts_count, record_vk_timeout
 from StarManager.vkbot.bot import bot as vkbot
 
 router = APIRouter()
@@ -360,7 +361,8 @@ async def yookassa(request: Request):
                     "delete from prempromo where id=$1", payment.personal_promo
                 )
                 await conn.execute(
-                    "update premiumexpirenotified set date=0 where uid=$1", payment.from_id
+                    "update premiumexpirenotified set date=0 where uid=$1",
+                    payment.from_id,
                 )
 
         text = f"Номер: <b>#{payment.order_id}</b>\n"
@@ -409,7 +411,9 @@ async def yookassa(request: Request):
 
         async with (await pool()).acquire() as conn:
             if payment.chat_id:
-                await managers.public_chats.edit_premium(payment.chat_id, make_premium=True)
+                await managers.public_chats.edit_premium(
+                    payment.chat_id, make_premium=True
+                )
             elif payment.coins:
                 await utils.add_user_coins(payment.to_id, payment.coins)
             else:
@@ -623,6 +627,7 @@ async def health(request: Request):
             "status": "ok" if (db_ok and scheduler_ok) else "degraded",
             "timestamp": time.time(),
             "vk_tasks": len(_vk_tasks),
+            "vk_tasks_timedout": await get_vk_timeouts_count(),
             "vk_queued": event_queue.qsize(),
             "db": {
                 "ok": db_ok,
@@ -665,12 +670,12 @@ async def process_vk_event(data, data_type):
             event_info = f"message_new text='{text}'"
 
         try:
-            async with asyncio.timeout(
-                100 if text.startswith("/stats") else 30
-            ):  # first /stats command in a new run can load for a minute or so
+            async with asyncio.timeout(60):
                 async with _vk_semaphore:
                     await vkbot.process_event(data)
         except asyncio.TimeoutError:
+            await record_vk_timeout()
+
             elapsed = time.time() - start
             logger.error(f"TIMEOUT after {elapsed:.2f}s: {event_info}")
             logger.error(f"Event data: {json.dumps(data, ensure_ascii=False)[:500]}")
