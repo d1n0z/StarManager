@@ -24,7 +24,6 @@ from StarManager.core.utils import (
     get_chat_settings,
     get_reg_date,
     get_rep_top,
-    get_user_access_level,
     get_user_ban,
     get_user_coins,
     get_user_last_message,
@@ -45,7 +44,7 @@ from StarManager.core.utils import (
     is_chat_admin,
     kick_user,
     messagereply,
-    point_words,
+    pluralize_words,
     search_id_in_message,
     set_user_access_level,
     upload_image,
@@ -171,29 +170,46 @@ async def stats(message: Message):
             "select exists(select 1 from rewardscollected where uid=$1 and deactivated=false)",
             message.from_id,
         )
-    acc = await managers.access_level.get_access_level(message.from_id, chat_id)
-    if acc < 1 and not await get_user_premium(message.from_id) and not rewards:
+
+    acc = await managers.access_level.get(message.from_id, chat_id)
+    access_level = acc.access_level if acc else 0
+    if not await managers.custom_access_level.is_active(access_level, chat_id):
         id = message.from_id
+        acc = None
+        access_level = 0
     else:
-        acc = await get_user_access_level(id, chat_id)
+        if access_level < 1 and not await get_user_premium(message.from_id) and not rewards:
+            id = message.from_id
+        else:
+            acc = await managers.access_level.get(id, chat_id)
+            access_level = acc.access_level if acc else 0
+            if not await managers.custom_access_level.is_active(access_level, chat_id):
+                acc = None
+                access_level = 0
+
     last_message = await get_user_last_message(id, chat_id)
     if isinstance(last_message, int):
         last_message = datetime.fromtimestamp(last_message).strftime("%d.%m.%Y")
-    url = (
-        await api.users.get(user_ids=[id], fields=[UsersFields.PHOTO_MAX.value])
-    )[0].photo_max
+    url = (await api.users.get(user_ids=[id], fields=[UsersFields.PHOTO_MAX.value]))[
+        0
+    ].photo_max
     if not url:
         return
     r = await api.http_client.request_content(url)
     file_path = settings.service.path + f"src/StarManager/core/media/temp/{id}ava.jpg"
-    
+
     def write_file():
         with open(file_path, "wb") as f:
             f.write(r)
-    
+
     await asyncio.to_thread(write_file)
 
-    lvl_name = await get_chat_access_name(chat_id, acc)
+    if acc is None or acc.custom_level_name is None:
+        lvl_name = (
+            await get_chat_access_name(chat_id, access_level)
+        ) or settings.lvl_names[access_level]
+    else:
+        lvl_name = acc.custom_level_name
     xp = int(await get_user_xp(id))
     lvl = await get_user_level(id) or 1
     try:
@@ -202,7 +218,8 @@ async def stats(message: Message):
             await get_user_warns(id, chat_id),
             await get_user_messages(id, chat_id),
             id,
-            await get_user_access_level(id, chat_id),
+            access_level,
+            acc is not None and acc.custom_level_name is not None,
             await get_user_nickname(id, chat_id),
             await get_user_coins(id),
             last_message,
@@ -214,19 +231,15 @@ async def stats(message: Message):
             await get_user_name(id),
             await get_user_mute(id, chat_id),
             await get_user_ban(id, chat_id),
-            lvl_name or settings.lvl_names[acc],
+            lvl_name,
             await get_user_needed_xp(xp) if lvl < 999 else 0,
             await get_user_premmenu_setting(id, "border_color", False),
             await get_user_league(id),
         )
-        photo = await upload_image(stats_image),
+        photo = (await upload_image(stats_image),)
         if not photo:
             raise Exception("Failed to upload image")
-        await messagereply(
-            message,
-            disable_mentions=1,
-            attachment=photo
-        )
+        await messagereply(message, disable_mentions=1, attachment=photo)
     except Exception as e:
         if message.from_id in settings.service.devs:
             traceback.print_exc()
@@ -236,7 +249,7 @@ async def stats(message: Message):
             message,
             disable_mentions=1,
             message="❌ Ошибка. Пожалуйста, попробуйте позже.",
-            raise_exceptions=True
+            raise_exceptions=True,
         )
         if "Failed to upload image" not in str(e):
             raise e
@@ -311,7 +324,7 @@ async def bonus(message: Message):
             chat_id=settings.telegram.chat_id,
             message_thread_id=settings.telegram.bonus_thread_id,
             text=f'{uid} | <a href="vk.com/id{uid}">{await get_user_name(uid)}</a> | '
-            f"Серия: {point_words(streak + 1, ('день', 'дня', 'дней'))}",
+            f"Серия: {pluralize_words(streak + 1, ('день', 'дня', 'дней'))}",
             disable_web_page_preview=True,
             parse_mode="HTML",
         )
@@ -632,9 +645,13 @@ async def transfer(message: Message):
 @bl.chat_message(SearchCMD("start"))
 async def start(message: Message):
     chat_id = message.peer_id - 2000000000
-    if await get_user_access_level(
-        message.from_id, chat_id
-    ) >= 7 or await is_chat_admin(message.from_id, chat_id):
+    acc = await managers.access_level.get(message.from_id, chat_id)
+    if (
+        acc is not None
+        and acc.access_level >= 7
+        and acc.custom_level_name is None
+        or await is_chat_admin(message.from_id, chat_id)
+    ):
         await messagereply(
             message, await messages.rejoin(), keyboard=keyboard.rejoin(chat_id)
         )

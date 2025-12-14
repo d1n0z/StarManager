@@ -1,7 +1,10 @@
+from typing import List, Optional
+
 from vkbottle import Callback, Keyboard, KeyboardButtonColor, OpenLink
 
 from StarManager.core import enums
 from StarManager.core.config import settings
+from StarManager.core.managers.custom_access_level import CachedCustomAccessLevelRow
 
 NUMOJIS = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
 
@@ -1649,14 +1652,33 @@ def timeout(uid, silence):
     return kb.get_json()
 
 
-def timeout_settings(uid, allowed):
+def timeout_settings(
+    uid, allowed, custom: bool = False, limit: int = 10, page: int = 0
+):
     kb = Keyboard(inline=True)
 
     kb.add(Callback("Назад", {"cmd": "timeout", "uid": uid}))
-    for i in range(0, 7):
+    kb.add(
+        Callback(
+            "Стандартные" if custom else "Пользовательские",
+            {"cmd": "timeout_settings", "uid": uid, "custom": not custom},
+        )
+    )
+    kb.row()
+    for i in range(
+        (page * 6 + 1) if custom else 0,
+        min((page + 1) * 6 + 1, (limit + 1)) if custom else 7,
+    ):
         kb.add(
             Callback(
-                f"Уровень {i}", {"cmd": "timeout_settings_turn", "uid": uid, "lvl": i}
+                f"Уровень {i}",
+                {
+                    "cmd": "timeout_settings_turn",
+                    "uid": uid,
+                    "lvl": i,
+                    "custom": custom,
+                    "page": page,
+                },
             ),
             KeyboardButtonColor.POSITIVE
             if i in allowed
@@ -1664,6 +1686,34 @@ def timeout_settings(uid, allowed):
         )
         if i % 2 == 0:
             kb.row()
+    if custom:
+        if page != 0:
+            kb.add(
+                Callback(
+                    "⏪",
+                    {
+                        "cmd": "timeout_settings",
+                        "uid": uid,
+                        "custom": custom,
+                        "page": page - 1,
+                    },
+                )
+            )
+        maxpage = int(limit / 6)
+        if page == 0 or page == maxpage:
+            kb.add(Callback(f"[{page}/{maxpage}]", {"cmd": "_"}))
+        if page < maxpage:
+            kb.add(
+                Callback(
+                    "⏩",
+                    {
+                        "cmd": "timeout_settings",
+                        "uid": uid,
+                        "custom": custom,
+                        "page": page + 1,
+                    },
+                )
+            )
 
     return kb.get_json()
 
@@ -2033,5 +2083,180 @@ def rps_play(uid, bet):
         Callback("Ножницы", {"cmd": "rps_play", "pick": "s", "uid": uid, "bet": bet}),
         KeyboardButtonColor.SECONDARY,
     )
+
+    return kb.get_json()
+
+
+def customlevel_to_settings(
+    uid,
+    level: int,
+    label: str = "Настроить",
+    kb: Optional[Keyboard] = None,
+    clear_type_queue: bool = False,
+):
+    if kb is None:
+        kb = Keyboard(inline=True)
+
+    kb.add(
+        Callback(
+            label,
+            {
+                "cmd": "customlevel_settings",
+                "uid": uid,
+                "level": level,
+                "clear": clear_type_queue,
+                "page": 0,
+            },
+        ),
+        KeyboardButtonColor.SECONDARY,
+    )
+
+    return kb.get_json()
+
+
+def customlevel_settings(
+    uid, level: CachedCustomAccessLevelRow, levelmenu_page: Optional[int] = None
+):
+    def _payload(action: str):
+        return {
+            "cmd": "customlevel_action",
+            "action": action,
+            "uid": uid,
+            "level": level.access_level,
+            "levelmenu_page": levelmenu_page,
+        }
+
+    kb = Keyboard(inline=True)
+
+    if levelmenu_page is not None:
+        kb.add(
+            Callback("Назад", {"cmd": "levelmenu", "uid": uid, "page": levelmenu_page}),
+            KeyboardButtonColor.PRIMARY,
+        )
+    kb.add(
+        Callback("Выключить" if level.status else "Включить", _payload("turn")),
+        KeyboardButtonColor.POSITIVE if level.status else KeyboardButtonColor.NEGATIVE,
+    )
+    kb.add(Callback("Удалить", _payload("delete")), KeyboardButtonColor.NEGATIVE)
+    kb.row()
+    kb.add(Callback("Приоритет", _payload("set_priority")))
+    kb.add(Callback("Название", _payload("set_name")))
+    kb.add(Callback("Эмодзи", _payload("set_emoji")))
+    kb.row()
+    kb.add(Callback("Команды", _payload("set_commands")), KeyboardButtonColor.PRIMARY)
+    kb.add(
+        Callback("Шаблоны", _payload("set_commands_presets")),
+        KeyboardButtonColor.PRIMARY,
+    )
+    kb.row()
+    kb.add(
+        Callback("Забрать права", _payload("remove_all")), KeyboardButtonColor.NEGATIVE
+    )
+
+    return kb.get_json()
+
+
+def customlevel_delete_yon(uid, level: int):
+    kb = Keyboard(inline=True)
+
+    customlevel_to_settings(uid, level, "Назад", kb)
+    kb.add(
+        Callback("Удалить", {"cmd": "customlevel_delete", "uid": uid, "level": level}),
+        KeyboardButtonColor.NEGATIVE,
+    )
+
+    return kb.get_json()
+
+
+def customlevel_remove_all_yon(uid, level: int):
+    kb = Keyboard(inline=True)
+
+    customlevel_to_settings(uid, level, "Назад", kb)
+    kb.add(
+        Callback(
+            "Удалить", {"cmd": "customlevel_remove_all", "uid": uid, "level": level}
+        ),
+        KeyboardButtonColor.NEGATIVE,
+    )
+
+    return kb.get_json()
+
+
+def customlevel_set_commands_presets(uid, level: int):
+    kb = Keyboard(inline=True)
+
+    customlevel_to_settings(uid, level, "Назад", kb)
+    for k in range(0, 7):
+        kb.add(
+            Callback(
+                f"[{k}] {settings.lvl_names[int(k)]}",
+                {
+                    "cmd": "customlevel_set_commands_preset",
+                    "uid": uid,
+                    "level": level,
+                    "preset": k,
+                },
+            ),
+        )
+        if k % 2 == 0:
+            kb.row()
+
+    return kb.get_json()
+
+
+def levelmenu(uid, levels: List[CachedCustomAccessLevelRow], page: int = 0):
+    kb = Keyboard(inline=True)
+
+    levels = sorted(levels, key=lambda x: x.access_level)
+
+    if page != 0:
+        kb.add(Callback("⏪", {"cmd": "levelmenu", "uid": uid, "page": page - 1}))
+    if len(levels) > 6:
+        kb.add(Callback(f"[{page}/{len(levels) // 6 + bool(len(levels) % 6)}]", {"cmd": "_"}))
+    if len(levels) > (6 * (page + 1)):
+        kb.add(Callback("⏩", {"cmd": "levelmenu", "uid": uid, "page": page + 1}))
+    kb.row()
+
+    for k in range(6):
+        try:
+            level = levels[6 * page + k]
+        except IndexError:
+            break
+        emoji = f"{level.emoji} " if level.emoji else ""
+        kb.add(
+            Callback(
+                f"[{level.access_level}] {emoji}{level.name}",
+                {
+                    "cmd": "customlevel_settings",
+                    "uid": uid,
+                    "level": level.access_level,
+                    "pre_page": page,
+                },
+            )
+        )
+        if k % 3 == 2:
+            kb.row()
+
+    return kb.get_json()
+
+
+def staff(uid, custom: bool = True, levels: Optional[int] = None, page: int = 0):
+    kb = Keyboard(inline=True)
+
+    kb.add(
+        Callback(
+            "Пользовательские" if custom else "Стандартные",
+            {"cmd": "staff", "uid": uid, "custom": custom, "pre_page": 0},
+        ),
+        KeyboardButtonColor.PRIMARY,
+    )
+    if custom and levels is not None:
+        kb.row()
+        if page != 0:
+            kb.add(Callback("⏪", {"cmd": "staff", "uid": uid, "page": page - 1}))
+        if levels > 10:
+            kb.add(Callback(f"[{page}/{levels // 10 + bool(levels % 10)}]", {"cmd": "_"}))
+        if levels > 10 * (page + 1):
+            kb.add(Callback("⏩", {"cmd": "staff", "uid": uid, "page": page + 1}))
 
     return kb.get_json()

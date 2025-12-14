@@ -1,5 +1,6 @@
+from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Set, Tuple, TypeAlias
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, TypeAlias
 
 from StarManager.core.managers.base import (
     BaseCachedModel,
@@ -11,12 +12,15 @@ from StarManager.core.tables import AccessLevel
 
 
 @dataclass
-class _CachedAccessLevel(BaseCachedModel):
+class CachedAccessLevelRow(BaseCachedModel):
+    uid: int
+    chat_id: int
     access_level: int
+    custom_level_name: Optional[str] = None
 
 
 CacheKey: TypeAlias = Tuple[int, int]
-Cache: TypeAlias = Dict[CacheKey, _CachedAccessLevel]
+Cache: TypeAlias = Dict[CacheKey, CachedAccessLevelRow]
 
 
 def _make_cache_key(uid: int, chat_id: int) -> CacheKey:
@@ -54,7 +58,7 @@ class AccessLevelCache(BaseCacheManager):
         async with self._lock:
             for row in await AccessLevel.all():
                 key = _make_cache_key(row.uid, row.chat_id)
-                self._cache[key] = _CachedAccessLevel.from_model(row)
+                self._cache[key] = CachedAccessLevelRow.from_model(row)
         await super().initialize()
 
     async def _ensure_cached(
@@ -70,28 +74,38 @@ class AccessLevelCache(BaseCacheManager):
             uid, chat_id, defaults=initial_data
         )
         async with self._lock:
-            self._cache[cache_key] = _CachedAccessLevel.from_model(model)
+            self._cache[cache_key] = CachedAccessLevelRow.from_model(model)
         return created
 
-    async def get(self, cache_key: CacheKey) -> int:
+    async def get(self, cache_key: CacheKey) -> Optional[CachedAccessLevelRow]:
+        async with self._lock:
+            return self._cache.get(cache_key)
+
+    async def get_access_level(self, cache_key: CacheKey) -> int:
         async with self._lock:
             obj = self._cache.get(cache_key)
             return obj.access_level if obj else 0
 
-    async def edit(self, cache_key: CacheKey, access_level: int):
-        created = await self._ensure_cached(cache_key, {"access_level": access_level})
+    async def edit(self, cache_key: CacheKey, **fields):
+        created = await self._ensure_cached(cache_key, fields)
         async with self._lock:
             if not created:
-                self._cache[cache_key].access_level = access_level
+                for k, v in fields.items():
+                    setattr(self._cache[cache_key], k, v)
             self._dirty.add(cache_key)
 
     async def remove(self, cache_key: CacheKey):
+        removed_item = None
         async with self._lock:
             if cache_key in self._cache:
+                removed_item = deepcopy(self._cache[cache_key])
                 self._dirty.discard(cache_key)
                 del self._cache[cache_key]
-        uid, chat_id = cache_key
-        await self.repo.delete_record(uid, chat_id)
+
+        if removed_item is not None:
+            await self.repo.delete_record(*cache_key)
+
+        return removed_item
 
     async def sync(self, batch_size: int = 1000):
         async with self._lock:
@@ -154,6 +168,32 @@ class AccessLevelCache(BaseCacheManager):
                 if cur is None or cur.access_level == old_val:
                     self._dirty.discard(key)
 
+    async def get_all(
+        self,
+        chat_id: Optional[int] = None,
+        uid: Optional[int] = None,
+        *,
+        predicate: Optional[Callable[[CachedAccessLevelRow], Any]] = None,
+    ) -> List[CachedAccessLevelRow]:
+        predicate = predicate or (lambda i: i.access_level > 0)
+
+        def predicate_chat_id(i: CachedAccessLevelRow):
+            if chat_id is None:
+                return True
+            return i.chat_id == chat_id
+
+        def predicate_uid(i: CachedAccessLevelRow):
+            if uid is None:
+                return i.uid > 0
+            return i.uid == uid
+
+        def pred(i: CachedAccessLevelRow):
+            return predicate(i) and predicate_chat_id(i) and predicate_uid(i)
+
+        async with self._lock:
+            snapshot = list(self._cache.values())
+        return [deepcopy(i) for i in snapshot if pred(i)]
+
 
 class AccessLevelManager(BaseManager):
     def __init__(self):
@@ -162,19 +202,47 @@ class AccessLevelManager(BaseManager):
         self.repo: AccessLevelRepository = AccessLevelRepository()
         self.cache: AccessLevelCache = AccessLevelCache(self.repo, self._cache)
 
+        self.get_all = self.cache.get_all
+
     async def initialize(self):
         await self.cache.initialize()
 
+    async def get_holders(self, chat_id: int, level_name: str) -> List[CachedAccessLevelRow]:
+        return await self.get_all(chat_id, predicate=lambda i: i.custom_level_name == level_name)
+
     async def get_access_level(self, uid: int, chat_id: int) -> int:
+        return await self.cache.get_access_level(_make_cache_key(uid, chat_id))
+
+    async def get(self, uid: int, chat_id: int) -> Optional[CachedAccessLevelRow]:
         return await self.cache.get(_make_cache_key(uid, chat_id))
 
-    async def edit_access_level(self, uid: int, chat_id: int, access_level: int):
+    async def edit_access_level(
+        self, uid: int, chat_id: int, access_level: int, custom_level_name: Optional[str] = None
+    ) -> Optional[CachedAccessLevelRow]:
         if access_level == 0:
             return await self.delete(uid, chat_id)
-        await self.cache.edit(_make_cache_key(uid, chat_id), access_level)
+        await self.cache.edit(_make_cache_key(uid, chat_id), access_level=access_level, custom_level_name=custom_level_name)
 
-    async def delete(self, uid: int, chat_id: int):
-        await self.cache.remove(_make_cache_key(uid, chat_id))
+    async def edit_custom_level_name(
+        self, chat_id: int, access_level: int, custom_level_name: str
+    ):
+        to_edit = await self.get_all(
+            chat_id=chat_id, predicate=lambda i: (i.access_level == access_level and i.custom_level_name is not None)
+        )
+        for i in to_edit:
+            await self.cache.edit(
+                _make_cache_key(i.uid, chat_id), custom_level_name=custom_level_name
+            )
 
-    async def sync(self):
-        await self.cache.sync()
+    async def delete(self, uid: int, chat_id: int) -> Optional[CachedAccessLevelRow]:
+        return await self.cache.remove(_make_cache_key(uid, chat_id))
+
+    async def delete_row(
+        self, row: CachedAccessLevelRow
+    ) -> Optional[CachedAccessLevelRow]:
+        return await self.cache.remove(_make_cache_key(row.uid, row.chat_id))
+
+    async def delete_rows(
+        self, rows: Iterable[CachedAccessLevelRow]
+    ) -> List[CachedAccessLevelRow]:
+        return [row for row in rows if await self.delete_row(row) is not None]

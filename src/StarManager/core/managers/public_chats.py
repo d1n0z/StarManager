@@ -24,7 +24,7 @@ UpCacheKey: TypeAlias = int
 
 
 @dataclass
-class _CachedPublicChatObject(BaseCachedModel):
+class CachedPublicChatObjectRow(BaseCachedModel):
     premium: bool
     last_up: int
     isopen: bool
@@ -32,17 +32,17 @@ class _CachedPublicChatObject(BaseCachedModel):
 
 
 @dataclass
-class _CachedUpLog(BaseCachedModel):
+class CachedUpLogRow(BaseCachedModel):
     timestamp: int
 
 
 @dataclass
-class _CachedPublicChat(BaseCachedModel):
-    chat: _CachedPublicChatObject
-    uplogs: Dict[UpCacheKey, _CachedUpLog]
+class CachedPublicChatRow(BaseCachedModel):
+    chat: CachedPublicChatObjectRow
+    uplogs: Dict[UpCacheKey, CachedUpLogRow]
 
 
-Cache: TypeAlias = Dict[CacheKey, _CachedPublicChat]
+Cache: TypeAlias = Dict[CacheKey, CachedPublicChatRow]
 
 
 def _make_cache_key(chat_id: int) -> CacheKey:
@@ -153,8 +153,8 @@ class PublicChatsCache(BaseCacheManager):
         async with self._lock:
             for row in rows:
                 key = _make_cache_key(row.chat_id)
-                self._cache[key] = _CachedPublicChat(
-                    chat=_CachedPublicChatObject(
+                self._cache[key] = CachedPublicChatRow(
+                    chat=CachedPublicChatObjectRow(
                         premium=bool(row.premium),
                         last_up=int(row.last_up or 0),
                         isopen=bool(row.isopen),
@@ -166,13 +166,13 @@ class PublicChatsCache(BaseCacheManager):
             for log in logs:
                 key = _make_cache_key(log.chat_id)
                 if key not in self._cache:
-                    self._cache[key] = _CachedPublicChat(
-                        chat=_CachedPublicChatObject(
+                    self._cache[key] = CachedPublicChatRow(
+                        chat=CachedPublicChatObjectRow(
                             premium=False, last_up=0, isopen=False, members_count=0
                         ),
                         uplogs={},
                     )
-                self._cache[key].uplogs[_make_up_cache_key(log.uid)] = _CachedUpLog(
+                self._cache[key].uplogs[_make_up_cache_key(log.uid)] = CachedUpLogRow(
                     timestamp=int(log.timestamp or 0)
                 )
 
@@ -189,8 +189,8 @@ class PublicChatsCache(BaseCacheManager):
         defaults = initial_chat_data or DEFAULTS
         model, created = await self.repo.ensure_record(chat_id, defaults=defaults)
         async with self._lock:
-            self._cache[cache_key] = _CachedPublicChat(
-                chat=_CachedPublicChatObject(
+            self._cache[cache_key] = CachedPublicChatRow(
+                chat=CachedPublicChatObjectRow(
                     premium=bool(model.premium),
                     last_up=int(model.last_up or 0),
                     isopen=bool(model.isopen),
@@ -220,12 +220,12 @@ class PublicChatsCache(BaseCacheManager):
     async def add_uplog(self, cache_key: CacheKey, uid: int, timestamp: int):
         await self._ensure_cached(cache_key)
         async with self._lock:
-            self._cache[cache_key].uplogs[_make_up_cache_key(uid)] = _CachedUpLog(
+            self._cache[cache_key].uplogs[_make_up_cache_key(uid)] = CachedUpLogRow(
                 timestamp=timestamp
             )
             self._dirty.add(cache_key)
 
-    async def get_uplog(self, cache_key: CacheKey, uid: int) -> Optional[_CachedUpLog]:
+    async def get_uplog(self, cache_key: CacheKey, uid: int) -> Optional[CachedUpLogRow]:
         async with self._lock:
             obj = self._cache.get(cache_key)
             if not obj:
@@ -248,8 +248,8 @@ class PublicChatsCache(BaseCacheManager):
         new_cache: Cache = {}
         for row in rows:
             key = _make_cache_key(row.chat_id)
-            new_cache[key] = _CachedPublicChat(
-                chat=_CachedPublicChatObject(
+            new_cache[key] = CachedPublicChatRow(
+                chat=CachedPublicChatObjectRow(
                     premium=bool(row.premium),
                     last_up=int(row.last_up or 0),
                     isopen=bool(row.isopen),
@@ -262,13 +262,13 @@ class PublicChatsCache(BaseCacheManager):
             for log in logs:
                 key = _make_cache_key(log.chat_id)
                 if key not in new_cache:
-                    new_cache[key] = _CachedPublicChat(
-                        chat=_CachedPublicChatObject(
+                    new_cache[key] = CachedPublicChatRow(
+                        chat=CachedPublicChatObjectRow(
                             premium=False, last_up=0, isopen=False, members_count=0
                         ),
                         uplogs={},
                     )
-                new_cache[key].uplogs[_make_up_cache_key(log.uid)] = _CachedUpLog(
+                new_cache[key].uplogs[_make_up_cache_key(log.uid)] = CachedUpLogRow(
                     timestamp=int(log.timestamp or 0)
                 )
 
@@ -412,7 +412,7 @@ class PublicChatsManager(BaseManager):
     ):
         return await self.repo.ensure_record(chat_id, defaults=defaults)
 
-    async def get_chat(self, chat_id: int) -> Optional[_CachedPublicChatObject]:
+    async def get_chat(self, chat_id: int) -> Optional[CachedPublicChatObjectRow]:
         return await self.cache.get(_make_cache_key(chat_id), field="chat")
 
     async def edit_chat(self, chat_id: int, **fields):
@@ -466,7 +466,7 @@ class PublicChatsManager(BaseManager):
         await self.cache.add_uplog(_make_cache_key(chat_id), uid, now_ts)
         return True, None
 
-    async def get_regular_chats(self) -> List[Tuple[int, _CachedPublicChatObject]]:
+    async def get_regular_chats(self) -> List[Tuple[int, CachedPublicChatObjectRow]]:
         async with self.cache._lock:
             return [
                 (cid, copy.deepcopy(item.chat))
@@ -474,7 +474,7 @@ class PublicChatsManager(BaseManager):
                 if item.chat.isopen
             ]
 
-    async def get_premium_chats(self) -> List[Tuple[int, _CachedPublicChatObject]]:
+    async def get_premium_chats(self) -> List[Tuple[int, CachedPublicChatObjectRow]]:
         async with self.cache._lock:
             return [
                 (cid, copy.deepcopy(item.chat))
@@ -487,8 +487,8 @@ class PublicChatsManager(BaseManager):
             return sum(1 for data in self._cache.values() if data.chat.isopen)
 
     async def sort_premium_chats(
-        self, chats: List[Tuple[str, Tuple[int, _CachedPublicChatObject], str]]
-    ) -> List[Tuple[str, Tuple[int, _CachedPublicChatObject], str]]:
+        self, chats: List[Tuple[str, Tuple[int, CachedPublicChatObjectRow], str]]
+    ) -> List[Tuple[str, Tuple[int, CachedPublicChatObjectRow], str]]:
         premium_chats = [
             item for item in chats if item[1][1].isopen and item[1][1].premium
         ]
@@ -507,9 +507,9 @@ class PublicChatsManager(BaseManager):
         await self.edit_chat(chat_id, premium=make_premium)
 
     async def get_chats_top(
-        self, chats: List[Tuple[int, _CachedPublicChatObject]]
+        self, chats: List[Tuple[int, CachedPublicChatObjectRow]]
     ) -> List[
-        Tuple[str, Tuple[int, _CachedPublicChatObject], str]
+        Tuple[str, Tuple[int, CachedPublicChatObjectRow], str]
     ]:  # TODO: merge chatname and publicchats or add new cache, <b>OPTIMIZE</b> with dataclasses or something
         res = []
         for chat in chats:

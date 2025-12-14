@@ -10,9 +10,23 @@ class AccessLevel(Model):
     uid = fields.IntField(default=0)
     chat_id = fields.IntField(default=0, db_index=True)
     access_level = fields.IntField(default=0)
+    custom_level_name = fields.CharField(32, null=True)
 
     class Meta:
         table = "accesslvl"
+
+
+class CustomAccessLevel(Model):
+    id = fields.IntField(primary_key=True)
+    chat_id = fields.IntField()
+    access_level = fields.IntField()
+    name = fields.CharField(32)
+    emoji = fields.CharField(10, null=True)
+    status = fields.BooleanField(default=True)
+    commands = fields.JSONField(default=list)
+
+    class Meta:
+        table = "customaccesslvl"
 
 
 class Warn(Model):
@@ -85,6 +99,7 @@ class SilenceMode(Model):
     chat_id = fields.IntField(default=0, db_index=True, unique=True)
     activated = fields.BooleanField(default=False)
     allowed = fields.TextField(default="[]")
+    allowed_custom = fields.TextField(default="[]")
 
     class Meta:
         table = "silencemode"

@@ -75,7 +75,7 @@ async def skick(message: Message):
     for chat_id in chats:
         u_acc = await get_user_access_level(uid, chat_id)
         if (
-            not await haveAccess("skick", chat_id, u_acc)
+            not await haveAccess("skick", chat_id, uid)
             or await get_user_access_level(id, chat_id) >= u_acc
         ):
             continue
@@ -161,7 +161,7 @@ async def sban(message: Message):
     for chat_id in chats:
         u_acc = await get_user_access_level(uid, chat_id)
         if (
-            not await haveAccess("sban", chat_id, u_acc)
+            not await haveAccess("sban", chat_id, uid)
             or await get_user_access_level(id, chat_id) >= u_acc
         ):
             continue
@@ -286,7 +286,7 @@ async def sunban(message: Message):
     for chat_id in chats:
         u_acc = await get_user_access_level(uid, chat_id)
         if (
-            not await haveAccess("sunban", chat_id, u_acc)
+            not await haveAccess("sunban", chat_id, uid)
             or await get_user_access_level(id, chat_id) >= u_acc
             or await get_user_ban(id, chat_id) <= time.time()
         ):
@@ -364,7 +364,7 @@ async def ssnick(message: Message):
     success = 0
     for chat_id in chats:
         u_acc = await get_user_access_level(uid, chat_id)
-        if not await haveAccess("ssnick", chat_id, u_acc) or (
+        if not await haveAccess("ssnick", chat_id, uid) or (
             u_acc <= await get_user_access_level(id, chat_id) and uid != id
         ):
             continue
@@ -449,7 +449,7 @@ async def srnick(message: Message):
     success = 0
     for chat_id in chats:
         u_acc = await get_user_access_level(uid, chat_id)
-        if not await haveAccess("srnick", chat_id, u_acc) or (
+        if not await haveAccess("srnick", chat_id, uid) or (
             u_acc <= await get_user_access_level(id, chat_id) and uid != id
         ):
             continue
@@ -507,7 +507,7 @@ async def szov(message: Message):
     text = " ".join(data[2:])
     for chat_id in chats:
         if not await haveAccess(
-            "szov", chat_id, await get_user_access_level(uid, chat_id)
+            "szov", chat_id, uid
         ):
             continue
         try:
@@ -626,7 +626,7 @@ async def chat(message: Message):
         ),
         keyboard=None
         if not await haveAccess(
-            "settings", chat_id, await get_user_access_level(message.from_id, chat_id)
+            "settings", chat_id, message.from_id
         )
         else (keyboard.chat(message.from_id, public == "Открытый")),
     )

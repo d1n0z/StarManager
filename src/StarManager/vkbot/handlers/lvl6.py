@@ -3,6 +3,7 @@ import time
 from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 
+from StarManager.core import managers
 from StarManager.vkbot import keyboard, messages
 from StarManager.vkbot.checkers import haveAccess
 from StarManager.vkbot.rules import SearchCMD
@@ -66,7 +67,7 @@ async def gdelaccess(message: Message):
     for chat_id in chats:
         u_acc = await get_user_access_level(uid, chat_id)
         if (
-            not await haveAccess("gdelaccess", chat_id, u_acc)
+            not await haveAccess("gdelaccess", chat_id, uid)
             or await get_user_access_level(id, chat_id) >= u_acc
         ):
             continue
@@ -144,7 +145,7 @@ async def gsetaccess(message: Message):
             acc >= u_acc
             or ch_acc >= u_acc
             or ch_acc >= acc
-            or not await haveAccess("gsetaccess", chat_id, u_acc)
+            or not await haveAccess("gsetaccess", chat_id, uid)
         ):
             continue
         await set_user_access_level(id, chat_id, acc)
@@ -233,7 +234,7 @@ async def ssetaccess(message: Message):
             acc >= u_acc
             or ch_acc >= u_acc
             or ch_acc >= acc
-            or not await haveAccess("ssetaccess", chat_id, u_acc)
+            or not await haveAccess("ssetaccess", chat_id, uid)
         ):
             continue
         await set_user_access_level(id, chat_id, acc)
@@ -301,7 +302,7 @@ async def sdelaccess(message: Message):
     for chat_id in chats:
         u_acc = await get_user_access_level(uid, chat_id)
         if (
-            not await haveAccess("sdelaccess", chat_id, u_acc)
+            not await haveAccess("sdelaccess", chat_id, uid)
             or await get_user_access_level(id, chat_id) >= u_acc
         ):
             continue
@@ -585,13 +586,11 @@ async def purge(message: Message):
             if i[1] not in users:
                 await conn.execute("delete from nickname where id=$1", i[0])
                 dtdnicknames += 1
-        for i in await conn.fetch(
-            "select id, uid from accesslvl where chat_id=$1", chat_id
-        ):
-            if i[1] not in users:
-                await conn.execute("delete from accesslvl where id=$1", i[0])
-                await set_chat_mute(i[1], chat_id, 0)
-                dtdaccesslevels += 1
+    for i in await managers.access_level.get_all(chat_id=chat_id):
+        if i.uid not in users:
+            await managers.access_level.delete_row(i)
+            await set_chat_mute(i.uid, chat_id, 0)
+            dtdaccesslevels += 1
 
     if edit is None:
         return

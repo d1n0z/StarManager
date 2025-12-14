@@ -2,25 +2,15 @@ import time
 from ast import literal_eval
 from collections import defaultdict
 from datetime import datetime
-from typing import Dict
+from typing import Dict, Iterable
 
 from cache.async_lru import AsyncLRU
 
-from StarManager.core import enums, tables
+from StarManager.core import enums, tables, utils
 from StarManager.core.config import settings
 from StarManager.core.db import pool
-from StarManager.core.utils import (
-    get_chat_access_name,
-    get_chat_setting_value,
-    get_group_name,
-    get_user_name,
-    get_user_nickname,
-    number_to_emoji,
-    point_days,
-    point_hours,
-    point_minutes,
-    point_words,
-)
+from StarManager.core.managers.access_level import CachedAccessLevelRow
+from StarManager.core.managers.custom_access_level import CachedCustomAccessLevelRow
 
 
 @AsyncLRU(maxsize=0)
@@ -64,7 +54,7 @@ async def id(uid, data, name, url, last_message):
 async def top(top):
     return await get("top") + "".join(
         [
-            f"{number_to_emoji(k + 1)} [id{i[0]}|{await get_user_name(i[0])}] - {i[1]} сообщений\n"
+            f"{utils.number_to_emoji(k + 1)} [id{i[0]}|{await utils.get_user_name(i[0])}] - {i[1]} сообщений\n"
             for k, i in enumerate(top)
         ]
     )
@@ -239,21 +229,21 @@ async def clear(deleting, uid, chat_id, delete_from):
         return await get(
             "clear_from",
             uid=uid,
-            u_name=await get_user_name(uid) or await get_user_nickname(uid, chat_id),
+            u_name=await utils.get_user_name(uid) or await utils.get_user_nickname(uid, chat_id),
             id=delete_from,
-            name=await get_user_name(delete_from)
-            or await get_user_nickname(delete_from, chat_id),
+            name=await utils.get_user_name(delete_from)
+            or await utils.get_user_nickname(delete_from, chat_id),
             deleted=len(deleting),
         )
     return await get(
         "clear",
         uid=uid,
-        u_name=await get_user_name(uid) or await get_user_nickname(uid, chat_id),
+        u_name=await utils.get_user_name(uid) or await utils.get_user_nickname(uid, chat_id),
         users=", ".join(
             set(
                 [
                     f"[{'id' if int(id) > 0 else 'club'}{id}|"
-                    f"{(await get_user_name(id) or await get_user_nickname(id, chat_id)) if id > 0 else await get_group_name(id)}]"
+                    f"{(await utils.get_user_name(id) or await utils.get_user_nickname(id, chat_id)) if id > 0 else await utils.get_group_name(id)}]"
                     for id in deleting
                 ]
             )
@@ -343,21 +333,21 @@ async def staff(res, names, chat_id):
     emoji = {"1": "☀", "2": "🔥", "3": "🔥", "4": "🔥", "5": "✨", "6": "⚡", "7": "⭐"}
     msg, users = await get("staff"), {}
     for item in res:
-        if f"{item[1]}" not in users:
-            users[f"{item[1]}"] = []
-        users[f"{item[1]}"].append(
+        if f"{item.access_level}" not in users:
+            users[f"{item.access_level}"] = []
+        users[f"{item.access_level}"].append(
             {
-                "uid": item[0],
+                "uid": item.uid,
                 "name": [
-                    f"{i.first_name} {i.last_name}" for i in names if i.id == item[0]
+                    f"{i.first_name} {i.last_name}" for i in names if i.id == item.uid
                 ][0],
-                "nickname": await get_user_nickname(item[0], chat_id),
-                "access_level": item[1],
+                "nickname": await utils.get_user_nickname(item.uid, chat_id),
+                "access_level": item.access_level,
             }
         )
     for k in sorted(users.keys(), reverse=True):
         msg += (
-            f"[{emoji[k]}] {await get_chat_access_name(chat_id, int(k), settings.lvl_names[int(k)])}\n"
+            f"[{emoji[k]}] {await utils.get_chat_access_name(chat_id, int(k), settings.lvl_names[int(k)])}\n"
             + "".join(
                 set(
                     [
@@ -367,6 +357,19 @@ async def staff(res, names, chat_id):
                 )
             )
         )
+    return msg
+
+
+async def staff_custom(levels: Iterable[CachedCustomAccessLevelRow], users: Iterable[CachedAccessLevelRow]):
+    msg = await get("staff_custom")
+    for level in levels:
+        emoji = f"[{level.emoji}] " if level.emoji else ""
+        tmpmsg = [f"{emoji}{level.name}\n"]
+        for user in users:
+            if user.access_level == level.access_level:
+                tmpmsg.append(f"➖ [id{user.uid}|{await utils.get_user_nickname(user.uid, level.chat_id) or await utils.get_user_name(user.uid)}]\n")
+        if len(tmpmsg) > 1:
+            msg += f"{''.join(tmpmsg)}\n"
     return msg
 
 
@@ -407,9 +410,9 @@ async def unwarn_hint():
 async def mutelist(res, mutedcount):
     msg = await get("mutelist", mutedcount=mutedcount)
     for ind, item in enumerate(res):
-        nickname = await get_user_nickname(item[0], item[1])
+        nickname = await utils.get_user_nickname(item[0], item[1])
         msg += (
-            f"[{ind + 1}]. [id{item[0]}|{nickname or await get_user_name(item[0])}] | "
+            f"[{ind + 1}]. [id{item[0]}|{nickname or await utils.get_user_name(item[0])}] | "
             f"{int((item[3] - time.time()) / 60)} минут | "
             f"{literal_eval(item[2])[-1] if item[2] and literal_eval(item[2])[-1] else 'Без указания причины'} "
             f"| Выдал: {literal_eval(item[4])[-1]}\n"
@@ -420,9 +423,9 @@ async def mutelist(res, mutedcount):
 async def warnlist(res, warnedcount):
     msg = await get("warnlist", warnedcount=warnedcount)
     for ind, item in enumerate(res):
-        nickname = await get_user_nickname(item[0], item[1])
+        nickname = await utils.get_user_nickname(item[0], item[1])
         msg += (
-            f"[{ind + 1}]. [id{item[0]}|{nickname or await get_user_name(item[0])}] | "
+            f"[{ind + 1}]. [id{item[0]}|{nickname or await utils.get_user_name(item[0])}] | "
             f"кол-во: {item[3]}/3 | "
             f"{'Без указания причины' if not item[2] or not literal_eval(item[2])[-1] else literal_eval(item[2])[-1]} |"
             f" Выдал: {literal_eval(item[4])[-1]}\n"
@@ -453,6 +456,14 @@ async def setacc_already_have_acc(id, name, nick):
 
 async def setacc_low_acc(acc):
     return await get("setacc_low_acc", acc=settings.lvl_names[acc])
+
+
+async def setaccess_has_custom_level():
+    return await get("setaccess_has_custom_level")
+
+
+async def delaccess_has_custom_level():
+    return await get("delaccess_has_custom_level")
 
 
 async def delaccess_hint():
@@ -499,7 +510,7 @@ async def inactive(uid, name, nick, count):
             "inactive",
             uid=uid,
             n=nick or name,
-            count=point_words(
+            count=utils.pluralize_words(
                 int(count),
                 (
                     "неактивного участника",
@@ -613,10 +624,10 @@ async def gkick_hint():
 async def banlist(res, bancount):
     msg = await get("banlist", bancount=bancount)
     for k, i in enumerate(res):
-        nickname = await get_user_nickname(i[0], i[1])
+        nickname = await utils.get_user_nickname(i[0], i[1])
         cause = literal_eval(i[2])[-1]
         msg += (
-            f"[{k + 1}]. [id{i[0]}|{nickname or await get_user_name(i[0])}] | "
+            f"[{k + 1}]. [id{i[0]}|{nickname or await utils.get_user_name(i[0])}] | "
             f"{int((i[3] - time.time()) / 86400) + 1} дней | "
             f"{cause if cause else 'Без указания причины'} | Выдал: {literal_eval(i[4])[-1]}\n"
         )
@@ -1236,7 +1247,7 @@ async def statuslist(pp):
     k = 0
     for k, i in enumerate(pp):
         msg += (
-            f"[{k + 1}]. [id{i[0]}|{await get_user_name(i[0])}] | "
+            f"[{k + 1}]. [id{i[0]}|{await utils.get_user_name(i[0])}] | "
             f"Осталось: {int((i[1] - time.time()) / 86400) + 1} дней\n"
         )
     return await get("statuslist", premium_status=k) + msg
@@ -1254,18 +1265,18 @@ async def settings_category(category, chat_settings, chat_id):
     if category == "antispam":
         if (
             chat_settings[0] == "Вкл."
-            and (val := await get_chat_setting_value(chat_id, "messagesPerMinute"))
+            and (val := await utils.get_chat_setting_value(chat_id, "messagesPerMinute"))
             is not None
         ):
             chat_settings[0] = (
-                point_words(val, ("сообщение", "сообщения", "сообщений")) + "/мин"
+                utils.pluralize_words(val, ("сообщение", "сообщения", "сообщений")) + "/мин"
             )
         if (
             chat_settings[1] == "Вкл."
-            and (val := await get_chat_setting_value(chat_id, "maximumCharsInMessage"))
+            and (val := await utils.get_chat_setting_value(chat_id, "maximumCharsInMessage"))
             is not None
         ):
-            chat_settings[1] = point_words(val, ("символ", "символа", "символов"))
+            chat_settings[1] = utils.pluralize_words(val, ("символ", "символа", "символов"))
         return await get(f"settings_{category}", settings=chat_settings)
     return await get(f"settings_{category}", settings=chat_settings)
 
@@ -1333,7 +1344,7 @@ async def settings_change_countable(
         return await get(
             f"settings_change_countable_{setting}",
             status="Включено" if pos else "Выключено",
-            time=f"{point_hours(value)} {point_minutes(value % 3600)}"
+            time=f"{utils.pluralize_hours(value)} {utils.pluralize_minutes(value % 3600)}"
             if value
             else "❌",
         )
@@ -1405,8 +1416,8 @@ async def settings_change_countable_done(setting, data):
 async def settings_change_autodelete_done(itime):
     return await get(
         "settings_change_countable_done_autodelete",
-        hours=point_hours(itime),
-        minutes=point_minutes(int(itime % 3600)),
+        hours=utils.pluralize_hours(itime),
+        minutes=utils.pluralize_minutes(int(itime % 3600)),
     )
 
 
@@ -1490,7 +1501,7 @@ async def getnick(res, query):
     msg = ""
     k = 0
     for k, item in enumerate(res):
-        msg += f"{k + 1}. {item[1]} - [id{item[0]}|{await get_user_name(item[0])}]\n"
+        msg += f"{k + 1}. {item[1]} - [id{item[0]}|{await utils.get_user_name(item[0])}]\n"
     return await get("getnick", query=query, cnt=k + 1) + msg
 
 
@@ -1553,7 +1564,7 @@ async def bonus(id, nick, name, xp, premium, streak):
         maxxp=maxxp,
         s=""
         if not streak
-        else f"Серия: {point_words(streak + 1, ('день', 'дня', 'дней'))} подряд! ",
+        else f"Серия: {utils.pluralize_words(streak + 1, ('день', 'дня', 'дней'))} подряд! ",
     ) + (
         ""
         if premium
@@ -1566,53 +1577,53 @@ async def bonus_time(id, nick, name, timeleft):
         "bonus_time",
         id=id,
         n=nick or name,
-        hours=point_hours((timeleft // 3600) * 3600),
-        minutes=point_minutes(timeleft - (timeleft // 3600) * 3600),
+        hours=utils.pluralize_hours((timeleft // 3600) * 3600),
+        minutes=utils.pluralize_minutes(timeleft - (timeleft // 3600) * 3600),
     )
 
 
 async def top_lvls(top, chattop):
     msg = await get("top_lvls")
     for k, i in enumerate(top.items()):
-        msg += f"{number_to_emoji(k + 1)} [id{i[0]}|{await get_user_name(i[0])}] - {i[1]} уровень\n"
+        msg += f"{utils.number_to_emoji(k + 1)} [id{i[0]}|{await utils.get_user_name(i[0])}] - {i[1]} уровень\n"
     msg += "\n🥨 В беседе:\n"
     for k, i in enumerate(chattop.items()):
-        msg += f"{number_to_emoji(k + 1)} [id{i[0]}|{await get_user_name(i[0])}] - {i[1]} уровень\n"
+        msg += f"{utils.number_to_emoji(k + 1)} [id{i[0]}|{await utils.get_user_name(i[0])}] - {i[1]} уровень\n"
     return msg
 
 
 async def top_duels(duels, category="общее"):
     msg = await get("top_duels", category=category)
     for k, item in enumerate(duels) if duels else []:
-        msg += f"{number_to_emoji(k + 1)} [id{item[0]}|{await get_user_name(item[0])}] - {item[1]} побед\n"
+        msg += f"{utils.number_to_emoji(k + 1)} [id{item[0]}|{await utils.get_user_name(item[0])}] - {item[1]} побед\n"
     return msg
 
 
 async def top_rep(top, category):
     msg = await get("top_rep", category=category)
     for k, item in enumerate(top[:10]) if top else []:
-        msg += f"{number_to_emoji(k + 1)} [id{item[0]}|{await get_user_name(item[0])}] - {'+' if item[1] > 0 else ''}{item[1]}\n"
+        msg += f"{utils.number_to_emoji(k + 1)} [id{item[0]}|{await utils.get_user_name(item[0])}] - {'+' if item[1] > 0 else ''}{item[1]}\n"
     return msg
 
 
 async def top_math(top):
     msg = await get("top_math")
     for k, item in enumerate(top[:10]) if top else []:
-        msg += f"{number_to_emoji(k + 1)} [id{item[0]}|{await get_user_name(item[0])}] - {item[1]} ответов\n"
+        msg += f"{utils.number_to_emoji(k + 1)} [id{item[0]}|{await utils.get_user_name(item[0])}] - {item[1]} ответов\n"
     return msg
 
 
 async def top_bonus(top):
     msg = await get("top_bonus")
     for k, item in enumerate(top[:10]) if top else []:
-        msg += f"{number_to_emoji(k + 1)} [id{item[0]}|{await get_user_name(item[0])}] - {item[1]} дней\n"
+        msg += f"{utils.number_to_emoji(k + 1)} [id{item[0]}|{await utils.get_user_name(item[0])}] - {item[1]} дней\n"
     return msg
 
 
 async def top_coins(top):
     msg = await get("top_coins")
     for k, item in enumerate(top[:10]) if top else []:
-        msg += f"{number_to_emoji(k + 1)} [id{item[0]}|{await get_user_name(item[0])}] - {point_words(item[1].coins, ('монетка', 'монетки', 'монет'))}\n"
+        msg += f"{utils.number_to_emoji(k + 1)} [id{item[0]}|{await utils.get_user_name(item[0])}] - {utils.pluralize_words(item[1].coins, ('монетка', 'монетки', 'монет'))}\n"
     return msg
 
 
@@ -2119,9 +2130,9 @@ async def check(id, name, nickname, ban, warn, mute):
         "check",
         id=id,
         n=nickname or name,
-        ban=point_days(ban) if ban else "Отсутствуют",
+        ban=utils.pluralize_days(ban) if ban else "Отсутствуют",
         warn=f"{warn} из 3" if warn else "Отсутствуют",
-        mute=point_minutes(mute) if mute else "Отсутствует",
+        mute=utils.pluralize_minutes(mute) if mute else "Отсутствует",
     )
 
 
@@ -2133,10 +2144,10 @@ async def check_ban(
         id=id,
         n=nickname or name,
         lbh=len(ban_history),
-        banm=point_days(ban) if ban else "Отсутствует",
+        banm=utils.pluralize_days(ban) if ban else "Отсутствует",
     )
     if ban:
-        msg += f"★ {ban_date} | {ban_from} | {point_days(ban_time)} | {ban_reason}"
+        msg += f"★ {ban_date} | {ban_from} | {utils.pluralize_days(ban_time)} | {ban_reason}"
     return msg
 
 
@@ -2148,12 +2159,10 @@ async def check_mute(
         id=id,
         n=nickname or name,
         lmh=len(mute_history),
-        mutem=point_minutes(mute) if mute else "Отсутствует",
+        mutem=utils.pluralize_minutes(mute) if mute else "Отсутствует",
     )
     if mute:
-        msg += (
-            f"★ {mute_date} | {mute_from} | {point_minutes(mute_time)} | {mute_reason}"
-        )
+        msg += f"★ {mute_date} | {mute_from} | {utils.pluralize_minutes(mute_time)} | {mute_reason}"
     return msg
 
 
@@ -2176,14 +2185,14 @@ async def check_warn(
 async def check_history_ban(id, name, nickname, dates, names, times, causes):
     msg = await get("check_history_ban", id=id, n=nickname or name)
     for k in range(len(times)):
-        msg += f"★ {dates[k]} | {names[k]} | {point_days(times[k]) if times[k] < 3650 else 'Навсегда'} | {causes[k]}\n"
+        msg += f"★ {dates[k]} | {names[k]} | {utils.pluralize_days(times[k]) if times[k] < 3650 else 'Навсегда'} | {causes[k]}\n"
     return msg
 
 
 async def check_history_mute(id, name, nickname, dates, names, times, causes):
     msg = await get("check_history_mute", id=id, n=nickname or name)
     for k in range(len(times)):
-        msg += f"★ {dates[k]} | {names[k]} | {point_minutes(times[k]) if times[k] < 44600 else 'Навсегда'} | {causes[k]}\n"
+        msg += f"★ {dates[k]} | {names[k]} | {utils.pluralize_minutes(times[k]) if times[k] < 44600 else 'Навсегда'} | {causes[k]}\n"
     return msg
 
 
@@ -2205,8 +2214,8 @@ async def purge_empty():
 async def purge(nicknames, levels):
     return await get(
         "purge",
-        nicknames=point_words(nicknames, ("никнейм", "никнейма", "никнеймов")),
-        levels=point_words(levels, ("уровень", "уровня", "уровней")),
+        nicknames=utils.pluralize_words(nicknames, ("никнейм", "никнейма", "никнеймов")),
+        levels=utils.pluralize_words(levels, ("уровень", "уровня", "уровней")),
     )
 
 
@@ -2358,7 +2367,7 @@ async def nightmode_end():
 
 async def commandcooldown(time):
     return await get(
-        "commandcooldown", time=point_words(time, ["секунду", "секунды", "секунд"])
+        "commandcooldown", time=utils.pluralize_words(time, ["секунду", "секунды", "секунд"])
     )
 
 
@@ -2367,15 +2376,15 @@ async def captcha(uid, n, ctime, punishment: str):
         punishment = "кикнуты"
     elif punishment.startswith("mute"):
         t = punishment.split("|")[-1]
-        punishment = f"замучены на {point_words(int(t), ('час', 'часа', 'часов'))}"
+        punishment = f"замучены на {utils.pluralize_words(int(t), ('час', 'часа', 'часов'))}"
     elif punishment.startswith("ban"):
         t = punishment.split("|")[-1]
-        punishment = f"забанены на {point_words(int(t), ('день', 'дня', 'дней'))}"
+        punishment = f"забанены на {utils.pluralize_words(int(t), ('день', 'дня', 'дней'))}"
     return await get(
         "captcha",
         uid=uid,
         n=n,
-        time=point_words(ctime, ("минута", "минуты", "минут")),
+        time=utils.pluralize_words(ctime, ("минута", "минуты", "минут")),
         punishment=punishment,
     )
 
@@ -2510,12 +2519,12 @@ async def antitag_del(id, name, nick):
 async def antitag_list(users, chat_id):
     return await get(
         "antitag_list",
-        userslen=point_words(
+        userslen=utils.pluralize_words(
             len(users), ("пользователь", "пользователя", "пользователей")
         ),
     ) + "".join(
         [
-            f"[{k + 1}]. [id{i}|{await get_user_nickname(i, chat_id) or await get_user_name(i)}]\n"
+            f"[{k + 1}]. [id{i}|{await utils.get_user_nickname(i, chat_id) or await utils.get_user_name(i)}]\n"
             for k, i in enumerate(users)
         ]
     )
@@ -2704,8 +2713,8 @@ async def rep_limit(uprem, lasttime):
     timeleft = (lasttime + 86400) - time.time()
     return await get(
         "rep_limit",
-        hours=point_hours((timeleft // 3600) * 3600),
-        minutes=point_minutes(timeleft - (timeleft // 3600) * 3600),
+        hours=utils.pluralize_hours((timeleft // 3600) * 3600),
+        minutes=utils.pluralize_minutes(timeleft - (timeleft // 3600) * 3600),
     ) + (
         "\n⭐ С Premium-статусом лимит расширяется до 3 изменений в сутки."
         if not uprem
@@ -3036,8 +3045,8 @@ async def rps_not_enough_coins():
 async def up_cooldown(remaining):
     return await get(
         "up_cooldown",
-        hours=point_hours(hours := ((remaining // 3600) * 3600)),
-        minutes=point_minutes(remaining - hours),
+        hours=utils.pluralize_hours(hours := ((remaining // 3600) * 3600)),
+        minutes=utils.pluralize_minutes(remaining - hours),
     )
 
 
@@ -3051,3 +3060,163 @@ async def up():
 
 async def chats_not_allowed():
     return await get("chats_not_allowed")
+
+
+async def unexpected_error():
+    return await get("unexpected_error")
+
+
+async def createlevel_hint(limit):
+    return await get("createlevel_hint", limit=limit)
+
+
+async def createlevel_level_limit(is_premium, level):
+    limit = 10 if not is_premium else 50
+    return await get(
+        "createlevel_level_limit",
+        limit=limit,
+        add=", c Premium-статусом лимит расширяется на +40 уровней прав"
+        if not is_premium
+        else "",
+    )
+
+
+async def createlevel_char_limit():
+    return await get("createlevel_char_limit")
+
+
+async def createlevel_level_already_exists(level, name):
+    return await get("createlevel_level_already_exists", level=level, name=name)
+
+
+async def createlevel_name_already_exists(name):
+    return await get("createlevel_name_already_exists", name=name)
+
+
+async def createlevel_name_forbidden_chars(chars):
+    return await get("createlevel_name_forbidden_chars", chars=chars)
+
+
+async def createlevel(name, level):
+    return await get("createlevel", name=name, level=level)
+
+
+async def customlevel_settings(level, name, emoji, status, role_holders, commands):
+    return await get(
+        "customlevel_settings",
+        level=level,
+        name=name,
+        emoji=emoji or '—',
+        status="Вкл." if status else "Выкл.",
+        role_holders=role_holders,
+        commands=", ".join(commands) if commands else '—',
+    )
+
+
+async def customlevel_delete_yon(name, level):
+    return await get("customlevel_delete_yon", name=name, level=level)
+
+
+async def customlevel_delete(name, level):
+    return await get("customlevel_delete", name=name, level=level)
+
+
+async def customlevel_remove_all_yon(name, level):
+    return await get("customlevel_remove_all_yon", name=name, level=level)
+
+
+async def customlevel_remove_all(name, level, holders):
+    return await get(
+        "customlevel_remove_all",
+        name=name,
+        level=level,
+        holders=utils.pluralize_words(
+            holders, ("пользователя", "пользователей", "пользователей")
+        ),
+    )
+
+
+async def customlevel_set_priority(limit):
+    return await get("customlevel_set_priority", limit=limit)
+
+
+async def customlevel_set_name():
+    return await get("customlevel_set_name")
+
+
+async def customlevel_set_emoji():
+    return await get("customlevel_set_emoji")
+
+
+async def customlevel_set_commands():
+    return await get("customlevel_set_commands")
+
+
+async def customlevel_set_commands_presets(name, level):
+    return await get("customlevel_set_commands_presets", name=name, level=level)
+
+
+async def customlevel_set_commands_done(name, level, commands, additional_text=""):
+    return await get(
+        "customlevel_set_commands_done",
+        name=name,
+        level=level,
+        commands=", ".join(commands),
+        add=additional_text,
+    )
+
+
+async def customlevel_set_priority_done(name, new_priority):
+    return await get("customlevel_set_priority_done", name=name, np=new_priority)
+
+
+async def customlevel_set_name_done(old_name, new_name):
+    return await get("customlevel_set_name_done", nn=new_name, on=old_name)
+
+
+async def customlevel_set_emoji_done(name, new_emoji):
+    return await get("customlevel_set_emoji_done", ne=new_emoji, name=name)
+
+
+async def levelmenu(levels, activated):
+    return await get("levelmenu", levels=levels, activated=activated)
+
+
+async def setlevel_hint():
+    return await get("setlevel_hint")
+
+
+async def setlevel_level_not_found(level):
+    return await get("setlevel_level_not_found", level=level)
+
+
+async def setlevel_level_too_high():
+    return await get("setlevel_level_too_high")
+
+
+async def setlevel_has_not_custom_level():
+    return await get("setlevel_has_not_custom_level")
+
+
+async def setlevel_to_level_higher():
+    return await get("setlevel_to_level_higher")
+
+
+async def setlevel(uid, unick, uname, level_name, level, id, nick, name):
+    return await get("setlevel", uid=uid, uname=unick or uname, level=level, levelname=level_name, id=id, name=nick or name)
+
+
+async def dellevel_hint():
+    return await get("dellevel_hint")
+
+
+async def dellevel_has_no_level():
+    return await get("dellevel_has_no_level")
+
+
+async def dellevel_has_not_custom_level():
+    return await get("dellevel_has_not_custom_level")
+
+
+async def dellevel(uid, unick, uname, level_name, level, id, nick, name):
+    return await get("dellevel", uid=uid, uname=unick or uname, level=level, levelname=level_name, id=id, name=nick or name)

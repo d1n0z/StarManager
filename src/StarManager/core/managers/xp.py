@@ -36,7 +36,7 @@ DEFAULTS = {
 
 
 @dataclass
-class _CachedXP(BaseCachedModel):
+class CachedXPRow(BaseCachedModel):
     xp: float
     coins: int
     coins_limit: int
@@ -48,7 +48,7 @@ class _CachedXP(BaseCachedModel):
 
 
 CacheKey: TypeAlias = int
-Cache: TypeAlias = Dict[CacheKey, _CachedXP]
+Cache: TypeAlias = Dict[CacheKey, CachedXPRow]
 
 
 def _make_cache_key(uid: int) -> CacheKey:
@@ -96,7 +96,7 @@ class XPCache(BaseCacheManager):
         async with self._lock:
             for row in rows:
                 key = _make_cache_key(row.uid)
-                self._cache[key] = _CachedXP.from_model(row)
+                self._cache[key] = CachedXPRow.from_model(row)
 
         await super().initialize()
 
@@ -111,7 +111,7 @@ class XPCache(BaseCacheManager):
         defaults = initial_data or DEFAULTS
         model, created = await self.repo.ensure_record(uid, defaults=defaults)
         async with self._lock:
-            self._cache[cache_key] = _CachedXP.from_model(model)
+            self._cache[cache_key] = CachedXPRow.from_model(model)
         return created
 
     @overload
@@ -157,7 +157,7 @@ class XPCache(BaseCacheManager):
         new_cache: Cache = {}
         for row in rows:
             key = _make_cache_key(row.uid)
-            new_cache[key] = _CachedXP.from_model(row)
+            new_cache[key] = CachedXPRow.from_model(row)
 
         async with self._lock:
             dirty_snapshot = set(self._dirty)
@@ -204,7 +204,7 @@ class XPCache(BaseCacheManager):
                     if uid in existing_map:
                         row = existing_map[uid]
                         dirty = False
-                        for field in _CachedXP.__dataclass_fields__:
+                        for field in CachedXPRow.__dataclass_fields__:
                             val = getattr(cached, field)
                             if getattr(row, field) != val:
                                 setattr(row, field, val)
@@ -217,7 +217,7 @@ class XPCache(BaseCacheManager):
                 if to_update:
                     await XP.bulk_update(
                         to_update,
-                        fields=list(_CachedXP.__dataclass_fields__.keys()),
+                        fields=list(CachedXPRow.__dataclass_fields__.keys()),
                         batch_size=batch_size,
                     )
                 if to_create:
@@ -255,7 +255,7 @@ class XPManager(BaseManager):
 
     async def get_xp_top(
         self, league: int, uids: List[int] | None, limit: int = 10
-    ) -> List[tuple[CacheKey, _CachedXP]]:
+    ) -> List[tuple[CacheKey, CachedXPRow]]:
         async with self._lock:
             top = [
                 (uid, obj)

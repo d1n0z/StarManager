@@ -80,7 +80,7 @@ async def gkick(message: Message):
     for chat_id in chats:
         u_acc = await get_user_access_level(uid, chat_id)
         if u_acc <= await get_user_access_level(id, chat_id) or not await haveAccess(
-            "gkick", chat_id, u_acc
+            "gkick", chat_id, uid
         ):
             continue
         if await kick_user(id, chat_id):
@@ -189,7 +189,7 @@ async def gban(message: Message):
     for chat_id in chats:
         u_acc = await get_user_access_level(uid, chat_id)
         if u_acc <= await get_user_access_level(id, chat_id) or not await haveAccess(
-            "gban", chat_id, u_acc
+            "gban", chat_id, uid
         ):
             continue
 
@@ -309,7 +309,7 @@ async def gunban(message: Message):
     for chat_id in chats:
         u_acc = await get_user_access_level(uid, chat_id)
         if u_acc <= await get_user_access_level(id, chat_id) or not await haveAccess(
-            "gunban", chat_id, u_acc
+            "gunban", chat_id, uid
         ):
             continue
         if await get_user_ban(id, chat_id) <= time.time():
@@ -393,7 +393,7 @@ async def gmute(message: Message):
     for chat_id in chats:
         u_acc = await get_user_access_level(uid, chat_id)
         if u_acc <= await get_user_access_level(id, chat_id) or not await haveAccess(
-            "gmute", chat_id, u_acc
+            "gmute", chat_id, uid
         ):
             continue
 
@@ -516,7 +516,7 @@ async def gunmute(message: Message):
     for chat_id in chats:
         u_acc = await get_user_access_level(uid, chat_id)
         ch_acc = await get_user_access_level(id, chat_id)
-        if u_acc <= ch_acc or not await haveAccess("gunmute", chat_id, u_acc):
+        if u_acc <= ch_acc or not await haveAccess("gunmute", chat_id, uid):
             continue
         async with (await pool()).acquire() as conn:
             if not await conn.fetchval(
@@ -594,7 +594,7 @@ async def gwarn(message: Message):
     for chat_id in chats:
         u_acc = await get_user_access_level(uid, chat_id)
         if u_acc <= await get_user_access_level(id, chat_id) or not await haveAccess(
-            "gwarn", chat_id, u_acc
+            "gwarn", chat_id, uid
         ):
             continue
 
@@ -727,7 +727,7 @@ async def gunwarn(message: Message):
     for chat_id in chats:
         u_acc = await get_user_access_level(uid, chat_id)
         if u_acc <= await get_user_access_level(id, chat_id) or not await haveAccess(
-            "gunwarn", chat_id, u_acc
+            "gunwarn", chat_id, uid
         ):
             continue
         ch_warns = await get_user_warns(id, chat_id)
@@ -814,7 +814,7 @@ async def gsnick(message: Message):
         u_acc = await get_user_access_level(uid, chat_id)
         if (
             u_acc <= await get_user_access_level(id, chat_id) and uid != id
-        ) or not await haveAccess("gsnick", chat_id, u_acc):
+        ) or not await haveAccess("gsnick", chat_id, uid):
             continue
 
         async with (await pool()).acquire() as conn:
@@ -896,7 +896,7 @@ async def grnick(message: Message):
         ch_nickname = await get_user_nickname(id, chat_id)
         if (
             (u_acc <= await get_user_access_level(id, chat_id) and uid != id)
-            or not await haveAccess("grnick", chat_id, u_acc)
+            or not await haveAccess("grnick", chat_id, uid)
             or ch_nickname is None
         ):
             continue
@@ -951,8 +951,7 @@ async def gzov(message: Message):
     success = 0
     cause = " ".join(data[1:])
     for chat_id in chats:
-        u_acc = await get_user_access_level(uid, chat_id)
-        if not await haveAccess("gzov", chat_id, u_acc):
+        if not await haveAccess("gzov", chat_id, uid):
             continue
         try:
             members = (

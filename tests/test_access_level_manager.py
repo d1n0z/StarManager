@@ -1,10 +1,10 @@
-# pytest-asyncio tests for AccessLevel cache/manager
-# Adjust import paths if your project layout differs.
-# These tests assume:
-# - Tortoise model AccessLevel is available at StarManager.core.tables.AccessLevel
-# - The AccessLevelManager class (and related cache/repo) is defined in
-#   StarManager.core.managers.access_level
-# If your module path is different, change the imports below.
+    # pytest-asyncio tests for AccessLevel cache/manager
+    # Adjust import paths if your project layout differs.
+    # These tests assume:
+    # - Tortoise model AccessLevel is available at StarManager.core.tables.AccessLevel
+    # - The AccessLevelManager class (and related cache/repo) is defined in
+    #   StarManager.core.managers.access_level
+    # If your module path is different, change the imports below.
 
 import asyncio
 import pytest
@@ -95,7 +95,6 @@ async def test_no_overwrite_if_changed_during_sync(monkeypatch, manager):
     update the cache while sync is mid-flight.
     """
     uid, chat_id = 777, 99
-    key = (uid, chat_id)
 
     # Prepare initial value and ensure it's in cache
     await manager.edit_access_level(uid, chat_id, 1)

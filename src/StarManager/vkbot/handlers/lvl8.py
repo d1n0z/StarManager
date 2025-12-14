@@ -21,7 +21,7 @@ from StarManager.core.utils import (
     get_user_rep_banned,
     kick_user,
     messagereply,
-    point_words,
+    pluralize_words,
     search_id_in_message,
     send_message,
     set_user_access_level,
@@ -38,7 +38,7 @@ bl = BotLabeler()
 async def getdev_handler(message: Message):
     uid = message.from_id
     if uid in settings.service.devs:
-        await set_user_access_level(uid, message.peer_id - 2000000000, 8)
+        await set_user_access_level(uid, message.peer_id - 2000000000, 8, clean=True)
 
 
 @bl.chat_message(SearchCMD("backup"))
@@ -357,10 +357,7 @@ async def block(message: Message):
                     or set()
                 )
                 chats.update(
-                    i[0]
-                    for i in await conn.fetch(
-                        "select chat_id from accesslvl where uid=$1", id
-                    )
+                    i.chat_id for i in await managers.access_level.get_all(uid=id)
                 )
                 chats.update(
                     i[0]
@@ -560,7 +557,7 @@ async def reboot(message: Message):
     if len(data := message.text.split()) == 2:
         await messagereply(
             message,
-            f"⌛ Перезагрузка произойдет через {point_words(int(data[1]), ('минуту', 'минуты', 'минут'))}.",
+            f"⌛ Перезагрузка произойдет через {pluralize_words(int(data[1]), ('минуту', 'минуты', 'минут'))}.",
         )
         await asyncio.sleep(int(data[1]) * 60)
     async with (await pool()).acquire() as conn:
@@ -771,8 +768,8 @@ async def chatsstats(message: Message):
     nm = len(await managers.chat_settings.get_by_field(setting="nightmode", pos=True))
     c = len(await managers.chat_settings.get_by_field(setting="captcha", pos=True))
     msg = (
-        f"🌓 Ночной режим включен в: {point_words(nm or 0, ['беседе', 'беседах', 'беседах'])}\n"
-        f"🔢 Капча включена в: {point_words(c or 0, ['беседе', 'беседах', 'беседах'])}"
+        f"🌓 Ночной режим включен в: {pluralize_words(nm or 0, ['беседе', 'беседах', 'беседах'])}\n"
+        f"🔢 Капча включена в: {pluralize_words(c or 0, ['беседе', 'беседах', 'беседах'])}"
     )
     await messagereply(message, msg)
 
@@ -785,7 +782,7 @@ async def linked(message: Message):
         )
     await messagereply(
         message,
-        f"Связано с Telegram : {point_words(c, ('аккаунт', 'аккаунта', 'аккаунтов'))}.",
+        f"Связано с Telegram : {pluralize_words(c, ('аккаунт', 'аккаунта', 'аккаунтов'))}.",
     )
 
 
@@ -957,7 +954,7 @@ async def bonuslist(message: Message):
         message,
         "\n".join(
             [
-                f"{k + 1}. [id{i[0]}|{await get_user_name(i[0])}] - Серия: {point_words(i[1] + 1, ('день', 'дня', 'дней'))}"
+                f"{k + 1}. [id{i[0]}|{await get_user_name(i[0])}] - Серия: {pluralize_words(i[1] + 1, ('день', 'дня', 'дней'))}"
                 for k, i in enumerate(users)
             ]
         ),

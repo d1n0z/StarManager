@@ -15,7 +15,6 @@ from StarManager.core.utils import (
     delete_messages,
     get_chat_name,
     get_chat_settings,
-    search_id_in_message,
     get_silence,
     get_silence_allowed,
     get_user_access_level,
@@ -30,13 +29,14 @@ from StarManager.core.utils import (
     get_user_premmenu_setting,
     kick_user,
     punish,
+    search_id_in_message,
     send_message,
     set_chat_mute,
 )
 from StarManager.vkbot import keyboard, messages
 from StarManager.vkbot.action_handlers import action_handle
 from StarManager.vkbot.add_msg_count import add_msg_counter
-from StarManager.vkbot.answers_handlers import answer_handler
+from StarManager.vkbot.state_handlers import answer_handler
 from StarManager.vkbot.checkers import getUChatLimit
 
 
@@ -103,6 +103,9 @@ async def message_handle(event: MessageNew) -> Any:
     if uid in settings.service.admins:
         print(f"{uid}({chat_id}): {msg}")
 
+    owners = await managers.access_level.get_all(
+        chat_id=chat_id, predicate=lambda i: i.access_level >= 7 and i.custom_level_name is None
+    )
     filterdata, pnt = msg.lower().replace(" ", ""), -1
     async with (await pool()).acquire() as conn:
         await conn.execute(
@@ -122,12 +125,9 @@ async def message_handle(event: MessageNew) -> Any:
                     "select 1 from gpool where uid=$2 and chat_id=$1) and filter not in ("
                     "select filter from filterexceptions where owner_id=$2 and chat_id=$1))",
                     chat_id,
-                    await conn.fetchval(
-                        "select uid from accesslvl where chat_id=$1 and access_level>=7 order by "
-                        "access_level, uid",
-                        chat_id,
-                    )
-                    or uid,
+                    sorted(owners, key=lambda i: i.access_level, reverse=True)[0].uid
+                    if owners
+                    else uid,
                 )
             ]
         ) and not await get_user_access_level(uid, chat_id):
@@ -395,7 +395,9 @@ async def message_handle(event: MessageNew) -> Any:
             chat_id, uid, event.object.message, chat_settings
         )
     ):
-        setting = await managers.chat_settings.get(chat_id, setting_key, ("id", "value", "pos2"))
+        setting = await managers.chat_settings.get(
+            chat_id, setting_key, ("id", "value", "pos2")
+        )
         if punishment := await punish(uid, chat_id, setting[0]):
             if punishment != "del":
                 await send_message(

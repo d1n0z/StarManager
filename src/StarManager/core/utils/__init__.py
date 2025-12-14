@@ -5,10 +5,11 @@ import random
 import re
 import tempfile
 import time
+import unicodedata
 from ast import literal_eval
 from copy import deepcopy
 from datetime import date, datetime
-from typing import Any, Dict, Iterable, List, Literal, Union
+from typing import Any, Dict, Generator, Iterable, List, Literal, Optional, Union
 from urllib.parse import urlparse
 
 import aiogram
@@ -41,6 +42,8 @@ from yookassa.payment import PaymentResponse
 from StarManager.core import config, managers
 from StarManager.core.config import api, settings, vk_api_session
 from StarManager.core.db import pool
+
+from . import models
 
 _hiddenalbumuid = None
 _hiddenalbumlock = asyncio.Lock()
@@ -209,7 +212,7 @@ async def edit_message(
 
 
 @AsyncTTL(time_to_live=300, maxsize=0)
-async def get_chat_name(chat_id: int, none: Any = "UNKNOWN"):
+async def get_chat_name(chat_id: int, none: Any = "UNKNOWN") -> Any:
     async with (await pool()).acquire() as conn:
         if name := await conn.fetchval(
             "select name from chatnames where chat_id=$1", chat_id
@@ -314,9 +317,7 @@ async def set_chat_mute(
         return
 
 
-async def upload_image(
-    file: str, uid: int | None = None, retry: int = 0
-) -> str | None:
+async def upload_image(file: str, uid: int | None = None, retry: int = 0) -> str | None:
     if not uid:
         uid = await get_hidden_album_user()
     try:
@@ -334,7 +335,7 @@ async def upload_image(
             _hiddenalbumuid = None
             uid = await get_hidden_album_user()
         if retry < 6 or "too many" in str(e).lower():
-            await asyncio.sleep((2 ** retry) / 2)
+            await asyncio.sleep((2**retry) / 2)
             return await upload_image(file, uid, retry + 1)
         if "internal" in str(e).lower():
             logger.error("Failed to find an appropriate hidden album!!")
@@ -375,8 +376,19 @@ async def get_reg_date(
 
 
 @AsyncTTL(time_to_live=2, maxsize=0)
-async def get_user_access_level(uid: int, chat_id: int, none: Any = 0) -> int | Any:
-    return await managers.access_level.get_access_level(uid, chat_id) or none
+async def get_user_access_level(uid: int, chat_id: int, none: Any = 0, ignore_custom: bool = False) -> models.SimpleAccessLevel | Any:
+    res = await managers.access_level.get(uid, chat_id)
+    if res is None:
+        return none
+    if not await managers.custom_access_level.is_active(res.access_level, chat_id):
+        return none
+    acc = models.SimpleAccessLevel(
+        access_level=res.access_level,
+        is_custom=res.custom_level_name is not None,
+    )
+    if ignore_custom and acc.is_custom:
+        return none
+    return acc
 
 
 async def get_user_last_message(
@@ -465,24 +477,24 @@ async def get_user_ban_info(uid, chat_id, none=None) -> dict:
     return none
 
 
-async def get_user_xp(uid, none=0):
+async def get_user_xp(uid, none=0) -> Any | int:
     return await managers.xp.get(uid, "xp") or none
 
 
-async def get_user_coins(uid, none=0):
+async def get_user_coins(uid, none=0) -> Any | int:
     return await managers.xp.get(uid, "coins") or none
 
 
-async def get_user_league(uid, none=1):
+async def get_user_league(uid, none=1) -> Any | int:
     return await managers.xp.get(uid, "league") or none
 
 
-async def get_user_level(uid, none=0):
+async def get_user_level(uid, none=0) -> Any | int:
     return await managers.xp.get(uid, "lvl") or none
 
 
 @AsyncLRU(maxsize=0)
-async def get_user_needed_xp(xp):
+async def get_user_needed_xp(xp: int) -> int:
     return 1000 - xp
 
 
@@ -505,7 +517,7 @@ async def get_user_premium(uid, none=0) -> int:
         return await conn.fetchval("select time from premium where uid=$1", uid) or none
 
 
-async def get_user_premmenu_setting(uid, setting, none):
+async def get_user_premmenu_setting(uid, setting, none) -> Any:
     async with (await pool()).acquire() as conn:
         res = await conn.fetchval(
             (
@@ -519,7 +531,7 @@ async def get_user_premmenu_setting(uid, setting, none):
     return res if res is not None else none
 
 
-async def get_user_premmenu_settings(uid):
+async def get_user_premmenu_settings(uid) -> Dict[str, bool | None]:
     user_settings = deepcopy(settings.premium_menu.default)
     async with (await pool()).acquire() as conn:
         clear_by_fire = await conn.fetchval(
@@ -542,7 +554,7 @@ async def get_user_premmenu_settings(uid):
     return user_settings
 
 
-async def get_chat_command_level(chat_id, cmd, none):
+async def get_chat_command_level(chat_id, cmd, none) -> Any:
     async with (await pool()).acquire() as conn:
         return (
             await conn.fetchval(
@@ -566,7 +578,7 @@ async def get_user_messages(uid, chat_id, none=0) -> int:
         )
 
 
-async def add_user_xp(uid, addxp, checklvlbanned=True):
+async def add_user_xp(uid, addxp, checklvlbanned=True) -> None:
     async with (await pool()).acquire() as conn:
         if checklvlbanned:
             if await conn.fetchval(
@@ -614,12 +626,12 @@ async def get_chat_settings(chat_id) -> Dict[str, Dict[str, int]]:
 
 
 @AsyncTTL(time_to_live=5, maxsize=0)
-async def get_chat_setting_value(chat_id, setting):
+async def get_chat_setting_value(chat_id, setting) -> Any:
     return await managers.chat_settings.get(chat_id, setting, "value")
 
 
 @AsyncTTL(time_to_live=5, maxsize=0)
-async def get_chat_alt_settings(chat_id):
+async def get_chat_alt_settings(chat_id) -> Dict[str, Dict[str, int]]:
     chatsettings = deepcopy(settings.settings_alt.defaults)
     for cat, chat in chatsettings.items():
         for setting, _ in chat.items():
@@ -648,7 +660,9 @@ async def turn_chat_setting(chat_id, category, setting, alt=False) -> None:
     )
 
 
-async def set_user_access_level(uid, chat_id, access_level):
+async def set_user_access_level(uid, chat_id, access_level, clean: bool = False) -> None:
+    if clean:
+        await managers.access_level.delete(uid, chat_id)
     await managers.access_level.edit_access_level(uid, chat_id, access_level)
 
 
@@ -661,7 +675,7 @@ async def get_silence(chat_id) -> bool:
 
 
 @AsyncTTL(time_to_live=120, maxsize=0)
-async def is_chat_member(uid, chat_id):
+async def is_chat_member(uid, chat_id) -> bool:
     try:
         return uid in [
             i.member_id
@@ -675,7 +689,7 @@ async def is_chat_member(uid, chat_id):
         return False
 
 
-def _nsfw_detector_sync(pic_path):
+def _nsfw_detector_sync(pic_path) -> bool:
     detector = NudeDetector()
     with open(pic_path, "rb") as f:
         image_data = f.read()
@@ -695,11 +709,11 @@ def _nsfw_detector_sync(pic_path):
     return False
 
 
-async def NSFW_detector(pic_path):
+async def NSFW_detector(pic_path) -> bool:
     return await asyncio.to_thread(_nsfw_detector_sync, pic_path)
 
 
-def whoiscached(text):
+def whoiscached(text) -> bool:
     # return whois.whois(text)  # doesn't work
     try:
         if "." not in text:
@@ -710,7 +724,7 @@ def whoiscached(text):
         return False
 
 
-def whoiscachedurl(text):
+def whoiscachedurl(text) -> None | Literal[True]:
     # return whois.whois(text)  # doesn't work
     for i in text.split("/"):
         try:
@@ -835,7 +849,7 @@ async def antispam_checker(
     return False
 
 
-async def command_cooldown_check(uid: int, cmd: str):
+async def command_cooldown_check(uid: int, cmd: str) -> None | float:
     if not (
         cd := (
             settings.commands.cooldown.get(cmd, 0)
@@ -853,7 +867,7 @@ async def command_cooldown_check(uid: int, cmd: str):
 
 
 @cached
-def point_days(seconds):
+def pluralize_days(seconds) -> str:
     res = int(int(seconds) // 86400)
     if res == 1:
         res = str(res) + " день"
@@ -865,7 +879,7 @@ def point_days(seconds):
 
 
 @cached
-def point_hours(seconds):
+def pluralize_hours(seconds) -> str:
     res = int(int(seconds) // 3600)
     if res in [23, 22, 4, 3, 2]:
         res = f"{res} часа"
@@ -877,7 +891,7 @@ def point_hours(seconds):
 
 
 @cached
-def point_minutes(seconds):
+def pluralize_minutes(seconds) -> str:
     res = int(int(seconds) // 60)
     if res % 10 == 1 and res % 100 != 11:
         res = str(res) + " минута"
@@ -889,7 +903,7 @@ def point_minutes(seconds):
 
 
 @cached
-def point_words(value, words):
+def pluralize_words(value, words) -> str:
     """
     :param value
     :param words: e.g. (минута, минуты, минут)
@@ -904,7 +918,7 @@ def point_words(value, words):
     return res
 
 
-def chunks(li, n):
+def chunks(li, n) -> Generator[Any, Any, None]:
     for i in range(0, len(li), n):
         yield li[i : i + n]
 
@@ -1113,7 +1127,7 @@ async def punish(uid, chat_id, setting_id):
     return False
 
 
-async def get_gpool(chat_id) -> List[Any] | Literal[False]:
+async def get_gpool(chat_id) -> Optional[List[Any]]:
     try:
         async with (await pool()).acquire() as conn:
             chats = [
@@ -1124,40 +1138,45 @@ async def get_gpool(chat_id) -> List[Any] | Literal[False]:
                 )
             ]
         if len(chats) == 0:
-            raise Exception
+            return None
         return chats
     except Exception:
-        return False
+        return None
 
 
-async def get_pool(chat_id, group) -> list[Any] | Literal[False]:
+async def get_pool(chat_id, group) -> Optional[list[Any]]:
     try:
+        owners = await managers.access_level.get_all(
+            chat_id=chat_id, predicate=lambda i: i.access_level > 6 and i.custom_level_name is None
+        )
+        if len(owners) == 0:
+            return None
+        owner_id = sorted(owners, key=lambda i: i.access_level, reverse=True)[0].uid
         async with (await pool()).acquire() as conn:
             chats = [
                 i[0]
                 for i in await conn.fetch(
-                    'select chat_id from chatgroups where "group"=$1 and uid='
-                    "(select uid from accesslvl where accesslvl.chat_id=$2 and access_level>6 "
-                    "order by access_level limit 1)",
+                    'select chat_id from chatgroups where "group"=$1 and uid=$2',
                     group,
-                    chat_id,
+                    owner_id,
                 )
             ]
         if len(chats) == 0:
-            raise Exception
+            return None
         return chats
     except Exception:
-        return False
+        return None
 
 
-async def get_silence_allowed(chat_id):
+async def get_silence_allowed(chat_id, custom: bool = False):
     async with (await pool()).acquire() as conn:
         lvls = await conn.fetchval(
-            "select allowed from silencemode where chat_id=$1", chat_id
+            f"select allowed{'_custom' if custom else ''} from silencemode where chat_id=$1",
+            chat_id,
         )
     if lvls is not None:
-        return literal_eval(lvls) + [7, 8]
-    return [7, 8]
+        return literal_eval(lvls) + ([7, 8] if not custom else [])
+    return [7, 8] if not custom else []
 
 
 async def get_user_rep(uid):
@@ -1439,7 +1458,7 @@ async def create_payment(
         },
     }
     if coins:
-        payment["receipt"]["items"][0]["description"] = point_words(
+        payment["receipt"]["items"][0]["description"] = pluralize_words(
             coins, ("монетка", "монетки", "монеток")
         )
         payment["metadata"]["coins"] = coins
@@ -1566,3 +1585,59 @@ def number_to_emoji(n: int) -> str:
         return "🔟"
     mapping = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
     return "".join(mapping[int(d)] for d in str(n))
+
+
+_emoji_pattern = re.compile(
+    r"^("
+    # 1) flags
+    r"(?:[\U0001F1E6-\U0001F1FF]{2})"
+    r"|"
+    # 2) Keycap (number/#, * + optional VS16 + enclosing keycap)
+    r"(?:[0-9#\*]\uFE0F?\u20E3)"
+    r"|"
+    # 3) Base unit + optional variation selector + optional skin tone, with possible ZWJ-linking
+    r"(?:"
+    r"["
+    r"\U0001F300-\U0001F5FF"  # Misc symbols and pictographs
+    r"\U0001F600-\U0001F64F"  # Emoticons
+    r"\U0001F680-\U0001F6FF"  # Transport & map
+    r"\U0001F700-\U0001F77F"  # Alchemical symbols (some glyphs)
+    r"\U0001F780-\U0001F7FF"  # Geometric shapes extended
+    r"\U0001F800-\U0001F8FF"  # Supplemental Arrows-C / symbols
+    r"\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
+    r"\U0001FA00-\U0001FA6F"  # Chess/etc and extended
+    r"\U0001FA70-\U0001FAFF"  # Symbols and Pictographs Extended-A
+    r"\u2600-\u26FF"  # Misc symbols (e.g. ☀)
+    r"\u2700-\u27BF"  # Dingbats (e.g. ✂)
+    r"]"
+    r"(?:\uFE0F)?"  # optional Variation Selector-16 (emoji presentation)
+    r"(?:[\U0001F3FB-\U0001F3FF])?"  # optional skin tone modifiers
+    # optional sequence: (ZWJ + (same pattern for another person/glyph))
+    r"(?:\u200D(?:"
+    r"["
+    r"\U0001F300-\U0001F5FF"
+    r"\U0001F600-\U0001F64F"
+    r"\U0001F680-\U0001F6FF"
+    r"\U0001F700-\U0001F77F"
+    r"\U0001F780-\U0001F7FF"
+    r"\U0001F800-\U0001F8FF"
+    r"\U0001F900-\U0001F9FF"
+    r"\U0001FA00-\U0001FA6F"
+    r"\U0001FA70-\U0001FAFF"
+    r"\u2600-\u26FF"
+    r"\u2700-\u27BF"
+    r"]"
+    r"(?:\uFE0F)?"
+    r"(?:[\U0001F3FB-\U0001F3FF])?"
+    r"))*"
+    r")"
+    r")$",
+    flags=re.UNICODE,
+)
+
+
+def is_single_emoji(s: str) -> bool:
+    if not s:
+        return False
+    s = unicodedata.normalize("NFC", s)
+    return bool(_emoji_pattern.match(s))

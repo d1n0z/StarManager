@@ -12,7 +12,7 @@ from StarManager.core.tables import ChatUserCMIDs
 
 
 @dataclass
-class _CachedChatUserCMIDs(BaseCachedModel):
+class CachedChatUserCMIDs(BaseCachedModel):
     cmids: List[int]
 
     @classmethod
@@ -21,7 +21,7 @@ class _CachedChatUserCMIDs(BaseCachedModel):
 
 
 CacheKey: TypeAlias = Tuple[int, int]
-Cache: TypeAlias = Dict[CacheKey, _CachedChatUserCMIDs]
+Cache: TypeAlias = Dict[CacheKey, CachedChatUserCMIDs]
 
 
 def _make_cache_key(uid: int, chat_id: int) -> CacheKey:
@@ -57,7 +57,7 @@ class ChatUserCMIDsCache(BaseCacheManager):
                 groups[key].append(row.cmid)
 
             for key, cmids in groups.items():
-                self._cache[key] = _CachedChatUserCMIDs.from_list(sorted(set(cmids)))
+                self._cache[key] = CachedChatUserCMIDs.from_list(sorted(set(cmids)))
         await super().initialize()
 
     async def _ensure_cached(
@@ -69,11 +69,11 @@ class ChatUserCMIDsCache(BaseCacheManager):
                 return
             existing = await self.repo.get_existing_cmids(*cache_key)
             if existing:
-                self._cache[cache_key] = _CachedChatUserCMIDs.from_list(
+                self._cache[cache_key] = CachedChatUserCMIDs.from_list(
                     sorted(set(existing))
                 )
             else:
-                self._cache[cache_key] = _CachedChatUserCMIDs.from_list(
+                self._cache[cache_key] = CachedChatUserCMIDs.from_list(
                     initial_data.get("cmids", [])
                 )
 

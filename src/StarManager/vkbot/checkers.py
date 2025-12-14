@@ -3,35 +3,56 @@ import time
 from cache.async_ttl import AsyncTTL
 
 import StarManager.vkbot.messages as messages
+from StarManager.core import managers
+from StarManager.core.config import settings
+from StarManager.core.db import pool
 from StarManager.core.utils import (
     command_cooldown_check,
     get_chat_settings,
     get_silence,
     get_silence_allowed,
-    get_user_access_level,
     get_user_last_message,
     get_user_mute,
     get_user_prefixes,
     get_user_premium,
     messagereply,
 )
-from StarManager.core.config import settings
-from StarManager.core.db import pool
 
 
-async def haveAccess(cmd, chat_id, uacc, premium=0) -> int | bool:
-    async with (await pool()).acquire() as conn:
-        cmdacc = await conn.fetchval(
-            "select lvl from commandlevels where chat_id=$1 and cmd=$2", chat_id, cmd
-        )
+async def haveAccess(cmd, chat_id, uid, premium=0) -> bool:
     if cmd == "check" and premium:
         return True
-    if cmdacc is not None:
-        return cmdacc <= uacc
+    if cmd == "getdev":
+        return True
+
+    level = await managers.access_level.get(uid, chat_id)
+    custom_level = None
+
+    if level and level.custom_level_name is not None:
+        custom_level = await managers.custom_access_level.get(level.access_level, chat_id)
+        if custom_level is not None:
+            if not custom_level.status:
+                custom_level = None
+                level = None
+
+    if level is None or level.custom_level_name is None:
+        async with (await pool()).acquire() as conn:
+            cmdacc = await conn.fetchval(
+                "select lvl from commandlevels where chat_id=$1 and cmd=$2",
+                chat_id,
+                cmd,
+            )
+        if cmdacc is not None:
+            return cmdacc <= (level.access_level if level else 0)
+
+    if custom_level is not None:
+        return cmd in custom_level.commands
+
     try:
-        return settings.commands.commands[cmd] <= uacc
+        required = settings.commands.commands[cmd]
+        return required <= (level.access_level if level else 0)
     except Exception:
-        return 7 <= uacc
+        return 7 <= (level.access_level if level else 0)
 
 
 @AsyncTTL(maxsize=0)
@@ -138,20 +159,26 @@ async def checkCMD(
         )
         return False
 
-    u_acc = await get_user_access_level(uid, chat_id)
+    u_acc = await managers.access_level.get(uid, chat_id)
     u_prem = await get_user_premium(uid)
     if (
-        not await haveAccess(cmd, chat_id, u_acc, u_prem)
+        not await haveAccess(cmd, chat_id, uid, u_prem)
         or prefix not in await get_user_prefixes(u_prem, uid)
         or await get_user_mute(uid, chat_id) > message.date
         or await getUserIgnore(uid, chat_id)
         or await getUInfBanned(uid, chat_id)
         or (
             await get_silence(chat_id)
-            and u_acc not in await get_silence_allowed(chat_id)
+            and (u_acc.access_level if u_acc else 0)
+            not in await get_silence_allowed(
+                chat_id, ((u_acc.custom_level_name is not None) if u_acc else False)
+            )
         )
         or await getUChatLimit(
-            message.date, await get_user_last_message(uid, chat_id, 0), u_acc, chat_id
+            message.date,
+            await get_user_last_message(uid, chat_id, 0),
+            (u_acc.access_level if u_acc else 0),
+            chat_id,
         )
     ):
         return False

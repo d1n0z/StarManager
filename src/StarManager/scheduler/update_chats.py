@@ -97,7 +97,7 @@ async def updateChats(conn):
             logger.exception("failed to get conversations:")
 
         for item in convs or []:
-            if not item or "execute_errors" in item:
+            if not item or "execute_errors" in item or not isinstance(item, dict):
                 continue
             for chat in item.get("items", []):
                 try:
@@ -117,7 +117,9 @@ async def updateChats(conn):
                 except Exception:
                     logger.exception("failed to get members:")
                     continue
-                for pid, item in (members or {}).items():
+                if not members or not isinstance(members, dict):
+                    continue
+                for pid, item in members.items():
                     if not item or "execute_errors" in item:
                         continue
                     try:

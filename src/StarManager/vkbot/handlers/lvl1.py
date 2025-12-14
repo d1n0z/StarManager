@@ -212,7 +212,10 @@ async def mute(message: Message):
         if not await conn.fetchval(
             "update mute set mute = $1, last_mutes_times = $2, last_mutes_causes = $3, last_mutes_names = $4, "
             "last_mutes_dates = $5 where chat_id=$6 and uid=$7 returning 1",
-            min(int(time.time() + mute_time), int(time.time() + 365 * 24 * 60 * 60 * 1000)),
+            min(
+                int(time.time() + mute_time),
+                int(time.time() + 365 * 24 * 60 * 60 * 1000),
+            ),
             f"{mute_times}",
             f"{mute_causes}",
             f"{mute_names}",
@@ -225,7 +228,10 @@ async def mute(message: Message):
                 "last_mutes_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)",
                 id,
                 chat_id,
-                min(int(time.time() + mute_time), int(time.time() + 365 * 24 * 60 * 60 * 1000)),
+                min(
+                    int(time.time() + mute_time),
+                    int(time.time() + 365 * 24 * 60 * 60 * 1000),
+                ),
                 f"{mute_times}",
                 f"{mute_causes}",
                 f"{mute_names}",
@@ -611,18 +617,21 @@ async def getnick(message: Message):
 @bl.chat_message(SearchCMD("staff"))
 async def staff(message: Message):
     chat_id = message.peer_id - 2000000000
-    async with (await pool()).acquire() as conn:
-        res = await conn.fetch(
-            "select uid, access_level from accesslvl where chat_id=$1 and uid>0 and access_level>0 and "
-            "access_level<8 order by access_level desc",
-            chat_id,
-        )
+    res = await managers.access_level.get_all(
+        chat_id=chat_id,
+        predicate=lambda i: i.access_level < 8 and i.custom_level_name is None,
+    )
+    if res:
+        res = sorted(res, key=lambda i: i.access_level, reverse=True)
     await messagereply(
         message,
         disable_mentions=1,
         message=await messages.staff(
-            res, await api.users.get(user_ids=[i[0] for i in res if i[0] > 0]), chat_id
+            res,
+            await api.users.get(user_ids=[i.uid for i in res if i.uid > 0]),
+            chat_id,
         ),
+        keyboard=keyboard.staff(message.from_id)
     )
 
 

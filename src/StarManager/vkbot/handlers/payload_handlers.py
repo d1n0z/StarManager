@@ -3,6 +3,7 @@ import json
 import secrets
 import time
 from ast import literal_eval
+from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime
 
@@ -56,7 +57,7 @@ async def join(message: MessageEvent):
         bp = message.user_id
         if (
             bp not in [i.member_id for i in members.items if i.is_admin or i.is_owner]
-            and await utils.get_user_access_level(bp, chat_id) < 7
+            and await utils.get_user_access_level(bp, chat_id, ignore_custom=True) < 7
         ):
             return
         async with (await pool()).acquire() as conn:
@@ -81,11 +82,10 @@ async def join(message: MessageEvent):
                 time.time(),
             ):
                 await utils.set_chat_mute(i[0], chat_id, 0)
-            x = await conn.fetch(
-                "delete from accesslvl where chat_id=$1 returning uid", chat_id
-            )
-            for id in x:
-                await utils.set_chat_mute(id[0], chat_id, 0)
+            for i in await managers.access_level.delete_rows(
+                await managers.access_level.get_all(chat_id=chat_id)
+            ):
+                await utils.set_chat_mute(i.uid, chat_id, 0)
             await conn.execute("delete from nickname where chat_id=$1", chat_id)
             await conn.execute("delete from welcome where chat_id=$1", chat_id)
             await conn.execute("delete from welcomehistory where chat_id=$1", chat_id)
@@ -136,7 +136,7 @@ async def join(message: MessageEvent):
         )
         return
     elif cmd == "rejoin" and payload["activate"]:
-        if await utils.get_user_access_level(uid, chat_id) >= 7 or uid in [
+        if await utils.get_user_access_level(uid, chat_id, ignore_custom=True) >= 7 or uid in [
             i.member_id
             for i in (
                 await api.messages.get_conversation_members(peer_id=peer_id)
@@ -394,9 +394,11 @@ async def settings_menu_antispam(message: MessageEvent):
         ]
         msgslimit, chrslimit = "не задан", "не задан"
         if val := msgs[2]:
-            msgslimit = utils.point_words(val, ("соообщение", "сообщения", "сообщений"))
+            msgslimit = utils.pluralize_words(
+                val, ("соообщение", "сообщения", "сообщений")
+            )
         if val := chrs[2]:
-            chrslimit = utils.point_words(val, ("символ", "символа", "символов"))
+            chrslimit = utils.pluralize_words(val, ("символ", "символа", "символов"))
 
         msg = f"""💬 Сообщения\nНастройте лимиты на длину и частоту сообщений.\n
 1️⃣ Сообщений в минуту
@@ -1182,7 +1184,7 @@ async def punishlist_delall(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
 
-    if await utils.get_user_access_level(uid, chat_id) < 6:
+    if await utils.get_user_access_level(uid, chat_id, ignore_custom=True) < 6:
         await message.show_snackbar("❌ Для данной функции требуется 6 уровень доступа")
         return
     await utils.send_message_event_answer(message.event_id, uid, peer_id)
@@ -1793,13 +1795,11 @@ async def resetaccess_accept(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
     lvl = int(message.payload["lvl"])
-    async with (await pool()).acquire() as conn:
-        await conn.execute(
-            "delete from accesslvl where chat_id=$1 and access_level=$2 and uid!=$3",
-            chat_id,
-            lvl,
-            uid,
+    await managers.access_level.delete_rows(
+        await managers.access_level.get_all(
+            chat_id, predicate=lambda i: i.access_level == lvl and i.uid != uid
         )
+    )
     await utils.edit_message(
         await messages.resetaccess_accept(uid, await utils.get_user_name(uid), lvl),
         peer_id,
@@ -2490,7 +2490,7 @@ async def unpunish(message: MessageEvent):
     cmid = payload["cmid"]
     u_acc = await utils.get_user_access_level(uid, chat_id)
     if u_acc <= await utils.get_user_access_level(id, chat_id) or not await haveAccess(
-        cmd, chat_id, u_acc
+        cmd, chat_id, uid
     ):
         await message.show_snackbar("⛔️ У вас недостаточно прав.")
         return
@@ -2688,12 +2688,22 @@ async def timeout_settings(message: MessageEvent):
             chat_id,
         ):
             return
+    if message.payload:
+        custom = message.payload.get("custom", False)
+        page = message.payload.get("page", 0)
+    else:
+        custom = False
+        page = 0
     await utils.edit_message(
         await messages.timeout_settings(),
         peer_id,
         message.conversation_message_id,
         keyboard.timeout_settings(
-            message.user_id, await utils.get_silence_allowed(chat_id)
+            message.user_id,
+            await utils.get_silence_allowed(chat_id, custom),
+            custom,
+            50 if await utils.get_user_premium(message.user_id) else 10,
+            page,
         ),
     )
 
@@ -2707,6 +2717,7 @@ async def timeout_settings_turn(message: MessageEvent):
     if not message.payload:
         return
     lvl = message.payload["lvl"]
+    custom = message.payload.get("custom", False)
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
     async with (await pool()).acquire() as conn:
@@ -2715,19 +2726,19 @@ async def timeout_settings_turn(message: MessageEvent):
             chat_id,
         ):
             return
-    allowed = sorted(await utils.get_silence_allowed(chat_id))
+    allowed = sorted(await utils.get_silence_allowed(chat_id, custom))
     if lvl in allowed:
         allowed.remove(lvl)
     else:
         allowed.append(lvl)
     async with (await pool()).acquire() as conn:
         if not await conn.fetchval(
-            "update silencemode set allowed = $1 where chat_id=$2 returning 1",
+            f"update silencemode set allowed{'_custom' if custom else ''} = $1 where chat_id=$2 returning 1",
             f"{allowed}",
             chat_id,
         ):
             await conn.execute(
-                "insert into silencemode (chat_id, activated, allowed) values ($1, false, $2)",
+                f"insert into silencemode (chat_id, activated, allowed{'_custom' if custom else ''}) values ($1, false, $2)",
                 chat_id,
                 f"{allowed}",
             )
@@ -2735,7 +2746,13 @@ async def timeout_settings_turn(message: MessageEvent):
         await messages.timeout_settings(),
         peer_id,
         message.conversation_message_id,
-        keyboard.timeout_settings(message.user_id, allowed),
+        keyboard.timeout_settings(
+            message.user_id,
+            allowed,
+            custom,
+            50 if await utils.get_user_premium(message.user_id) else 10,
+            message.payload.get("page", 0),
+        ),
     )
 
 
@@ -2964,7 +2981,15 @@ async def import_start(message: MessageEvent):
                 i = await managers.chat_settings.get(
                     *k, ("setting", "pos", "value", "punishment", "value2", "pos2")
                 )
-                await managers.chat_settings.edit(chatid, setting=i[0], pos=i[1], value=i[2], punishment=i[3], value2=i[4], pos2=i[5])
+                await managers.chat_settings.edit(
+                    chatid,
+                    setting=i[0],
+                    pos=i[1],
+                    value=i[2],
+                    punishment=i[3],
+                    value2=i[4],
+                    pos2=i[5],
+                )
             if i := await conn.fetchrow(
                 "select msg, url, photo, button_label from welcome where chat_id=$1",
                 importchatid,
@@ -3109,22 +3134,6 @@ async def import_start(message: MessageEvent):
                         chatid,
                         *i,
                     )
-        if settings["acc"]:
-            for i in await conn.fetch(
-                "select uid, access_level from accesslvl where chat_id=$1", importchatid
-            ):
-                if not await conn.fetchval(
-                    "update accesslvl set access_level = $1 where chat_id=$2 and uid=$3 "
-                    "returning 1",
-                    i[1],
-                    chatid,
-                    i[0],
-                ):
-                    await conn.execute(
-                        "insert into accesslvl (chat_id, uid, access_level) values ($1, $2, $3)",
-                        chatid,
-                        *i,
-                    )
         if settings["nicks"]:
             for i in await conn.fetch(
                 "select uid, nickname from nickname where chat_id=$1", importchatid
@@ -3224,6 +3233,9 @@ async def import_start(message: MessageEvent):
                         chatid,
                         *i,
                     )
+    if settings["acc"]:
+        for i in await managers.access_level.get_all(chat_id=importchatid):
+            await managers.access_level.edit_access_level(i.uid, chatid, i.access_level)
     await utils.edit_message(
         await messages.import_end(importchatid),
         message.object.peer_id,
@@ -3344,18 +3356,22 @@ async def filterlist(message: MessageEvent):
     if not message.payload:
         return
     page, chat_id = message.payload.get("page", 0), message.peer_id - 2000000000
+
+    owners = await managers.access_level.get_all(
+        chat_id=chat_id, predicate=lambda i: i.access_level >= 7 and i.custom_level_name is None
+    )
+    if owners:
+        owner_id = sorted(owners, key=lambda i: i.access_level, reverse=True)[0].uid
+    else:
+        owner_id = message.user_id
+
     async with (await pool()).acquire() as conn:
         filters = await conn.fetch(
             "select chat_id, owner_id, filter from filters where (chat_id=$1 or (owner_id=$2 and exists("
             "select 1 from gpool where uid=$2 and chat_id=$1))) and filter not in ("
             "select filter from filterexceptions where owner_id=$2 and chat_id=$1)",
             chat_id,
-            await conn.fetchval(
-                "select uid from accesslvl where chat_id=$1 and access_level>=7 order by "
-                "access_level, uid",
-                chat_id,
-            )
-            or message.user_id,
+            owner_id,
         )
     await utils.edit_message(
         await messages.filter_list(filters[25 * page : 25 * page + 25], page),
@@ -3371,15 +3387,20 @@ async def filterlist(message: MessageEvent):
 async def filteradd(message: MessageEvent):
     if not message.payload:
         return
+    chat_id = message.peer_id - 2000000000
+
+    owners = await managers.access_level.get_all(
+        chat_id=chat_id, predicate=lambda i: i.access_level >= 7 and i.custom_level_name is None
+    )
+    if owners:
+        owner_id = sorted(owners, key=lambda i: i.access_level, reverse=True)[0].uid
+    else:
+        owner_id = message.user_id
+
     async with (await pool()).acquire() as conn:
         await conn.execute(
             "update filters set chat_id=null, owner_id=$1 where id=$2",
-            await conn.fetchval(
-                "select uid from accesslvl where chat_id=$1 and access_level>=7 order by "
-                "access_level, uid",
-                message.peer_id - 2000000000,
-            )
-            or message.user_id,
+            owner_id,
             message.payload["fid"],
         )
     await utils.edit_message(
@@ -3393,18 +3414,23 @@ async def filteradd(message: MessageEvent):
 async def filterdel(message: MessageEvent):
     if not message.payload:
         return
+    chat_id = message.peer_id - 2000000000
+
+    owners = await managers.access_level.get_all(
+        chat_id=chat_id, predicate=lambda i: i.access_level >= 7 and i.custom_level_name is None
+    )
+    if owners:
+        owner_id = sorted(owners, key=lambda i: i.access_level, reverse=True)[0].uid
+    else:
+        owner_id = message.user_id
+
     async with (await pool()).acquire() as conn:
         filter = await conn.fetchval(
             "delete from filters where id=$1 returning filter", message.payload["fid"]
         )
         await conn.execute(
             "delete from filterexceptions where owner_id=$1 and filter=$2",
-            await conn.fetchval(
-                "select uid from accesslvl where chat_id=$1 and access_level>=7 order by "
-                "access_level, uid",
-                message.peer_id - 2000000000,
-            )
-            or message.user_id,
+            owner_id,
             filter,
         )
     await utils.edit_message(
@@ -3920,4 +3946,320 @@ async def chats(message: MessageEvent):
         peer_id,
         message.conversation_message_id,
         keyboard.chats(message.user_id, len(res), page, mode),
+    )
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_EVENT,
+    MessageEvent,
+    SearchPayloadCMD(["customlevel_settings"]),
+)
+async def customlevel_settings(message: MessageEvent):
+    if not message.payload:
+        return
+    if message.payload.get("clear", False):
+        async with (await pool()).acquire() as conn:
+            await conn.execute(
+                "delete from typequeue where chat_id=$1 and uid=$2",
+                message.object.peer_id - 2000000000,
+                message.user_id,
+            )
+    level = message.payload["level"]
+    level = await managers.custom_access_level.get(
+        level, message.object.peer_id - 2000000000
+    )
+    if not level:
+        return
+    holders = await managers.access_level.get_holders(
+        message.object.peer_id - 2000000000, level.name
+    )
+    await utils.edit_message(
+        await messages.customlevel_settings(
+            level.access_level,
+            level.name,
+            level.emoji,
+            level.status,
+            len(holders),
+            level.commands,
+        ),
+        message.object.peer_id,
+        message.conversation_message_id,
+        keyboard.customlevel_settings(
+            message.user_id,
+            level,
+            (message.payload.get("pre_page", None) if message.payload else None),
+        ),
+    )
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["customlevel_action"])
+)
+async def customlevel_action(message: MessageEvent):
+    if not message.payload:
+        return
+    chat_id = message.object.peer_id - 2000000000
+    level = message.payload["level"]
+    levelmenu_page = message.payload["levelmenu_page"]
+    level = await managers.custom_access_level.get(level, chat_id)
+    if not level:
+        if message.object.conversation_message_id:
+            try:
+                await utils.delete_messages(
+                    message.object.conversation_message_id, chat_id
+                )
+            except Exception:
+                pass
+        return
+    action = message.payload["action"]
+
+    if action == "turn":
+        level.status = not level.status
+        await managers.custom_access_level.edit(
+            level.access_level, chat_id, status=level.status
+        )
+        holders = await managers.access_level.get_holders(chat_id, level.name)
+        return await utils.edit_message(
+            await messages.customlevel_settings(
+                level.access_level,
+                level.name,
+                level.emoji,
+                level.status,
+                len(holders),
+                level.commands,
+            ),
+            message.object.peer_id,
+            message.conversation_message_id,
+            keyboard.customlevel_settings(message.user_id, level, levelmenu_page),
+        )
+    if action == "delete":
+        return await utils.edit_message(
+            await messages.customlevel_delete_yon(level.name, level.access_level),
+            message.object.peer_id,
+            message.conversation_message_id,
+            keyboard.customlevel_delete_yon(message.user_id, level.access_level),
+        )
+    if action == "set_commands_presets":
+        return await utils.edit_message(
+            await messages.customlevel_set_commands_presets(
+                level.name, level.access_level
+            ),
+            message.object.peer_id,
+            message.conversation_message_id,
+            keyboard.customlevel_set_commands_presets(
+                message.user_id, level.access_level
+            ),
+        )
+    if action == "remove_all":
+        return await utils.edit_message(
+            await messages.customlevel_remove_all_yon(level.name, level.access_level),
+            message.object.peer_id,
+            message.conversation_message_id,
+            keyboard.customlevel_remove_all_yon(message.user_id, level.access_level),
+        )
+
+    if action == "set_priority":
+        await utils.edit_message(
+            await messages.customlevel_set_priority(
+                50 if await utils.get_user_premium(message.user_id) else 10
+            ),
+            message.object.peer_id,
+            message.conversation_message_id,
+            keyboard.customlevel_to_settings(
+                message.user_id, level.access_level, "Назад", clear_type_queue=True
+            ),
+        )
+    if action == "set_name":
+        await utils.edit_message(
+            await messages.customlevel_set_name(),
+            message.object.peer_id,
+            message.conversation_message_id,
+            keyboard.customlevel_to_settings(
+                message.user_id, level.access_level, "Назад", clear_type_queue=True
+            ),
+        )
+    if action == "set_emoji":
+        await utils.edit_message(
+            await messages.customlevel_set_emoji(),
+            message.object.peer_id,
+            message.conversation_message_id,
+            keyboard.customlevel_to_settings(
+                message.user_id, level.access_level, "Назад", clear_type_queue=True
+            ),
+        )
+    if action == "set_commands":
+        await utils.edit_message(
+            await messages.customlevel_set_commands(),
+            message.object.peer_id,
+            message.conversation_message_id,
+            keyboard.customlevel_to_settings(
+                message.user_id, level.access_level, "Назад", clear_type_queue=True
+            ),
+        )
+
+    async with (await pool()).acquire() as conn:
+        await conn.execute(
+            "insert into typequeue (chat_id, uid, type, additional) values ($1, $2, $3, $4)",
+            chat_id,
+            message.user_id,
+            f"customlevel_{action}",
+            f'{{"level": {level.access_level}}}',
+        )
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["customlevel_delete"])
+)
+async def customlevel_delete(message: MessageEvent):
+    if not message.payload:
+        return
+    chat_id = message.object.peer_id - 2000000000
+    level = message.payload["level"]
+    level = await managers.custom_access_level.delete(level, chat_id)
+    if level is None:
+        if not message.conversation_message_id:
+            return
+        return await utils.delete_messages(message.conversation_message_id, chat_id)
+
+    holders = await managers.access_level.get_holders(chat_id, level.name)
+    await managers.access_level.delete_rows(holders)
+
+    await utils.edit_message(
+        await messages.customlevel_delete(level.name, level.access_level),
+        message.object.peer_id,
+        message.conversation_message_id,
+    )
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_EVENT,
+    MessageEvent,
+    SearchPayloadCMD(["customlevel_remove_all"]),
+)
+async def customlevel_remove_all(message: MessageEvent):
+    if not message.payload:
+        return
+    chat_id = message.object.peer_id - 2000000000
+    level = message.payload["level"]
+    level = await managers.custom_access_level.get(level, chat_id)
+    if level is None:
+        if not message.conversation_message_id:
+            return
+        return await utils.delete_messages(message.conversation_message_id, chat_id)
+
+    holders = await managers.access_level.get_holders(chat_id, level.name)
+    await managers.access_level.delete_rows(holders)
+
+    await utils.edit_message(
+        await messages.customlevel_remove_all(
+            level.name, level.access_level, len(holders)
+        ),
+        message.object.peer_id,
+        message.conversation_message_id,
+    )
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_EVENT,
+    MessageEvent,
+    SearchPayloadCMD(["customlevel_set_commands_preset"]),
+)
+async def customlevel_set_commands_preset(message: MessageEvent):
+    if not message.payload:
+        return
+    chat_id = message.object.peer_id - 2000000000
+    level = message.payload["level"]
+    level = await managers.custom_access_level.get(level, chat_id)
+    if level is None:
+        if not message.conversation_message_id:
+            return
+        return await utils.delete_messages(message.conversation_message_id, chat_id)
+
+    preset = message.payload["preset"]
+    all_commands = defaultdict(list)
+    for k, v in settings.commands.commands.items():
+        all_commands[v].append(k)
+    commands = []
+    for k in range(0, preset + 1):
+        commands.extend(all_commands[k])
+    for preserved_cmd in settings.commands.custom_preserved:
+        if preserved_cmd in commands:
+            commands.remove(preserved_cmd)
+    await managers.custom_access_level.set_preset(
+        level.access_level, level.chat_id, commands
+    )
+
+    await utils.edit_message(
+        await messages.customlevel_set_commands_done(
+            level.name,
+            level.access_level,
+            commands,
+            " Остальные команды были отключены.",
+        ),
+        message.object.peer_id,
+        message.conversation_message_id,
+        keyboard.customlevel_to_settings(message.user_id, level.access_level, "Назад"),
+    )
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_EVENT,
+    MessageEvent,
+    SearchPayloadCMD(["levelmenu"]),
+)
+async def levelmenu(message: MessageEvent):
+    if not message.payload:
+        page = 0
+    else:
+        page = message.payload.get("page", 0)
+    chat_id = message.object.peer_id - 2000000000
+    levels = await managers.custom_access_level.get_all(chat_id)
+    activated = [i for i in levels if i.status]
+    await utils.edit_message(
+        await messages.levelmenu(len(levels), len(activated)),
+        message.object.peer_id,
+        message.conversation_message_id,
+        keyboard.levelmenu(message.user_id, levels, page),
+    )
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_EVENT,
+    MessageEvent,
+    SearchPayloadCMD(["staff"]),
+)
+async def staff(message: MessageEvent):
+    if not message.payload:
+        custom = False
+        page = 0
+    else:
+        custom = message.payload.get("custom", False)
+        page = message.payload.get("page", 0)
+    chat_id = message.object.peer_id - 2000000000
+    if not custom:
+        res = await managers.access_level.get_all(
+            chat_id=chat_id,
+            predicate=lambda i: i.access_level < 8 and i.custom_level_name is None,
+        )
+        if res:
+            res = sorted(res, key=lambda i: (i.access_level, i.uid), reverse=True)
+        users = await api.users.get(user_ids=[i.uid for i in res if i.uid > 0])
+        msg = await messages.staff(res, users, chat_id)
+    else:
+        levels = await managers.custom_access_level.get_all(chat_id)
+        msg = await messages.staff_custom(
+            sorted(levels, key=lambda i: i.access_level, reverse=True)[
+                page * 10 : (page + 1) * 10
+            ],
+            await managers.access_level.get_all(
+                chat_id=chat_id,
+                predicate=lambda i: i.custom_level_name is not None,
+            ),
+        )
+
+    await utils.edit_message(
+        msg,
+        message.object.peer_id,
+        message.conversation_message_id,
+        keyboard.staff(message.user_id, not custom, len(levels) if custom else 0, page),
     )

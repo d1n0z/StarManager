@@ -3,20 +3,21 @@ import re
 from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 
-from StarManager.vkbot import keyboard, messages
-from StarManager.vkbot.rules import SearchCMD
-from StarManager.core.utils import (
-    get_user_premium,
-    get_user_name,
-    get_user_nickname,
-    get_chat_name,
-    get_user_access_level,
-    search_id_in_message,
-    get_user_league,
-    messagereply,
-)
+from StarManager.core import managers
 from StarManager.core.config import settings
 from StarManager.core.db import pool
+from StarManager.core.utils import (
+    get_chat_name,
+    get_user_access_level,
+    get_user_league,
+    get_user_name,
+    get_user_nickname,
+    get_user_premium,
+    messagereply,
+    search_id_in_message,
+)
+from StarManager.vkbot import keyboard, messages
+from StarManager.vkbot.rules import SearchCMD
 
 bl = BotLabeler()
 
@@ -671,4 +672,202 @@ async def import_(message: Message):
         disable_mentions=1,
         message=await messages.import_(importchatid, await get_chat_name(importchatid)),
         keyboard=keyboard.import_(message.from_id, importchatid),
+    )
+
+
+@bl.chat_message(SearchCMD("createlevel"))
+async def createlevel(message: Message):
+    data = message.text.split(maxsplit=2)
+    is_premium = await get_user_premium(message.from_id)
+    if len(data) < 3 or not data[1].isdigit():
+        return await messagereply(
+            message,
+            disable_mentions=1,
+            message=await messages.createlevel_hint(50 if is_premium else 10),
+        )
+    level = int(data[1])
+    if level > 50 or (level > 10 and not is_premium) or level < 1:
+        return await messagereply(
+            message,
+            disable_mentions=1,
+            message=await messages.createlevel_level_limit(is_premium, level),
+        )
+    if (
+        cal := await managers.custom_access_level.get(level, message.chat_id)
+    ) is not None:
+        return await messagereply(
+            message,
+            disable_mentions=1,
+            message=await messages.createlevel_level_already_exists(level, cal.name),
+        )
+    name = data[2]
+    if len(name) > 32:
+        return await messagereply(
+            message, disable_mentions=1, message=await messages.createlevel_char_limit()
+        )
+    if (
+        await managers.custom_access_level.get_by_name(name, message.chat_id)
+        is not None
+    ):
+        return await messagereply(
+            message,
+            disable_mentions=1,
+            message=await messages.createlevel_name_already_exists(name),
+        )
+    if chars := re.findall(
+        r"[^a-zA-Zа-яА-ЯёЁ0-9 ~!@#$%^&*()_+\-={}|;:'\",.<>?\/]", name
+    ):
+        return await messagereply(
+            message,
+            disable_mentions=1,
+            message=await messages.createlevel_name_forbidden_chars(
+                ", ".join([f'"{i}"' for i in set(chars)])
+            ),
+        )
+    level = await managers.custom_access_level.edit(level, message.chat_id, name=name)
+    await messagereply(
+        message,
+        disable_mentions=1,
+        message=await messages.createlevel(name, level.access_level),
+        keyboard=keyboard.customlevel_to_settings(message.from_id, level.access_level),
+    )
+
+
+@bl.chat_message(SearchCMD("levelmenu"))
+async def levelmenu(message: Message):
+    levels = await managers.custom_access_level.get_all(message.chat_id)
+    activated = [i for i in levels if i.status]
+    await messagereply(
+        message,
+        disable_mentions=1,
+        message=await messages.levelmenu(len(levels), len(activated)),
+        keyboard=keyboard.levelmenu(message.from_id, levels),
+    )
+
+
+@bl.chat_message(SearchCMD("setlevel"))
+async def setlevel(message: Message):
+    data = message.text.split()
+    if (
+        len(data) != 3
+        or not data[2].isdigit()
+        or not (id := await search_id_in_message(message.text, message.reply_message))
+    ):
+        return await messagereply(
+            message, disable_mentions=1, message=await messages.setlevel_hint()
+        )
+    if id < 0:
+        return await messagereply(
+            message, disable_mentions=1, message=await messages.id_group()
+        )
+    level = int(data[2])
+    level = (
+        await managers.custom_access_level.get(level, message.chat_id)
+        if level in range(1, 51)
+        else None
+    )
+    if level is None:
+        return await messagereply(
+            message,
+            disable_mentions=1,
+            message=await messages.setlevel_level_not_found(data[2]),
+        )
+    from_level = await managers.access_level.get(message.from_id, message.chat_id)
+    if not from_level:
+        return await messagereply(
+            message,
+            disable_mentions=1,
+            message=await messages.unexpected_error(),
+        )
+    if from_level.custom_level_name and from_level.access_level <= level.access_level:
+        return await messagereply(
+            message,
+            disable_mentions=1,
+            message=await messages.setlevel_level_too_high(),
+        )
+    to_level = await managers.access_level.get(id, message.chat_id)
+    if to_level:
+        if to_level.custom_level_name is None:
+            return await messagereply(
+                message,
+                disable_mentions=1,
+                message=await messages.setlevel_has_not_custom_level(),
+            )
+        if (
+            from_level.custom_level_name is not None or from_level.access_level < 6
+        ) and to_level.access_level >= from_level.access_level:
+            return await messagereply(
+                message,
+                disable_mentions=1,
+                message=await messages.setlevel_to_level_higher(),
+            )
+    await managers.access_level.edit_access_level(
+        id, message.chat_id, level.access_level, level.name
+    )
+    await messagereply(
+        message,
+        disable_mentions=1,
+        message=await messages.setlevel(
+            message.from_id,
+            await get_user_nickname(message.from_id, message.chat_id),
+            await get_user_name(message.from_id),
+            level.name,
+            level.access_level,
+            id,
+            await get_user_nickname(id, message.chat_id),
+            await get_user_name(id),
+        ),
+    )
+
+
+@bl.chat_message(SearchCMD("dellevel"))
+async def dellevel(message: Message):
+    data = message.text.split()
+    if len(data) != 2 or not (
+        id := await search_id_in_message(message.text, message.reply_message)
+    ):
+        return await messagereply(
+            message, disable_mentions=1, message=await messages.dellevel_hint()
+        )
+    if id < 0:
+        return await messagereply(
+            message, disable_mentions=1, message=await messages.id_group()
+        )
+    user_level = await managers.access_level.get(id, message.chat_id)
+    if not user_level:
+        return await messagereply(
+            message,
+            disable_mentions=1,
+            message=await messages.dellevel_has_no_level(),
+        )
+    if user_level.custom_level_name is None:
+        return await messagereply(
+            message,
+            disable_mentions=1,
+            message=await messages.dellevel_has_not_custom_level(),
+        )
+    from_level = await managers.access_level.get(message.from_id, message.chat_id)
+    if from_level:
+        if (
+            from_level.custom_level_name is not None or from_level.access_level < 6
+        ) and user_level.access_level >= from_level.access_level:
+            return await messagereply(
+                message,
+                disable_mentions=1,
+                message=await messages.setlevel_to_level_higher(),
+            )
+    await managers.access_level.edit_access_level(id, message.chat_id, 0)
+    await messagereply(
+        message,
+        disable_mentions=1,
+        message=await messages.dellevel(
+            message.from_id,
+            await get_user_nickname(message.from_id, message.chat_id),
+            await get_user_name(message.from_id),
+            user_level.custom_level_name,
+            user_level.access_level,
+            id,
+            await get_user_nickname(id, message.chat_id),
+            await get_user_name(id),
+        ),
     )

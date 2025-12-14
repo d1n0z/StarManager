@@ -18,6 +18,7 @@ class CommandsConfig(BaseModel):
     commands: Dict[str, int]
     pm: List[str]
     premium: List[str]
+    custom_preserved: List[str]
     cooldown: Dict[str, int]
     descriptions: Dict[str, str]
     prefix: List[str]

@@ -1,3 +1,4 @@
+from colorsys import hsv_to_rgb
 import time
 from ast import literal_eval
 
@@ -11,6 +12,7 @@ def createStatsImage(
     messages,
     uid,
     access_level,
+    is_custom,
     nickname,
     starcoins,
     last_activity,
@@ -80,24 +82,28 @@ def createStatsImage(
         except Exception as _:
             color = False
     else:
-        if access_level == 1:
-            color = (37, 72, 161)
-        elif access_level == 2:
-            color = (67, 64, 238)
-        elif access_level == 3:
-            color = (5, 0, 255)
-        elif access_level == 4:
-            color = (56, 157, 48)
-        elif access_level == 5:
-            color = (255, 107, 0)
-        elif access_level == 6:
-            color = (87, 0, 155)
-        elif access_level == 7:
-            color = (181, 86, 255)
-        elif access_level == 8:
-            color = (255, 0, 0)
+        if is_custom:
+            def _hsv_color_for_level(level: int):
+                h = (level - 1) / 50.0
+                s = 0.65 + 0.25 * ((level % 5) / 4)
+                v = 0.78 + 0.17 * ((level % 7) / 6)
+                r, g, b = hsv_to_rgb(h, s, v)
+                return (int(round(r * 255)), int(round(g * 255)), int(round(b * 255)))
+
+            color = _hsv_color_for_level(access_level) if 1 <= access_level <= 50 else (84, 84, 84)
         else:
-            color = (84, 84, 84)
+            colors = {
+                0: (84, 84, 84),
+                1: (37, 72, 161),
+                2: (67, 64, 238),
+                3: (5, 0, 255),
+                4: (56, 157, 48),
+                5: (255, 107, 0),
+                6: (87, 0, 155),
+                7: (181, 86, 255),
+                8: (255, 0, 0),
+            }
+            color = colors.get(access_level, (84, 84, 84))
 
     draw.text(
         (img.size[0] // 2, 408),
@@ -274,29 +280,6 @@ def createStatsImage(
         anchor="ma",
     )
 
-    img.save(f"{settings.service.path}src/StarManager/core/media/temp/frame{uid}.png")
-    return f"{settings.service.path}src/StarManager/core/media/temp/frame{uid}.png"
-
-
-if __name__ == "__main__":
-    createStatsImage(
-        0,
-        123,
-        746110579,
-        8,
-        "test",
-        123,
-        123,
-        time.time() + 123 * 86400,
-        123,
-        123,
-        123,
-        123,
-        "Копытов Илья",
-        0,
-        0,
-        "dev",
-        750,
-        None,
-        1,
-    )
+    path = f"{settings.service.path}src/StarManager/core/media/temp/frame{uid}_{time.time()}.png"
+    img.save(path)
+    return path

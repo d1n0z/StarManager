@@ -371,11 +371,11 @@ async def yookassa(request: Request):
             text += f"""Тип: <code>"Premium-беседа"</code>
     ID беседы: <code>{payment.chat_id}</code>\n"""
         elif payment.coins:
-            payment_type = utils.point_words(
+            payment_type = utils.pluralize_words(
                 payment.coins, ("монетка", "монетки", "монеток")
             )
             text += f"""Тип: <code>"Монетки"</code>
-    Количество: <code>{utils.point_words(payment.coins, ("монетка", "монетки", "монеток"))}</code>\n"""
+    Количество: <code>{utils.pluralize_words(payment.coins, ("монетка", "монетки", "монеток"))}</code>\n"""
         else:
             days = list(settings.premium_cost.cost.keys())[
                 list(settings.premium_cost.cost.values()).index(payment.cost)
@@ -444,7 +444,7 @@ async def yookassa(request: Request):
         elif payment.coins:
             user = (await vkapi.users.get(user_ids=[payment.from_id]))[0]
             msg = (
-                f"⭐️ [id{user.id}|{user.first_name} {user.last_name}], вы успешно приобрели {utils.point_words(payment.coins, ('монетку', 'монетки', 'монеток'))}"
+                f"⭐️ [id{user.id}|{user.first_name} {user.last_name}], вы успешно приобрели {utils.pluralize_words(payment.coins, ('монетку', 'монетки', 'монеток'))}"
                 f"! Вы можете обменять их с помощью команды /shop, передать с помощью /transfer или попробовать сыграть: /duel, /guess.\n\n📗 Номер платежа: #{payment.order_id}\n📗 Время "
                 f"покупки: {datetime.now().strftime('%d.%m.%Y / %H:%M:%S')}"
             )

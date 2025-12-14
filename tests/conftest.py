@@ -1,8 +1,13 @@
 import asyncio
+import sys
+from pathlib import Path
+
 import pytest
 from tortoise import Tortoise
 
-from StarManager.core.tables import ChatUserCMIDs, AccessLevel
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from StarManager.core.tables import AccessLevel, ChatUserCMIDs
 
 DATABASE_URL = "sqlite://:memory:"
 

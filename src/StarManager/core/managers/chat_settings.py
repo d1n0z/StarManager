@@ -30,7 +30,7 @@ DEFAULTS = {
 
 
 @dataclass
-class _CachedChatSettings(BaseCachedModel):
+class CachedChatSettingsRow(BaseCachedModel):
     id: int
     pos: Optional[bool] = None
     pos2: Optional[bool] = None
@@ -40,7 +40,7 @@ class _CachedChatSettings(BaseCachedModel):
 
 
 CacheKey: TypeAlias = Tuple[int, str]
-Cache: TypeAlias = Dict[CacheKey, _CachedChatSettings]
+Cache: TypeAlias = Dict[CacheKey, CachedChatSettingsRow]
 
 
 def _make_cache_key(chat_id: int, setting: str) -> CacheKey:
@@ -87,7 +87,7 @@ class ChatSettingsCache(BaseCacheManager):
         async with self._lock:
             for row in rows:
                 key = _make_cache_key(row.chat_id, row.setting)
-                self._cache[key] = _CachedChatSettings.from_model(row)
+                self._cache[key] = CachedChatSettingsRow.from_model(row)
 
         await super().initialize()
 
@@ -101,7 +101,7 @@ class ChatSettingsCache(BaseCacheManager):
         defaults = initial_data or DEFAULTS
         model, created = await self.repo.ensure_record(*cache_key, defaults=defaults)
         async with self._lock:
-            self._cache[cache_key] = _CachedChatSettings.from_model(model)
+            self._cache[cache_key] = CachedChatSettingsRow.from_model(model)
         return created
 
     async def get_by_id(self, id: int) -> CacheKey:
@@ -204,7 +204,7 @@ class ChatSettingsCache(BaseCacheManager):
                     if cache_key in existing_map:
                         row = existing_map[cache_key]
                         dirty = False
-                        for field in _CachedChatSettings.__dataclass_fields__:
+                        for field in CachedChatSettingsRow.__dataclass_fields__:
                             val = getattr(cached, field)
                             if getattr(row, field) != val:
                                 setattr(row, field, val)
@@ -218,7 +218,7 @@ class ChatSettingsCache(BaseCacheManager):
 
                 if to_update:
                     update_fields = list(
-                        _CachedChatSettings.__dataclass_fields__.keys()
+                        CachedChatSettingsRow.__dataclass_fields__.keys()
                     )
                     update_fields = [
                         f for f in update_fields if f not in ("chat_id", "setting")

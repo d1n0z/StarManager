@@ -22,7 +22,7 @@ from StarManager.core.utils import (
     add_user_xp,
     archive_report,
     get_user_name,
-    point_words,
+    pluralize_words,
 )
 from StarManager.tgbot import keyboard, states
 
@@ -84,7 +84,7 @@ async def startdeep(
         async with conn.transaction():
             await conn.execute(
                 "insert into tgwaitingforsubscription (tgid) values ($1) on conflict (tgid) do nothing ",
-                from_id := message.from_user.id
+                from_id := message.from_user.id,
             )
     msg = await bot.send_message(
         chat_id=from_id,
@@ -135,7 +135,11 @@ async def start(message: Message | CallbackQuery, state: FSMContext, bot: Bot):
 
 @router.message(Command("info"), F.chat.type == "private")
 async def info(message: Message, state: FSMContext, bot: Bot):
-    if message.from_user is None or message.text is None or (from_id := message.from_user.id) not in settings.telegram.admins:
+    if (
+        message.from_user is None
+        or message.text is None
+        or (from_id := message.from_user.id) not in settings.telegram.admins
+    ):
         return
 
     await message.delete()
@@ -227,7 +231,7 @@ async def ref(query: CallbackQuery, state: FSMContext, bot: Bot):
         text=f"<b>👤 Пригласите ваших друзей подписаться на нашу группу бота в Telegram и получайте за каждого друга "
         f"по 150 опыта. Для этого достаточно поделится ссылкой на вступление в чат:\n\n<code>"
         f"{await create_start_link(bot, str(query.from_user.id), encode=True)}</code>\n\n💡 "
-        f"Вами приглашено: {point_words(cnt, ('пользователь', 'пользователя', 'пользователей'))}</b>",
+        f"Вами приглашено: {pluralize_words(cnt, ('пользователь', 'пользователя', 'пользователей'))}</b>",
     )
     await state.clear()
     await state.update_data(msg=msg)
@@ -348,7 +352,13 @@ async def report_callback_handler(
                 raise Exception("Unknown ReportCallback action")
     message_ids = json.loads(report[2])
     await archive_report(
-        message_ids, query.from_user, report[3], action, bot, callback_data.report_id, report[0]
+        message_ids,
+        query.from_user,
+        report[3],
+        action,
+        bot,
+        callback_data.report_id,
+        report[0],
     )
 
 

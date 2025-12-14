@@ -18,7 +18,7 @@ class BaseCacheManager(ABC):
 
     @abstractmethod
     async def initialize(self):
-        """Must call super().initialize()"""
+        """Must call super().initialize() or self._start_tasks()"""
         self._start_tasks()
 
     def _start_tasks(self):

@@ -10,7 +10,7 @@ CacheKey: TypeAlias = Tuple[int, int]
 
 
 @dataclass
-class _CachedRPS(BaseCachedModel):
+class CachedRPSRow(BaseCachedModel):
     start_timestamp: float
     created_by: int
     second_player_id: Optional[int] = None
@@ -21,7 +21,7 @@ class _CachedRPS(BaseCachedModel):
 class RPSManager(BaseManager):
     def __init__(self):
         super().__init__()
-        self._games: Dict[CacheKey, _CachedRPS] = {}
+        self._games: Dict[CacheKey, CachedRPSRow] = {}
         self._clean_task = None
 
     async def initialize(self):
@@ -93,7 +93,7 @@ class RPSManager(BaseManager):
     async def add_game(self, cmid: int, peer_id: int, started_at: float, created_by: int):
         key = self._cache_key(cmid, peer_id)
         async with self._lock:
-            self._games[key] = _CachedRPS(start_timestamp=started_at, created_by=created_by)
+            self._games[key] = CachedRPSRow(start_timestamp=started_at, created_by=created_by)
 
     async def set_pick(self, cmid: int, peer_id: int, pick: str, is_first_player: bool, second_player_id: Optional[int] = None):
         key = self._cache_key(cmid, peer_id)

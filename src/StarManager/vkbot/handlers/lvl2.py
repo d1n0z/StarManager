@@ -3,6 +3,7 @@ import time
 from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 
+from StarManager.core import managers
 from StarManager.core.config import settings
 from StarManager.core.db import pool
 from StarManager.core.utils import (
@@ -190,8 +191,15 @@ async def setaccess(message: Message):
         return await messagereply(
             message, disable_mentions=1, message=await messages.setacc_hint()
         )
-    ch_acc = await get_user_access_level(id, chat_id)
-    if acc == ch_acc:
+
+    ch_acc = await managers.access_level.get(id, chat_id)
+    if ch_acc and ch_acc.custom_level_name is not None:
+        return await messagereply(
+            message,
+            disable_mentions=1,
+            message=await messages.setaccess_has_custom_level(),
+        )
+    if acc == (ch_acc.access_level if ch_acc else 0):
         return await messagereply(
             message,
             disable_mentions=1,
@@ -205,7 +213,7 @@ async def setaccess(message: Message):
         return await messagereply(
             message, disable_mentions=1, message=await messages.setacc_low_acc(acc)
         )
-    if ch_acc >= u_acc and uid not in settings.service.main_devs:
+    if (ch_acc.access_level if ch_acc else 0) >= u_acc and uid not in settings.service.main_devs:
         return await messagereply(
             message, disable_mentions=1, message=await messages.setacc_higher()
         )
@@ -245,8 +253,14 @@ async def delaccess(message: Message):
             message, disable_mentions=1, message=await messages.delaccess_myself()
         )
 
-    ch_acc = await get_user_access_level(id, chat_id)
-    if ch_acc <= 0:
+    ch_acc = await managers.access_level.get(id, chat_id)
+    if ch_acc and ch_acc.custom_level_name is not None:
+        return await messagereply(
+            message,
+            disable_mentions=1,
+            message=await messages.setaccess_has_custom_level(),
+        )
+    if not ch_acc or not ch_acc.access_level:
         return await messagereply(
             message,
             disable_mentions=1,
@@ -255,7 +269,7 @@ async def delaccess(message: Message):
             ),
         )
     if (
-        ch_acc >= await get_user_access_level(uid, chat_id)
+        ch_acc.access_level >= await get_user_access_level(uid, chat_id)
         and uid not in settings.service.devs
     ):
         return await messagereply(

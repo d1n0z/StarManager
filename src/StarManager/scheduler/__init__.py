@@ -316,7 +316,6 @@ async def run_notifications(conn: asyncpg.Connection):
                 call = True
             elif tag == 2:
                 try:
-                    await asyncio.sleep(0.34)
                     members = await api.messages.get_conversation_members(
                         chat_id + 2000000000
                     )
@@ -327,30 +326,23 @@ async def run_notifications(conn: asyncpg.Connection):
                     )
                 except Exception:
                     pass
-            elif tag == 3:
-                ac = await conn.fetch(
-                    "SELECT uid FROM accesslvl WHERE chat_id = $1 AND access_level > 0 AND uid > 0",
-                    chat_id,
-                )
-                call = "".join(f"[id{a[0]}|\u200b\u206c]" for a in ac)
             else:
-                ac = await conn.fetch(
-                    "SELECT uid FROM accesslvl WHERE chat_id = $1 AND access_level > 0 AND uid > 0",
-                    chat_id,
-                )
-                excluded = {a[0] for a in ac}
-                try:
-                    await asyncio.sleep(0.34)
-                    members = await api.messages.get_conversation_members(
-                        chat_id + 2000000000
-                    )
-                    call = "".join(
-                        f"[id{m.member_id}|\u200b\u206c]"
-                        for m in members.items
-                        if m.member_id > 0 and m.member_id not in excluded
-                    )
-                except Exception:
-                    pass
+                ac = await managers.access_level.get_all(chat_id=chat_id)
+                if tag == 3:
+                    call = "".join(f"[id{a.uid}|\u200b\u206c]" for a in ac)
+                else:
+                    excluded = {a.uid for a in ac}
+                    try:
+                        members = await api.messages.get_conversation_members(
+                            chat_id + 2000000000
+                        )
+                        call = "".join(
+                            f"[id{m.member_id}|\u200b\u206c]"
+                            for m in members.items
+                            if m.member_id > 0 and m.member_id not in excluded
+                        )
+                    except Exception:
+                        pass
             if call:
                 if not await send_message(
                     chat_id + 2000000000,
