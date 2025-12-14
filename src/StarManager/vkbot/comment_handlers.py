@@ -70,7 +70,7 @@ async def comment_handle(event: GroupTypes.WallReplyNew) -> Any:
                 uid,
                 event.object.post_id,
             )
-        await add_user_xp(uid, 250)
+        await add_user_xp(uid, 1000)
         return await api.wall.create_comment(
             owner_id=-settings.vk.group_id,
             post_id=event.object.post_id,
