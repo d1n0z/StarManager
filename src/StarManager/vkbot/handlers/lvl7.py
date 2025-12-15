@@ -749,8 +749,8 @@ async def levelmenu(message: Message):
 async def setlevel(message: Message):
     data = message.text.split()
     if (
-        len(data) != 3
-        or not data[2].isdigit()
+        (len(data) + bool(message.reply_message)) != 3
+        or not data[-1].isdigit()
         or not (id := await search_id_in_message(message.text, message.reply_message))
     ):
         return await messagereply(
@@ -760,7 +760,7 @@ async def setlevel(message: Message):
         return await messagereply(
             message, disable_mentions=1, message=await messages.id_group()
         )
-    level = int(data[2])
+    level = int(data[-1])
     level = (
         await managers.custom_access_level.get(level, message.chat_id)
         if level in range(1, 51)
@@ -770,7 +770,7 @@ async def setlevel(message: Message):
         return await messagereply(
             message,
             disable_mentions=1,
-            message=await messages.setlevel_level_not_found(data[2]),
+            message=await messages.setlevel_level_not_found(data[-1]),
         )
     from_level = await managers.access_level.get(message.from_id, message.chat_id)
     if not from_level:
@@ -823,7 +823,7 @@ async def setlevel(message: Message):
 @bl.chat_message(SearchCMD("dellevel"))
 async def dellevel(message: Message):
     data = message.text.split()
-    if len(data) != 2 or not (
+    if (len(data) + bool(message.reply_message)) != 2 or not (
         id := await search_id_in_message(message.text, message.reply_message)
     ):
         return await messagereply(
