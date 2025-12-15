@@ -52,6 +52,7 @@ async def comment_handle(event: GroupTypes.WallReplyNew) -> Any:
         {"posts": f"-{settings.vk.group_id}_{event.object.post_id}"},
     )
     if time.time() - post_data["items"][0]["date"] < 86400 * 7:
+        addxp = 1000
         async with (await pool()).acquire() as conn:
             if await conn.fetchval(
                 "select exists(select 1 from newpostcomments where uid=$1 and pid=$2)",
@@ -62,7 +63,7 @@ async def comment_handle(event: GroupTypes.WallReplyNew) -> Any:
                     owner_id=-settings.vk.group_id,
                     post_id=event.object.post_id,
                     from_group=settings.vk.group_id,
-                    message=await messages.newpost_dup(await get_user_name(uid), uid),
+                    message=await messages.newpost_dup(await get_user_name(uid), uid, addxp),
                     reply_to_comment=event.object.id,
                 )
             await conn.execute(
@@ -70,11 +71,11 @@ async def comment_handle(event: GroupTypes.WallReplyNew) -> Any:
                 uid,
                 event.object.post_id,
             )
-        await add_user_xp(uid, 1000)
+        await add_user_xp(uid, addxp)
         return await api.wall.create_comment(
             owner_id=-settings.vk.group_id,
             post_id=event.object.post_id,
             from_group=settings.vk.group_id,
-            message=await messages.newpost(await get_user_name(uid), uid),
+            message=await messages.newpost(await get_user_name(uid), uid, addxp),
             reply_to_comment=event.object.id,
         )

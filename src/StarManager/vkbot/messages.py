@@ -2653,12 +2653,12 @@ async def import_end(importchatid):
     return await get("import_end", chid=importchatid)
 
 
-async def newpost(name, uid):
-    return await get("newpost", n=name, uid=uid)
+async def newpost(name, uid, addxp):
+    return await get("newpost", n=name, uid=uid, addxp=addxp)
 
 
-async def newpost_dup(name, uid):
-    return await get("newpost_dup", n=name, uid=uid)
+async def newpost_dup(name, uid, addxp):
+    return await get("newpost_dup", n=name, uid=uid, addxp=addxp)
 
 
 async def rename_hint():
