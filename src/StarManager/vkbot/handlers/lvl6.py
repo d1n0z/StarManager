@@ -70,8 +70,10 @@ async def gdelaccess(message: Message):
             "gdelaccess", chat_id, uid
         ):
             continue
-        await set_user_access_level(id, chat_id, 0)
-        success += 1
+        acc = (await managers.access_level.get(id, chat_id))
+        if acc is None or acc.custom_level_name is None:
+            await set_user_access_level(id, chat_id, 0)
+            success += 1
 
     if edit is None:
         return
@@ -142,8 +144,10 @@ async def gsetaccess(message: Message):
             "gsetaccess", chat_id, uid
         ):
             continue
-        await set_user_access_level(id, chat_id, acc)
-        success += 1
+        acc = (await managers.access_level.get(id, chat_id))
+        if acc is None or acc.custom_level_name is None:
+            await set_user_access_level(id, chat_id, acc)
+            success += 1
 
     if edit is None:
         return
@@ -226,8 +230,10 @@ async def ssetaccess(message: Message):
             "ssetaccess", chat_id, uid
         ):
             continue
-        await set_user_access_level(id, chat_id, acc)
-        success += 1
+        acc = (await managers.access_level.get(id, chat_id))
+        if acc is None or acc.custom_level_name is None:
+            await set_user_access_level(id, chat_id, acc)
+            success += 1
 
     if edit is None:
         return
@@ -293,8 +299,10 @@ async def sdelaccess(message: Message):
             "sdelaccess", chat_id, uid
         ):
             continue
-        await set_user_access_level(id, chat_id, 0)
-        success += 1
+        acc = (await managers.access_level.get(id, chat_id))
+        if acc is None or acc.custom_level_name is None:
+            await set_user_access_level(id, chat_id, 0)
+            success += 1
 
     if edit is None:
         return
