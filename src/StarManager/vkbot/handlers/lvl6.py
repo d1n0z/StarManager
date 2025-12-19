@@ -4,25 +4,26 @@ from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 
 from StarManager.core import managers
+from StarManager.core.config import api, settings
+from StarManager.core.db import pool
+from StarManager.core.utils import (
+    edit_message,
+    get_chat_access_name,
+    get_gpool,
+    get_pool,
+    get_user_access_level,
+    get_user_name,
+    get_user_nickname,
+    get_user_premium,
+    is_higher,
+    messagereply,
+    search_id_in_message,
+    set_chat_mute,
+    set_user_access_level,
+)
 from StarManager.vkbot import keyboard, messages
 from StarManager.vkbot.checkers import haveAccess
 from StarManager.vkbot.rules import SearchCMD
-from StarManager.core.utils import (
-    search_id_in_message,
-    get_user_name,
-    get_user_nickname,
-    get_user_access_level,
-    get_user_premium,
-    edit_message,
-    get_gpool,
-    get_pool,
-    set_user_access_level,
-    set_chat_mute,
-    get_chat_access_name,
-    messagereply,
-)
-from StarManager.core.config import api, settings
-from StarManager.core.db import pool
 
 bl = BotLabeler()
 
@@ -65,10 +66,8 @@ async def gdelaccess(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await get_user_access_level(uid, chat_id)
-        if (
-            not await haveAccess("gdelaccess", chat_id, uid)
-            or await get_user_access_level(id, chat_id) >= u_acc
+        if not await is_higher(uid, id, chat_id) or not await haveAccess(
+            "gdelaccess", chat_id, uid
         ):
             continue
         await set_user_access_level(id, chat_id, 0)
@@ -139,13 +138,8 @@ async def gsetaccess(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await get_user_access_level(uid, chat_id)
-        ch_acc = await get_user_access_level(id, chat_id)
-        if (
-            acc >= u_acc
-            or ch_acc >= u_acc
-            or ch_acc >= acc
-            or not await haveAccess("gsetaccess", chat_id, uid)
+        if not await is_higher(uid, id, chat_id) or not await haveAccess(
+            "gsetaccess", chat_id, uid
         ):
             continue
         await set_user_access_level(id, chat_id, acc)
@@ -228,13 +222,8 @@ async def ssetaccess(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await get_user_access_level(uid, chat_id)
-        ch_acc = await get_user_access_level(id, chat_id)
-        if (
-            acc >= u_acc
-            or ch_acc >= u_acc
-            or ch_acc >= acc
-            or not await haveAccess("ssetaccess", chat_id, uid)
+        if not await is_higher(uid, id, chat_id) or not await haveAccess(
+            "ssetaccess", chat_id, uid
         ):
             continue
         await set_user_access_level(id, chat_id, acc)
@@ -300,10 +289,8 @@ async def sdelaccess(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await get_user_access_level(uid, chat_id)
-        if (
-            not await haveAccess("sdelaccess", chat_id, uid)
-            or await get_user_access_level(id, chat_id) >= u_acc
+        if not await is_higher(uid, id, chat_id) or not await haveAccess(
+            "sdelaccess", chat_id, uid
         ):
             continue
         await set_user_access_level(id, chat_id, 0)

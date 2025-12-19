@@ -10,8 +10,8 @@ from StarManager.vkbot import keyboard, messages
 from StarManager.vkbot.checkers import haveAccess
 from StarManager.vkbot.rules import SearchCMD
 from StarManager.core.utils import (
+    is_higher,
     search_id_in_message,
-    get_user_access_level,
     get_user_name,
     get_user_nickname,
     kick_user,
@@ -73,10 +73,8 @@ async def skick(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await get_user_access_level(uid, chat_id)
-        if (
-            not await haveAccess("skick", chat_id, uid)
-            or await get_user_access_level(id, chat_id) >= u_acc
+        if not await is_higher(uid, id, chat_id) or not await haveAccess(
+            "skick", chat_id, uid
         ):
             continue
         ch_nickname = await get_user_nickname(id, chat_id)
@@ -159,10 +157,8 @@ async def sban(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await get_user_access_level(uid, chat_id)
-        if (
-            not await haveAccess("sban", chat_id, uid)
-            or await get_user_access_level(id, chat_id) >= u_acc
+        if not await is_higher(uid, id, chat_id) or not await haveAccess(
+            "sban", chat_id, uid
         ):
             continue
         if await get_user_ban(id, chat_id) >= time.time():
@@ -284,10 +280,9 @@ async def sunban(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await get_user_access_level(uid, chat_id)
         if (
-            not await haveAccess("sunban", chat_id, uid)
-            or await get_user_access_level(id, chat_id) >= u_acc
+            not await is_higher(uid, id, chat_id)
+            or not await haveAccess("sunban", chat_id, uid)
             or await get_user_ban(id, chat_id) <= time.time()
         ):
             continue
@@ -363,9 +358,8 @@ async def ssnick(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await get_user_access_level(uid, chat_id)
-        if not await haveAccess("ssnick", chat_id, uid) or (
-            u_acc <= await get_user_access_level(id, chat_id) and uid != id
+        if not await is_higher(uid, id, chat_id) or not await haveAccess(
+            "ssnick", chat_id, uid
         ):
             continue
         async with (await pool()).acquire() as conn:
@@ -448,9 +442,9 @@ async def srnick(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await get_user_access_level(uid, chat_id)
-        if not await haveAccess("srnick", chat_id, uid) or (
-            u_acc <= await get_user_access_level(id, chat_id) and uid != id
+        if uid != id and (
+            not await is_higher(uid, id, chat_id)
+            or not await haveAccess("srnick", chat_id, uid)
         ):
             continue
         async with (await pool()).acquire() as conn:
@@ -506,13 +500,12 @@ async def szov(message: Message):
     success = 0
     text = " ".join(data[2:])
     for chat_id in chats:
-        if not await haveAccess(
-            "szov", chat_id, uid
-        ):
+        if not await haveAccess("szov", chat_id, uid):
             continue
         try:
             members = await api.messages.get_conversation_members(
-                peer_id=chat_id + 2000000000, fields=['deactivated']  # type: ignore
+                peer_id=chat_id + 2000000000,
+                fields=["deactivated"],  # type: ignore
             )
             if not await send_message(
                 peer_ids=chat_id + 2000000000,
@@ -625,9 +618,7 @@ async def chat(message: Message):
             prem,
         ),
         keyboard=None
-        if not await haveAccess(
-            "settings", chat_id, message.from_id
-        )
+        if not await haveAccess("settings", chat_id, message.from_id)
         else (keyboard.chat(message.from_id, public == "Открытый")),
     )
 

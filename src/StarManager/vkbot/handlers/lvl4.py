@@ -10,7 +10,7 @@ from StarManager.vkbot.checkers import haveAccess
 from StarManager.vkbot.rules import SearchCMD
 from StarManager.core.utils import (
     search_id_in_message,
-    get_user_access_level,
+    is_higher,
     get_user_name,
     get_user_nickname,
     kick_user,
@@ -78,8 +78,7 @@ async def gkick(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await get_user_access_level(uid, chat_id)
-        if u_acc <= await get_user_access_level(id, chat_id) or not await haveAccess(
+        if not await is_higher(uid, id, chat_id) or not await haveAccess(
             "gkick", chat_id, uid
         ):
             continue
@@ -187,8 +186,7 @@ async def gban(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await get_user_access_level(uid, chat_id)
-        if u_acc <= await get_user_access_level(id, chat_id) or not await haveAccess(
+        if not await is_higher(uid, id, chat_id) or not await haveAccess(
             "gban", chat_id, uid
         ):
             continue
@@ -307,8 +305,7 @@ async def gunban(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await get_user_access_level(uid, chat_id)
-        if u_acc <= await get_user_access_level(id, chat_id) or not await haveAccess(
+        if not await is_higher(uid, id, chat_id) or not await haveAccess(
             "gunban", chat_id, uid
         ):
             continue
@@ -391,8 +388,7 @@ async def gmute(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await get_user_access_level(uid, chat_id)
-        if u_acc <= await get_user_access_level(id, chat_id) or not await haveAccess(
+        if not await is_higher(uid, id, chat_id) or not await haveAccess(
             "gmute", chat_id, uid
         ):
             continue
@@ -514,9 +510,7 @@ async def gunmute(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await get_user_access_level(uid, chat_id)
-        ch_acc = await get_user_access_level(id, chat_id)
-        if u_acc <= ch_acc or not await haveAccess("gunmute", chat_id, uid):
+        if not await is_higher(uid, id, chat_id) or not await haveAccess("gunmute", chat_id, uid):
             continue
         async with (await pool()).acquire() as conn:
             if not await conn.fetchval(
@@ -592,8 +586,7 @@ async def gwarn(message: Message):
     edit = await messagereply(message, disable_mentions=1, message=msg)
     success = 0
     for chat_id in chats:
-        u_acc = await get_user_access_level(uid, chat_id)
-        if u_acc <= await get_user_access_level(id, chat_id) or not await haveAccess(
+        if not await is_higher(uid, id, chat_id) or not await haveAccess(
             "gwarn", chat_id, uid
         ):
             continue
@@ -725,8 +718,7 @@ async def gunwarn(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await get_user_access_level(uid, chat_id)
-        if u_acc <= await get_user_access_level(id, chat_id) or not await haveAccess(
+        if not await is_higher(uid, id, chat_id) or not await haveAccess(
             "gunwarn", chat_id, uid
         ):
             continue
@@ -811,10 +803,7 @@ async def gsnick(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await get_user_access_level(uid, chat_id)
-        if (
-            u_acc <= await get_user_access_level(id, chat_id) and uid != id
-        ) or not await haveAccess("gsnick", chat_id, uid):
+        if (uid != id and not await is_higher(uid, id, chat_id)) or not await haveAccess("gsnick", chat_id, uid):
             continue
 
         async with (await pool()).acquire() as conn:
@@ -892,10 +881,9 @@ async def grnick(message: Message):
     )
     success = 0
     for chat_id in chats:
-        u_acc = await get_user_access_level(uid, chat_id)
         ch_nickname = await get_user_nickname(id, chat_id)
         if (
-            (u_acc <= await get_user_access_level(id, chat_id) and uid != id)
+            (uid != id and not await is_higher(uid, id, chat_id))
             or not await haveAccess("grnick", chat_id, uid)
             or ch_nickname is None
         ):

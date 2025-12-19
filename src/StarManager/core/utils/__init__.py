@@ -1641,3 +1641,16 @@ def is_single_emoji(s: str) -> bool:
         return False
     s = unicodedata.normalize("NFC", s)
     return bool(_emoji_pattern.match(s))
+
+
+async def is_higher(higher_id, lower_id, chat_id):
+    h_acc = await managers.access_level.get(higher_id, chat_id)
+    l_acc = await managers.access_level.get(lower_id, chat_id)
+    
+    if h_acc is None:
+        return False
+    if h_acc.custom_level_name is not None or h_acc.access_level < 6:
+        if l_acc is None:
+            return True
+        return h_acc.access_level > l_acc.access_level
+    return True
