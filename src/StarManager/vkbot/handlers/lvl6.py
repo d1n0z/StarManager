@@ -226,6 +226,9 @@ async def ssetaccess(message: Message):
     )
     success = 0
     for chat_id in chats:
+        if chat_id == 114436:
+            print(await is_higher(uid, id, chat_id))
+            print(await haveAccess("ssetaccess", chat_id, uid))
         if not await is_higher(uid, id, chat_id) or not await haveAccess(
             "ssetaccess", chat_id, uid
         ):
