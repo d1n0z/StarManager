@@ -1158,7 +1158,7 @@ async def get_pool(chat_id, group) -> Optional[list[Any]]:
             print(owners)
         if len(owners) == 0:
             return None
-        owner_id = sorted(owners, key=lambda i: i.access_level, reverse=True)[0].uid
+        owner_id = sorted(owners, key=lambda i: i.access_level)[0].uid
         if chat_id == 117802:
             print(owner_id)
         async with (await pool()).acquire() as conn:
