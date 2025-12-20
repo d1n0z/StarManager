@@ -376,11 +376,13 @@ async def get_reg_date(
 
 
 @AsyncTTL(time_to_live=2, maxsize=0)
-async def get_user_access_level(uid: int, chat_id: int, none: Any = 0, ignore_custom: bool = False) -> models.SimpleAccessLevel | Any:
+async def get_user_access_level(
+    uid: int, chat_id: int, none: Any = 0, ignore_custom: bool = False
+) -> models.SimpleAccessLevel | Any:
     res = await managers.access_level.get(uid, chat_id)
     if res is None:
         return none
-    if not await managers.custom_access_level.is_active(res.access_level, chat_id):
+    if res.custom_level_name is not None and not await managers.custom_access_level.is_active(res.access_level, chat_id):
         return none
     acc = models.SimpleAccessLevel(
         access_level=res.access_level,
@@ -660,7 +662,9 @@ async def turn_chat_setting(chat_id, category, setting, alt=False) -> None:
     )
 
 
-async def set_user_access_level(uid, chat_id, access_level, clean: bool = False) -> None:
+async def set_user_access_level(
+    uid, chat_id, access_level, clean: bool = False
+) -> None:
     if clean:
         await managers.access_level.delete(uid, chat_id)
     await managers.access_level.edit_access_level(uid, chat_id, access_level)
@@ -1147,7 +1151,8 @@ async def get_gpool(chat_id) -> Optional[List[Any]]:
 async def get_pool(chat_id, group) -> Optional[list[Any]]:
     try:
         owners = await managers.access_level.get_all(
-            chat_id=chat_id, predicate=lambda i: i.access_level > 6 and i.custom_level_name is None
+            chat_id=chat_id,
+            predicate=lambda i: i.access_level > 6 and i.custom_level_name is None,
         )
         if len(owners) == 0:
             return None
@@ -1658,3 +1663,17 @@ async def is_higher(higher_id, lower_id, chat_id):
     if l_acc.custom_level_name is not None:
         return True
     return h_acc.access_level > l_acc.access_level
+
+
+async def set_premium_status(to_id: int, days: int, *, operation: Literal["add", "set"] = "set"):
+    async with (await pool()).acquire() as conn:
+        if not await conn.fetchval(
+            f"update premium set time {'= time +' if operation == 'add' else '='} $1 where uid=$2 returning 1",
+            time.time() + days * 86400,
+            to_id,
+        ):
+            await conn.execute(
+                "insert into premium (uid, time) values ($1, $2)",
+                to_id,
+                time.time() + days * 86400,
+            )

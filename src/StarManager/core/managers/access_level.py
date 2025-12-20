@@ -217,10 +217,14 @@ class AccessLevelManager(BaseManager):
         return await self.cache.get(_make_cache_key(uid, chat_id))
 
     async def edit_access_level(
-        self, uid: int, chat_id: int, access_level: int, custom_level_name: Optional[str] = None
+        self, uid: int, chat_id: int, access_level: int | CachedAccessLevelRow, custom_level_name: Optional[str] = None
     ) -> Optional[CachedAccessLevelRow]:
         if access_level == 0:
             return await self.delete(uid, chat_id)
+        if isinstance(access_level, CachedAccessLevelRow):
+            access_level = access_level.access_level
+        elif not isinstance(access_level, int):
+            raise Exception("Invalid access level type")
         await self.cache.edit(_make_cache_key(uid, chat_id), access_level=access_level, custom_level_name=custom_level_name)
 
     async def edit_custom_level_name(

@@ -144,8 +144,8 @@ async def gsetaccess(message: Message):
             "gsetaccess", chat_id, uid
         ):
             continue
-        acc = (await managers.access_level.get(id, chat_id))
-        if acc is None or acc.custom_level_name is None:
+        u_acc = (await managers.access_level.get(id, chat_id))
+        if u_acc is None or u_acc.custom_level_name is None:
             await set_user_access_level(id, chat_id, acc)
             success += 1
 
@@ -230,8 +230,8 @@ async def ssetaccess(message: Message):
             "ssetaccess", chat_id, uid
         ):
             continue
-        acc = (await managers.access_level.get(id, chat_id))
-        if acc is None or acc.custom_level_name is None:
+        u_acc = (await managers.access_level.get(id, chat_id))
+        if u_acc is None or u_acc.custom_level_name is None:
             await set_user_access_level(id, chat_id, acc)
             success += 1
 

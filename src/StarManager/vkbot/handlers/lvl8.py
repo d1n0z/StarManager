@@ -24,6 +24,7 @@ from StarManager.core.utils import (
     pluralize_words,
     search_id_in_message,
     send_message,
+    set_premium_status,
     set_user_access_level,
 )
 from StarManager.scheduler import backup
@@ -171,17 +172,7 @@ async def setstatus(message: Message):
         return await messagereply(message, await messages.setstatus_hint())
     if id < 0:
         return await messagereply(message, await messages.id_group())
-    async with (await pool()).acquire() as conn:
-        if not await conn.fetchval(
-            "update premium set time = $1 where uid=$2 returning 1",
-            time.time() + int(data[2]) * 86400,
-            id,
-        ):
-            await conn.execute(
-                "insert into premium (uid, time) values ($1, $2)",
-                id,
-                time.time() + int(data[2]) * 86400,
-            )
+    await set_premium_status(id, int(data[2]))
 
     dev_name = await get_user_name(uid)
     await messagereply(
