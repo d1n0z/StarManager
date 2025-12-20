@@ -39,7 +39,7 @@ from vkbottle_types.objects import (
 from yookassa import Configuration, Payment
 from yookassa.payment import PaymentResponse
 
-from StarManager.core import config, managers
+from StarManager.core import config, enums, managers
 from StarManager.core.config import api, settings, vk_api_session
 from StarManager.core.db import pool
 
@@ -382,7 +382,10 @@ async def get_user_access_level(
     res = await managers.access_level.get(uid, chat_id)
     if res is None:
         return none
-    if res.custom_level_name is not None and not await managers.custom_access_level.is_active(res.access_level, chat_id):
+    if (
+        res.custom_level_name is not None
+        and not await managers.custom_access_level.is_active(res.access_level, chat_id)
+    ):
         return none
     acc = models.SimpleAccessLevel(
         access_level=res.access_level,
@@ -589,7 +592,9 @@ async def add_user_xp(uid, addxp, checklvlbanned=True) -> None:
                 "select exists(select 1 from blocked where uid=$1 and type='user')", uid
             ):
                 return
-    await managers.xp.add_user_xp(uid, addxp)
+    is_level_up = await managers.xp.add_user_xp(uid, addxp)
+    if is_level_up:
+        await managers.event.task_progress(uid, enums.TaskCategory.level_up, 1)
 
 
 async def add_user_coins(
@@ -1154,13 +1159,9 @@ async def get_pool(chat_id, group) -> Optional[list[Any]]:
             chat_id=chat_id,
             predicate=lambda i: i.access_level > 6 and i.custom_level_name is None,
         )
-        if chat_id == 117802:
-            print(owners)
         if len(owners) == 0:
             return None
         owner_id = sorted(owners, key=lambda i: i.access_level)[0].uid
-        if chat_id == 117802:
-            print(owner_id)
         async with (await pool()).acquire() as conn:
             chats = [
                 i[0]
@@ -1170,8 +1171,6 @@ async def get_pool(chat_id, group) -> Optional[list[Any]]:
                     owner_id,
                 )
             ]
-        if chat_id == 117802:
-            print(chats)
         if len(chats) == 0:
             return None
         return chats
@@ -1671,7 +1670,9 @@ async def is_higher(higher_id, lower_id, chat_id):
     return h_acc.access_level > l_acc.access_level
 
 
-async def set_premium_status(to_id: int, days: int, *, operation: Literal["add", "set"] = "set"):
+async def set_premium_status(
+    to_id: int, days: int, *, operation: Literal["add", "set"] = "set"
+):
     async with (await pool()).acquire() as conn:
         if not await conn.fetchval(
             f"update premium set time {'= time +' if operation == 'add' else '='} $1 where uid=$2 returning 1",

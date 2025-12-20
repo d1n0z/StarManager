@@ -980,3 +980,9 @@ async def setlig(message: Message):
         message,
         f'✅ Вы успешно установили лигу "{settings.leagues.leagues[int(data[2]) - 1]}" пользователю [id{id}|{await get_user_name(id)}]',
     )
+
+
+@bl.chat_message(SearchCMD("eventdroptasks"))
+async def eventdroptasks(message: Message):
+    await managers.event.drop_tasks()
+    await messagereply(message, "✅")

@@ -142,6 +142,7 @@ class TelegramSettings(BaseSettings):
     reports_archive_thread_id: int
     public_chat_id: int
     public_giveaway_thread_id: int
+    winter_event_thread_id: int
     api_hash: str
     api_id: int
     webhook_url: str

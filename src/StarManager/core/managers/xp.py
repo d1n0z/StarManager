@@ -80,6 +80,7 @@ class XPRepository(BaseRepository):
     async def nullify_xp_limit(self):
         await XP.filter(coins_limit__gt=0).update(coins_limit=0)
 
+
 class XPCache(BaseCacheManager):
     def __init__(
         self,
@@ -286,10 +287,15 @@ class XPManager(BaseManager):
                 fields=["deactivated"],  # type: ignore
             )
         }
-        return [(uid, copy.deepcopy(i)) for uid, i in top if uids is None or (uid in uids and not uids[uid].deactivated)][:limit]
+        return [
+            (uid, copy.deepcopy(i))
+            for uid, i in top
+            if uids is None or (uid in uids and not uids[uid].deactivated)
+        ][:limit]
 
     async def add_user_xp(self, uid: int, addxp: float):
-        uxp, ulvl, ulg = await self.cache.get(uid, ["xp", "lvl", "league"])
+        """returns True on level up"""
+        uxp, oldlvl, ulg = await self.cache.get(uid, ["xp", "lvl", "league"])
         if uxp is None:
             return await self.cache.edit(
                 uid,
@@ -300,15 +306,16 @@ class XPManager(BaseManager):
             )
 
         uxp += addxp
-        ulvl += int(uxp // 1000)
+        ulvl = oldlvl + int(uxp // 1000)
         uxp %= 1000
         if (
             ulg != len(settings.leagues.required_level)
             and ulvl >= settings.leagues.required_level[ulg]
         ):
-            await self.cache.edit(uid, xp=.0, league=ulg + 1, lvl=1)
+            await self.cache.edit(uid, xp=0.0, league=ulg + 1, lvl=1)
         else:
             await self.cache.edit(uid, xp=uxp, lvl=ulvl)
+        return oldlvl != ulvl
 
     async def add_user_coins(
         self, uid: int, addcoins: int, u_limit: int, addlimit: bool

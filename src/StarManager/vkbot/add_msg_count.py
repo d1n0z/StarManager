@@ -1,7 +1,7 @@
 import secrets
 import time
 
-from StarManager.core import managers
+from StarManager.core import enums, managers
 from StarManager.core.db import pool
 from StarManager.core.utils import (
     add_user_coins,
@@ -84,4 +84,5 @@ async def add_msg_counter(chat_id, uid, audio=False, sticker=False) -> bool:
             bonus_peer_id=chat_id + 2000000000,
         )
     await add_user_xp(uid, addxp, checklvlbanned=False)
+    await managers.event.task_progress(uid, enums.TaskCategory.send_messages, 1)
     return True

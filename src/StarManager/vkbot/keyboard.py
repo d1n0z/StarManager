@@ -2212,7 +2212,11 @@ def levelmenu(uid, levels: List[CachedCustomAccessLevelRow], page: int = 0):
     if page != 0:
         kb.add(Callback("⏪", {"cmd": "levelmenu", "uid": uid, "page": page - 1}))
     if len(levels) > 6:
-        kb.add(Callback(f"[{page}/{len(levels) // 6 + bool(len(levels) % 6)}]", {"cmd": "_"}))
+        kb.add(
+            Callback(
+                f"[{page}/{len(levels) // 6 + bool(len(levels) % 6)}]", {"cmd": "_"}
+            )
+        )
     if len(levels) > (6 * (page + 1)):
         kb.add(Callback("⏩", {"cmd": "levelmenu", "uid": uid, "page": page + 1}))
     kb.row()
@@ -2255,8 +2259,21 @@ def staff(uid, custom: bool = True, levels: Optional[int] = None, page: int = 0)
         if page != 0:
             kb.add(Callback("⏪", {"cmd": "staff", "uid": uid, "page": page - 1}))
         if levels > 10:
-            kb.add(Callback(f"[{page}/{levels // 10 + bool(levels % 10)}]", {"cmd": "_"}))
+            kb.add(
+                Callback(f"[{page}/{levels // 10 + bool(levels % 10)}]", {"cmd": "_"})
+            )
         if levels > 10 * (page + 1):
             kb.add(Callback("⏩", {"cmd": "staff", "uid": uid, "page": page + 1}))
+
+    return kb.get_json()
+
+
+def event(uid):
+    kb = Keyboard(inline=True)
+
+    kb.add(
+        Callback("❄️ Открыть кейс", {"cmd": "event_open", "uid": uid}),
+        KeyboardButtonColor.PRIMARY,
+    )
 
     return kb.get_json()

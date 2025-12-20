@@ -445,6 +445,10 @@ async def everyday(conn: asyncpg.Connection):
             await asyncio.sleep(0.1 * min(2 ** attempt, 256))
 
 
+async def drop_event_tasks():
+    await managers.event.drop_tasks()
+
+
 async def new_tg_giveaway(conn: asyncpg.Connection):
     msg = await tgbot.send_message(
         chat_id=settings.telegram.public_chat_id,
@@ -558,6 +562,12 @@ def add_jobs(scheduler):
         schedule(everyday, timeout=86400),
         CronTrigger.from_crontab("0 0 * * *"),
         id="everyday",
+    )
+
+    scheduler.add_job(
+        schedule(drop_event_tasks, timeout=86400, use_db=False),
+        CronTrigger.from_crontab("0 5 * * *"),
+        id="drop_event_tasks",
     )
 
     scheduler.add_job(

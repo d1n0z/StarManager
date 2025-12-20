@@ -136,7 +136,9 @@ async def join(message: MessageEvent):
         )
         return
     elif cmd == "rejoin" and payload["activate"]:
-        if await utils.get_user_access_level(uid, chat_id, ignore_custom=True) >= 7 or uid in [
+        if await utils.get_user_access_level(
+            uid, chat_id, ignore_custom=True
+        ) >= 7 or uid in [
             i.member_id
             for i in (
                 await api.messages.get_conversation_members(peer_id=peer_id)
@@ -219,6 +221,7 @@ async def duel(message: MessageEvent):
 
         await utils.add_user_coins(loseid, -duelcoins)
         await utils.add_user_coins(winid, duel_coins_com)
+        await managers.event.task_progress(winid, enums.TaskCategory.win_duels, 1)
 
         async with (await pool()).acquire() as conn:
             if not await conn.fetchval(
@@ -3358,7 +3361,8 @@ async def filterlist(message: MessageEvent):
     page, chat_id = message.payload.get("page", 0), message.peer_id - 2000000000
 
     owners = await managers.access_level.get_all(
-        chat_id=chat_id, predicate=lambda i: i.access_level >= 7 and i.custom_level_name is None
+        chat_id=chat_id,
+        predicate=lambda i: i.access_level >= 7 and i.custom_level_name is None,
     )
     if owners:
         owner_id = sorted(owners, key=lambda i: i.access_level, reverse=True)[0].uid
@@ -3390,7 +3394,8 @@ async def filteradd(message: MessageEvent):
     chat_id = message.peer_id - 2000000000
 
     owners = await managers.access_level.get_all(
-        chat_id=chat_id, predicate=lambda i: i.access_level >= 7 and i.custom_level_name is None
+        chat_id=chat_id,
+        predicate=lambda i: i.access_level >= 7 and i.custom_level_name is None,
     )
     if owners:
         owner_id = sorted(owners, key=lambda i: i.access_level, reverse=True)[0].uid
@@ -3417,7 +3422,8 @@ async def filterdel(message: MessageEvent):
     chat_id = message.peer_id - 2000000000
 
     owners = await managers.access_level.get_all(
-        chat_id=chat_id, predicate=lambda i: i.access_level >= 7 and i.custom_level_name is None
+        chat_id=chat_id,
+        predicate=lambda i: i.access_level >= 7 and i.custom_level_name is None,
     )
     if owners:
         owner_id = sorted(owners, key=lambda i: i.access_level, reverse=True)[0].uid
@@ -4262,4 +4268,26 @@ async def staff(message: MessageEvent):
         message.object.peer_id,
         message.conversation_message_id,
         keyboard.staff(message.user_id, not custom, len(levels) if custom else 0, page),
+    )
+
+
+@bl.raw_event(
+    GroupEventType.MESSAGE_EVENT,
+    MessageEvent,
+    SearchPayloadCMD(["event_open"]),
+)
+async def event_open(message: MessageEvent):
+    user = await managers.event.get_user(message.user_id)
+    if user.event_user is None or user.event_user.has_cases == 0:
+        await message.show_snackbar(
+            "❄️ У вас нет кейсов - выполняйте задания, чтобы получить больше!"
+        )
+        return
+    await utils.send_message_event_answer(
+        message.event_id, message.user_id, message.peer_id
+    )
+
+    await utils.send_message(
+        message.peer_id,
+        await managers.event.open_case(message.user_id, message.peer_id - 2000000000),
     )

@@ -5,6 +5,7 @@ from .chatusercmids import ChatUserCMIDsManager
 from .commands_cooldown import CommandsCooldownManager
 from .custom_access_level import CustomAccessLevelManager
 from .duel import DuelLockManager
+from .event import EventManager
 from .public_chats import PublicChatsManager
 from .raid import RaidManager
 from .rps import RPSManager
@@ -18,6 +19,7 @@ managers = [
     commands_cooldown := CommandsCooldownManager(),
     custom_access_level := CustomAccessLevelManager(),
     duel_lock := DuelLockManager(),
+    event := EventManager(),
     public_chats := PublicChatsManager(),
     raid := RaidManager(),
     rps := RPSManager(),

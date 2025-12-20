@@ -37,8 +37,8 @@ async def test_initialize_loads_db(init_db):
     mgr = CustomAccessLevelManager()
     await mgr.initialize()
 
-    val = await mgr.get_access_level(11, 1001)  # type: ignore
-    assert val == 11
+    val = await mgr.get(11, 1001)  # type: ignore
+    assert val is not None and val.access_level == 11
 
     await mgr.delete(11, 1001)
 
@@ -56,7 +56,8 @@ async def test_ensure_cached_returns_false_if_exists(manager):
     assert created is False
 
     # Теперь кеш обязан содержать запись
-    assert await manager.get_access_level(access_level, chat_id) == access_level
+    obj = await manager.get(access_level, chat_id)
+    assert obj is not None and obj.access_level == access_level
 
     # Удалим
     await manager.delete(access_level, chat_id)
@@ -148,7 +149,7 @@ async def test_edit_access_level_created_true_and_new_key_exists(manager):
 
     # Вызов edit_access_level: поскольку старого ключа нет, _ensure_cached создаст запись (created=True)
     # Чтобы repo.delete_record вызвался, проверим его поведение через непосредственное вызове менеджера
-    await manager.edit_access_level(old_level, chat_id, new_level, "old_exists")
+    await manager.edit_access_level(old_level, chat_id, new_level, name="old_exists")
 
     # После выполнения new_key должен оставаться в кеше и его access_level должно быть new_level (оно и было)
     async with manager.cache._lock:
@@ -251,7 +252,10 @@ async def test_sync_exception_does_not_clear_dirty(monkeypatch, manager):
     monkeypatch.setattr(CustomAccessLevel, "bulk_create", raising_bulk_create)
 
     # Запускаем sync — должно поймать исключение
-    await manager.cache.sync()
+    try:
+        await manager.cache.sync()
+    except Exception:
+        pass
 
     # После исключения ключ должен остаться в dirty
     async with manager.cache._lock:

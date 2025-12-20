@@ -1,5 +1,6 @@
 {
     "commands": {
+        "event": 0,
         "start": 0,
         "help": 0,
         "id": 0,
@@ -162,7 +163,8 @@
         "bonuslist": 8,
         "rewardscount": 8,
         "givecoins": 8,
-        "setlig": 8
+        "setlig": 8,
+        "eventdroptasks": 8
     },
     "pm": [
         "anon",
@@ -379,6 +381,7 @@
         "+"
     ],
     "lvlbanned": [
+        "event",
         "bonus",
         "transfer",
         "duel",

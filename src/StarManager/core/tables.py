@@ -3,6 +3,7 @@ import asyncio
 from tortoise import Tortoise, fields
 from tortoise.models import Model
 
+from StarManager.core import enums
 from StarManager.core.config import database_config
 
 
@@ -776,6 +777,42 @@ class UpCommandLogs(Model):
 
     class Meta:
         table = "upcommandlogs"
+
+
+class EventTasks(Model):
+    uid = fields.IntField(unique=True)
+    send_messages = fields.IntField(default=25)
+    send_messages_base = fields.IntField(default=25)
+    transfer_coins = fields.IntField(default=50)
+    transfer_coins_base = fields.IntField(default=50)
+    rep_users = fields.IntField(default=3)
+    rep_users_base = fields.IntField(default=3)
+    win_duels = fields.IntField(default=3)
+    win_duels_base = fields.IntField(default=3)
+    level_up = fields.IntField(default=1)
+    level_up_base = fields.IntField(default=1)
+    recieved_case = fields.BooleanField(default=False)
+
+    class Meta:
+        table = "eventtasks"
+
+
+class EventUsers(Model):
+    uid = fields.IntField(unique=True)
+    cases_opened = fields.IntField(default=0)
+    has_cases = fields.IntField(default=0)
+
+    class Meta:
+        table = "eventusers"
+
+
+class RewardsPool(Model):
+    uid = fields.IntField()
+    reward_category = fields.CharEnumField(enums.RewardCategory)
+    value = fields.IntField()
+
+    class Meta:
+        table = "rewardspool"
 
 
 async def init() -> None:
