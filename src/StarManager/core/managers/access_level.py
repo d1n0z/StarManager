@@ -217,10 +217,14 @@ class AccessLevelCache(BaseCacheManager):
                 keys = set(self._cache.keys())
 
             result: List[CachedAccessLevelRow] = []
+            if chat_id == 117802:
+                print(keys)
             for key in keys:
                 row = self._cache.get(key)
                 if row and predicate(row):
                     result.append(deepcopy(row))
+            if chat_id == 117802:
+                print(result)
 
         return result
 

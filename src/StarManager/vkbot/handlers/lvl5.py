@@ -358,10 +358,12 @@ async def ssnick(message: Message):
     )
     success = 0
     for chat_id in chats:
-        if not await is_higher(uid, id, chat_id) or not await haveAccess(
-            "ssnick", chat_id, uid
-        ):
+        if uid != id:
+            if not await is_higher(uid, id, chat_id):
+                continue
+        if not await haveAccess("ssnick", chat_id, uid):
             continue
+
         async with (await pool()).acquire() as conn:
             ch_nick = await conn.fetchval(
                 "select nickname from nickname where chat_id=$1 and uid=$2", chat_id, id
@@ -442,10 +444,10 @@ async def srnick(message: Message):
     )
     success = 0
     for chat_id in chats:
-        if uid != id and (
-            not await is_higher(uid, id, chat_id)
-            or not await haveAccess("srnick", chat_id, uid)
-        ):
+        if uid != id:
+            if not await is_higher(uid, id, chat_id):
+                continue
+        if not await haveAccess("srnick", chat_id, uid):
             continue
         async with (await pool()).acquire() as conn:
             if await conn.fetchval(

@@ -114,8 +114,8 @@ async def search_id_in_message(
             return 0
         message = data[place - 1]
 
-    from_link_id = re.search(r"vk\.com/id(\d+)", message)
-    from_link = re.search(r"vk\.com/([a-zA-Z0-9_.]+)", message)
+    from_link_id = re.search(r"vk\.(?:com|ru)/id(\d+)", message)
+    from_link = re.search(r"vk\.(?:com|ru)/([a-zA-Z0-9_.]+)", message)
     from_mention = re.search(r"\[(club|id)(\d+)\|", message)
 
     if from_link_id:
@@ -1154,9 +1154,13 @@ async def get_pool(chat_id, group) -> Optional[list[Any]]:
             chat_id=chat_id,
             predicate=lambda i: i.access_level > 6 and i.custom_level_name is None,
         )
+        if chat_id == 117802:
+            print(owners)
         if len(owners) == 0:
             return None
         owner_id = sorted(owners, key=lambda i: i.access_level, reverse=True)[0].uid
+        if chat_id == 117802:
+            print(owner_id)
         async with (await pool()).acquire() as conn:
             chats = [
                 i[0]
@@ -1166,6 +1170,8 @@ async def get_pool(chat_id, group) -> Optional[list[Any]]:
                     owner_id,
                 )
             ]
+        if chat_id == 117802:
+            print(chats)
         if len(chats) == 0:
             return None
         return chats

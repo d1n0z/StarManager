@@ -803,8 +803,11 @@ async def gsnick(message: Message):
     )
     success = 0
     for chat_id in chats:
-        if (uid != id and not await is_higher(uid, id, chat_id)) or not await haveAccess("gsnick", chat_id, uid):
+        if not await haveAccess("gsnick", chat_id, uid):
             continue
+        if uid != id:
+            if not await is_higher(uid, id, chat_id):
+                continue
 
         async with (await pool()).acquire() as conn:
             if not await conn.fetchval(
@@ -882,12 +885,13 @@ async def grnick(message: Message):
     success = 0
     for chat_id in chats:
         ch_nickname = await get_user_nickname(id, chat_id)
-        if (
-            (uid != id and not await is_higher(uid, id, chat_id))
-            or not await haveAccess("grnick", chat_id, uid)
-            or ch_nickname is None
-        ):
+        if ch_nickname is None:
             continue
+        if not await haveAccess("grnick", chat_id, uid):
+            continue
+        if uid != id:
+            if not await is_higher(uid, id, chat_id):
+                continue
         try:
             await send_message(
                 peer_ids=chat_id + 2000000000,
