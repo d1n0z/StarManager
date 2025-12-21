@@ -4274,13 +4274,13 @@ async def staff(message: MessageEvent):
 @bl.raw_event(
     GroupEventType.MESSAGE_EVENT,
     MessageEvent,
-    SearchPayloadCMD(["event_open"]),
+    SearchPayloadCMD(["event_open"], answer=False),
 )
 async def event_open(message: MessageEvent):
     user = await managers.event.get_user(message.user_id)
     if user.event_user is None or user.event_user.has_cases == 0:
         await message.show_snackbar(
-            "❄️ У вас нет кейсов - выполняйте задания, чтобы получить больше!"
+            "❄️ Вы не выполнили все задания."
         )
         return
     await utils.send_message_event_answer(
