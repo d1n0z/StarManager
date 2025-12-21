@@ -497,7 +497,7 @@ class EventManager(BaseManager):
     async def task_progress(self, uid: int, type: enums.TaskCategory, value: int):
         await self.generate_tasks(uid)
         user, old_value, new_value = await self.cache.task_progress(
-            _make_cache_key(uid), type, value
+            _make_cache_key(uid), type.value, value
         )
         if (
             user is not None
