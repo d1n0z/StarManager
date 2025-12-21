@@ -230,7 +230,7 @@ async def delstatus(message: Message):
 @bl.chat_message(SearchCMD("statuslist"))
 async def statuslist(message: Message):
     async with (await pool()).acquire() as conn:
-        prem = await conn.fetch("select uid, time from premium")
+        prem = await conn.fetch("select uid, time from premium order by time desc")
     await messagereply(
         message,
         await messages.statuslist(prem),

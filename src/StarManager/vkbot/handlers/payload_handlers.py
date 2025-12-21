@@ -1227,7 +1227,7 @@ async def page_statuslist(message: MessageEvent):
         return
     async with (await pool()).acquire() as conn:
         premium_pool = await conn.fetch(
-            "select uid, time from premium where time>$1", time.time()
+            "select uid, time from premium where time>$1 order by time desc", time.time()
         )
     if len(premium_pool) <= 0:
         return
