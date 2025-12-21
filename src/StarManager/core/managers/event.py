@@ -544,9 +544,9 @@ class EventManager(BaseManager):
                 else:
                     return enums.RewardCategory.coins
 
-            if r <= 0.35:
+            if r <= 0.425:
                 return enums.RewardCategory.xp
-            elif r <= 0.7:
+            elif r <= 0.85:
                 return enums.RewardCategory.coins
             else:
                 return enums.RewardCategory.premium
@@ -567,10 +567,10 @@ class EventManager(BaseManager):
                 return random.choices(
                     [3, 7, 15, 30, 45],
                     [
-                        0.5 if (p3 < 2 or p30 == p45 == 0) and p3 < 3 else 0,
+                        0.57 if (p3 < 2 or p30 == p45 == 0) and p3 < 3 else 0,
                         0.3 if (p7 == 0 or p30 == p45 == p15 == 0) and p7 < 2 else 0,
-                        0.15 if (p15 == 0 or p30 == p45 == 0) and p15 < 2 else 0,
-                        *((0.04, 0.01) if p30 == p45 == 0 and p15 < 2 else (0, 0)),
+                        0.1 if (p15 == 0 or p30 == p45 == 0) and p15 < 2 else 0,
+                        *((0.02, 0.01) if p30 == p45 == 0 and p15 < 2 else (0, 0)),
                     ],
                 )[0]
             elif category == enums.RewardCategory.coins:
