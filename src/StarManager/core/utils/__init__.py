@@ -1676,7 +1676,7 @@ async def set_premium_status(
     async with (await pool()).acquire() as conn:
         if not await conn.fetchval(
             f"update premium set time {'= time +' if operation == 'add' else '='} $1 where uid=$2 returning 1",
-            time.time() + days * 86400,
+            (time.time() if operation == "set" else 0) + days * 86400,
             to_id,
         ):
             await conn.execute(
