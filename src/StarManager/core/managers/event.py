@@ -308,11 +308,10 @@ class EventCache(BaseCacheManager):
         await self.ensure_by_model(CachedEventTasksRow, key)
         async with self._lock:
             old_value = getattr(self._cache[key].tasks, type)
-            new_value = old_value - value
-            if new_value < 0 and old_value <= 0:
-                return self._cache[key], old_value, old_value
-            setattr(self._cache[key].tasks, type, max(new_value, 0))
-            self._dirty.add(key)
+            new_value = max(old_value - value, 0)
+            if new_value != old_value:
+                setattr(self._cache[key].tasks, type, new_value)
+                self._dirty.add(key)
             return self._cache[key], old_value, new_value
 
     async def edit_cases(self, key: CacheKey, action=1) -> Optional[CachedEventRow]:
@@ -435,17 +434,17 @@ class EventCache(BaseCacheManager):
         rep_users_base = random.choice((3, 5, 7))
         win_duels_base = random.choice((3, 5, 7))
         return {
-                "send_messages": send_messages_base,
-                "send_messages_base": send_messages_base,
-                "transfer_coins": transfer_coins_base,
-                "transfer_coins_base": transfer_coins_base,
-                "rep_users": rep_users_base,
-                "rep_users_base": rep_users_base,
-                "win_duels": win_duels_base,
-                "win_duels_base": win_duels_base,
-                "level_up": 1,
-                "level_up_base": 1,
-            }
+            "send_messages": send_messages_base,
+            "send_messages_base": send_messages_base,
+            "transfer_coins": transfer_coins_base,
+            "transfer_coins_base": transfer_coins_base,
+            "rep_users": rep_users_base,
+            "rep_users_base": rep_users_base,
+            "win_duels": win_duels_base,
+            "win_duels_base": win_duels_base,
+            "level_up": 1,
+            "level_up_base": 1,
+        }
 
     async def drop_tasks(self):
         async with self._lock:
