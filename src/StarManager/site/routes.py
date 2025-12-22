@@ -670,7 +670,7 @@ async def process_vk_event(data, data_type):
             event_info = f"message_new text='{text}'"
 
         try:
-            async with asyncio.timeout(60):
+            async with asyncio.timeout(300):
                 async with _vk_semaphore:
                     await vkbot.process_event(data)
         except asyncio.TimeoutError:
