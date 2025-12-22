@@ -4280,7 +4280,7 @@ async def event_open(message: MessageEvent):
     user = await managers.event.get_user(message.user_id)
     if user.event_user is None or user.event_user.has_cases == 0:
         await message.show_snackbar(
-            "❄️ Вы не выполнили все задания."
+            "❄️ Вы не выполнили все задания." if user.tasks is None or not user.tasks.recieved_case else "❄️ Вы уже открыли все свои кейсы."
         )
         return
     await utils.send_message_event_answer(
