@@ -309,9 +309,9 @@ class EventCache(BaseCacheManager):
         async with self._lock:
             old_value = getattr(self._cache[key].tasks, type)
             new_value = old_value - value
-            if new_value < 0:
-                return self._cache[key], old_value, new_value
-            setattr(self._cache[key].tasks, type, new_value)
+            if new_value < 0 and old_value <= 0:
+                return self._cache[key], old_value, old_value
+            setattr(self._cache[key].tasks, type, max(new_value, 0))
             self._dirty.add(key)
             return self._cache[key], old_value, new_value
 
