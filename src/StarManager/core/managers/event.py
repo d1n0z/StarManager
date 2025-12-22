@@ -682,4 +682,4 @@ class EventManager(BaseManager):
                 parse_mode="HTML",
             )
         except Exception:
-            loguru.logger.exception("Failed to send reward log:")
+            pass
