@@ -421,7 +421,6 @@ class AllChats(Model):
 
 class AllUsers(Model):
     uid = fields.IntField(default=0, db_index=True, unique=True)
-    is_last_hidden_album = fields.BooleanField(default=False)
 
     class Meta:
         table = "allusers"
@@ -578,13 +577,6 @@ class Antitag(Model):
 
     class Meta:
         table = "antitag"
-
-
-class HiddenAlbumServerInternalError(Model):
-    uid = fields.IntField()
-
-    class Meta:
-        table = "hiddenalbumserverinternalerror"
 
 
 class Promocodes(Model):

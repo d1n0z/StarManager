@@ -45,9 +45,6 @@ from StarManager.core.db import pool
 
 from . import models
 
-_hiddenalbumuid = None
-_hiddenalbumlock = asyncio.Lock()
-
 
 @AsyncTTL(time_to_live=300, maxsize=0)
 async def get_user_name(uid: int) -> str:
@@ -317,30 +314,18 @@ async def set_chat_mute(
         return
 
 
-async def upload_image(file: str, uid: int | None = None, retry: int = 0) -> str | None:
-    if not uid:
-        uid = await get_hidden_album_user()
+async def upload_image(file: str, retry: int = 0) -> str | None:
     try:
-        photo = await PhotoMessageUploader(api).upload(file_source=file, peer_id=uid)
+        photo = await PhotoMessageUploader(api).upload(file_source=file)
         if not photo:
             raise Exception
         return photo
     except Exception as e:
-        if "internal" in str(e).lower() or "access" in str(e).lower():
-            async with (await pool()).acquire() as conn:
-                await conn.execute(
-                    "insert into hiddenalbumserverinternalerror (uid) values ($1)", uid
-                )
-            global _hiddenalbumuid
-            _hiddenalbumuid = None
-            uid = await get_hidden_album_user()
         if retry < 6 or "too many" in str(e).lower():
             await asyncio.sleep((2**retry) / 2)
-            return await upload_image(file, uid, retry + 1)
-        if "internal" in str(e).lower():
-            logger.error("Failed to find an appropriate hidden album!!")
-            return
-        raise e
+            return await upload_image(file, retry + 1)
+        logger.exception("Failed to send photo:")
+        return
 
 
 def _get_reg_date_sync(id: int, format: str) -> str | None:
@@ -1223,59 +1208,6 @@ async def is_messages_from_group_allowed(uid):
             group_id=settings.vk.group_id, user_id=uid
         )
     ).is_allowed
-
-
-async def get_hidden_album_user():
-    global _hiddenalbumuid
-    async with _hiddenalbumlock:
-        if _hiddenalbumuid:
-            return _hiddenalbumuid
-
-        async with (await pool()).acquire() as conn:
-            last_uid_row = await conn.fetchrow(
-                "select uid from allusers where is_last_hidden_album=true limit 1"
-            )
-            if last_uid_row:
-                last_uid = last_uid_row[0]
-                if (
-                    await api.messages.is_messages_from_group_allowed(
-                        group_id=settings.vk.group_id, user_id=last_uid
-                    )
-                ).is_allowed:
-                    _hiddenalbumuid = last_uid
-                    return _hiddenalbumuid
-
-            await conn.execute(
-                "update allusers set is_last_hidden_album=false where is_last_hidden_album=true"
-            )
-
-            excluded = [
-                i[0]
-                for i in await conn.fetch(
-                    "select uid from hiddenalbumserverinternalerror"
-                )
-            ]
-            userspool = await conn.fetch(
-                "select uid from allusers where not uid=ANY($1) and uid>0", excluded
-            )
-
-        for user in userspool:
-            uid = user[0]
-            if (
-                await api.messages.is_messages_from_group_allowed(
-                    group_id=settings.vk.group_id, user_id=uid
-                )
-            ).is_allowed:
-                _hiddenalbumuid = uid
-                async with (await pool()).acquire() as conn:
-                    await conn.execute("update allusers set is_last_hidden_album=false")
-                    await conn.execute(
-                        "update allusers set is_last_hidden_album=true where uid=$1",
-                        uid,
-                    )
-                return _hiddenalbumuid
-
-            await asyncio.sleep(0.51)
 
 
 async def get_import_settings(uid, chat_id):

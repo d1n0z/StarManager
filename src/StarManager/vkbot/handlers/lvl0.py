@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 import random
 import re
 import time
@@ -199,7 +200,9 @@ async def stats(message: Message):
     file_path = settings.service.path + f"src/StarManager/core/media/temp/{id}ava.jpg"
 
     def write_file():
-        with open(file_path, "wb") as f:
+        path = Path(file_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "wb") as f:
             f.write(r)
 
     await asyncio.to_thread(write_file)
