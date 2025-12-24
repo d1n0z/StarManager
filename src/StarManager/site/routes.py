@@ -342,72 +342,81 @@ async def create_payment(request: Request, data: models.Item):
 @router.post("/api/listener/yookassa/")
 async def yookassa(request: Request):
     try:
+        logger.debug(f"New payment: {await request.json()}")
         if request.method != "POST":
             return RedirectResponse(url="/", status_code=303)
 
         payment = models.Payment(**(await request.json())["object"])
         Configuration.account_id = settings.yookassa.merchant_id
         Configuration.secret_key = settings.yookassa.token
-        Payment.capture(payment.yookassa_order_id)
+        def _capture_and_return_yes():
+            Payment.capture(payment.yookassa_order_id)
+            return JSONResponse(content="YES")
 
-        async with (await pool()).acquire() as conn:
-            if not await conn.fetchval(
-                "update payments set success=1 where id=$1 and success=0 returning 1",
-                payment.order_id,
-            ):
-                return JSONResponse(content="YES")
-            if payment.personal_promo:
-                await conn.execute(
-                    "delete from prempromo where id=$1", payment.personal_promo
+        try:
+            async with (await pool()).acquire() as conn:
+                if not await conn.fetchval(
+                    "update payments set success=1 where id=$1 and success=0 returning 1",
+                    payment.order_id,
+                ):
+                    return _capture_and_return_yes()
+                if payment.personal_promo:
+                    await conn.execute(
+                        "delete from prempromo where id=$1", payment.personal_promo
+                    )
+                    await conn.execute(
+                        "update premiumexpirenotified set date=0 where uid=$1",
+                        payment.from_id,
+                    )
+        except Exception:
+            pass
+
+        try:
+            text = f"Номер: <b>#{payment.order_id}</b>\n"
+            if payment.chat_id:
+                payment_type = "Premium-беседа"
+                text += f"""Тип: <code>"Premium-беседа"</code>
+        ID беседы: <code>{payment.chat_id}</code>\n"""
+            elif payment.coins:
+                payment_type = utils.pluralize_words(
+                    payment.coins, ("монетка", "монетки", "монеток")
                 )
-                await conn.execute(
-                    "update premiumexpirenotified set date=0 where uid=$1",
-                    payment.from_id,
+                text += f"""Тип: <code>"Монетки"</code>
+        Количество: <code>{utils.pluralize_words(payment.coins, ("монетка", "монетки", "монеток"))}</code>\n"""
+            else:
+                days = list(settings.premium_cost.cost.keys())[
+                    list(settings.premium_cost.cost.values()).index(payment.cost)
+                ]
+                payment_type = f"Premium-подписка ({days} дней)"
+                text += f"""Тип: <code>"Premium-статус"</code>
+        Срок: <code>{days} дней</code>\n"""
+
+            text += f"""Сумма: <code>{payment.final_cost[:-3]} рублей</code>
+        Покупатель: <a href="https://vk.com/id{payment.from_id}">@id{payment.from_id}</a>\n"""
+
+            if not payment.chat_id:
+                text += f'Получатель: <a href="https://vk.com/id{payment.to_id}">@id{payment.to_id}</a>\n'
+
+            text += f"""Дата: <code>{datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}</code>
+        Способ: <code>Юкасса</code>
+        Код платежа: <code>{payment.yookassa_order_id}</code>"""
+
+            emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
+            text = "\n".join([f"{emojis[k]} {i}" for k, i in enumerate(text.split("\n"))])
+
+            async with httpx.AsyncClient() as client:
+                await client.get(
+                    f"https://api.telegram.org/bot{settings.telegram.token}/sendMessage",
+                    params={
+                        "chat_id": settings.telegram.chat_id,
+                        "message_thread_id": settings.telegram.premium_thread_id,
+                        "parse_mode": "html",
+                        "disable_web_page_preview": True,
+                        "text": text,
+                    },
                 )
-
-        text = f"Номер: <b>#{payment.order_id}</b>\n"
-        if payment.chat_id:
-            payment_type = "Premium-беседа"
-            text += f"""Тип: <code>"Premium-беседа"</code>
-    ID беседы: <code>{payment.chat_id}</code>\n"""
-        elif payment.coins:
-            payment_type = utils.pluralize_words(
-                payment.coins, ("монетка", "монетки", "монеток")
-            )
-            text += f"""Тип: <code>"Монетки"</code>
-    Количество: <code>{utils.pluralize_words(payment.coins, ("монетка", "монетки", "монеток"))}</code>\n"""
-        else:
-            days = list(settings.premium_cost.cost.keys())[
-                list(settings.premium_cost.cost.values()).index(payment.cost)
-            ]
-            payment_type = f"Premium-подписка ({days} дней)"
-            text += f"""Тип: <code>"Premium-статус"</code>
-    Срок: <code>{days} дней</code>\n"""
-
-        text += f"""Сумма: <code>{payment.final_cost[:-3]} рублей</code>
-    Покупатель: <a href="https://vk.com/id{payment.from_id}">@id{payment.from_id}</a>\n"""
-
-        if not payment.chat_id:
-            text += f'Получатель: <a href="https://vk.com/id{payment.to_id}">@id{payment.to_id}</a>\n'
-
-        text += f"""Дата: <code>{datetime.now().strftime("%d.%m.%Y / %H:%M:%S")}</code>
-    Способ: <code>Юкасса</code>
-    Код платежа: <code>{payment.yookassa_order_id}</code>"""
-
-        emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
-        text = "\n".join([f"{emojis[k]} {i}" for k, i in enumerate(text.split("\n"))])
-
-        async with httpx.AsyncClient() as client:
-            await client.get(
-                f"https://api.telegram.org/bot{settings.telegram.token}/sendMessage",
-                params={
-                    "chat_id": settings.telegram.chat_id,
-                    "message_thread_id": settings.telegram.premium_thread_id,
-                    "parse_mode": "html",
-                    "disable_web_page_preview": True,
-                    "text": text,
-                },
-            )
+        except Exception:
+            pass
 
         async with (await pool()).acquire() as conn:
             if payment.chat_id:
@@ -502,7 +511,7 @@ async def yookassa(request: Request):
         except Exception:
             pass
 
-        return JSONResponse(content="YES")
+        return _capture_and_return_yes()
     except Exception:
         logger.exception("Failed to capture payment:")
         raise
