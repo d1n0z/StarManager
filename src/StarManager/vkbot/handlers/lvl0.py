@@ -1,11 +1,11 @@
 import asyncio
-from pathlib import Path
 import random
 import re
 import time
 import traceback
 from copy import deepcopy
 from datetime import datetime
+from pathlib import Path
 
 from vkbottle import KeyboardButtonColor
 from vkbottle.bot import Message
@@ -179,7 +179,11 @@ async def stats(message: Message):
         acc = None
         access_level = 0
     else:
-        if access_level < 1 and not await get_user_premium(message.from_id) and not rewards:
+        if (
+            access_level < 1
+            and not await get_user_premium(message.from_id)
+            and not rewards
+        ):
             id = message.from_id
         else:
             acc = await managers.access_level.get(id, chat_id)
@@ -596,7 +600,7 @@ async def transfer(message: Message):
                 )
             ]
         )
-    if (td >= 500 and not u_prem) or (td >= 1000 and not u_prem):
+    if (td + tcoins >= 500 and not u_prem) or (td + tcoins >= 1000 and not u_prem):
         return await messagereply(
             message, disable_mentions=1, message=await messages.transfer_limit(u_prem)
         )
@@ -1110,7 +1114,9 @@ async def event(message: Message):
             win_duels_base=tasks.win_duels_base,
             win_duels=tasks.win_duels,
             level_up=tasks.level_up,
-            cases_recieved=(user.event_user.has_cases + user.event_user.cases_opened) if user is not None and user.event_user is not None else 0,
+            cases_recieved=(user.event_user.has_cases + user.event_user.cases_opened)
+            if user is not None and user.event_user is not None
+            else 0,
         ),
         keyboard=keyboard.event(message.from_id),
         disable_mentions=1,

@@ -65,9 +65,7 @@ class XPRepository(BaseRepository):
         defaults = defaults or {}
         obj, created = await XP.get_or_create(
             uid=uid,
-            defaults=(
-                defaults | {k: v for k, v in DEFAULTS.items() if k not in defaults}
-            ),
+            defaults=defaults,
         )
         return obj, created
 
@@ -109,7 +107,10 @@ class XPCache(BaseCacheManager):
                 return False
 
         uid = cache_key
-        defaults = initial_data or DEFAULTS
+        if initial_data:
+            defaults = initial_data | {k: v for k, v in DEFAULTS.items() if k not in initial_data or initial_data[k] is None}
+        else:
+            defaults = copy.deepcopy(DEFAULTS)
         model, created = await self.repo.ensure_record(uid, defaults=defaults)
         async with self._lock:
             self._cache[cache_key] = CachedXPRow.from_model(model)
