@@ -5,6 +5,7 @@ import random
 import re
 import tempfile
 import time
+import traceback
 import unicodedata
 from ast import literal_eval
 from copy import deepcopy
@@ -313,19 +314,60 @@ async def set_chat_mute(
     except Exception:
         return
 
+last_global_upload_failure = 0
 
-async def upload_image(file: str, retry: int = 0) -> str | None:
+
+async def upload_image(file: str, retry: int = 0, *, targeted_ids: Optional[List[int]] = None) -> str | None:
+    global last_global_upload_failure
+
+    use_global = (last_global_upload_failure == 0 or time.time() - last_global_upload_failure > 3600)
     try:
-        photo = await PhotoMessageUploader(api).upload(file_source=file)
+        try:
+            if use_global:
+                photo = await PhotoMessageUploader(api).upload(file_source=file)
+            else:
+                photo = await upload_image_with_targets(file, targeted_ids)
+        except Exception as oe:
+            if retry == 0 and use_global:
+                photo = await upload_image_with_targets(file, targeted_ids)
+                if photo:
+                    return photo
+            if use_global:
+                last_global_upload_failure = time.time()
+            raise oe
+
         if not photo:
             raise Exception
         return photo
     except Exception as e:
+        if "internal server error" in str(e).lower():
+            logger.debug(f"Failed to send photo: {traceback.format_exc()}")
+            return
         if retry < 6 or "too many" in str(e).lower():
             await asyncio.sleep((2**retry) / 2)
             return await upload_image(file, retry + 1)
         logger.exception("Failed to send photo:")
         return
+
+
+async def upload_image_with_targets(file, targeted_ids):
+    async def _upload():
+        return await PhotoMessageUploader(api).upload(file_source=file, peer_id=id)
+
+    for id in targeted_ids or []:
+        try:
+            try:
+                photo = await _upload()
+            except Exception as e:
+                if "too many" in str(e).lower():
+                    await asyncio.sleep(3)
+                    photo = await _upload()
+                raise e
+        except Exception:
+            continue
+        if photo:
+            return photo
+    return None
 
 
 def _get_reg_date_sync(id: int, format: str) -> str | None:

@@ -225,7 +225,7 @@ async def action_handle(message: MessageNew) -> None:
             if s := await managers.chat_settings.get(chat_id, "captcha", ("pos", "value", "punishment")):
                 if s[0] and s[1] and s[2]:
                     captcha = await utils.generate_captcha(uid, chat_id, s[1])
-                    photo = await utils.upload_image(captcha[0])
+                    photo = await utils.upload_image(captcha[0], targeted_ids=[event.peer_id, id, uid])
                     if photo:
                         m = await utils.send_message(
                             event.peer_id,

@@ -239,7 +239,7 @@ async def stats(message: Message):
             await get_user_premmenu_setting(id, "border_color", False),
             await get_user_league(id),
         )
-        photo = (await upload_image(stats_image),)
+        photo = (await upload_image(stats_image, targeted_ids=[message.peer_id, id]),)
         if not photo:
             raise Exception("Failed to upload image")
         await messagereply(message, disable_mentions=1, attachment=photo)

@@ -316,7 +316,7 @@ async def handle_settings(
             r = await asyncio.to_thread(requests.get, attachment[0].photo.sizes[-1].url)
             path = f"{settings.service.path}src/StarManager/core/media/temp/{uid}welcome.jpg"
             await asyncio.to_thread(lambda: open(path, "wb").write(r.content))
-            photo = await upload_image(path)
+            photo = await upload_image(path, targeted_ids=[event.object.message.peer_id, uid])
             if not photo:
                 return await send_message(
                     chat_id + 2000000000,
