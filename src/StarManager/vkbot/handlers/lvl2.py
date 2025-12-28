@@ -119,7 +119,7 @@ async def unwarn(message: Message):
 
     async with (await pool()).acquire() as conn:
         if not await conn.fetchval(
-            "update warn set warns = warns - 1 where chat_id=$1 and uid=$2 returning 1",
+            "update warn set warns = warns - 1 where chat_id=$1 and uid=$2 and warns>0 returning 1",
             chat_id,
             id,
         ):
