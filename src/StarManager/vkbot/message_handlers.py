@@ -106,8 +106,7 @@ async def message_handle(event: MessageNew) -> Any:
 
     await managers.allchats.create_if_not_exists(chat_id)
     await managers.allusers.create_if_not_exists(uid)
-    # if not uacc and await managers.filters.matches(chat_id, await get_chat_owner(chat_id), msg):
-    if await managers.filters.matches(chat_id, await get_chat_owner(chat_id), msg):
+    if not uacc and await managers.filters.matches(chat_id, await get_chat_owner(chat_id), msg):
         async with (await pool()).acquire() as conn:
             pnt = await conn.fetchval(
                 "select punishment from filtersettings where chat_id=$1", chat_id

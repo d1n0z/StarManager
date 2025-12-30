@@ -286,7 +286,7 @@ async def get_chat_owner(chat_id: int) -> int | bool:
             return sorted(owners, key=lambda i: i.access_level)[0].uid
 
         async with (await pool()).acquire() as conn:
-            owner = conn.fetchval(
+            owner = await conn.fetchval(
                 "select uid from gpool where chat_id=$1",
                 chat_id,
             )
