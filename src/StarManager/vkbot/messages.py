@@ -2908,7 +2908,7 @@ async def filter_list(filters, page):
     return await get(
         "filter_list",
         filters="\n".join(
-            f'[{k + 1 + (page * 25)}]. {"📘" if i[1] else "📗"} | "{i[2]}"'
+            f'[{k + 1 + (page * 25)}]. {"📘" if i[0] else "📗"} | "{i[1]}"'
             for k, i in enumerate(filters)
         ),
     )

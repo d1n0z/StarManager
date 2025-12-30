@@ -14,6 +14,7 @@ from StarManager.core.utils import (
     antispam_checker,
     delete_messages,
     get_chat_name,
+    get_chat_owner,
     get_chat_settings,
     get_silence,
     get_silence_allowed,
@@ -103,155 +104,130 @@ async def message_handle(event: MessageNew) -> Any:
     if uid in settings.service.admins:
         print(f"{uid}({chat_id}): {msg}")
 
-    owners = await managers.access_level.get_all(
-        chat_id=chat_id, predicate=lambda i: i.access_level >= 7 and i.custom_level_name is None
-    )
-    filterdata, pnt = msg.lower().replace(" ", ""), -1
-    async with (await pool()).acquire() as conn:
-        await conn.execute(
-            "insert into allusers (uid) values ($1) on conflict (uid) do nothing", uid
-        )
-        await conn.execute(
-            "insert into allchats (chat_id) values ($1) on conflict (chat_id) do nothing",
-            chat_id,
-        )
-
-        if any(
-            i in filterdata
-            for i in [
-                i[0]
-                for i in await conn.fetch(
-                    "select filter from filters where chat_id=$1 or (owner_id=$2 and exists("
-                    "select 1 from gpool where uid=$2 and chat_id=$1) and filter not in ("
-                    "select filter from filterexceptions where owner_id=$2 and chat_id=$1))",
-                    chat_id,
-                    sorted(owners, key=lambda i: i.access_level, reverse=True)[0].uid
-                    if owners
-                    else uid,
-                )
-            ]
-        ) and not await get_user_access_level(uid, chat_id):
+    await managers.allchats.create_if_not_exists(chat_id)
+    await managers.allusers.create_if_not_exists(uid)
+    # if not uacc and await managers.filters.matches(chat_id, await get_chat_owner(chat_id), msg):
+    if await managers.filters.matches(chat_id, await get_chat_owner(chat_id), msg):
+        async with (await pool()).acquire() as conn:
             pnt = await conn.fetchval(
                 "select punishment from filtersettings where chat_id=$1", chat_id
             )
-    if pnt == -1:
-        pass
-    elif not pnt:
-        return await delete_messages(
-            event.object.message.conversation_message_id, chat_id
-        )
-    elif pnt == 1:
-        mute_time = 315360000
-        async with (await pool()).acquire() as conn:
-            ms = await conn.fetchrow(
-                "select last_mutes_times, last_mutes_causes, last_mutes_names, last_mutes_dates "
-                "from mute where chat_id=$1 and uid=$2",
-                chat_id,
-                uid,
+        if not pnt:
+            return await delete_messages(
+                event.object.message.conversation_message_id, chat_id
             )
-        if ms is not None:
-            mute_times = literal_eval(ms[0])
-            mute_causes = literal_eval(ms[1])
-            mute_names = literal_eval(ms[2])
-            mute_dates = literal_eval(ms[3])
-        else:
-            mute_times, mute_causes, mute_names, mute_dates = [], [], [], []
-
-        mute_times.append(mute_time)
-        mute_causes.append("Фильтрация слов")
-        mute_names.append("[club222139436|Star Manager]")
-        mute_dates.append(datetime.now().strftime("%Y.%m.%d %H:%M:%S"))
-
-        async with (await pool()).acquire() as conn:
-            if not await conn.fetchval(
-                "update mute set mute = $1, last_mutes_times = $2, last_mutes_causes = $3, last_mutes_names = $4, "
-                "last_mutes_dates = $5 where chat_id=$6 and uid=$7 returning 1",
-                time.time() + mute_time,
-                f"{mute_times}",
-                f"{mute_causes}",
-                f"{mute_names}",
-                f"{mute_dates}",
-                chat_id,
-                uid,
-            ):
-                await conn.execute(
-                    "insert into mute (uid, chat_id, mute, last_mutes_times, last_mutes_causes, last_mutes_names, "
-                    "last_mutes_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-                    uid,
+        elif pnt == 1:
+            mute_time = 315360000
+            async with (await pool()).acquire() as conn:
+                ms = await conn.fetchrow(
+                    "select last_mutes_times, last_mutes_causes, last_mutes_names, last_mutes_dates "
+                    "from mute where chat_id=$1 and uid=$2",
                     chat_id,
+                    uid,
+                )
+            if ms is not None:
+                mute_times = literal_eval(ms[0])
+                mute_causes = literal_eval(ms[1])
+                mute_names = literal_eval(ms[2])
+                mute_dates = literal_eval(ms[3])
+            else:
+                mute_times, mute_causes, mute_names, mute_dates = [], [], [], []
+
+            mute_times.append(mute_time)
+            mute_causes.append("Фильтрация слов")
+            mute_names.append("[club222139436|Star Manager]")
+            mute_dates.append(datetime.now().strftime("%Y.%m.%d %H:%M:%S"))
+
+            async with (await pool()).acquire() as conn:
+                if not await conn.fetchval(
+                    "update mute set mute = $1, last_mutes_times = $2, last_mutes_causes = $3, last_mutes_names = $4, "
+                    "last_mutes_dates = $5 where chat_id=$6 and uid=$7 returning 1",
                     time.time() + mute_time,
                     f"{mute_times}",
                     f"{mute_causes}",
                     f"{mute_names}",
                     f"{mute_dates}",
-                )
-
-        await set_chat_mute(uid, chat_id)
-        await delete_messages(event.object.message.conversation_message_id, chat_id)
-        return await send_message(
-            chat_id + 2000000000,
-            await messages.filterpunish_mute(
-                uid, await get_user_name(uid), await get_user_nickname(uid, chat_id)
-            ),
-        )
-    else:
-        ban_time = 315360000
-        async with (await pool()).acquire() as conn:
-            res = await conn.fetchrow(
-                "select last_bans_times, last_bans_causes, last_bans_names, last_bans_dates from ban where "
-                "chat_id=$1 and uid=$2",
-                chat_id,
-                uid,
-            )
-        if res is not None:
-            ban_times = literal_eval(res[0])
-            ban_causes = literal_eval(res[1])
-            ban_names = literal_eval(res[2])
-            ban_dates = literal_eval(res[3])
-        else:
-            ban_times, ban_causes, ban_names, ban_dates = [], [], [], []
-
-        ban_times.append(ban_time)
-        ban_causes.append("Фильтрация слов")
-        ban_names.append("[club222139436|Star Manager]")
-        ban_dates.append(datetime.now().strftime("%Y.%m.%d %H:%M:%S"))
-
-        async with (await pool()).acquire() as conn:
-            if not await conn.fetchval(
-                "update ban set ban = $1, last_bans_times = $2, last_bans_causes = $3, last_bans_names = $4, "
-                "last_bans_dates = $5 where chat_id=$6 and uid=$7 returning 1",
-                time.time() + ban_time,
-                f"{ban_times}",
-                f"{ban_causes}",
-                f"{ban_names}",
-                f"{ban_dates}",
-                chat_id,
-                uid,
-            ):
-                await conn.execute(
-                    "insert into ban (uid, chat_id, ban, last_bans_times, last_bans_causes, last_bans_names, "
-                    "last_bans_dates) values ($1, $2, $3, $4, $5, $6, $7)",
-                    uid,
                     chat_id,
+                    uid,
+                ):
+                    await conn.execute(
+                        "insert into mute (uid, chat_id, mute, last_mutes_times, last_mutes_causes, last_mutes_names, "
+                        "last_mutes_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                        uid,
+                        chat_id,
+                        time.time() + mute_time,
+                        f"{mute_times}",
+                        f"{mute_causes}",
+                        f"{mute_names}",
+                        f"{mute_dates}",
+                    )
+
+            await set_chat_mute(uid, chat_id)
+            await delete_messages(event.object.message.conversation_message_id, chat_id)
+            return await send_message(
+                chat_id + 2000000000,
+                await messages.filterpunish_mute(
+                    uid, await get_user_name(uid), await get_user_nickname(uid, chat_id)
+                ),
+            )
+        else:
+            ban_time = 315360000
+            async with (await pool()).acquire() as conn:
+                res = await conn.fetchrow(
+                    "select last_bans_times, last_bans_causes, last_bans_names, last_bans_dates from ban where "
+                    "chat_id=$1 and uid=$2",
+                    chat_id,
+                    uid,
+                )
+            if res is not None:
+                ban_times = literal_eval(res[0])
+                ban_causes = literal_eval(res[1])
+                ban_names = literal_eval(res[2])
+                ban_dates = literal_eval(res[3])
+            else:
+                ban_times, ban_causes, ban_names, ban_dates = [], [], [], []
+
+            ban_times.append(ban_time)
+            ban_causes.append("Фильтрация слов")
+            ban_names.append("[club222139436|Star Manager]")
+            ban_dates.append(datetime.now().strftime("%Y.%m.%d %H:%M:%S"))
+
+            async with (await pool()).acquire() as conn:
+                if not await conn.fetchval(
+                    "update ban set ban = $1, last_bans_times = $2, last_bans_causes = $3, last_bans_names = $4, "
+                    "last_bans_dates = $5 where chat_id=$6 and uid=$7 returning 1",
                     time.time() + ban_time,
                     f"{ban_times}",
                     f"{ban_causes}",
                     f"{ban_names}",
                     f"{ban_dates}",
-                )
+                    chat_id,
+                    uid,
+                ):
+                    await conn.execute(
+                        "insert into ban (uid, chat_id, ban, last_bans_times, last_bans_causes, last_bans_names, "
+                        "last_bans_dates) values ($1, $2, $3, $4, $5, $6, $7)",
+                        uid,
+                        chat_id,
+                        time.time() + ban_time,
+                        f"{ban_times}",
+                        f"{ban_causes}",
+                        f"{ban_names}",
+                        f"{ban_dates}",
+                    )
 
-        await delete_messages(event.object.message.conversation_message_id, chat_id)
-        return await send_message(
-            chat_id + 2000000000,
-            await messages.filterpunish_ban(
-                uid, await get_user_name(uid), await get_user_nickname(uid, chat_id)
+            await delete_messages(event.object.message.conversation_message_id, chat_id)
+            return await send_message(
+                chat_id + 2000000000,
+                await messages.filterpunish_ban(
+                    uid, await get_user_name(uid), await get_user_nickname(uid, chat_id)
+                )
+                + (
+                    "\n❗ Пользователя не удалось кикнуть"
+                    if not await kick_user(uid, chat_id)
+                    else ""
+                ),
             )
-            + (
-                "\n❗ Пользователя не удалось кикнуть"
-                if not await kick_user(uid, chat_id)
-                else ""
-            ),
-        )
 
     uprem = await get_user_premium(uid)
     data = event.object.message.text.split()

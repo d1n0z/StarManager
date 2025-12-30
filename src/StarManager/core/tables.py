@@ -124,21 +124,30 @@ class ChatGroups(Model):
 
 
 class Filters(Model):
-    chat_id = fields.IntField(null=True)
-    owner_id = fields.IntField(null=True)
-    filter = fields.TextField()  # type: ignore
+    chat_id = fields.IntField()
+    filter_ = fields.TextField()
 
     class Meta:
         table = "filters"
+        unique_together = (("chat_id", "filter_"),)
 
 
-class FilterExceptions(Model):
+class GlobalFilters(Model):
     owner_id = fields.IntField()
-    chat_id = fields.IntField()
-    filter = fields.TextField()  # type: ignore
+    filter_ = fields.TextField()
 
     class Meta:
-        table = "filterexceptions"
+        table = "globalfilters"
+        unique_together = (("owner_id", "filter_"),)
+
+
+class FiltersExceptions(Model):
+    chat_id = fields.IntField()
+    filter_ = fields.TextField()
+
+    class Meta:
+        table = "filtersexceptions"
+        unique_together = (("chat_id", "filter_"),)
 
 
 class FilterSettings(Model):

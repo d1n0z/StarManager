@@ -25,6 +25,7 @@ dependencies = [
     "nudenet>=3.4.2",
     "pillow>=11.3.0",
     "psutil>=6.1.0",
+    "pyahocorasick>=2.3.0",
     "pydantic-settings>=2.10.1",
     "pysafebrowsing>=0.1.4",
     "pytest-asyncio>=1.2.0",

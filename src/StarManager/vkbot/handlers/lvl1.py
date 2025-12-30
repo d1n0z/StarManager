@@ -407,7 +407,7 @@ async def clear(message: Message):
     try:
         deleted = []
         for chunk in chunks([mid for _, mid in to_delete], 99):
-            new_deleted = await delete_messages(chat_id=chat_id, cmids=chunk)
+            new_deleted = await delete_messages(chat_id=chat_id, cmids=list(chunk))
             if isinstance(new_deleted, list):
                 deleted.extend(new_deleted)
 

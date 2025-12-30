@@ -10,7 +10,18 @@ import unicodedata
 from ast import literal_eval
 from copy import deepcopy
 from datetime import date, datetime
-from typing import Any, Dict, Generator, Iterable, List, Literal, Optional, Union
+from typing import (
+    Any,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Literal,
+    Optional,
+    Sequence,
+    TypeVar,
+    Union,
+)
 from urllib.parse import urlparse
 
 import aiogram
@@ -45,6 +56,8 @@ from StarManager.core.config import api, settings, vk_api_session
 from StarManager.core.db import pool
 
 from . import models
+
+T = TypeVar("T")
 
 
 @AsyncTTL(time_to_live=300, maxsize=0)
@@ -263,9 +276,23 @@ async def is_chat_admin(id: int, chat_id: int) -> bool:
     return False
 
 
-@AsyncTTL(maxsize=0)
 async def get_chat_owner(chat_id: int) -> int | bool:
     try:
+        owners = await managers.access_level.get_all(
+            chat_id=chat_id,
+            predicate=lambda i: i.access_level >= 7 and i.custom_level_name is None,
+        )
+        if owners:
+            return sorted(owners, key=lambda i: i.access_level)[0].uid
+
+        async with (await pool()).acquire() as conn:
+            owner = conn.fetchval(
+                "select uid from gpool where chat_id=$1",
+                chat_id,
+            )
+        if owner:
+            return owner
+
         status = await api.messages.get_conversation_members(
             peer_id=chat_id + 2000000000
         )
@@ -314,13 +341,19 @@ async def set_chat_mute(
     except Exception:
         return
 
+
 last_global_upload_failure = 0
 
 
-async def upload_image(file: str, retry: int = 0, *, targeted_ids: Optional[List[int]] = None) -> str | None:
+async def upload_image(
+    file: str, retry: int = 0, *, targeted_ids: Optional[List[int]] = None
+) -> str | None:
     global last_global_upload_failure
 
-    use_global = (last_global_upload_failure == 0 or time.time() - last_global_upload_failure > 3600)
+    use_global = (
+        last_global_upload_failure == 0
+        or time.time() - last_global_upload_failure > 3600
+    )
     try:
         try:
             if use_global:
@@ -954,7 +987,7 @@ def pluralize_words(value, words) -> str:
     return res
 
 
-def chunks(li, n) -> Generator[Any, Any, None]:
+def chunks(li: Sequence[T], n: int) -> Generator[Sequence[T], None, None]:
     for i in range(0, len(li), n):
         yield li[i : i + n]
 
@@ -1227,8 +1260,7 @@ async def get_rep_top(uid):
             i[0]
             for i in await conn.fetch("select uid from reputation order by rep desc")
         ]
-        allu = await conn.fetchval("select count(*) as c from allusers")
-    return (top.index(uid) + 1) if uid in top else allu
+    return (top.index(uid) + 1) if uid in top else await managers.allusers.count_all()
 
 
 @cached

@@ -8,6 +8,7 @@ from StarManager.core.config import settings
 from StarManager.core.db import pool
 from StarManager.core.utils import (
     get_chat_name,
+    get_chat_owner,
     get_user_access_level,
     get_user_league,
     get_user_name,
@@ -352,37 +353,19 @@ async def filteradd(message: Message):
         )
     word = " ".join(data[1:])
     uid = message.from_id
-    async with (await pool()).acquire() as conn:
-        if await conn.fetchval(
-            "select exists(select 1 from filterexceptions where owner_id=$1 and chat_id=$2 and "
-            "filter=$3)",
-            uid,
-            chat_id,
-            word,
-        ):
-            await conn.execute(
-                "delete from filterexceptions where owner_id=$1 and chat_id=$2 and filter=$3",
-                uid,
-                chat_id,
-                word,
-            )
-            id = None
-        elif await conn.fetchval(
-            "select exists(select 1 from filters where (chat_id=$1 or (owner_id=$2 and exists("
-            "select 1 from gpool where uid=$2 and chat_id=$1))) and filter=$3)",
-            chat_id,
-            uid,
-            word,
-        ):
-            return await messagereply(
-                message, disable_mentions=1, message=await messages.filteradd_dup(word)
-            )
-        else:
-            id = await conn.fetchval(
-                "insert into filters (chat_id, filter) values ($1, $2) returning id",
-                chat_id,
-                word,
-            )
+
+    await managers.filters.exceptions_f.del_filter(chat_id, word)
+
+    if await managers.filters.chat_f.filter_exists(
+        chat_id, word
+    ) or await managers.filters.global_f.filter_exists(
+        await get_chat_owner(chat_id) or uid, word
+    ):
+        return await messagereply(
+            message, disable_mentions=1, message=await messages.filteradd_dup(word)
+        )
+    await managers.filters.chat_f.new_filter(chat_id, word)
+
     msg = await messages.filteradd(
         uid, await get_user_name(uid), await get_user_nickname(uid, chat_id), word
     )
@@ -390,7 +373,7 @@ async def filteradd(message: Message):
         message,
         disable_mentions=1,
         message=msg,
-        keyboard=keyboard.filteradd(uid, id, msg) if id else None,
+        keyboard=keyboard.filteradd(uid, word, msg) if id else None,
     )
 
 
@@ -403,31 +386,23 @@ async def filterdel(message: Message):
             message, disable_mentions=1, message=await messages.filterdel_hint()
         )
     word = " ".join(data[1:])
-    uid, fid = message.from_id, None
-    async with (await pool()).acquire() as conn:
-        if fid := await conn.fetchval(
-            "select id from filters where owner_id=$1 and filter=$2 and exists("
-            "select 1 from gpool where uid=$1 and chat_id=$3)",
-            uid,
-            word,
-            chat_id,
-        ):
-            await conn.execute(
-                "insert into filterexceptions (owner_id, chat_id, filter) values ($1, $2, $3)",
-                uid,
-                chat_id,
-                word,
-            )
-        elif not await conn.fetchval(
-            "delete from filters where chat_id=$1 and filter=$2 returning 1",
-            chat_id,
-            word,
-        ):
+    uid = message.from_id
+
+    if await managers.filters.global_f.filter_exists(
+        await get_chat_owner(chat_id) or uid, word
+    ):
+        await managers.filters.exceptions_f.new_filter(chat_id, word)
+        kbd = keyboard.filterdel
+    else:
+        kbd = None
+        if not await managers.filters.chat_f.filter_exists(chat_id, word):
             return await messagereply(
                 message,
                 disable_mentions=1,
                 message=await messages.filterdel_not_found(word),
             )
+        await managers.filters.chat_f.del_filter(chat_id, word)
+
     msg = await messages.filterdel(
         uid, await get_user_name(uid), await get_user_nickname(uid, chat_id), word
     )
@@ -435,7 +410,7 @@ async def filterdel(message: Message):
         message,
         disable_mentions=1,
         message=msg,
-        keyboard=keyboard.filterdel(uid, fid, msg) if fid else None,
+        keyboard=kbd(uid, word, msg) if kbd is not None else None,
     )
 
 

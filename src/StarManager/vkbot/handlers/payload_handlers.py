@@ -98,7 +98,6 @@ async def join(message: MessageEvent):
             await conn.execute("delete from gpool where chat_id=$1", chat_id)
             await conn.execute("delete from chatgroups where chat_id=$1", chat_id)
             await conn.execute("delete from silencemode where chat_id=$1", chat_id)
-            await conn.execute("delete from filters where chat_id=$1", chat_id)
             await conn.execute("delete from chatlimit where chat_id=$1", chat_id)
             await conn.execute("delete from notifications where chat_id=$1", chat_id)
             await conn.execute("delete from typequeue where chat_id=$1", chat_id)
@@ -114,6 +113,7 @@ async def join(message: MessageEvent):
                 time.time(),
             )
         await managers.chat_settings.remove(chat_id)
+        await managers.filters.chat_f.del_all_filters(chat_id)
 
         await managers.access_level.edit_access_level(bp, chat_id, 7)
 
@@ -1227,7 +1227,8 @@ async def page_statuslist(message: MessageEvent):
         return
     async with (await pool()).acquire() as conn:
         premium_pool = await conn.fetch(
-            "select uid, time from premium where time>$1 order by time desc", time.time()
+            "select uid, time from premium where time>$1 order by time desc",
+            time.time(),
         )
     if len(premium_pool) <= 0:
         return
@@ -2953,19 +2954,15 @@ async def import_start(message: MessageEvent):
                         chatid,
                         *i,
                     )
-            for i in await conn.fetch(
-                "select filter from filters where chat_id=$1", importchatid
-            ):
-                if not await conn.fetchval(
-                    "select exists(select 1 from filters where chat_id=$1 and filter=$2)",
-                    chatid,
-                    *i,
-                ):
-                    await conn.execute(
-                        "insert into filters (chat_id, filter) values ($1, $2)",
-                        chatid,
-                        *i,
-                    )
+
+            for f in await managers.filters.chat_f.get_all(importchatid):
+                await managers.filters.chat_f.new_filter(chatid, f)
+            if (import_owner_id := await utils.get_chat_owner(importchatid)) and (owner_id := await utils.get_chat_owner(chatid)):
+                for f in await managers.filters.global_f.get_all(import_owner_id):
+                    await managers.filters.global_f.new_filter(owner_id, f)
+            for f in await managers.filters.exceptions_f.get_all(importchatid):
+                await managers.filters.exceptions_f.new_filter(chatid, f)
+
             for i in await conn.fetch(
                 "select cmd, lvl from commandlevels where chat_id=$1", importchatid
             ):
@@ -3360,23 +3357,18 @@ async def filterlist(message: MessageEvent):
         return
     page, chat_id = message.payload.get("page", 0), message.peer_id - 2000000000
 
-    owners = await managers.access_level.get_all(
-        chat_id=chat_id,
-        predicate=lambda i: i.access_level >= 7 and i.custom_level_name is None,
-    )
-    if owners:
-        owner_id = sorted(owners, key=lambda i: i.access_level, reverse=True)[0].uid
-    else:
-        owner_id = message.user_id
+    owner_id = await utils.get_chat_owner(chat_id) or message.user_id
 
-    async with (await pool()).acquire() as conn:
-        filters = await conn.fetch(
-            "select chat_id, owner_id, filter from filters where (chat_id=$1 or (owner_id=$2 and exists("
-            "select 1 from gpool where uid=$2 and chat_id=$1))) and filter not in ("
-            "select filter from filterexceptions where owner_id=$2 and chat_id=$1)",
-            chat_id,
-            owner_id,
-        )
+    chat_filters = await managers.filters.chat_f.get_all(chat_id)
+    global_filters = await managers.filters.global_f.get_all(owner_id)
+    for filter_ in await managers.filters.exceptions_f.get_all(chat_id):
+        try:
+            global_filters.remove(filter_)
+        except KeyError:
+            pass
+    filters = [(True, i) for i in global_filters]
+    filters.extend([(False, i) for i in chat_filters])
+    filters = sorted(filters, key=lambda i: i[1])
     await utils.edit_message(
         await messages.filter_list(filters[25 * page : 25 * page + 25], page),
         message.object.peer_id,
@@ -3393,21 +3385,10 @@ async def filteradd(message: MessageEvent):
         return
     chat_id = message.peer_id - 2000000000
 
-    owners = await managers.access_level.get_all(
-        chat_id=chat_id,
-        predicate=lambda i: i.access_level >= 7 and i.custom_level_name is None,
+    await managers.filters.chat_f.del_filter(chat_id, message.payload["word"])
+    await managers.filters.global_f.new_filter(
+        await utils.get_chat_owner(chat_id) or message.user_id, message.payload["word"]
     )
-    if owners:
-        owner_id = sorted(owners, key=lambda i: i.access_level, reverse=True)[0].uid
-    else:
-        owner_id = message.user_id
-
-    async with (await pool()).acquire() as conn:
-        await conn.execute(
-            "update filters set chat_id=null, owner_id=$1 where id=$2",
-            owner_id,
-            message.payload["fid"],
-        )
     await utils.edit_message(
         message.payload["msg"], message.object.peer_id, message.conversation_message_id
     )
@@ -3421,24 +3402,12 @@ async def filterdel(message: MessageEvent):
         return
     chat_id = message.peer_id - 2000000000
 
-    owners = await managers.access_level.get_all(
-        chat_id=chat_id,
-        predicate=lambda i: i.access_level >= 7 and i.custom_level_name is None,
+    await managers.filters.global_f.del_filter(
+        await utils.get_chat_owner(chat_id) or message.user_id, message.payload["word"]
     )
-    if owners:
-        owner_id = sorted(owners, key=lambda i: i.access_level, reverse=True)[0].uid
-    else:
-        owner_id = message.user_id
+    for cid in await utils.get_gpool(chat_id) or [chat_id]:
+        await managers.filters.exceptions_f.del_filter(cid, message.payload["word"])
 
-    async with (await pool()).acquire() as conn:
-        filter = await conn.fetchval(
-            "delete from filters where id=$1 returning filter", message.payload["fid"]
-        )
-        await conn.execute(
-            "delete from filterexceptions where owner_id=$1 and filter=$2",
-            owner_id,
-            filter,
-        )
     await utils.edit_message(
         message.payload["msg"], message.object.peer_id, message.conversation_message_id
     )
@@ -4280,7 +4249,9 @@ async def event_open(message: MessageEvent):
     user = await managers.event.get_user(message.user_id)
     if user.event_user is None or user.event_user.has_cases == 0:
         await message.show_snackbar(
-            "❄️ Вы не выполнили все задания." if user.tasks is None or not user.tasks.recieved_case else "❄️ Вы уже открыли все свои кейсы."
+            "❄️ Вы не выполнили все задания."
+            if user.tasks is None or not user.tasks.recieved_case
+            else "❄️ Вы уже открыли все свои кейсы."
         )
         return
     await utils.send_message_event_answer(

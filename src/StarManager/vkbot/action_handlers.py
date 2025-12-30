@@ -91,10 +91,8 @@ async def action_handle(message: MessageNew) -> None:
     if action.type.value != "chat_invite_user":
         return
     id = event.from_id
+    await managers.allusers.create_if_not_exists(id)
     async with (await pool()).acquire() as conn:
-        await conn.execute(
-            "insert into allusers (uid) values ($1) on conflict (uid) do nothing", id
-        )
         if not await conn.fetchval(
             "update userjoineddate set time = $1 where chat_id=$2 and uid=$3 returning 1",
             time.time(),
@@ -126,12 +124,8 @@ async def action_handle(message: MessageNew) -> None:
                 await utils.send_message(event.peer_id, await messages.blocked())
                 await utils.kick_user(-settings.vk.group_id, chat_id=chat_id)
                 return
-            if not await conn.fetchval(
-                "select exists(select 1 from allchats where chat_id=$1)", chat_id
-            ):
-                await conn.execute(
-                    "insert into allchats (chat_id) values ($1)", chat_id
-                )
+            if not await managers.allchats.exists(chat_id):
+                await managers.allchats.create_if_not_exists(chat_id)
                 await utils.send_message(
                     event.peer_id, await messages.join(), keyboard.join(chat_id)
                 )

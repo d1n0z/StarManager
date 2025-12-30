@@ -1911,24 +1911,24 @@ def filter_list(uid, page, count):
     return kb.get_json()
 
 
-def filteradd(uid, id, msg):
+def filteradd(uid, word, msg):
     kb = Keyboard(inline=True)
 
     kb.add(
         Callback(
-            "Добавить в связки", {"cmd": "filteradd", "fid": id, "msg": msg, "uid": uid}
+            "Добавить в связки", {"cmd": "filteradd", "word": word, "msg": msg, "uid": uid}
         )
     )
 
     return kb.get_json()
 
 
-def filterdel(uid, id, msg):
+def filterdel(uid, word, msg):
     kb = Keyboard(inline=True)
 
     kb.add(
         Callback(
-            "Удалить в связке", {"cmd": "filterdel", "fid": id, "msg": msg, "uid": uid}
+            "Удалить в связке", {"cmd": "filterdel", "word": word, "msg": msg, "uid": uid}
         )
     )
 

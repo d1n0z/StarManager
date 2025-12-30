@@ -56,8 +56,7 @@ async def msg(message: Message):
     devmsg = " ".join(data[1:])
     msg = await messages.msg(devmsg)
     k = 0
-    async with (await pool()).acquire() as conn:
-        chats = await conn.fetch("select chat_id from allchats")
+    chats = list(await managers.allchats.read_all())
     print(len(chats))
     for i in chunks(chats, 2500):
         try:
@@ -65,7 +64,7 @@ async def msg(message: Message):
             for y in chunks(i, 100):
                 code += (
                     'API.await messages.send({"random_id": 0, "peer_ids": ['
-                    + ",".join(str(o[0]) for o in y)
+                    + ",".join(str(o) for o in y)
                     + '], "message": "'
                     + f"{msg}"
                     + '"});'
