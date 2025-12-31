@@ -25,7 +25,7 @@ from StarManager.core.config import settings, sitedata
 from StarManager.core.db import smallpool as pool
 from StarManager.core.event_queue import event_queue
 from StarManager.site import enums, models
-from StarManager.site.utils import get_vk_timeouts_count, record_vk_timeout
+from StarManager.site.utils import check_tg_timings, get_vk_timeouts_count, record_vk_timeout
 from StarManager.vkbot.bot import bot as vkbot
 
 router = APIRouter()
@@ -404,17 +404,18 @@ async def yookassa(request: Request):
             emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
             text = "\n".join([f"{emojis[k]} {i}" for k, i in enumerate(text.split("\n"))])
 
-            async with httpx.AsyncClient() as client:
-                await client.get(
-                    f"https://api.telegram.org/bot{settings.telegram.token}/sendMessage",
-                    params={
-                        "chat_id": settings.telegram.chat_id,
-                        "message_thread_id": settings.telegram.premium_thread_id,
-                        "parse_mode": "html",
-                        "disable_web_page_preview": True,
-                        "text": text,
-                    },
-                )
+            if check_tg_timings():
+                async with httpx.AsyncClient() as client:
+                    await client.get(
+                        f"https://api.telegram.org/bot{settings.telegram.token}/sendMessage",
+                        params={
+                            "chat_id": settings.telegram.chat_id,
+                            "message_thread_id": settings.telegram.premium_thread_id,
+                            "parse_mode": "html",
+                            "disable_web_page_preview": True,
+                            "text": text,
+                        },
+                    )
         except Exception:
             pass
 
