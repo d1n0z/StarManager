@@ -414,8 +414,8 @@ class EventCache(BaseCacheManager):
         self, key: CacheKey, reward_category: enums.RewardCategory, value: int
     ):
         await self.ensure_by_model(CachedEventUsersRow, key)
-        await self.rewards_pool_repo.ensure_record(
-            key, {"reward_category": reward_category, "value": value}
+        await self.rewards_pool_repo.create_record(
+            key, reward_category, value
         )
         async with self._lock:
             rwrd = CachedRewardsPoolRow(
