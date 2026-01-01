@@ -32,6 +32,7 @@ _gl_c = 0
 
 def check_tg_timings():
     global _gl_c
-    if _gl_c % 3 == 1:
+    _gl_c += 1
+    if _gl_c % 2 == 0:
         return False
     return True
