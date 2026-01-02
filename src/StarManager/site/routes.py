@@ -712,11 +712,14 @@ async def vk(request: Request):
         return PlainTextResponse('Error: wrong "secret" key.')
 
     if len(_vk_tasks) > 200:
-        await event_queue.put(data)
-
         queued_events = event_queue.qsize()
-        if queued_events % 100 == 0:
-            logger.warning(f"Queued {queued_events} events, tasks: {len(_vk_tasks)}")
+        if queued_events >= 999:
+            logger.warning(f"Queued {queued_events} events, skipping events!")
+        else:
+            await event_queue.put(data)
+
+            if (queued_events + 1) % 100 == 0:
+                logger.warning(f"Queued {queued_events + 1} events, tasks: {len(_vk_tasks)}")
 
         return PlainTextResponse("ok")
 
