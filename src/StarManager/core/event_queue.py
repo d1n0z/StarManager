@@ -17,6 +17,14 @@ class EventQueue:
     async def get(self):
         return await self.queue.get()
 
+    async def drop_all(self):
+        while not self.queue.empty():
+            try:
+                self.queue.get_nowait()
+                self.queue.task_done()
+            except asyncio.QueueEmpty:
+                pass
+
     def qsize(self):
         return self.queue.qsize()
 

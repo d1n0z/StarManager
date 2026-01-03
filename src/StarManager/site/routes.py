@@ -25,7 +25,11 @@ from StarManager.core.config import settings, sitedata
 from StarManager.core.db import smallpool as pool
 from StarManager.core.event_queue import event_queue
 from StarManager.site import enums, models
-from StarManager.site.utils import check_tg_timings, get_vk_timeouts_count, record_vk_timeout
+from StarManager.site.utils import (
+    check_tg_timings,
+    get_vk_timeouts_count,
+    record_vk_timeout,
+)
 from StarManager.vkbot.bot import bot as vkbot
 
 router = APIRouter()
@@ -349,6 +353,7 @@ async def yookassa(request: Request):
         payment = models.Payment(**(await request.json())["object"])
         Configuration.account_id = settings.yookassa.merchant_id
         Configuration.secret_key = settings.yookassa.token
+
         def _capture_and_return_yes():
             Payment.capture(payment.yookassa_order_id)
             return JSONResponse(content="YES")
@@ -402,7 +407,9 @@ async def yookassa(request: Request):
         Код платежа: <code>{payment.yookassa_order_id}</code>"""
 
             emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
-            text = "\n".join([f"{emojis[k]} {i}" for k, i in enumerate(text.split("\n"))])
+            text = "\n".join(
+                [f"{emojis[k]} {i}" for k, i in enumerate(text.split("\n"))]
+            )
 
             if check_tg_timings():
                 async with httpx.AsyncClient() as client:
@@ -666,7 +673,7 @@ async def health(request: Request):
 
 
 _vk_semaphore = asyncio.Semaphore(50)
-_vk_tasks = set()
+_vk_tasks: set[asyncio.Task] = set()
 
 
 async def process_vk_event(data, data_type):
@@ -713,15 +720,25 @@ async def vk(request: Request):
 
     if len(_vk_tasks) > 200:
         queued_events = event_queue.qsize()
-        if queued_events >= 999:
-            logger.warning(f"Queued {queued_events} events, skipping events!")
+        if queued_events >= 1000:
+            logger.warning(f"Queued {queued_events} events, dropping queue!")
+            await event_queue.drop_all()
+            queued_events = 0
+            for task in _vk_tasks:
+                try:
+                    task.cancel()
+                except Exception:
+                    pass
+
+            return PlainTextResponse("ok")
         else:
             await event_queue.put(data)
-
             if (queued_events + 1) % 100 == 0:
-                logger.warning(f"Queued {queued_events + 1} events, tasks: {len(_vk_tasks)}")
+                logger.warning(
+                    f"Queued {queued_events + 1} events, tasks: {len(_vk_tasks)}"
+                )
 
-        return PlainTextResponse("ok")
+            return PlainTextResponse("ok")
 
     await process_vk_event(data, data_type)
     return PlainTextResponse("ok")
