@@ -41,7 +41,7 @@ def main():
     async def like_add(event: GroupTypes.LikeAdd):
         await like_handle(event)
     
-    @bot.error_handler.register_error_handler(VKAPIError[100], VKAPIError[917])
+    @bot.error_handler.register_error_handler(VKAPIError[100], VKAPIError[917], VKAPIError[6])
     async def unwanted_tracebacks_handler(e: VKAPIError):
         pass
 
