@@ -73,6 +73,8 @@ def setup_logs():
     logging.getLogger("aiogram").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("yadisk").setLevel(logging.WARNING)
+    logging.getLogger("PIL").setLevel(logging.WARNING)
+    logging.getLogger("tortoise").setLevel(logging.WARNING)
 
     def filter_vk_api_error_spam(record):
         if "API error(s) in response wasn't handled" in record["message"]:
