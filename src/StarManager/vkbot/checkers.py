@@ -29,7 +29,9 @@ async def haveAccess(cmd, chat_id, uid, premium=0) -> bool:
     custom_level = None
 
     if level and level.custom_level_name is not None:
-        custom_level = await managers.custom_access_level.get(level.access_level, chat_id)
+        custom_level = await managers.custom_access_level.get(
+            level.access_level, chat_id
+        )
         if custom_level is not None:
             if not custom_level.status:
                 custom_level = None
@@ -109,32 +111,29 @@ async def checkCMD(
     except Exception:
         return False
 
-    async with (await pool()).acquire() as conn:
-        if text[:1] in settings.commands.prefix:
-            prefix = text[:1]
+    if text[:1] in settings.commands.prefix:
+        prefix = text[:1]
+    else:
+        pv1, pv2 = text[:1], text[:2]
+        for p in await managers.prefixes.get_all(uid):
+            if pv1 in p or pv2 in p:
+                prefix = p
+                break
+    if not prefix:
+        return False
+
+    raw = text.replace(prefix, "", 1)
+
+    if raw in settings.commands.commands:
+        cmd = raw
+    else:
+        db_cmd = await managers.cmdnames.get_or_none(uid, raw)
+        if db_cmd:
+            cmd = db_cmd
         else:
-            prefix = await conn.fetchval(
-                "select prefix from prefix where uid=$1 and prefix=ANY($2)",
-                uid,
-                [text[:1], text[:2]],
-            )
-        if not prefix:
+            if raw in settings.commands.pm and message.peer_id >= 2000000000:
+                await messagereply(message, await messages.pmcmd())
             return False
-
-        raw = text.replace(prefix, "", 1)
-
-        if raw in settings.commands.commands:
-            cmd = raw
-        else:
-            db_cmd = await conn.fetchval(
-                "select cmd from cmdnames where uid=$1 and name=$2", uid, raw
-            )
-            if db_cmd:
-                cmd = db_cmd
-            else:
-                if raw in settings.commands.pm and message.peer_id >= 2000000000:
-                    await messagereply(message, await messages.pmcmd())
-                return False
 
     if raw in settings.commands.pm:
         if message.peer_id >= 2000000000:

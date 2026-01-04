@@ -368,10 +368,7 @@ async def cmd(message: Message):
                 message=await messages.resetcmd_not_found(cmd),
             )
 
-        async with (await pool()).acquire() as conn:
-            cmdn = await conn.fetchval(
-                "delete from cmdnames where uid=$1 and cmd=$2 returning name", uid, cmd
-            )
+        cmdn = await managers.cmdnames.del_cmd(uid, cmd)
         if not cmdn:
             return await messagereply(
                 message,
@@ -411,10 +408,8 @@ async def cmd(message: Message):
                 message=await messages.cmd_changed_in_cmds(),
             )
 
-        async with (await pool()).acquire() as conn:
-            cmdns = await conn.fetch("select cmd, name from cmdnames where uid=$1", uid)
         res = []
-        for i in cmdns:
+        for i in (await managers.cmdnames.get_all(uid) or {}).items():
             if i[0] not in res:
                 res.append(i[0])
             if changed == i[1]:
@@ -439,19 +434,8 @@ async def cmd(message: Message):
                 message, disable_mentions=1, message=await messages.cmd_char_limit()
             )
 
-        async with (await pool()).acquire() as conn:
-            if not await conn.fetchval(
-                "update cmdnames set name = $1 where uid=$2 and cmd=$3 returning 1",
-                changed,
-                uid,
-                cmd,
-            ):
-                await conn.execute(
-                    "insert into cmdnames (uid, cmd, name) values ($1, $2, $3)",
-                    uid,
-                    cmd,
-                    changed,
-                )
+        if not await managers.cmdnames.edit_cmd(uid, cmd, changed):
+            await managers.cmdnames.new_cmd(uid, cmd, changed)
 
         await messagereply(
             message,

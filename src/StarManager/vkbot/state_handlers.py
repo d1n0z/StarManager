@@ -316,7 +316,9 @@ async def handle_settings(
             r = await asyncio.to_thread(requests.get, attachment[0].photo.sizes[-1].url)
             path = f"{settings.service.path}src/StarManager/core/media/temp/{uid}welcome.jpg"
             await asyncio.to_thread(lambda: open(path, "wb").write(r.content))
-            photo = await upload_image(path, targeted_ids=[event.object.message.peer_id, uid])
+            photo = await upload_image(
+                path, targeted_ids=[event.object.message.peer_id, uid]
+            )
             if not photo:
                 return await send_message(
                     chat_id + 2000000000,
@@ -717,17 +719,7 @@ async def handle_prefix(
                 keyboard.prefix_back(uid),
             )
             return
-        async with (await pool()).acquire() as conn:
-            if not await conn.fetchval(
-                "select exists(select 1 from prefix where uid=$1 and prefix=$2)",
-                uid,
-                event.object.message.text,
-            ):
-                await conn.execute(
-                    "insert into prefix (uid, prefix) values ($1, $2)",
-                    uid,
-                    event.object.message.text,
-                )
+        await managers.prefixes.new_prefix(uid, event.object.message.text)
         await send_message(
             event.object.message.peer_id,
             await messages.addprefix(
@@ -743,18 +735,13 @@ async def handle_prefix(
     if queue_type == "prefix_del":
         await delete_messages(additional["cmid"], chat_id)
         await delete_messages(event.object.message.conversation_message_id, chat_id)
-        async with (await pool()).acquire() as conn:
-            if not await conn.fetchval(
-                "delete from prefix where uid=$1 and prefix=$2 returning 1",
-                uid,
-                event.object.message.text,
-            ):
-                await send_message(
-                    event.object.message.peer_id,
-                    await messages.delprefix_not_found(event.object.message.text),
-                    keyboard.prefix_back(uid),
-                )
-                return
+        if not await managers.prefixes.del_prefix(uid, event.object.message.text):
+            await send_message(
+                event.object.message.peer_id,
+                await messages.delprefix_not_found(event.object.message.text),
+                keyboard.prefix_back(uid),
+            )
+            return
         await send_message(
             event.object.message.peer_id,
             await messages.delprefix(

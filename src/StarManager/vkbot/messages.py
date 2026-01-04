@@ -1701,7 +1701,7 @@ async def listprefix(uid, name, nick, prefixes):
             + 'Префиксов не обнаружено. Используйте кнопку "Добавить префикс"'
         )
     return await get("listprefix", uid=uid, n=nick or name) + "".join(
-        [f'➖ "{i[0]}"\n' for i in prefixes]
+        [f'➖ "{i}"\n' for i in prefixes]
     )
 
 

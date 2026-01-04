@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional, Set
 
 
 class BaseCacheManager(ABC):
-    def __init__(self, sync_interval: int = 10, reload_interval: int = 30):
+    def __init__(self, sync_interval: int = 30, reload_interval: int = 30):
         self._cache: Dict[Any, Any] = {}
         self._dirty: Set[Any] = set()
         self._lock = asyncio.Lock()

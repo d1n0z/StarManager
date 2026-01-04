@@ -308,7 +308,7 @@ class Payments(Model):
         table = "payments"
 
 
-class CMDNames(Model):
+class CommandNames(Model):
     uid = fields.IntField(default=0, db_index=True)
     cmd = fields.TextField(null=True)
     name = fields.TextField(null=True)

@@ -2216,13 +2216,7 @@ async def cmdlist(message: MessageEvent):
         return
     page = message.payload["page"]
     uid = message.user_id
-    async with (await pool()).acquire() as conn:
-        cmdnames = {
-            i[0]: i[1]
-            for i in await conn.fetch(
-                "select cmd, name from cmdnames where uid=$1", uid
-            )
-        }
+    cmdnames = await managers.cmdnames.get_all(uid)
     await utils.edit_message(
         await messages.cmdlist(
             dict(list(cmdnames.items())[page * 10 : (page * 10) + 10]),
@@ -2573,22 +2567,16 @@ async def prefix_(message: MessageEvent):
             await messages.no_prem(), peer_id, message.conversation_message_id
         )
         return
-    async with (await pool()).acquire() as conn:
-        if (
-            cmd == "prefix_add"
-            and await conn.fetchval(
-                "select count(*) as c from prefix where uid=$1", uid
-            )
-            > 2
-        ):
-            await utils.edit_message(
-                await messages.addprefix_max(),
-                peer_id,
-                message.conversation_message_id,
-                keyboard.prefix_back(uid),
-            )
-            return
-        if cmd in ("prefix_add", "prefix_del"):
+    if cmd == "prefix_add" and len(await managers.prefixes.get_all(uid)) > 2:
+        await utils.edit_message(
+            await messages.addprefix_max(),
+            peer_id,
+            message.conversation_message_id,
+            keyboard.prefix_back(uid),
+        )
+        return
+    if cmd in ("prefix_add", "prefix_del"):
+        async with (await pool()).acquire() as conn:
             await conn.execute(
                 "insert into typequeue (chat_id, uid, type, additional) values ($1, $2, $3, $4)",
                 chat_id,
@@ -2596,29 +2584,29 @@ async def prefix_(message: MessageEvent):
                 cmd,
                 '{"cmid": ' + str(message.conversation_message_id) + "}",
             )
-            await utils.edit_message(
-                await messages.get(cmd), peer_id, message.conversation_message_id
-            )
-        elif cmd == "prefix_list":
-            prefixes = await conn.fetch("select prefix from prefix where uid=$1", uid)
-            await utils.edit_message(
-                await messages.listprefix(
-                    uid,
-                    await utils.get_user_name(uid),
-                    await utils.get_user_nickname(uid, chat_id),
-                    prefixes,
-                ),
-                peer_id,
-                message.conversation_message_id,
-                keyboard.prefix_back(uid),
-            )
-        else:
-            await utils.edit_message(
-                await messages.prefix(),
-                peer_id,
-                message.conversation_message_id,
-                keyboard.prefix(uid),
-            )
+        await utils.edit_message(
+            await messages.get(cmd), peer_id, message.conversation_message_id
+        )
+    elif cmd == "prefix_list":
+        prefixes = await managers.prefixes.get_all(uid)
+        await utils.edit_message(
+            await messages.listprefix(
+                uid,
+                await utils.get_user_name(uid),
+                await utils.get_user_nickname(uid, chat_id),
+                prefixes,
+            ),
+            peer_id,
+            message.conversation_message_id,
+            keyboard.prefix_back(uid),
+        )
+    else:
+        await utils.edit_message(
+            await messages.prefix(),
+            peer_id,
+            message.conversation_message_id,
+            keyboard.prefix(uid),
+        )
 
 
 @bl.raw_event(
@@ -2957,7 +2945,9 @@ async def import_start(message: MessageEvent):
 
             for f in await managers.filters.chat_f.get_all(importchatid):
                 await managers.filters.chat_f.new_filter(chatid, f)
-            if (import_owner_id := await utils.get_chat_owner(importchatid)) and (owner_id := await utils.get_chat_owner(chatid)):
+            if (import_owner_id := await utils.get_chat_owner(importchatid)) and (
+                owner_id := await utils.get_chat_owner(chatid)
+            ):
                 for f in await managers.filters.global_f.get_all(import_owner_id):
                     await managers.filters.global_f.new_filter(owner_id, f)
             for f in await managers.filters.exceptions_f.get_all(importchatid):

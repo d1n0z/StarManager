@@ -805,9 +805,7 @@ def whoiscachedurl(text) -> None | Literal[True]:
 
 async def get_user_prefixes(u_prem, uid) -> list:
     if u_prem:
-        async with (await pool()).acquire() as conn:
-            prefixes = await conn.fetch("select prefix from prefix where uid=$1", uid)
-        return settings.commands.prefix + [i[0] for i in prefixes]
+        return list(await managers.prefixes.get_all(uid)) + settings.commands.prefix
     return settings.commands.prefix
 
 
