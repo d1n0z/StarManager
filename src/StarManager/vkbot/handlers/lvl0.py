@@ -201,15 +201,15 @@ async def stats(message: Message):
     if not url:
         return
     r = await api.http_client.request_content(url)
-    file_path = settings.service.path + f"src/StarManager/core/media/temp/{id}ava.jpg"
+    avatar_path = Path(settings.service.path + f"src/StarManager/core/media/temp/{id}ava.jpg")
 
     def write_file():
-        path = Path(file_path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "wb") as f:
+        avatar_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(avatar_path, "wb") as f:
             f.write(r)
 
-    await asyncio.to_thread(write_file)
+    if not avatar_path.exists():
+        await asyncio.to_thread(write_file)
 
     if acc is None or acc.custom_level_name is None:
         lvl_name = (
