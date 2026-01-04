@@ -111,6 +111,7 @@ async def checkCMD(
     except Exception:
         return False
 
+    prefix = None
     if text[:1] in settings.commands.prefix:
         prefix = text[:1]
     else:
