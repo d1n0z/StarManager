@@ -201,7 +201,9 @@ async def stats(message: Message):
     if not url:
         return
     r = await api.http_client.request_content(url)
-    avatar_path = Path(settings.service.path + f"src/StarManager/core/media/temp/{id}ava.jpg")
+    avatar_path = Path(
+        settings.service.path + f"src/StarManager/core/media/temp/{id}ava.jpg"
+    )
 
     def write_file():
         avatar_path.parent.mkdir(parents=True, exist_ok=True)
@@ -626,7 +628,6 @@ async def transfer(message: Message):
         )
     except Exception:
         pass
-    await managers.event.task_progress(uid, enums.TaskCategory.transfer_coins, tcoins)
     await messagereply(
         message,
         disable_mentions=1,
@@ -831,7 +832,6 @@ async def rep(message: Message):
             id,
             time.time(),
         )
-    await managers.event.task_progress(uid, enums.TaskCategory.rep_users, 1)
     await messagereply(
         message,
         disable_mentions=1,
@@ -1083,25 +1083,14 @@ async def chats(message: Message):
 @bl.chat_message(SearchCMD("event"))
 async def event(message: Message):
     user = await managers.event.get_user(message.from_id)
-    tasks = user.tasks
-    if tasks is None:
-        tasks = await managers.event.generate_tasks(message.from_id)
+    if user is not None and user.event_user is not None:
+        hc = user.event_user.has_cases
+        cr = hc + user.event_user.cases_opened
+    else:
+        hc, cr = 0, 0
     await messagereply(
         message,
-        await messages.event(
-            send_messages_base=tasks.send_messages_base,
-            send_messages=tasks.send_messages,
-            transfer_coins_base=tasks.transfer_coins_base,
-            transfer_coins=tasks.transfer_coins,
-            rep_users_base=tasks.rep_users_base,
-            rep_users=tasks.rep_users,
-            win_duels_base=tasks.win_duels_base,
-            win_duels=tasks.win_duels,
-            level_up=tasks.level_up,
-            cases_recieved=(user.event_user.has_cases + user.event_user.cases_opened)
-            if user is not None and user.event_user is not None
-            else 0,
-        ),
-        keyboard=keyboard.event(message.from_id),
+        await messages.event(cr, hc),
+        keyboard=keyboard.event(message.from_id) if hc > 0 else None,
         disable_mentions=1,
     )

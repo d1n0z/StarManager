@@ -221,7 +221,6 @@ async def duel(message: MessageEvent):
 
         await utils.add_user_coins(loseid, -duelcoins)
         await utils.add_user_coins(winid, duel_coins_com)
-        await managers.event.task_progress(winid, enums.TaskCategory.win_duels, 1)
 
         async with (await pool()).acquire() as conn:
             if not await conn.fetchval(

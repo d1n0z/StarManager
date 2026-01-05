@@ -652,10 +652,7 @@ async def add_user_xp(uid, addxp, checklvlbanned=True) -> None:
                 "select exists(select 1 from blocked where uid=$1 and type='user')", uid
             ):
                 return
-    is_level_up = await managers.xp.add_user_xp(uid, addxp)
-    if is_level_up:
-        await managers.event.task_progress(uid, enums.TaskCategory.level_up, 1)
-
+    await managers.xp.add_user_xp(uid, addxp)
 
 async def add_user_coins(
     uid, addcoins, checklvlbanned=True, addlimit=False, bonus_peer_id=0

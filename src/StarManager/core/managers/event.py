@@ -493,27 +493,6 @@ class EventManager(BaseManager):
     async def user_already_got_money(self, uid: int) -> bool:
         return await self.cache.user_already_got_money(_make_cache_key(uid))
 
-    async def task_progress(self, uid: int, type: enums.TaskCategory, value: int):
-        await self.generate_tasks(uid)
-        user, old_value, new_value = await self.cache.task_progress(
-            _make_cache_key(uid), type.value, value
-        )
-        if (
-            user is not None
-            and user.tasks is not None
-            and all(
-                (
-                    user.tasks.send_messages <= 0,
-                    user.tasks.transfer_coins <= 0,
-                    user.tasks.rep_users <= 0,
-                    user.tasks.win_duels <= 0,
-                    user.tasks.level_up <= 0,
-                    not user.tasks.recieved_case,
-                )
-            )
-        ):
-            await self.cache.edit_cases(_make_cache_key(uid), +1)
-
     async def open_case(self, uid: int, chat_id: int):
         async with self._open_case_lock[uid]:
             return await self._open_case(uid, chat_id)

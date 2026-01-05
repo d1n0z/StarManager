@@ -1,7 +1,7 @@
 import time
 from ast import literal_eval
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, Iterable
 
 from cache.async_lru import AsyncLRU
@@ -3262,54 +3262,5 @@ async def dellevel(uid, unick, uname, level_name, level, id, nick, name):
     )
 
 
-async def event(
-    send_messages_base: int,
-    send_messages: int,
-    transfer_coins_base: int,
-    transfer_coins: int,
-    rep_users_base: int,
-    rep_users: int,
-    win_duels_base: int,
-    win_duels: int,
-    level_up: int,
-    cases_recieved: int,
-):
-    now = datetime.now()
-    til_reset = now.replace(hour=5)
-    if til_reset <= now:
-        til_reset += timedelta(days=1)
-    return await get(
-        "event",
-        now=now.strftime("%d.%m.%Y"),
-        til_reset=int((til_reset - now).total_seconds() // 3600),
-        messages_e="1️⃣" if send_messages > 0 else "✅",
-        messages=(
-            f"{send_messages_base - send_messages}/"
-            if send_messages > 0
-            else ""
-        )
-        + f"{utils.pluralize_words(send_messages_base, ('сообщение', 'сообщения', 'сообщений'))}",
-        transfer_e="2️⃣" if transfer_coins > 0 else "✅",
-        transfer=(
-            f"{transfer_coins_base - transfer_coins}/"
-            if transfer_coins > 0
-            else ""
-        )
-        + f"{utils.pluralize_words(transfer_coins_base, ('монетку', 'монетки', 'монеток'))}",
-        rep_e="3️⃣" if rep_users > 0 else "✅",
-        rep=(
-            f"{rep_users_base - rep_users}/"
-            if rep_users > 0
-            else ""
-        )
-        + f"{utils.pluralize_words(rep_users_base, ('пользователю', 'пользователям', 'пользователям'))}",
-        duels_e="4️⃣" if win_duels > 0 else "✅",
-        duels=(
-            f"{win_duels_base - win_duels}/"
-            if win_duels > 0
-            else ""
-        )
-        + f"{utils.pluralize_words(win_duels_base, ('раз', 'раза', 'раз'))}",
-        lvlup_e="5️⃣" if level_up > 0 else "✅",
-        cases=cases_recieved,
-    )
+async def event(cases_recieved, has_cases):
+    return await get("event", cases=min(cases_recieved, 14), has_cases=f"❄️ Доступно кейсов: {has_cases}" if has_cases > 0 else "")
