@@ -426,9 +426,7 @@ async def yookassa(request: Request):
             pass
 
         if payment.chat_id:
-            await managers.public_chats.edit_premium(
-                payment.chat_id, make_premium=True
-            )
+            await managers.public_chats.edit_premium(payment.chat_id, make_premium=True)
         elif payment.coins:
             await utils.add_user_coins(payment.to_id, payment.coins)
         elif payment.to_id:
@@ -628,8 +626,9 @@ async def health(request: Request):
             "status": "ok" if (db_ok and scheduler_ok) else "degraded",
             "timestamp": time.time(),
             "vk_tasks": len(_vk_tasks),
-            "vk_tasks_timedout": await get_vk_timeouts_count(),
             "vk_queued": event_queue.qsize(),
+            "vk_tasks_completed": _vk_tasks_completed,
+            "vk_tasks_timedout": await get_vk_timeouts_count(),
             "db": {
                 "ok": db_ok,
                 "response_time": round(db_time, 3),
@@ -658,10 +657,14 @@ async def health(request: Request):
 
 _vk_semaphore = asyncio.Semaphore(50)
 _vk_tasks: set[asyncio.Task] = set()
+_vk_tasks_completed = 0
+_vk_tasks_completed_lock = asyncio.Lock()
 
 
 async def process_vk_event(data, data_type):
     async def _process_with_limit():
+        global _vk_tasks_completed
+
         start = time.time()
         event_info = f"{data_type}"
         text = ""
@@ -674,6 +677,8 @@ async def process_vk_event(data, data_type):
             async with asyncio.timeout(60):
                 async with _vk_semaphore:
                     await vkbot.process_event(data)
+                    async with _vk_tasks_completed_lock:
+                        _vk_tasks_completed += 1
         except asyncio.TimeoutError:
             await record_vk_timeout()
 
