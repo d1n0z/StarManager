@@ -20,7 +20,6 @@ from StarManager.core.utils import (
     get_user_access_level,
     get_user_ban,
     get_user_ban_info,
-    get_user_last_message,
     get_user_mute,
     get_user_name,
     get_user_nickname,
