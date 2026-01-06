@@ -671,7 +671,7 @@ async def process_vk_event(data, data_type):
             event_info = f"message_new text='{text}'"
 
         try:
-            async with asyncio.timeout(300):
+            async with asyncio.timeout(60):
                 async with _vk_semaphore:
                     await vkbot.process_event(data)
         except asyncio.TimeoutError:
@@ -707,15 +707,19 @@ async def vk(request: Request):
             logger.warning(f"Queued {queued_events} events, dropping queue!")
             await event_queue.drop_all()
             queued_events = 0
-            for task in _vk_tasks:
+            for task in list(_vk_tasks):
                 try:
                     task.cancel()
                 except Exception:
                     pass
+            await asyncio.sleep(0)
 
             return PlainTextResponse("ok")
         else:
-            await event_queue.put(data)
+            try:
+                await asyncio.wait_for(event_queue.put(data), timeout=0.5)
+            except asyncio.TimeoutError:
+                pass
             if (queued_events + 1) % 100 == 0:
                 logger.warning(
                     f"Queued {queued_events + 1} events, tasks: {len(_vk_tasks)}"
