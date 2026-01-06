@@ -329,7 +329,7 @@ class XPManager(BaseManager):
         if coins is None:
             return await self.cache.edit(
                 uid,
-                coins=coins,
+                coins=addcoins,
                 coins_limit=addcoins if addlimit else 0,
                 lm=int(time.time()),
                 lvm=int(time.time()),
