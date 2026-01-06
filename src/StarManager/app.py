@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI):
 
         try:
             while True:
-                if len(_vk_tasks) < 150 and event_queue.qsize() > 0:
+                if len(_vk_tasks) < 50 and event_queue.qsize() > 0:
                     data = await event_queue.get()
                     await process_vk_event(data, data.get("type"))
                 else:
