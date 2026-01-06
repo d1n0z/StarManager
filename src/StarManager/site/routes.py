@@ -683,7 +683,7 @@ async def process_vk_event(data, data_type):
             await record_vk_timeout()
 
             elapsed = time.time() - start
-            logger.error(f"TIMEOUT after {elapsed:.2f}s: {event_info}")
+            logger.exception(f"TIMEOUT after {elapsed:.2f}s: {event_info}")
             logger.error(f"Event data: {json.dumps(data, ensure_ascii=False)[:500]}")
         except asyncio.CancelledError:
             raise
