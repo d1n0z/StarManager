@@ -12,6 +12,7 @@ from .event import EventManager
 from .filters import FiltersManager
 from .prefix import PrefixesManager
 from .public_chats import PublicChatsManager
+from .punishments import BanManager, MuteManager, WarnManager
 from .raid import RaidManager
 from .rps import RPSManager
 from .xp import XPManager
@@ -31,6 +32,9 @@ managers = [
     filters := FiltersManager(),
     prefixes := PrefixesManager(),
     public_chats := PublicChatsManager(),
+    ban := BanManager(),
+    mute := MuteManager(),
+    warn := WarnManager(),
     raid := RaidManager(),
     rps := RPSManager(),
     xp := XPManager(),

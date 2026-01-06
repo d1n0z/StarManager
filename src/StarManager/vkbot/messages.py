@@ -416,12 +416,12 @@ async def unwarn_hint():
 async def mutelist(res, mutedcount):
     msg = await get("mutelist", mutedcount=mutedcount)
     for ind, item in enumerate(res):
-        nickname = await utils.get_user_nickname(item[0], item[1])
+        nickname = await utils.get_user_nickname(item.uid, item.chat_id)
         msg += (
-            f"[{ind + 1}]. [id{item[0]}|{nickname or await utils.get_user_name(item[0])}] | "
-            f"{int((item[3] - time.time()) / 60)} минут | "
-            f"{literal_eval(item[2])[-1] if item[2] and literal_eval(item[2])[-1] else 'Без указания причины'} "
-            f"| Выдал: {literal_eval(item[4])[-1]}\n"
+            f"[{ind + 1}]. [id{item.uid}|{nickname or await utils.get_user_name(item.uid)}]"
+            f" | {int((item.mute - time.time()) / 60)} минут"
+            f" | {literal_eval(item.last_mutes_causes)[-1] if item.last_mutes_causes and literal_eval(item.last_mutes_causes)[-1] else 'Без указания причины'}"
+            f" | Выдал: {literal_eval(item.last_mutes_names)[-1]}\n"
         )
     return msg
 
@@ -3263,4 +3263,8 @@ async def dellevel(uid, unick, uname, level_name, level, id, nick, name):
 
 
 async def event(cases_recieved, has_cases):
-    return await get("event", cases=min(cases_recieved, 14), has_cases=f"❄️ Доступно кейсов: {has_cases}" if has_cases > 0 else "")
+    return await get(
+        "event",
+        cases=min(cases_recieved, 14),
+        has_cases=f"❄️ Доступно кейсов: {has_cases}" if has_cases > 0 else "",
+    )

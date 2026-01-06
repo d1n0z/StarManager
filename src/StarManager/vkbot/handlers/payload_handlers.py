@@ -76,12 +76,10 @@ async def join(message: MessageEvent):
                         m.member_id,
                         int(time.time()),
                     )
-            for i in await conn.fetch(
-                "select uid from mute where chat_id=$1 and mute>$2",
-                chat_id,
-                time.time(),
-            ):
-                await utils.set_chat_mute(i[0], chat_id, 0)
+            now = time.time()
+            for i in await managers.mute.get_all(chat_id):
+                if i.mute > now:
+                    await utils.set_chat_mute(i.uid, chat_id, 0)
             for i in await managers.access_level.delete_rows(
                 await managers.access_level.get_all(chat_id=chat_id)
             ):
@@ -92,9 +90,6 @@ async def join(message: MessageEvent):
             await conn.execute("delete from accessnames where chat_id=$1", chat_id)
             await conn.execute("delete from ignore where chat_id=$1", chat_id)
             await conn.execute("delete from commandlevels where chat_id=$1", chat_id)
-            await conn.execute("delete from mute where chat_id=$1", chat_id)
-            await conn.execute("delete from warn where chat_id=$1", chat_id)
-            await conn.execute("delete from ban where chat_id=$1", chat_id)
             await conn.execute("delete from gpool where chat_id=$1", chat_id)
             await conn.execute("delete from chatgroups where chat_id=$1", chat_id)
             await conn.execute("delete from silencemode where chat_id=$1", chat_id)
@@ -114,6 +109,9 @@ async def join(message: MessageEvent):
             )
         await managers.chat_settings.remove(chat_id)
         await managers.filters.chat_f.del_all_filters(chat_id)
+        await managers.mute.del_all(chat_id)
+        await managers.ban.del_all(chat_id)
+        await managers.warn.del_all(chat_id)
 
         await managers.access_level.edit_access_level(bp, chat_id, 7)
 
@@ -1093,17 +1091,17 @@ async def page_mutelist(message: MessageEvent):
     peer_id = message.object.peer_id
     page = message.payload["page"]
 
-    async with (await pool()).acquire() as conn:
-        res = await conn.fetch(
-            "select uid, chat_id, last_mutes_causes, mute, last_mutes_names from mute where chat_id=$1 and "
-            "mute>$2 order by uid desc",
-            peer_id - 2000000000,
-            time.time(),
-        )
+    now = time.time()
+    res = [i for i in await managers.mute.get_all(peer_id - 2000000000) if i.mute > now]
     if not (count := len(res)):
         return
+    res = sorted(
+        res[page * 30 : page * 30 + 30],
+        key=lambda i: i.uid,
+        reverse=True,
+    )
     await utils.edit_message(
-        await messages.mutelist(res[page * 30 : page * 30 + 30], count),
+        await messages.mutelist(res, count),
         peer_id,
         message.conversation_message_id,
         keyboard.mutelist(message.user_id, page, count),
@@ -1121,15 +1119,14 @@ async def page_warnlist(message: MessageEvent):
     peer_id = message.object.peer_id
     page = message.payload["page"]
 
-    async with (await pool()).acquire() as conn:
-        res = await conn.fetch(
-            "select uid, chat_id, last_warns_causes, warns, last_warns_names from warn where chat_id=$1 and"
-            " warns>0 order by uid desc",
-            peer_id - 2000000000,
-        )
+    res = [
+        i
+        for i in await managers.warn.get_all(peer_id - 2000000000)
+        if i and i.warns > 0
+    ]
     if not (count := len(res)):
         return
-    res = res[page * 30 : page * 30 + 30]
+    res = sorted(res[page * 30 : page * 30 + 30], key=lambda i: i.uid, reverse=True)
     await utils.edit_message(
         await messages.warnlist(res, count),
         peer_id,
@@ -1147,22 +1144,23 @@ async def page_banlist(message: MessageEvent):
     if not message.payload:
         return
     payload = message.payload
-    peer_id = message.object.peer_id
     page = payload["page"] + (-1 if payload["cmd"].startswith("prev") else 1)
-
     if page < 0:
         return
-    async with (await pool()).acquire() as conn:
-        res = await conn.fetch(
-            "select uid, chat_id, last_bans_causes, ban, last_bans_names from ban where chat_id=$1 and "
-            "ban>$2 order by uid desc",
-            peer_id - 2000000000,
-            time.time(),
-        )
+
+    peer_id = message.object.peer_id
+    now = time.time()
+    res = [
+        i for i in await managers.ban.get_all(peer_id - 2000000000) if i and i.ban > now
+    ]
     if not res:
         return
     banned_count = len(res)
-    res = res[page * 30 : page * 30 + 30]
+    res = sorted(
+        res[page * 30 : page * 30 + 30],
+        key=lambda i: i.uid,
+        reverse=True,
+    )
     await utils.edit_message(
         await messages.banlist(res, banned_count),
         peer_id,
@@ -1191,19 +1189,17 @@ async def punishlist_delall(message: MessageEvent):
         return
     await utils.send_message_event_answer(message.event_id, uid, peer_id)
 
-    async with (await pool()).acquire() as conn:
-        if cmd.startswith("mute"):
-            uids = await conn.fetch(
-                "update mute set mute=0 where chat_id=$1 returning uid", chat_id
-            )
-            for i in uids:
-                await utils.set_chat_mute(i[0], chat_id, 0)
-        elif cmd.startswith("warn"):
-            await conn.execute("update warn set warns=0 where chat_id=$1", chat_id)
-        elif cmd.startswith("ban"):
-            await conn.execute("update ban set ban=0 where chat_id=$1", chat_id)
-        else:
-            raise Exception('cmd.startswith("mute" or "warn" or "ban")')
+    if cmd.startswith("mute"):
+        uids = await managers.mute.unmute_all(chat_id)
+        for i in uids:
+            await utils.set_chat_mute(i, chat_id, 0)
+    elif cmd.startswith("warn"):
+        uids = await managers.warn.unwarn_all(chat_id)
+    elif cmd.startswith("ban"):
+        uids = await managers.ban.unban_all(chat_id)
+    else:
+        raise Exception('cmd.startswith("mute" or "warn" or "ban")')
+
     await utils.edit_message(
         await messages.punishlist_delall_done(cmd.replace("list_delall", "")),
         peer_id,
@@ -2239,22 +2235,17 @@ async def check(message: MessageEvent):
     id = payload["id"]
     check = payload["check"]
     if check == "ban":
-        async with (await pool()).acquire() as conn:
-            res = await conn.fetchrow(
-                "select last_bans_causes, last_bans_names, last_bans_dates, last_bans_times from ban where "
-                "chat_id=$1 and uid=$2",
-                chat_id,
-                id,
-            )
+        res = await managers.ban.get(id, chat_id)
         if res is not None:
-            ban_date = literal_eval(res[0])[::-1][0]
-            u_bans_names = literal_eval(res[1])[::-1]
+            ban_date = literal_eval(res.last_bans_dates or "[]")[::-1][0]
+            u_bans_names = literal_eval(res.last_bans_names or "[]")[::-1]
             ban_from = u_bans_names[0]
-            ban_reason = literal_eval(res[2])[::-1][0]
-            ban_time = literal_eval(res[3])[::-1][0]
+            ban_reason = literal_eval(res.last_bans_causes or "[]")[::-1][0]
+            ban_time = literal_eval(res.last_bans_times or "[]")[::-1][0]
         else:
             u_bans_names = []
             ban_date = ban_from = ban_reason = ban_time = None
+
         await utils.edit_message(
             await messages.check_ban(
                 id,
@@ -2272,22 +2263,17 @@ async def check(message: MessageEvent):
             keyboard.check_history(sender, id, "ban", len(u_bans_names)),
         )
     elif check == "mute":
-        async with (await pool()).acquire() as conn:
-            res = await conn.fetchrow(
-                "select last_mutes_causes, last_mutes_names, last_mutes_dates, last_mutes_times from mute "
-                "where chat_id=$1 and uid=$2",
-                chat_id,
-                id,
-            )
+        res = await managers.mute.get(id, chat_id)
         if res is not None:
-            mute_date = literal_eval(res[0])[::-1][0]
-            u_mutes_names = literal_eval(res[1])[::-1]
+            mute_date = literal_eval(res.last_mutes_dates or "[]")[::-1][0]
+            u_mutes_names = literal_eval(res.last_mutes_names or "[]")[::-1]
             mute_from = u_mutes_names[0]
-            mute_reason = literal_eval(res[2])[::-1][0]
-            mute_time = literal_eval(res[3])[::-1][0]
+            mute_reason = literal_eval(res.last_mutes_causes or "[]")[::-1][0]
+            mute_time = literal_eval(res.last_mutes_times or "[]")[::-1][0]
         else:
             u_mutes_names = []
             mute_date = mute_from = mute_reason = mute_time = None
+
         await utils.edit_message(
             await messages.check_mute(
                 id,
@@ -2305,17 +2291,11 @@ async def check(message: MessageEvent):
             keyboard.check_history(sender, id, "mute", len(u_mutes_names)),
         )
     elif check == "warn":
-        async with (await pool()).acquire() as conn:
-            res = await conn.fetchrow(
-                "select last_warns_causes, last_warns_names, last_warns_dates from warn where uid=$1 and "
-                "chat_id=$2",
-                id,
-                chat_id,
-            )
+        res = await managers.warn.get(id, chat_id)
         if res is not None:
-            u_warns_causes = literal_eval(res[0])[::-1]
-            u_warns_names = literal_eval(res[1])[::-1]
-            u_warns_dates = literal_eval(res[2])[::-1]
+            u_warns_causes = literal_eval(res.last_warns_causes or "[]")[::-1]
+            u_warns_names = literal_eval(res.last_warns_names or "[]")[::-1]
+            u_warns_dates = literal_eval(res.last_warns_dates or "[]")[::-1]
         else:
             u_warns_names = u_warns_causes = u_warns_dates = []
         await utils.edit_message(
@@ -2385,18 +2365,28 @@ async def check_history(message: MessageEvent):
         return
     await utils.send_message_event_answer(message.event_id, uid, peer_id)
     if check == "ban":
-        async with (await pool()).acquire() as conn:
-            res = await conn.fetchrow(
-                "select last_bans_causes, last_bans_names, last_bans_dates, last_bans_times from ban where "
-                "chat_id=$1 and uid=$2",
-                chat_id,
-                id,
-            )
+        res = await managers.ban.get(id, chat_id)
         if res is not None:
-            bans_causes = literal_eval(res[0])[::-1][:50]
-            bans_names = literal_eval(res[1])[::-1][:50]
-            bans_dates = literal_eval(res[2])[::-1][:50]
-            bans_times = literal_eval(res[3])[::-1][:50]
+            bans_causes = (
+                (literal_eval(res.last_bans_causes)[::-1][:50])
+                if res.last_bans_causes
+                else []
+            )
+            bans_names = (
+                (literal_eval(res.last_bans_names)[::-1][:50])
+                if res.last_bans_names
+                else []
+            )
+            bans_dates = (
+                (literal_eval(res.last_bans_dates)[::-1][:50])
+                if res.last_bans_dates
+                else []
+            )
+            bans_times = (
+                (literal_eval(res.last_bans_times)[::-1][:50])
+                if res.last_bans_times
+                else []
+            )
         else:
             bans_causes = bans_names = bans_dates = bans_times = []
         await utils.edit_message(
@@ -2413,18 +2403,28 @@ async def check_history(message: MessageEvent):
             message.conversation_message_id,
         )
     elif check == "mute":
-        async with (await pool()).acquire() as conn:
-            res = await conn.fetchrow(
-                "select last_mutes_causes, last_mutes_names, last_mutes_dates, last_mutes_times from "
-                "mute where chat_id=$1 and uid=$2",
-                chat_id,
-                id,
-            )
+        res = await managers.mute.get(id, chat_id)
         if res is not None:
-            mutes_causes = literal_eval(res[0])[::-1][:50]
-            mutes_names = literal_eval(res[1])[::-1][:50]
-            mutes_dates = literal_eval(res[2])[::-1][:50]
-            mutes_times = literal_eval(res[3])[::-1][:50]
+            mutes_causes = (
+                (literal_eval(res.last_mutes_causes)[::-1][:50])
+                if res.last_mutes_causes
+                else []
+            )
+            mutes_names = (
+                (literal_eval(res.last_mutes_names)[::-1][:50])
+                if res.last_mutes_names
+                else []
+            )
+            mutes_dates = (
+                (literal_eval(res.last_mutes_dates)[::-1][:50])
+                if res.last_mutes_dates
+                else []
+            )
+            mutes_times = (
+                (literal_eval(res.last_mutes_times)[::-1][:50])
+                if res.last_mutes_times
+                else []
+            )
         else:
             mutes_causes = mutes_names = mutes_dates = mutes_times = []
         await utils.edit_message(
@@ -2441,18 +2441,28 @@ async def check_history(message: MessageEvent):
             message.conversation_message_id,
         )
     elif check == "warn":
-        async with (await pool()).acquire() as conn:
-            res = await conn.fetchrow(
-                "select last_warns_causes, last_warns_names, last_warns_dates, last_warns_times from warn "
-                "where chat_id=$1 and uid=$2",
-                chat_id,
-                id,
-            )
+        res = await managers.warn.get(id, chat_id)
         if res is not None:
-            warns_causes = literal_eval(res[0])[::-1][:50]
-            warns_names = literal_eval(res[1])[::-1][:50]
-            warns_dates = literal_eval(res[2])[::-1][:50]
-            warns_times = literal_eval(res[3])[::-1][:50]
+            warns_causes = (
+                (literal_eval(res.last_warns_causes)[::-1][:50])
+                if res.last_warns_causes
+                else []
+            )
+            warns_names = (
+                (literal_eval(res.last_warns_names)[::-1][:50])
+                if res.last_warns_names
+                else []
+            )
+            warns_dates = (
+                (literal_eval(res.last_warns_dates)[::-1][:50])
+                if res.last_warns_dates
+                else []
+            )
+            warns_times = (
+                (literal_eval(res.last_warns_times)[::-1][:50])
+                if res.last_warns_times
+                else []
+            )
         else:
             warns_causes = warns_names = warns_dates = warns_times = []
         await utils.edit_message(
@@ -2498,14 +2508,8 @@ async def unpunish(message: MessageEvent):
     uname = await utils.get_user_name(uid)
     unickname = await utils.get_user_nickname(uid, chat_id)
     if cmd == "unmute":
-        async with (await pool()).acquire() as conn:
-            if not await conn.fetchval(
-                "update mute set mute=0 where chat_id=$1 and uid=$2 and mute>$3 returning 1",
-                chat_id,
-                id,
-                time.time(),
-            ):
-                return
+        if not await managers.mute.unmute(id, chat_id):
+            return
         await utils.set_chat_mute(id, chat_id, 0)
         await utils.edit_message(
             await messages.unmute(uname, unickname, uid, name, nickname, id),
@@ -2514,14 +2518,8 @@ async def unpunish(message: MessageEvent):
             keyboard.deletemessages(uid, [message.conversation_message_id]),
         )
     elif cmd == "unwarn":
-        async with (await pool()).acquire() as conn:
-            if not await conn.fetchval(
-                "update warn set warns=warns-1 where chat_id=$1 and uid=$2 and warns>0 and "
-                "warns<3 returning 1",
-                chat_id,
-                id,
-            ):
-                return
+        if not await managers.warn.unwarn(id, chat_id):
+            return
         await utils.edit_message(
             await messages.unwarn(uname, unickname, uid, name, nickname, id),
             peer_id,
@@ -2529,14 +2527,8 @@ async def unpunish(message: MessageEvent):
             keyboard.deletemessages(uid, [message.conversation_message_id]),
         )
     elif cmd == "unban":
-        async with (await pool()).acquire() as conn:
-            if not await conn.fetchval(
-                "update ban set ban=0 where chat_id=$1 and uid=$2 and ban>$3 returning 1",
-                chat_id,
-                id,
-                time.time(),
-            ):
-                return
+        if not await managers.ban.unban(id, chat_id):
+            return
         await utils.edit_message(
             await messages.unban(uname, unickname, uid, name, nickname, id),
             peer_id,
@@ -2781,20 +2773,16 @@ async def turnpublic(message: MessageEvent):
             )
             else "Не привязана"
         )
-        muted = await conn.fetchval(
-            "select count(*) from mute where chat_id=$1 and mute>$2",
-            chat_id,
-            time.time(),
-        )
-        banned = await conn.fetchval(
-            "select count(*) from ban where chat_id=$1 and ban>$2", chat_id, time.time()
-        )
         if bjd := await conn.fetchval(
             "select time from botjoineddate where chat_id=$1", chat_id
         ):
             bjd = datetime.utcfromtimestamp(bjd).strftime("%d.%m.%Y %H:%M")
         else:
             bjd = "Невозможно определить"
+    now = time.time()
+    muted = len([i for i in await managers.mute.get_all(chat_id) if i.mute > now])
+    banned = len([i for i in await managers.ban.get_all(chat_id) if i.ban > now])
+
     members = (
         await api.messages.get_conversation_members(peer_id=chat_id + 2000000000)
     ).items
@@ -3140,63 +3128,39 @@ async def import_start(message: MessageEvent):
                         *i,
                     )
         if settings["punishes"]:
-            for i in await conn.fetch(
-                "select uid, warns, last_warns_times, last_warns_names, last_warns_dates, "
-                "last_warns_causes from warn where chat_id=$1",
-                importchatid,
-            ):
-                if not await conn.fetchval(
-                    "update warn set warns = $1, last_warns_times = $2, last_warns_names = "
-                    "$3, last_warns_dates = $4, last_warns_causes = $5 where chat_id=$6 and "
-                    "uid=$7 returning 1",
-                    *i[1:],
-                    chatid,
-                    i[0],
-                ):
-                    await conn.execute(
-                        "insert into warn (chat_id, uid, warns, last_warns_times, last_warns_names, "
-                        "last_warns_dates, last_warns_causes) values ($1, $2, $3, $4, $5, $6, $7)",
-                        chatid,
-                        *i,
-                    )
-            for i in await conn.fetch(
-                "select uid, ban, last_bans_times, last_bans_names, last_bans_dates, "
-                "last_bans_causes from ban where chat_id=$1",
-                importchatid,
-            ):
-                if not await conn.fetchval(
-                    "update ban set ban = $1, last_bans_times = $2, last_bans_names = $3, "
-                    "last_bans_dates = $4, last_bans_causes = $5 where chat_id=$6 and uid=$7"
-                    " returning 1",
-                    *i[1:],
-                    chatid,
-                    i[0],
-                ):
-                    await conn.execute(
-                        "insert into ban (chat_id, uid, ban, last_bans_times, last_bans_names, "
-                        "last_bans_dates, last_bans_causes) values ($1, $2, $3, $4, $5, $6, $7)",
-                        chatid,
-                        *i,
-                    )
-            for i in await conn.fetch(
-                "select uid, mute, last_mutes_times, last_mutes_names, last_mutes_dates, "
-                "last_mutes_causes from mute where chat_id=$1",
-                importchatid,
-            ):
-                if not await conn.fetchval(
-                    "update mute set mute = $1, last_mutes_times = $2, last_mutes_names = $3"
-                    ", last_mutes_dates = $4, last_mutes_causes = $5 where chat_id=$6 and "
-                    "uid=$7 returning 1",
-                    *i[1:],
-                    chatid,
-                    i[0],
-                ):
-                    await conn.execute(
-                        "insert into mute (chat_id, uid, mute, last_mutes_times, last_mutes_names, "
-                        "last_mutes_dates, last_mutes_causes) values ($1, $2, $3, $4, $5, $6, $7)",
-                        chatid,
-                        *i,
-                    )
+            for i in await managers.warn.get_all(importchatid):
+                await managers.warn.cache._ensure_cached(
+                    (i.uid, chatid),
+                    {
+                        "warns": i.warns,
+                        "last_warns_times": i.last_warns_times,
+                        "last_warns_names": i.last_warns_names,
+                        "last_warns_dates": i.last_warns_dates,
+                        "last_warns_causes": i.last_warns_causes,
+                    },
+                )
+            for i in await managers.ban.get_all(importchatid):
+                await managers.ban.cache._ensure_cached(
+                    (i.uid, chatid),
+                    {
+                        "ban": i.ban,
+                        "last_bans_times": i.last_bans_times,
+                        "last_bans_names": i.last_bans_names,
+                        "last_bans_dates": i.last_bans_dates,
+                        "last_bans_causes": i.last_bans_causes,
+                    },
+                )
+            for i in await managers.mute.get_all(importchatid):
+                await managers.mute.cache._ensure_cached(
+                    (i.uid, chatid),
+                    {
+                        "mute": i.mute,
+                        "last_mutes_times": i.last_mutes_times,
+                        "last_mutes_names": i.last_mutes_names,
+                        "last_mutes_dates": i.last_mutes_dates,
+                        "last_mutes_causes": i.last_mutes_causes,
+                    },
+                )
         if settings["binds"]:
             for i in await conn.fetch(
                 "select uid from gpool where chat_id=$1", importchatid

@@ -1,29 +1,28 @@
 import time
-from ast import literal_eval
-from datetime import datetime
 
 from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 
+from StarManager.core import managers
+from StarManager.core.config import api
+from StarManager.core.db import pool
+from StarManager.core.utils import (
+    edit_message,
+    get_gpool,
+    get_user_ban,
+    get_user_name,
+    get_user_nickname,
+    get_user_warns,
+    is_higher,
+    kick_user,
+    messagereply,
+    search_id_in_message,
+    send_message,
+    set_chat_mute,
+)
 from StarManager.vkbot import messages
 from StarManager.vkbot.checkers import haveAccess
 from StarManager.vkbot.rules import SearchCMD
-from StarManager.core.utils import (
-    search_id_in_message,
-    is_higher,
-    get_user_name,
-    get_user_nickname,
-    kick_user,
-    get_user_ban,
-    set_chat_mute,
-    get_user_warns,
-    get_gpool,
-    edit_message,
-    send_message,
-    messagereply,
-)
-from StarManager.core.config import api
-from StarManager.core.db import pool
 
 bl = BotLabeler()
 
@@ -191,54 +190,13 @@ async def gban(message: Message):
         ):
             continue
 
-        ban_date = datetime.now().strftime("%Y.%m.%d %H:%M:%S")
-        async with (await pool()).acquire() as conn:
-            res = await conn.fetchrow(
-                "select last_bans_times, last_bans_causes, last_bans_names, last_bans_dates "
-                "from ban where chat_id=$1 and uid=$2",
-                chat_id,
-                id,
-            )
-        if res is not None:
-            ban_times = literal_eval(res[0])
-            ban_causes = literal_eval(res[1])
-            ban_names = literal_eval(res[2])
-            ban_dates = literal_eval(res[3])
-        else:
-            ban_times, ban_causes, ban_names, ban_dates = [], [], [], []
-        if ban_cause is None:
-            ban_cause = "Без указания причины"
-        if ban_date is None:
-            ban_date = "Дата неизвестна"
-        ban_times.append(ban_time)
-        ban_causes.append(ban_cause)
-        ban_names.append(f"[id{uid}|{u_name}]")
-        ban_dates.append(ban_date)
-
-        async with (await pool()).acquire() as conn:
-            if not await conn.fetchval(
-                "update ban set ban = $1, last_bans_times = $2, last_bans_causes = $3, last_bans_names = $4, "
-                "last_bans_dates = $5 where chat_id=$6 and uid=$7 returning 1",
-                time.time() + ban_time,
-                f"{ban_times}",
-                f"{ban_causes}",
-                f"{ban_names}",
-                f"{ban_dates}",
-                chat_id,
-                id,
-            ):
-                await conn.execute(
-                    "insert into ban (uid, chat_id, ban, last_bans_times, last_bans_causes, last_bans_names, "
-                    "last_bans_dates) values ($1, $2, $3, $4, $5, $6, $7)",
-                    id,
-                    chat_id,
-                    time.time() + ban_time,
-                    f"{ban_times}",
-                    f"{ban_causes}",
-                    f"{ban_names}",
-                    f"{ban_dates}",
-                )
-
+        await managers.ban.ban(
+            id,
+            chat_id,
+            ban_time,
+            ban_cause or "Без указания причины",
+            f"[id{uid}|{u_name}]",
+        )
         if await kick_user(id, chat_id):
             await send_message(
                 msg=await messages.ban(
@@ -311,14 +269,8 @@ async def gunban(message: Message):
             continue
         if await get_user_ban(id, chat_id) <= time.time():
             continue
-        async with (await pool()).acquire() as conn:
-            if await conn.fetchval(
-                "update ban set ban = 0 where chat_id=$1 and uid=$2 and ban>$3 returning 1",
-                chat_id,
-                id,
-                time.time(),
-            ):
-                success += 1
+        if await managers.ban.unban(id, chat_id):
+            success += 1
 
     if edit is None:
         return
@@ -393,55 +345,13 @@ async def gmute(message: Message):
         ):
             continue
 
-        async with (await pool()).acquire() as conn:
-            res = await conn.fetchrow(
-                "select last_mutes_times, last_mutes_causes, last_mutes_names, "
-                "last_mutes_dates from mute where chat_id=$1 and uid=$2",
-                chat_id,
-                id,
-            )
-        if res is not None:
-            mute_times = literal_eval(res[0])
-            mute_causes = literal_eval(res[1])
-            mute_names = literal_eval(res[2])
-            mute_dates = literal_eval(res[3])
-        else:
-            mute_times, mute_causes, mute_names, mute_dates = [], [], [], []
-
-        mute_date = datetime.now().strftime("%Y.%m.%d %H:%M:%S")
-        if mute_cause is None:
-            mute_cause = "Без указания причины"
-        if mute_date is None:
-            mute_date = "Дата неизвестна"
-
-        mute_times.append(mute_time)
-        mute_causes.append(mute_cause)
-        mute_names.append(f"[id{uid}|{u_name}]")
-        mute_dates.append(mute_date)
-
-        async with (await pool()).acquire() as conn:
-            if not await conn.fetchval(
-                "update mute set mute = $1, last_mutes_times = $2, last_mutes_causes = $3, "
-                "last_mutes_names = $4, last_mutes_dates = $5 where chat_id=$6 and uid=$7 returning 1",
-                time.time() + mute_time,
-                f"{mute_times}",
-                f"{mute_causes}",
-                f"{mute_names}",
-                f"{mute_dates}",
-                chat_id,
-                id,
-            ):
-                await conn.execute(
-                    "insert into mute (uid, chat_id, mute, last_mutes_times, last_mutes_causes, last_mutes_names, "
-                    "last_mutes_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-                    id,
-                    chat_id,
-                    time.time() + mute_time,
-                    f"{mute_times}",
-                    f"{mute_causes}",
-                    f"{mute_names}",
-                    f"{mute_dates}",
-                )
+        await managers.mute.mute(
+            id,
+            chat_id,
+            mute_time,
+            mute_cause or "Без указания причины",
+            f"[id{uid}|{u_name}]",
+        )
 
         await set_chat_mute(id, chat_id, mute_time)
         await send_message(
@@ -510,15 +420,12 @@ async def gunmute(message: Message):
     )
     success = 0
     for chat_id in chats:
-        if not await is_higher(uid, id, chat_id) or not await haveAccess("gunmute", chat_id, uid):
+        if not await is_higher(uid, id, chat_id) or not await haveAccess(
+            "gunmute", chat_id, uid
+        ):
             continue
-        async with (await pool()).acquire() as conn:
-            if not await conn.fetchval(
-                "update mute set mute = 0 where chat_id=$1 and uid=$2 returning 1",
-                chat_id,
-                id,
-            ):
-                continue
+        if not await managers.mute.unmute(id, chat_id):
+            continue
         await set_chat_mute(id, chat_id, 0)
         await send_message(
             peer_ids=chat_id + 2000000000,
@@ -570,6 +477,8 @@ async def gwarn(message: Message):
         warn_cause = " ".join(data[2:])
     else:
         warn_cause = " ".join(data[1:])
+    if not warn_cause:
+        warn_cause = "Без указания причины"
 
     u_name = await get_user_name(uid)
     ch_name = await get_user_name(id)
@@ -591,34 +500,8 @@ async def gwarn(message: Message):
         ):
             continue
 
-        warn_date = datetime.now().strftime("%Y.%m.%d %H:%M:%S")
-        async with (await pool()).acquire() as conn:
-            res = await conn.fetchrow(
-                "select warns, last_warns_times, last_warns_causes, last_warns_names, last_warns_dates from warn "
-                "where chat_id=$1 and uid=$2",
-                chat_id,
-                id,
-            )
-        if res is not None:
-            warns = res[0] + 1
-            warn_times = literal_eval(res[1])
-            warn_causes = literal_eval(res[2])
-            warn_names = literal_eval(res[3])
-            warn_dates = literal_eval(res[4])
-        else:
-            warns = 1
-            warn_times, warn_causes, warn_names, warn_dates = [], [], [], []
-        if warn_cause is None:
-            warn_cause = "Без указания причины"
-        if warn_date is None:
-            warn_date = "Дата неизвестна"
-        warn_times.append(0)
-        warn_causes.append(warn_cause)
-        warn_names.append(f"[id{uid}|{u_name}]")
-        warn_dates.append(warn_date)
-
+        warns = await managers.warn.warn(id, chat_id, warn_cause, f"[id{uid}|{u_name}]")
         if warns >= 3:
-            warns = 0
             await kick_user(id, chat_id)
             msg = await messages.warn_kick(
                 u_name,
@@ -639,30 +522,6 @@ async def gwarn(message: Message):
                 id,
                 warn_cause,
             )
-
-        async with (await pool()).acquire() as conn:
-            if not await conn.fetchval(
-                "update warn set warns = $1, last_warns_times = $2, last_warns_causes = $3, "
-                "last_warns_names = $4, last_warns_dates = $5 where chat_id=$6 and uid=$7 returning 1",
-                warns,
-                f"{warn_times}",
-                f"{warn_causes}",
-                f"{warn_names}",
-                f"{warn_dates}",
-                chat_id,
-                id,
-            ):
-                await conn.execute(
-                    "insert into warn (uid, chat_id, warns, last_warns_times, last_warns_causes, last_warns_names, "
-                    "last_warns_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-                    id,
-                    chat_id,
-                    warns,
-                    f"{warn_times}",
-                    f"{warn_causes}",
-                    f"{warn_names}",
-                    f"{warn_dates}",
-                )
 
         await send_message(msg=msg, peer_ids=chat_id + 2000000000)
         success += 1
@@ -725,14 +584,8 @@ async def gunwarn(message: Message):
         ch_warns = await get_user_warns(id, chat_id)
         if ch_warns == 0:
             continue
-        async with (await pool()).acquire() as conn:
-            if not await conn.fetchval(
-                "update warn set warns = $1 where chat_id=$2 and uid=$3 returning 1",
-                ch_warns - 1,
-                chat_id,
-                id,
-            ):
-                continue
+        if not await managers.warn.unwarn(id, chat_id):
+            continue
         await send_message(
             peer_ids=chat_id + 2000000000,
             msg=await messages.unwarn(
@@ -948,7 +801,8 @@ async def gzov(message: Message):
         try:
             members = (
                 await api.messages.get_conversation_members(
-                    peer_id=chat_id + 2000000000, fields=['deactivated']  # type: ignore
+                    peer_id=chat_id + 2000000000,
+                    fields=["deactivated"],  # type: ignore
                 )
             ).items
             if not await send_message(

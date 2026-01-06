@@ -37,14 +37,14 @@ DEFAULTS = {
 
 @dataclass
 class CachedXPRow(BaseCachedModel):
-    xp: float
-    coins: int
-    coins_limit: int
-    lvl: int
-    league: int
-    lm: int
-    lvm: int
-    lsm: int
+    xp: float = 0
+    coins: int = 0
+    coins_limit: int = 0
+    lvl: int = 1
+    league: int = 1
+    lm: int = 0
+    lvm: int = 0
+    lsm: int = 0
 
 
 CacheKey: TypeAlias = int
@@ -108,7 +108,11 @@ class XPCache(BaseCacheManager):
 
         uid = cache_key
         if initial_data:
-            defaults = initial_data | {k: v for k, v in DEFAULTS.items() if k not in initial_data or initial_data[k] is None}
+            defaults = initial_data | {
+                k: v
+                for k, v in DEFAULTS.items()
+                if k not in initial_data or initial_data[k] is None
+            }
         else:
             defaults = copy.deepcopy(DEFAULTS)
         model, created = await self.repo.ensure_record(uid, defaults=defaults)

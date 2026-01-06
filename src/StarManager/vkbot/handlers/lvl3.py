@@ -1,12 +1,12 @@
 import asyncio
 import re
 import time
-from ast import literal_eval
 from datetime import datetime, timedelta
 
 from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 
+from StarManager.core import managers
 from StarManager.core.config import api
 from StarManager.core.db import pool
 from StarManager.core.utils import (
@@ -51,7 +51,7 @@ async def inactive(message: Message):
         cutoff = datetime.strptime(value, "%d.%m.%Y").timestamp()
         m = 1
     except ValueError:
-        m = re.match(r"^(\d+)([dwm])$", (value if not value.isdigit() else value + 'd'))
+        m = re.match(r"^(\d+)([dwm])$", (value if not value.isdigit() else value + "d"))
         if m:
             num, unit = int(m.group(1)), m.group(2)
             now = datetime.now()
@@ -193,55 +193,14 @@ async def ban(message: Message):
             ),
         )
 
-    ban_date = datetime.now().strftime("%Y.%m.%d %H:%M:%S")
-    async with (await pool()).acquire() as conn:
-        res = await conn.fetchrow(
-            "select last_bans_times, last_bans_causes, last_bans_names, last_bans_dates from ban where "
-            "chat_id=$1 and uid=$2",
-            chat_id,
-            id,
-        )
-    if res is not None:
-        ban_times = literal_eval(res[0])
-        ban_causes = literal_eval(res[1])
-        ban_names = literal_eval(res[2])
-        ban_dates = literal_eval(res[3])
-    else:
-        ban_times, ban_causes, ban_names, ban_dates = [], [], [], []
-
-    if ban_cause is None:
-        ban_cause = "Без указания причины"
-    if ban_date is None:
-        ban_date = "Дата неизвестна"
-    ban_times.append(ban_time)
-    ban_causes.append(ban_cause)
     u_name = await get_user_name(uid)
-    ban_names.append(f"[id{uid}|{u_name}]")
-    ban_dates.append(ban_date)
-
-    async with (await pool()).acquire() as conn:
-        if not await conn.fetchval(
-            "update ban set ban = $1, last_bans_times = $2, last_bans_causes = $3, last_bans_names = $4, "
-            "last_bans_dates = $5 where chat_id=$6 and uid=$7 returning 1",
-            time.time() + ban_time,
-            f"{ban_times}",
-            f"{ban_causes}",
-            f"{ban_names}",
-            f"{ban_dates}",
-            chat_id,
-            id,
-        ):
-            await conn.execute(
-                "insert into ban (uid, chat_id, ban, last_bans_times, last_bans_causes, last_bans_names, "
-                "last_bans_dates) values ($1, $2, $3, $4, $5, $6, $7)",
-                id,
-                chat_id,
-                time.time() + ban_time,
-                f"{ban_times}",
-                f"{ban_causes}",
-                f"{ban_names}",
-                f"{ban_dates}",
-            )
+    await managers.ban.ban(
+        id,
+        chat_id,
+        ban_time,
+        ban_cause or "Без указания причины",
+        f"[id{uid}|{u_name}]",
+    )
 
     await messagereply(
         message,
@@ -301,10 +260,8 @@ async def unban(message: Message):
                 id, await get_user_name(id), await get_user_nickname(id, chat_id)
             ),
         )
-    async with (await pool()).acquire() as conn:
-        await conn.execute(
-            "update ban set ban = 0 where chat_id=$1 and uid=$2", chat_id, id
-        )
+
+    await managers.ban.unban(id, chat_id)
     await messagereply(
         message,
         disable_mentions=1,
@@ -322,15 +279,18 @@ async def unban(message: Message):
 
 @bl.chat_message(SearchCMD("banlist"))
 async def banlist(message: Message):
-    async with (await pool()).acquire() as conn:
-        res = await conn.fetch(
-            "select uid, chat_id, last_bans_causes, ban, last_bans_names from ban where chat_id=$1 and "
-            "ban>$2 order by uid desc",
-            message.peer_id - 2000000000,
-            time.time(),
-        )
+    now = time.time()
+    res = [
+        i
+        for i in await managers.ban.get_all(message.peer_id - 2000000000)
+        if i and i.ban > now
+    ]
     count = len(res)
-    res = res[:30]
+    res = sorted(
+        res[:30],
+        key=lambda i: i.uid,
+        reverse=True,
+    )
     await messagereply(
         message,
         disable_mentions=1,
@@ -361,7 +321,7 @@ async def zov(message: Message):
                 )
             ).items,
         ),
-        disable_mentions=0
+        disable_mentions=0,
     )
 
 

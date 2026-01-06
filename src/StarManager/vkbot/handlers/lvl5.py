@@ -1,30 +1,29 @@
 import time
-from ast import literal_eval
 from datetime import datetime
 
 from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 
 from StarManager.core import managers
-from StarManager.vkbot import keyboard, messages
-from StarManager.vkbot.checkers import haveAccess
-from StarManager.vkbot.rules import SearchCMD
+from StarManager.core.config import api
+from StarManager.core.db import pool
 from StarManager.core.utils import (
-    is_higher,
-    search_id_in_message,
-    get_user_name,
-    get_user_nickname,
-    kick_user,
-    get_user_ban,
+    delete_messages,
     get_chat_name,
     get_group_name,
     get_pool,
-    send_message,
-    delete_messages,
+    get_user_ban,
+    get_user_name,
+    get_user_nickname,
+    is_higher,
+    kick_user,
     messagereply,
+    search_id_in_message,
+    send_message,
 )
-from StarManager.core.config import api
-from StarManager.core.db import pool
+from StarManager.vkbot import keyboard, messages
+from StarManager.vkbot.checkers import haveAccess
+from StarManager.vkbot.rules import SearchCMD
 
 bl = BotLabeler()
 
@@ -173,53 +172,13 @@ async def sban(message: Message):
             ban_cause,
             ban_time // 86400,
         )
-        ban_date = datetime.now().strftime("%Y.%m.%d %H:%M:%S")
-        async with (await pool()).acquire() as conn:
-            res = await conn.fetchrow(
-                "select last_bans_times, last_bans_causes, last_bans_names, last_bans_dates from ban where "
-                "chat_id=$1 and uid=$2",
-                chat_id,
-                id,
-            )
-        if res is not None:
-            ban_times = literal_eval(res[0])
-            ban_causes = literal_eval(res[1])
-            ban_names = literal_eval(res[2])
-            ban_dates = literal_eval(res[3])
-        else:
-            ban_times, ban_causes, ban_names, ban_dates = [], [], [], []
-        if ban_cause is None:
-            ban_cause = "Без указания причины"
-        if ban_date is None:
-            ban_date = "Дата неизвестна"
-        ban_times.append(ban_time)
-        ban_causes.append(ban_cause)
-        ban_names.append(f"[id{uid}|{u_name}]")
-        ban_dates.append(ban_date)
-
-        async with (await pool()).acquire() as conn:
-            if not await conn.fetchval(
-                "update ban set ban = $1, last_bans_times = $2, last_bans_causes = $3, last_bans_names = $4, "
-                "last_bans_dates = $5 where chat_id=$6 and uid=$7 returning 1",
-                time.time() + ban_time,
-                f"{ban_times}",
-                f"{ban_causes}",
-                f"{ban_names}",
-                f"{ban_dates}",
-                chat_id,
-                id,
-            ):
-                await conn.execute(
-                    "insert into ban (uid, chat_id, ban, last_bans_times, last_bans_causes, last_bans_names, "
-                    "last_bans_dates) values ($1, $2, $3, $4, $5, $6, $7)",
-                    id,
-                    chat_id,
-                    time.time() + ban_time,
-                    f"{ban_times}",
-                    f"{ban_causes}",
-                    f"{ban_names}",
-                    f"{ban_dates}",
-                )
+        await managers.ban.ban(
+            id,
+            chat_id,
+            ban_time,
+            ban_cause or "Без указания причины",
+            f"[id{uid}|{u_name}]",
+        )
 
         if await kick_user(id, chat_id):
             await send_message(msg=msg, peer_ids=chat_id + 2000000000)
@@ -286,13 +245,8 @@ async def sunban(message: Message):
             or await get_user_ban(id, chat_id) <= time.time()
         ):
             continue
-        async with (await pool()).acquire() as conn:
-            if await conn.fetchval(
-                "update ban set ban = 0 where chat_id=$1 and uid=$2 returning 1",
-                chat_id,
-                id,
-            ):
-                success += 1
+        if await managers.ban.unban(id, chat_id):
+            success += 1
 
     if edit is None:
         return
@@ -573,16 +527,9 @@ async def chat(message: Message):
             else "Не привязана"
         )
 
-        muted = await conn.fetchval(
-            "select count(*) as c from mute where chat_id=$1 and mute>$2",
-            chat_id,
-            time.time(),
-        )
-        banned = await conn.fetchval(
-            "select count(*) as c from ban where chat_id=$1 and ban>$2",
-            chat_id,
-            time.time(),
-        )
+        now = time.time()
+        muted = len([i for i in await managers.mute.get_all(chat_id) if i.mute > now])
+        banned = len(await managers.ban.get_all(chat_id))
 
         if bjd := await conn.fetchval(
             "select time from botjoineddate where chat_id=$1", chat_id

@@ -9,7 +9,7 @@ import traceback
 import unicodedata
 from ast import literal_eval
 from copy import deepcopy
-from datetime import date, datetime
+from datetime import date
 from typing import (
     Any,
     Dict,
@@ -51,7 +51,7 @@ from vkbottle_types.objects import (
 from yookassa import Configuration, Payment
 from yookassa.payment import PaymentResponse
 
-from StarManager.core import config, enums, managers
+from StarManager.core import config, managers
 from StarManager.core.config import api, settings, vk_api_session
 from StarManager.core.db import pool
 
@@ -483,33 +483,18 @@ async def get_user_nickname(uid: int, chat_id: int, none: Any = None) -> str | A
 
 
 async def get_user_mute(uid, chat_id, none=0) -> int:
-    async with (await pool()).acquire() as conn:
-        return (
-            await conn.fetchval(
-                "select mute from mute where chat_id=$1 and uid=$2", chat_id, uid
-            )
-            or none
-        )
+    user = await managers.mute.get(uid, chat_id)
+    return user.mute if user is not None else none
 
 
 async def get_user_warns(uid, chat_id, none=0) -> int:
-    async with (await pool()).acquire() as conn:
-        return (
-            await conn.fetchval(
-                "select warns from warn where chat_id=$1 and uid=$2", chat_id, uid
-            )
-            or none
-        )
+    user = await managers.warn.get(uid, chat_id)
+    return user.warns if user is not None else none
 
 
 async def get_user_ban(uid, chat_id, none=0) -> int:
-    async with (await pool()).acquire() as conn:
-        return (
-            await conn.fetchval(
-                "select ban from ban where chat_id=$1 and uid=$2", chat_id, uid
-            )
-            or none
-        )
+    user = await managers.ban.get(uid, chat_id)
+    return user.ban if user is not None else none
 
 
 async def get_chat_access_name(chat_id: int, lvl: int, none: Any = None) -> int | None:
@@ -525,19 +510,15 @@ async def get_chat_access_name(chat_id: int, lvl: int, none: Any = None) -> int 
 async def get_user_ban_info(uid, chat_id, none=None) -> dict:
     if none is None:
         none = {"times": [], "causes": [], "names": [], "dates": []}
-    async with (await pool()).acquire() as conn:
-        ban = await conn.fetchrow(
-            "select last_bans_times, last_bans_causes, last_bans_names, last_bans_dates "
-            "from ban where chat_id=$1 and uid=$2",
-            chat_id,
-            uid,
-        )
+    ban = await managers.ban.get(uid, chat_id)
     if ban:
         return {
-            "times": literal_eval(ban[0]),
-            "causes": literal_eval(ban[1]),
-            "names": literal_eval(ban[2]),
-            "dates": literal_eval(ban[3]),
+            "times": literal_eval(ban.last_bans_times) if ban.last_bans_times else [],
+            "causes": literal_eval(ban.last_bans_causes)
+            if ban.last_bans_causes
+            else [],
+            "names": literal_eval(ban.last_bans_names) if ban.last_bans_names else [],
+            "dates": literal_eval(ban.last_bans_dates) if ban.last_bans_dates else [],
         }
     return none
 
@@ -653,6 +634,7 @@ async def add_user_xp(uid, addxp, checklvlbanned=True) -> None:
             ):
                 return
     await managers.xp.add_user_xp(uid, addxp)
+
 
 async def add_user_coins(
     uid, addcoins, checklvlbanned=True, addlimit=False, bonus_peer_id=0
@@ -1041,152 +1023,18 @@ async def punish(uid, chat_id, setting_id):
         cause = "Нарушение правил беседы."
 
     if punishment[0] == "mute":
-        async with (await pool()).acquire() as conn:
-            ms = await conn.fetchrow(
-                "select last_mutes_times, last_mutes_causes, last_mutes_names, last_mutes_dates from mute where "
-                "chat_id=$1 and uid=$2",
-                chat_id,
-                uid,
-            )
-        if ms is not None:
-            mute_times = literal_eval(ms[0])
-            mute_causes = literal_eval(ms[1])
-            mute_names = literal_eval(ms[2])
-            mute_dates = literal_eval(ms[3])
-        else:
-            mute_times, mute_causes, mute_names, mute_dates = [], [], [], []
-
-        mute_date = datetime.now().strftime("%Y.%m.%d %H:%M:%S")
-        mute_time = int(punishment[1]) * 60
-        mute_times.append(mute_time)
-        mute_causes.append(cause)
-        mute_names.append(f"[club{-settings.vk.group_id}|Star Manager]")
-        mute_dates.append(mute_date)
-
-        async with (await pool()).acquire() as conn:
-            if not await conn.fetchval(
-                "update mute set mute = $1, last_mutes_times = $2, last_mutes_causes = $3, "
-                "last_mutes_names = $4, last_mutes_dates = $5 where chat_id=$6 and uid=$7 returning 1",
-                time.time() + mute_time,
-                f"{mute_times}",
-                f"{mute_causes}",
-                f"{mute_names}",
-                f"{mute_dates}",
-                chat_id,
-                uid,
-            ):
-                await conn.execute(
-                    "insert into mute (uid, chat_id, mute, last_mutes_times, last_mutes_causes, last_mutes_names, "
-                    "last_mutes_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-                    uid,
-                    chat_id,
-                    time.time() + mute_time,
-                    f"{mute_times}",
-                    f"{mute_causes}",
-                    f"{mute_names}",
-                    f"{mute_dates}",
-                )
-
-        await set_chat_mute(uid, chat_id, mute_time)
+        mt = int(punishment[1]) * 60
+        await managers.mute.mute(uid, chat_id, mt, cause)
+        await set_chat_mute(uid, chat_id, mt)
         return punishment
     elif punishment[0] == "ban":
-        ban_date = datetime.now().strftime("%Y.%m.%d %H:%M:%S")
-        async with (await pool()).acquire() as conn:
-            res = await conn.fetchrow(
-                "select last_bans_times, last_bans_causes, last_bans_names, last_bans_dates from ban where "
-                "chat_id=$1 and uid=$2",
-                chat_id,
-                uid,
-            )
-        if res is not None:
-            ban_times = literal_eval(res[0])
-            ban_causes = literal_eval(res[1])
-            ban_names = literal_eval(res[2])
-            ban_dates = literal_eval(res[3])
-        else:
-            ban_times, ban_causes, ban_names, ban_dates = [], [], [], []
-
         ban_time = int(punishment[1]) * 86400
-        ban_times.append(ban_time)
-        ban_causes.append(cause)
-        ban_names.append(f"[club{-settings.vk.group_id}|Star Manager]")
-        ban_dates.append(ban_date)
-
-        async with (await pool()).acquire() as conn:
-            if not await conn.fetchval(
-                "update ban set ban = $1, last_bans_times = $2, last_bans_causes = $3, last_bans_names = $4, "
-                "last_bans_dates = $5 where chat_id=$6 and uid=$7 returning 1",
-                time.time() + ban_time,
-                f"{ban_times}",
-                f"{ban_causes}",
-                f"{ban_names}",
-                f"{ban_dates}",
-                chat_id,
-                uid,
-            ):
-                await conn.execute(
-                    "insert into ban (uid, chat_id, ban, last_bans_times, last_bans_causes, last_bans_names, "
-                    "last_bans_dates) values ($1, $2, $3, $4, $5, $6, $7)",
-                    uid,
-                    chat_id,
-                    time.time() + ban_time,
-                    f"{ban_times}",
-                    f"{ban_causes}",
-                    f"{ban_names}",
-                    f"{ban_dates}",
-                )
-
+        await managers.ban.ban(uid, chat_id, ban_time, cause)
         await kick_user(uid, chat_id)
         return punishment
     elif punishment[0] == "warn":
-        async with (await pool()).acquire() as conn:
-            res = await conn.fetchrow(
-                "select warns, last_warns_times, last_warns_causes, last_warns_names, "
-                "last_warns_dates from warn where chat_id=$1 and uid=$2",
-                chat_id,
-                uid,
-            )
-        if res is not None:
-            warns = res[0] + 1
-            warn_times = literal_eval(res[1])
-            warn_causes = literal_eval(res[2])
-            warn_names = literal_eval(res[3])
-            warn_dates = literal_eval(res[4])
-        else:
-            warns = 1
-            warn_times, warn_causes, warn_names, warn_dates = [], [], [], []
-        warn_times.append(0)
-        warn_causes.append(cause)
-        warn_names.append(f"[club{-settings.vk.group_id}|Star Manager]")
-        warn_dates.append(datetime.now().strftime("%Y.%m.%d %H:%M:%S"))
-
-        if warns >= 3:
-            warns = 0
+        if await managers.warn.warn(uid, chat_id, cause) >= 3:
             await kick_user(uid, chat_id)
-
-        async with (await pool()).acquire() as conn:
-            if not await conn.fetchval(
-                "update warn set warns = $1, last_warns_times = $2, last_warns_causes = $3, last_warns_names = $4, "
-                "last_warns_dates = $5 where chat_id=$6 and uid=$7 returning 1",
-                warns,
-                f"{warn_times}",
-                f"{warn_causes}",
-                f"{warn_names}",
-                f"{warn_dates}",
-                chat_id,
-                uid,
-            ):
-                await conn.execute(
-                    "insert into warn (uid, chat_id, warns, last_warns_times, last_warns_causes, last_warns_names, "
-                    "last_warns_dates) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-                    uid,
-                    chat_id,
-                    warns,
-                    f"{warn_times}",
-                    f"{warn_causes}",
-                    f"{warn_names}",
-                    f"{warn_dates}",
-                )
         return punishment
     return False
 
