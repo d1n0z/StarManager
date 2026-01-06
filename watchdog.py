@@ -118,8 +118,8 @@ if __name__ == "__main__":
         if consecutive_failures >= MAX_FAILURES:
             log("⚠️ Max failures reached, initiating restart...")
             if restart_service():
-                log("Waiting 120s for service to start...")
-                time.sleep(120)
+                log("Waiting 300s for service to start...")
+                time.sleep(300)
                 if check_alive():
                     log("✅ Service is back online")
                 else:
