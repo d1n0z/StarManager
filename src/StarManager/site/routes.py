@@ -674,11 +674,10 @@ async def process_vk_event(data, data_type):
             event_info = f"message_new text='{text}'"
 
         try:
-            async with asyncio.timeout(60):
-                async with _vk_semaphore:
-                    await vkbot.process_event(data)
-                    async with _vk_tasks_completed_lock:
-                        _vk_tasks_completed += 1
+            async with _vk_semaphore:
+                await asyncio.wait_for(vkbot.process_event(data), timeout=60)
+                async with _vk_tasks_completed_lock:
+                    _vk_tasks_completed += 1
         except asyncio.TimeoutError:
             await record_vk_timeout()
 
