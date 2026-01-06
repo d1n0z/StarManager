@@ -683,7 +683,7 @@ async def process_vk_event(data, data_type):
             await record_vk_timeout()
 
             elapsed = time.time() - start
-            logger.exception(f"TIMEOUT after {elapsed:.2f}s: {event_info}")
+            logger.error(f"TIMEOUT after {elapsed:.2f}s: {event_info}")
             logger.error(f"Event data: {json.dumps(data, ensure_ascii=False)[:500]}")
         except asyncio.CancelledError:
             raise
@@ -706,7 +706,7 @@ async def vk(request: Request):
     if data.get("secret") != settings.vk.callback_secret:
         return PlainTextResponse('Error: wrong "secret" key.')
 
-    if len(_vk_tasks) > 200:
+    if len(_vk_tasks) > 50:
         queued_events = event_queue.qsize()
         if queued_events >= 1000:
             logger.warning(f"Queued {queued_events} events, dropping queue!")
