@@ -69,33 +69,28 @@ async def getUserIgnore(uid, chat_id) -> bool:
 
 @AsyncTTL(maxsize=0)
 async def getUInfBanned(uid, chat_id) -> bool:
-    async with (await pool()).acquire() as conn:
-        return await conn.fetchval(
-            "select exists(select 1 from blocked where (uid=$1 and type='chat') or "
-            "(uid=$2 and type='user'))",
-            chat_id,
-            uid,
-        )
+    return bool(await managers.blocked.get(uid, "user")) or bool(
+        await managers.blocked.get(chat_id, "chat")
+    )
 
 
 @AsyncTTL(maxsize=0)
 async def getULvlBanned(uid) -> bool:
-    if await getUInfBanned(uid, None):
+    if await getUInfBanned(uid, None) or await managers.lvlbanned.exists(uid):
         return True
-    async with (await pool()).acquire() as conn:
-        return await conn.fetchval(
-            "select exists(select 1 from lvlbanned where uid=$1)", uid
-        )
+    return False
 
 
-async def getUChatLimit(msgtime, last_message, u_acc, chat_id) -> bool:
+async def getUChatLimit(msgtime, get_user_last_message_params, u_acc, chat_id) -> bool:
     if u_acc >= 6:
         return False
-    async with (await pool()).acquire() as conn:
-        chl = await conn.fetchval(
-            "select time from chatlimit where chat_id=$1", chat_id
-        )
-    if not chl or msgtime - last_message >= chl:
+    chl = await managers.chatlimit.get(chat_id)
+    if not chl:
+        return False
+
+    last_message = await get_user_last_message(*get_user_last_message_params)
+
+    if msgtime - last_message >= chl.time:
         return False
     return True
 
@@ -176,7 +171,7 @@ async def checkCMD(
         )
         or await getUChatLimit(
             message.date,
-            await get_user_last_message(uid, chat_id, 0),
+            (uid, chat_id, 0),
             (u_acc.access_level if u_acc else 0),
             chat_id,
         )

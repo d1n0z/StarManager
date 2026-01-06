@@ -8,7 +8,6 @@ from vkbottle.framework.labeler import BotLabeler
 
 from StarManager.core import managers
 from StarManager.core.config import api
-from StarManager.core.db import pool
 from StarManager.core.utils import (
     get_silence,
     get_user_access_level,
@@ -75,15 +74,10 @@ async def inactive(message: Message):
     )
 
     if mode == "chat":
-        async with (await pool()).acquire() as conn:
-            res = await conn.fetch(
-                "select uid, last_message from lastmessagedate where chat_id=$1 and uid>0",
-                chat_id,
-            )
-
+        res = await managers.lastmessagedate.get_all(chat_id)
         for row in res:
-            if row[1] < cutoff:
-                to_kick.append(row[0])
+            if row.last_message < cutoff:
+                to_kick.append(row.uid)
     else:
         if not chat_members or not chat_members.profiles:
             return await messagereply(

@@ -108,15 +108,14 @@ async def message_handle(event: MessageNew) -> Any:
     if not uacc and await managers.filters.matches(
         chat_id, await get_chat_owner(chat_id), msg
     ):
-        async with (await pool()).acquire() as conn:
-            pnt = await conn.fetchval(
-                "select punishment from filtersettings where chat_id=$1", chat_id
-            )
+        pnt = await managers.filters.filter_settings.get(chat_id)
         if not pnt:
             return await delete_messages(
                 event.object.message.conversation_message_id, chat_id
             )
-        elif pnt == 1:
+        else:
+            pnt = pnt.punishment
+        if pnt == 1:
             mute_time = 315360000
             await managers.mute.mute(uid, chat_id, mute_time, "Фильтрация слов")
             await set_chat_mute(uid, chat_id)
@@ -145,47 +144,43 @@ async def message_handle(event: MessageNew) -> Any:
 
     uprem = await get_user_premium(uid)
     data = event.object.message.text.split()
-    if not any(
-        event.object.message.text.startswith(i)
-        for i in await get_user_prefixes(uprem, uid)
-    ) and (
-        pinged := [
-            i
-            for i in [
-                (
-                    await search_id_in_message(
-                        event.object.message.text, None, place=k
-                    ),
-                    data[k - 1],
-                )
-                for k in range(1, len(data) + 1)
-                if not data[k - 1].isdigit()
+    if (
+        uacc == 0
+        and await managers.antitag.get_for_chat(chat_id)
+        and not any(
+            event.object.message.text.startswith(i)
+            for i in await get_user_prefixes(uprem, uid)
+        )
+        and (
+            pinged := [
+                i
+                for i in [
+                    (
+                        await search_id_in_message(
+                            event.object.message.text, None, place=k
+                        ),
+                        data[k - 1],
+                    )
+                    for k in range(1, len(data) + 1)
+                    if not data[k - 1].isdigit()
+                ]
+                if i[0]
             ]
-            if i[0]
-        ]
+        )
     ):
-        async with (await pool()).acquire() as conn:
-            if (
-                await conn.fetchval(
-                    "select exists(select 1 from antitag where chat_id=$1)", chat_id
-                )
-                and await conn.fetchval(
-                    "select exists(select 1 from antitag where chat_id=$1 and uid=ANY($2))",
-                    chat_id,
-                    [i[0] for i in pinged],
-                )
-                and await delete_messages(
-                    event.object.message.conversation_message_id, chat_id
-                )
-            ):
-                return await send_message(
-                    event.object.message.peer_id,
-                    await messages.antitag_on(
-                        uid,
-                        await get_user_nickname(uid, chat_id),
-                        await get_user_name(uid),
-                    ),
-                )
+        if await managers.antitag.exists_many(
+            chat_id, [i[0] for i in pinged]
+        ) and await delete_messages(
+            event.object.message.conversation_message_id, chat_id
+        ):
+            return await send_message(
+                event.object.message.peer_id,
+                await messages.antitag_on(
+                    uid,
+                    await get_user_nickname(uid, chat_id),
+                    await get_user_name(uid),
+                ),
+            )
         if uprem and (
             tonotif := [
                 i
@@ -222,7 +217,7 @@ async def message_handle(event: MessageNew) -> Any:
         )
         return await kick_user(uid, chat_id=chat_id)
     if uacc == 0 and await getUChatLimit(
-        msgtime, await get_user_last_message(uid, chat_id, 0), uacc, chat_id
+        msgtime, (uid, chat_id, 0), uacc, chat_id
     ):
         return await delete_messages(
             event.object.message.conversation_message_id, chat_id

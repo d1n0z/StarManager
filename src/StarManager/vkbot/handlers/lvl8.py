@@ -1,4 +1,5 @@
 import asyncio
+from copy import deepcopy
 import os
 import statistics
 import time
@@ -208,8 +209,7 @@ async def delstatus(message: Message):
         return await messagereply(message, await messages.delstatus_hint())
     if id < 0:
         return await messagereply(message, await messages.id_group())
-    async with (await pool()).acquire() as conn:
-        await conn.execute("delete from premium where uid=$1", id)
+    await managers.premium.delete(id)
 
     dev_name = await get_user_name(uid)
     await messagereply(
@@ -228,8 +228,7 @@ async def delstatus(message: Message):
 
 @bl.chat_message(SearchCMD("statuslist"))
 async def statuslist(message: Message):
-    async with (await pool()).acquire() as conn:
-        prem = await conn.fetch("select uid, time from premium order by time desc")
+    prem = deepcopy(sorted(managers.premium._cache.values(), key=lambda i: i.time, reverse=True)[:30])
     await messagereply(
         message,
         await messages.statuslist(prem),
@@ -325,18 +324,11 @@ async def block(message: Message):
         return await messagereply(message, await messages.block_hint())
     reason = " ".join(data[3:]) or None
     async with (await pool()).acquire() as conn:
-        if not await conn.fetchval(
-            "select exists(select 1 from blocked where uid=$1 and type=$2)", id, data[1]
-        ):
-            await conn.execute(
-                "insert into blocked (uid, type, reason) values ($1, $2, $3)",
-                id,
-                data[1],
-                reason,
-            )
+        if await managers.blocked.get(id, data[1]) is None:
+            await managers.blocked.cache._ensure_cached(id, {"type": data[1], "reason": reason})
             if data[1] != "chat":
                 await managers.xp.remove(id)
-                await conn.execute("delete from premium where uid=$1", id)
+                await managers.premium.delete(id)
                 chats = (
                     set(
                         i[0]
@@ -392,11 +384,8 @@ async def unblock(message: Message):
     id = await search_id_in_message(message.text, message.reply_message, 3)
     if len(data) != 3 or data[1] not in ["chat", "user"] or not id:
         return await messagereply(message, await messages.unblock_hint())
-    async with (await pool()).acquire() as conn:
-        if not await conn.fetchval(
-            "delete from blocked where uid=$1 and type=$2 returning 1", id, data[1]
-        ):
-            return await messagereply(message, await messages.unblock_noban())
+    if not await managers.blocked.delete(id, data[1]):
+        return await messagereply(message, await messages.unblock_noban())
     if data[1] == "chat":
         await send_message(id + 2000000000, await messages.block_chatunblocked(id))
     await messagereply(message, await messages.unblock())
@@ -404,13 +393,12 @@ async def unblock(message: Message):
 
 @bl.chat_message(SearchCMD("blocklist"))
 async def blocklist(message: Message):
-    async with (await pool()).acquire() as conn:
-        inf = await conn.fetch("select uid, reason from blocked where type='user'")
+    inf = await managers.blocked.get_all("user")
     msg = f"⚛ Список пользователей в блокировке бота (Всего : {len(inf)})\n\n"
     for user in inf:
         msg += (
-            f"➖ [id{user[0]}|{await get_user_name(user[0])}]"
-            + (f" | {user[1]}" if user[1] else "")
+            f"➖ [id{user.uid}|{await get_user_name(user.uid)}]"
+            + (f" | {user.reason}" if user.reason else "")
             + "\n"
         )
     await messagereply(message, msg, keyboard=keyboard.blocklist(message.from_id))
@@ -684,10 +672,7 @@ async def lvlban(message: Message):
     id = await search_id_in_message(message.text, message.reply_message)
     if len(data) != 2 or not id:
         return await messagereply(message, await messages.lvlban_hint())
-    async with (await pool()).acquire() as conn:
-        await conn.execute(
-            "insert into lvlbanned (uid) values ($1) on conflict (uid) do nothing", id
-        )
+    await managers.lvlbanned.add(id)
     await messagereply(message, await messages.lvlban())
 
 
@@ -697,21 +682,17 @@ async def lvlunban(message: Message):
     id = await search_id_in_message(message.text, message.reply_message)
     if len(data) != 2 or not id:
         return await messagereply(message, await messages.lvlunban_hint())
-    async with (await pool()).acquire() as conn:
-        if not await conn.fetchval(
-            "delete from lvlbanned where uid=$1 returning 1", id
-        ):
-            return await messagereply(message, await messages.lvlunban_noban())
+    if not await managers.lvlbanned.remove(id):
+        return await messagereply(message, await messages.lvlunban_noban())
     await messagereply(message, await messages.lvlunban())
 
 
 @bl.chat_message(SearchCMD("lvlbanlist"))
 async def lvlbanlist(message: Message):
-    async with (await pool()).acquire() as conn:
-        lvlban = await conn.fetch("select uid from lvlbanned")
+    lvlban = await managers.lvlbanned.get_all_uids()
     msg = f"⚛ Список пользователей в lvlban бота (Всего : {len(lvlban)})\n\n"
     for user in lvlban:
-        msg += f"➖ {user[0]} : | [id{user[0]}|{await get_user_name(user[0])}]\n"
+        msg += f"➖ {user} : | [id{user}|{await get_user_name(user)}]\n"
     await messagereply(message, msg)
 
 
@@ -953,11 +934,10 @@ async def bonuslist(message: Message):
 
 @bl.chat_message(SearchCMD("rewardscount"))
 async def rewardscount(message: Message):
-    async with (await pool()).acquire() as conn:
-        users = await conn.fetch("select deactivated from rewardscollected")
+    users = await managers.rewardscollected.cache.get_all()
     await messagereply(
         message,
-        f"Число пользователей, активировавших /rewards: {len(users)}. Из них отписалось: {len([i for i in users if i[0]])}",
+        f"Число пользователей, активировавших /rewards: {len(users)}. Из них отписалось: {len([i for i in users if i.deactivated])}",
     )
 
 

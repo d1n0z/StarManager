@@ -1,8 +1,7 @@
 import secrets
 import time
 
-from StarManager.core import enums, managers
-from StarManager.core.db import pool
+from StarManager.core import managers
 from StarManager.core.utils import (
     add_user_coins,
     add_user_xp,
@@ -15,34 +14,9 @@ from StarManager.vkbot.checkers import getUInfBanned, getULvlBanned
 
 async def add_msg_counter(chat_id, uid, audio=False, sticker=False) -> bool:
     now_ts = int(time.time())
-    async with (await pool()).acquire() as conn:
-        if not await conn.fetchval(
-            "update messages set messages=messages+1 where chat_id=$1 and uid=$2 "
-            "returning 1",
-            chat_id,
-            uid,
-        ):
-            await conn.execute(
-                "insert into messages (uid, chat_id, messages) values ($1, $2, 1)",
-                uid,
-                chat_id,
-            )
-        if not await conn.fetchval(
-            "update lastmessagedate set last_message = $1 where chat_id=$2 and uid=$3 "
-            "returning 1",
-            now_ts,
-            chat_id,
-            uid,
-        ):
-            await conn.execute(
-                "insert into lastmessagedate (uid, chat_id, last_message) values ($1, $2, $3)",
-                uid,
-                chat_id,
-                now_ts,
-            )
-        rewards = await conn.fetchval(
-            "select date from rewardscollected where uid=$1 and deactivated=false", uid
-        )
+    await managers.messages.increment_messages(uid, chat_id)
+    await managers.lastmessagedate.edit(uid, chat_id, now_ts)
+    rewards = await managers.rewardscollected.get(uid)
     if await getUInfBanned(uid, chat_id) or await getULvlBanned(uid):
         return False
 
@@ -69,7 +43,7 @@ async def add_msg_counter(chat_id, uid, audio=False, sticker=False) -> bool:
         addxp *= 2
     if await chat_premium(chat_id):
         addxp *= 1.5
-    if rewards and now_ts - rewards <= 86400 * 7:
+    if rewards and now_ts - rewards.date <= 86400 * 7:
         addxp *= 2
     if (await get_user_shop_bonuses(uid))[0] > now_ts:
         addxp *= 2

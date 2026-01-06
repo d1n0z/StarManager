@@ -39,13 +39,7 @@ async def asynch(message: Message):
                 message=await messages.async_already_bound(),
             )
         bound = await conn.fetchval("select count(*) as c from gpool where uid=$1", uid)
-        u_premium = (
-            True
-            if await conn.fetchval(
-                "select exists(select 1 from premium where uid=$1)", uid
-            )
-            else False
-        )
+        u_premium = await get_user_premium(uid)
         if (not u_premium and bound >= 30) or (u_premium and bound >= 150):
             return await messagereply(
                 message, disable_mentions=1, message=await messages.async_limit()

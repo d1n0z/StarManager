@@ -54,7 +54,7 @@ async def id(uid, data, name, url, last_message):
 async def top(top):
     return await get("top") + "".join(
         [
-            f"{utils.number_to_emoji(k + 1)} [id{i[0]}|{await utils.get_user_name(i[0])}] - {i[1]} сообщений\n"
+            f"{utils.number_to_emoji(k + 1)} [id{i.uid}|{await utils.get_user_name(i.uid)}] - {i.messages} сообщений\n"
             for k, i in enumerate(top)
         ]
     )
@@ -1253,8 +1253,8 @@ async def statuslist(pp):
     k = 0
     for k, i in enumerate(pp):
         msg += (
-            f"[{k + 1}]. [id{i[0]}|{await utils.get_user_name(i[0])}] | "
-            f"Осталось: {int((i[1] - time.time()) / 86400) + 1} дней\n"
+            f"[{k + 1}]. [id{i.uid}|{await utils.get_user_name(i.uid)}] | "
+            f"Осталось: {int((i.time - time.time()) / 86400) + 1} дней\n"
         )
     return await get("statuslist", premium_status=k) + msg
 

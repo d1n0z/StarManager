@@ -60,22 +60,15 @@ async def join(message: MessageEvent):
             and await utils.get_user_access_level(bp, chat_id, ignore_custom=True) < 7
         ):
             return
-        async with (await pool()).acquire() as conn:
-            for m in members.items:
-                if m.member_id <= 0:
-                    continue
-                exists = await conn.fetchval(
-                    "select 1 from lastmessagedate where chat_id=$1 and uid=$2",
-                    chat_id,
-                    m.member_id,
+
+        for m in members.items:
+            if m.member_id <= 0:
+                continue
+            if not await managers.lastmessagedate.get(m.member_id, chat_id):
+                await managers.lastmessagedate.edit(
+                    m.member_id, chat_id, int(time.time())
                 )
-                if not exists:
-                    await conn.execute(
-                        "insert into lastmessagedate (chat_id, uid, last_message) values ($1, $2, $3)",
-                        chat_id,
-                        m.member_id,
-                        int(time.time()),
-                    )
+        async with (await pool()).acquire() as conn:
             now = time.time()
             for i in await managers.mute.get_all(chat_id):
                 if i.mute > now:
@@ -92,8 +85,6 @@ async def join(message: MessageEvent):
             await conn.execute("delete from commandlevels where chat_id=$1", chat_id)
             await conn.execute("delete from gpool where chat_id=$1", chat_id)
             await conn.execute("delete from chatgroups where chat_id=$1", chat_id)
-            await conn.execute("delete from silencemode where chat_id=$1", chat_id)
-            await conn.execute("delete from chatlimit where chat_id=$1", chat_id)
             await conn.execute("delete from notifications where chat_id=$1", chat_id)
             await conn.execute("delete from typequeue where chat_id=$1", chat_id)
             await conn.execute(
@@ -107,6 +98,8 @@ async def join(message: MessageEvent):
                 chat_id,
                 time.time(),
             )
+        await managers.chatlimit.delete(chat_id)
+        await managers.silencemode.delete(chat_id)
         await managers.chat_settings.remove(chat_id)
         await managers.filters.chat_f.del_all_filters(chat_id)
         await managers.mute.del_all(chat_id)
@@ -1220,14 +1213,14 @@ async def page_statuslist(message: MessageEvent):
 
     if page < 0:
         return
-    async with (await pool()).acquire() as conn:
-        premium_pool = await conn.fetch(
-            "select uid, time from premium where time>$1 order by time desc",
-            time.time(),
-        )
+    premium_pool = managers.premium._cache.values()
     if len(premium_pool) <= 0:
         return
-    premium_pool = premium_pool[page * 30 : page * 30 + 30]
+    premium_pool = sorted(
+        list(premium_pool)[page * 30 : page * 30 + 30],
+        key=lambda i: i.time,
+        reverse=True,
+    )
     await utils.edit_message(
         await messages.statuslist(premium_pool),
         message.object.peer_id,
@@ -1356,19 +1349,12 @@ async def top_(message: MessageEvent):
     if not conv_members:
         top = []
     else:
-        async with (await pool()).acquire() as conn:
-            top = await conn.fetch(
-                "select uid, messages from messages where uid>0 and messages>0 and chat_id=$1 and "
-                "uid=ANY($2) and uid!=ALL($3) order by messages desc limit 10",
-                chat_id,
-                [
-                    i.member_id
-                    for i in (
-                        await api.messages.get_conversation_members(peer_id=peer_id)
-                    ).items
-                ],
-                [i.id for i in (conv_members.profiles or []) if i.deactivated],
-            )
+        members = [i.member_id for i in conv_members.items]
+        exclude = [i.id for i in (conv_members.profiles or []) if i.deactivated]
+        top = await managers.messages.top_in_chat_excluding(
+            chat_id, members, exclude, limit=10
+        )
+
     await utils.edit_message(
         await messages.top(top),
         peer_id,
@@ -2607,20 +2593,7 @@ async def timeout_turn(message: MessageEvent):
     uid = message.user_id
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
-    async with (await pool()).acquire() as conn:
-        if (
-            activated := await conn.fetchval(
-                "update silencemode set activated=not activated where chat_id=$1 "
-                "returning activated",
-                chat_id,
-            )
-        ) is None:
-            activated = True
-            await conn.execute(
-                "insert into silencemode (chat_id, activated, allowed) values ($1, $2, '[]')",
-                chat_id,
-                activated,
-            )
+    activated = await managers.silencemode.turn(chat_id)
     if activated:
         await utils.send_message(
             peer_id,
@@ -2665,12 +2638,6 @@ async def timeout(message: MessageEvent):
 async def timeout_settings(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
-    async with (await pool()).acquire() as conn:
-        if await conn.fetchval(
-            "select exists(select 1 from silencemode where chat_id=$1 and activated=true)",
-            chat_id,
-        ):
-            return
     if message.payload:
         custom = message.payload.get("custom", False)
         page = message.payload.get("page", 0)
@@ -2703,28 +2670,8 @@ async def timeout_settings_turn(message: MessageEvent):
     custom = message.payload.get("custom", False)
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
-    async with (await pool()).acquire() as conn:
-        if await conn.fetchval(
-            "select exists(select 1 from silencemode where chat_id=$1 and activated=true)",
-            chat_id,
-        ):
-            return
-    allowed = sorted(await utils.get_silence_allowed(chat_id, custom))
-    if lvl in allowed:
-        allowed.remove(lvl)
-    else:
-        allowed.append(lvl)
-    async with (await pool()).acquire() as conn:
-        if not await conn.fetchval(
-            f"update silencemode set allowed{'_custom' if custom else ''} = $1 where chat_id=$2 returning 1",
-            f"{allowed}",
-            chat_id,
-        ):
-            await conn.execute(
-                f"insert into silencemode (chat_id, activated, allowed{'_custom' if custom else ''}) values ($1, false, $2)",
-                chat_id,
-                f"{allowed}",
-            )
+    allowed = await managers.silencemode.turn_lvl(chat_id, lvl, custom)
+
     await utils.edit_message(
         await messages.timeout_settings(),
         peer_id,
@@ -2822,15 +2769,7 @@ async def turnpublic(message: MessageEvent):
 async def antitag_list(message: MessageEvent):
     peer_id = message.object.peer_id
     chat_id = peer_id - 2000000000
-    async with (await pool()).acquire() as conn:
-        users = set(
-            [
-                i[0]
-                for i in await conn.fetch(
-                    "select uid from antitag where chat_id=$1", chat_id
-                )
-            ]
-        )
+    users = await managers.antitag.get_for_chat(chat_id)
     await utils.edit_message(
         await messages.antitag_list(users, chat_id),
         peer_id,
@@ -2914,21 +2853,13 @@ async def import_start(message: MessageEvent):
     settings = await utils.get_import_settings(message.user_id, importchatid)
     async with (await pool()).acquire() as conn:
         if settings["sys"]:
-            if i := await conn.fetchrow(
-                "select activated, allowed from silencemode where chat_id=$1",
-                importchatid,
-            ):
-                if not await conn.fetchval(
-                    "update silencemode set activated = $1, allowed = $2 where chat_id=$3 "
-                    "returning 1",
-                    *i,
+            if i := await managers.silencemode.get(importchatid):
+                await managers.silencemode.edit(
                     chatid,
-                ):
-                    await conn.execute(
-                        "insert into silencemode (chat_id, activated, allowed) values ($1, $2, $3)",
-                        chatid,
-                        *i,
-                    )
+                    activated=i.activated,
+                    allowed=i.allowed,
+                    allowed_custom=i.allowed_custom,
+                )
 
             for f in await managers.filters.chat_f.get_all(importchatid):
                 await managers.filters.chat_f.new_filter(chatid, f)
@@ -3009,19 +2940,8 @@ async def import_start(message: MessageEvent):
                     await conn.execute(
                         "insert into ignore (chat_id, uid) values ($1, $2)", chatid, *i
                     )
-            if i := await conn.fetchrow(
-                "select time from chatlimit where chat_id=$1", importchatid
-            ):
-                if not await conn.fetchval(
-                    "update chatlimit set time = $1 where chat_id=$2 returning 1",
-                    *i,
-                    chatid,
-                ):
-                    await conn.execute(
-                        "insert into chatlimit (chat_id, time) values ($1, $2)",
-                        chatid,
-                        *i,
-                    )
+            if i := await managers.chatlimit.get(importchatid):
+                await managers.chatlimit.edit_time(importchatid, i.time)
             for i in await conn.fetch(
                 "select tag, every, status, time, description, text, name from notifications "
                 "where chat_id=$1",
@@ -3082,20 +3002,10 @@ async def import_start(message: MessageEvent):
                         chatid,
                         *i,
                     )
+            for i in await managers.antitag.get_for_chat(importchatid):
+                await managers.antitag.add(i, chatid)
             for i in await conn.fetch(
-                "select uid from antitag where chat_id=$1", importchatid
-            ):
-                if not await conn.fetchval(
-                    "select exists(select 1 from antitag where chat_id=$1 and uid=$2)",
-                    chatid,
-                    *i,
-                ):
-                    await conn.execute(
-                        "insert into antitag (chat_id, uid) values ($1, $2)", chatid, *i
-                    )
-            for i in await conn.fetch(
-                "select uid, sys, acc, nicks, punishes, binds from importsettings where "
-                "chat_id=$1",
+                "select uid, sys, acc, nicks, punishes, binds from importsettings where chat_id=$1",
                 importchatid,
             ):
                 if not await conn.fetchval(
@@ -3200,13 +3110,12 @@ async def import_start(message: MessageEvent):
     GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["blocklist_chats"])
 )
 async def blocklist_chats(message: MessageEvent):
-    async with (await pool()).acquire() as conn:
-        inf = await conn.fetch("select uid, reason from blocked where type='chat'")
+    inf = await managers.blocked.get_all("chat")
     msg = f"⚛ Список чатов в блокировке бота (Всего:{len(inf)})\n\n"
     for chat in inf:
         msg += (
-            f"➖ id {chat[0]} | {await utils.get_chat_name(chat[0])}"
-            + (f" | {chat[1]}" if chat[1] else "")
+            f"➖ id {chat.uid} | {await utils.get_chat_name(chat.uid)}"
+            + (f" | {chat.reason}" if chat.reason else "")
             + "\n"
         )
     await utils.edit_message(
@@ -3221,13 +3130,12 @@ async def blocklist_chats(message: MessageEvent):
     GroupEventType.MESSAGE_EVENT, MessageEvent, SearchPayloadCMD(["blocklist"])
 )
 async def blocklist(message: MessageEvent):
-    async with (await pool()).acquire() as conn:
-        inf = await conn.fetch("select uid, reason from blocked where type='user'")
+    inf = await managers.blocked.get_all("user")
     msg = f"⚛ Список пользователей в блокировке бота (Всего:{len(inf)})\n\n"
     for user in inf:
         msg += (
-            f"➖ [id{user[0]}|{await utils.get_user_name(user[0])}]"
-            + (f" | {user[1]}" if user[1] else "")
+            f"➖ [id{user.uid}|{await utils.get_user_name(user.uid)}]"
+            + (f" | {user.reason}" if user.reason else "")
             + "\n"
         )
     await utils.edit_message(
@@ -3274,26 +3182,12 @@ async def filterpunishments(message: MessageEvent):
     if not message.payload:
         return
     chat_id = message.peer_id - 2000000000
-    async with (await pool()).acquire() as conn:
-        if message.payload["cmd"].endswith("_set"):
-            pnt = message.payload["set"]
-            if not await conn.fetchval(
-                "update filtersettings set punishment=$1 where chat_id=$2 returning 1",
-                pnt,
-                chat_id,
-            ):
-                await conn.execute(
-                    "insert into filtersettings (chat_id, punishment) values ($1, $2)",
-                    chat_id,
-                    pnt,
-                )
-        else:
-            pnt = (
-                await conn.fetchval(
-                    "select punishment from filtersettings where chat_id=$1", chat_id
-                )
-                or 0
-            )
+    if message.payload["cmd"].endswith("_set"):
+        pnt = message.payload["set"]
+        await managers.filters.filter_settings.edit(chat_id, punishment=pnt)
+    else:
+        pnt = await managers.filters.filter_settings.get(chat_id)
+        pnt = pnt.punishment if pnt else 0
     await utils.edit_message(
         await messages.filter_punishments(pnt),
         message.object.peer_id,

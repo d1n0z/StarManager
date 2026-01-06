@@ -171,7 +171,7 @@ async def every10min(conn: asyncpg.Connection):
     )
     now = time.time()
     await conn.execute('DELETE FROM prempromo WHERE "end" < $1', now)
-    await conn.execute("DELETE FROM premium WHERE time < $1", now)
+    await managers.premium.delete_expired()
     expired = await conn.fetch(
         "SELECT uid, cmid FROM premiumexpirenotified WHERE date < $1",
         now - 86400 * 2,
@@ -188,12 +188,7 @@ async def every10min(conn: asyncpg.Connection):
     notified = {
         row[0] for row in await conn.fetch("SELECT uid FROM premiumexpirenotified")
     }
-    expiring = await conn.fetch(
-        "SELECT uid FROM premium WHERE time < $1 AND time > $2 AND uid != ALL($3)",
-        now + 86400 * 3,
-        now + 86400 * 2,
-        list(notified),
-    )
+    expiring = [i for i in await managers.premium.get_expiring() if i not in notified]
     for (uid,) in expiring:
         promo = None
         while not promo or await conn.fetchval(
@@ -244,21 +239,15 @@ async def every10min(conn: asyncpg.Connection):
     if deletes:
         await conn.executemany("DELETE FROM bonus WHERE id=$1", deletes)
 
-    for chunk in chunks(
-        await conn.fetch("SELECT uid FROM rewardscollected WHERE deactivated = false"),
-        499,
-    ):
+    for chunk in chunks(await managers.rewardscollected.get_all_activated(), 499):
         try:
             await asyncio.sleep(0.5)
             members = await api.groups.is_member(
-                group_id=settings.vk.group_id, user_ids=[row[0] for row in chunk]
+                group_id=settings.vk.group_id, user_ids=[row.uid for row in chunk]
             )
             to_deactivate = [m.user_id for m in members if not m.member]
-            if to_deactivate:
-                await conn.execute(
-                    "UPDATE rewardscollected SET deactivated = true WHERE uid = ANY($1)",
-                    to_deactivate,
-                )
+            for uid in to_deactivate:
+                await managers.rewardscollected.turn(uid)
         except Exception:
             pass
 
@@ -305,11 +294,14 @@ async def everyminute(conn: asyncpg.Connection):
 async def run_notifications(conn: asyncpg.Connection):
     now = int(time.time())
     rows = await conn.fetch(
-        "select id, chat_id, tag, every, time, name, text from notifications where status = 1 and every != -1 and time < $1 and not exists (select 1 from blocked where uid = notifications.chat_id and type = 'chat')",
+        "select id, chat_id, tag, every, time, name, text from notifications where status = 1 and every != -1 and time < $1",
         now,
     )
     for row in rows:
         id_, chat_id, tag, every, ttime, name, text = row
+        if await managers.blocked.get(chat_id, "chat"):
+            await conn.execute("delete from notifications where chat_id=$1", chat_id)
+            continue
         try:
             call = False
             if tag == 1:

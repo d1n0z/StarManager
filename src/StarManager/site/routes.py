@@ -172,12 +172,11 @@ async def profile(request: Request):
         )
         if rep > 0:
             rep = "+" + str(rep)
-        premium = (
-            await conn.fetchval("select time from premium where uid=$1", user.id) or 0
-        )
         paymenthistory = await conn.fetch(
             "select date, type, sum, comment from paymenthistory where uid=$1", user.id
         )
+    premium = await managers.premium.get(user.id)
+    premium = premium.time if premium else 0
     paymenthistory = [
         models.PaymentHistory(
             date=datetime.fromtimestamp(int(i[0])).strftime("%d.%m.%Y"),
@@ -426,29 +425,14 @@ async def yookassa(request: Request):
         except Exception:
             pass
 
-        async with (await pool()).acquire() as conn:
-            if payment.chat_id:
-                await managers.public_chats.edit_premium(
-                    payment.chat_id, make_premium=True
-                )
-            elif payment.coins:
-                await utils.add_user_coins(payment.to_id, payment.coins)
-            else:
-                user_premium = await conn.fetchval(
-                    "select time from premium where uid=$1", payment.to_id
-                )
-                if user_premium is None:
-                    await conn.execute(
-                        "insert into premium (uid, time) VALUES ($1, $2)",
-                        payment.to_id,
-                        int(days * 86400 + time.time()),
-                    )
-                else:
-                    await conn.execute(
-                        "update premium set time = $1 where uid=$2",
-                        int(days * 86400 + user_premium),
-                        payment.to_id,
-                    )
+        if payment.chat_id:
+            await managers.public_chats.edit_premium(
+                payment.chat_id, make_premium=True
+            )
+        elif payment.coins:
+            await utils.add_user_coins(payment.to_id, payment.coins)
+        elif payment.to_id:
+            await managers.premium.add_premium(payment.to_id, days * 86400)
 
         if payment.chat_id:
             user = (await vkapi.users.get(user_ids=[payment.from_id]))[0]

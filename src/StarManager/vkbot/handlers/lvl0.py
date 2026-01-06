@@ -131,18 +131,8 @@ async def premium(message: Message):
 @bl.chat_message(SearchCMD("top"))
 async def top(message: Message):
     chat_id = message.peer_id - 2000000000
-    async with (await pool()).acquire() as conn:
-        msgs = await conn.fetch(
-            "select uid, messages from messages where uid>0 and messages>0 and chat_id=$1 and "
-            "uid=ANY($2) order by messages desc limit 10",
-            chat_id,
-            [
-                i.member_id
-                for i in (
-                    await api.messages.get_conversation_members(peer_id=message.peer_id)
-                ).items
-            ],
-        )
+    members = [i.member_id for i in (await api.messages.get_conversation_members(peer_id=message.peer_id)).items]
+    msgs = await managers.messages.top_in_chat_excluding(chat_id, members, limit=10)
     await messagereply(
         message,
         disable_mentions=1,
@@ -166,11 +156,8 @@ async def stats(message: Message):
         message, await messages.stats_loading(), disable_mentions=1
     )
 
-    async with (await pool()).acquire() as conn:
-        rewards = await conn.fetchval(
-            "select exists(select 1 from rewardscollected where uid=$1 and deactivated=false)",
-            message.from_id,
-        )
+    rewards = await managers.rewardscollected.get(message.from_id)
+    rewards = False if rewards is None else not rewards.deactivated
 
     acc = await managers.access_level.get(message.from_id, chat_id)
     access_level = acc.access_level if acc else 0
@@ -901,41 +888,31 @@ async def rewards(message: Message):
                 await get_user_nickname(uid, message.chat_id),
             ),
         )
-    async with (await pool()).acquire() as conn:
-        collected = await conn.fetchrow(
-            "select deactivated, date from rewardscollected where uid=$1", uid
-        )
-        if collected:
-            if collected[0]:
-                await conn.fetchrow(
-                    "update rewardscollected set deactivated=false where uid=$1", uid
-                )
-                return await messagereply(
-                    message,
-                    disable_mentions=1,
-                    message=await messages.rewards_activated(
-                        uid,
-                        await get_user_name(uid),
-                        await get_user_nickname(uid, message.chat_id),
-                        collected[1],
-                        7,
-                    ),
-                )
+    if collected := await managers.rewardscollected.get(uid):
+        if collected.deactivated:
+            await managers.rewardscollected.turn(uid)
             return await messagereply(
                 message,
                 disable_mentions=1,
-                message=await messages.rewards_collected(
+                message=await messages.rewards_activated(
                     uid,
                     await get_user_name(uid),
                     await get_user_nickname(uid, message.chat_id),
-                    datetime.fromtimestamp(collected[1]).strftime("%d.%m.%Y"),
+                    collected.date,
+                    7,
                 ),
             )
-        await conn.execute(
-            "insert into rewardscollected (uid, date, deactivated) values ($1, $2, false)",
-            uid,
-            int(time.time()),
+        return await messagereply(
+            message,
+            disable_mentions=1,
+            message=await messages.rewards_collected(
+                uid,
+                await get_user_name(uid),
+                await get_user_nickname(uid, message.chat_id),
+                datetime.fromtimestamp(collected.date).strftime("%d.%m.%Y"),
+            ),
         )
+    await managers.rewardscollected.cache._ensure_cached(uid, {"date": int(time.time()), "deactivated": False})
     await add_user_xp(uid, 10000)
     await messagereply(
         message,

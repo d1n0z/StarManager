@@ -108,12 +108,10 @@ async def action_handle(message: MessageNew) -> None:
 
     if uid == -settings.vk.group_id:
         async with (await pool()).acquire() as conn:
-            if block := await conn.fetchrow(
-                "select reason from blocked where uid=$1 and type='chat'", chat_id
-            ):
+            if block := await managers.blocked.get(chat_id, "chat"):
                 await utils.send_message(
                     event.peer_id,
-                    await messages.block_chatblocked(id, block[0]),
+                    await messages.block_chatblocked(id, block.reason),
                     keyboard.block_chatblocked(),
                 )
                 await api.messages.remove_chat_user(id, user_id=-settings.vk.group_id)
@@ -158,13 +156,11 @@ async def action_handle(message: MessageNew) -> None:
         await utils.kick_user(uid, chat_id=chat_id)
         return
     async with (await pool()).acquire() as conn:
-        if block := await conn.fetchrow(
-            "select reason from blocked where uid=$1 and type='user'", uid
-        ):
+        if block := await managers.blocked.get(uid, "user"):
             await utils.send_message(
                 event.peer_id,
                 await messages.block_blockeduserinvite(
-                    uid, await utils.get_user_name(uid), block[0]
+                    uid, await utils.get_user_name(uid), block.reason
                 ),
             )
             await utils.kick_user(uid, chat_id=chat_id)

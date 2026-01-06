@@ -450,19 +450,8 @@ async def chatlimit(message: Message):
         st = 0
         tst = 0
 
-    async with (await pool()).acquire() as conn:
-        chlim = await conn.fetchval(
-            "select time from chatlimit where chat_id=$1", chat_id
-        )
-        lpos = chlim or 1
-        if chlim is not None:
-            await conn.execute(
-                "update chatlimit set time = $1 where chat_id=$2", st, chat_id
-            )
-        else:
-            await conn.execute(
-                "insert into chatlimit (chat_id, time) values ($1, $2)", chat_id, st
-            )
+    chlim = await managers.chatlimit.edit_time(chat_id, st)
+    lpos = chlim or 1
 
     await messagereply(
         message,

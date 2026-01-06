@@ -590,10 +590,7 @@ async def antitag(message: Message):
         )
     chat_id = message.peer_id - 2000000000
     if data[1] == "add":
-        async with (await pool()).acquire() as conn:
-            await conn.execute(
-                "insert into antitag (uid, chat_id) values ($1, $2)", id, chat_id
-            )
+        await managers.antitag.add(id, chat_id)
         return await messagereply(
             message,
             disable_mentions=1,
@@ -601,10 +598,7 @@ async def antitag(message: Message):
                 id, await get_user_name(id), await get_user_nickname(id, chat_id)
             ),
         )
-    async with (await pool()).acquire() as conn:
-        await conn.execute(
-            "delete from antitag where uid=$1 and chat_id=$2", id, chat_id
-        )
+    await managers.antitag.remove(id, chat_id)
     return await messagereply(
         message,
         disable_mentions=1,

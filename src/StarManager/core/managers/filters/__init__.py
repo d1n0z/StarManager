@@ -4,6 +4,7 @@ from ..base import BaseManagerGroup
 from .chat_filters import ChatFiltersManager
 from .filters_exceptions import FiltersExceptionsManager
 from .global_filters import GlobalFiltersManager
+from .filtersettings import FilterSettingsManager
 
 
 class FiltersManager(BaseManagerGroup):
@@ -11,7 +12,8 @@ class FiltersManager(BaseManagerGroup):
         self.chat_f = ChatFiltersManager()
         self.global_f = GlobalFiltersManager()
         self.exceptions_f = FiltersExceptionsManager()
-        self.managers = [self.chat_f, self.global_f, self.exceptions_f]
+        self.filter_settings = FilterSettingsManager()
+        self.managers = [self.chat_f, self.global_f, self.exceptions_f, self.filter_settings]
 
     async def matches(self, chat_id: Optional[int], owner_id: Optional[int], text: str):
         matched = None

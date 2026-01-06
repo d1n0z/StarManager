@@ -459,15 +459,7 @@ async def get_user_access_level(
 async def get_user_last_message(
     uid: int, chat_id: int, none: Any = "Неизвестно"
 ) -> int | Any:
-    async with (await pool()).acquire() as conn:
-        return (
-            await conn.fetchval(
-                "select last_message from lastmessagedate where chat_id=$1 and uid=$2",
-                chat_id,
-                uid,
-            )
-            or none
-        )
+    return await managers.lastmessagedate.get_user_last_message(uid, chat_id) or none
 
 
 async def get_user_nickname(uid: int, chat_id: int, none: Any = None) -> str | Any:
@@ -557,10 +549,9 @@ async def get_xp_top(
         raise Exception('returnval must be "count" or "lvl"')
 
 
-@AsyncTTL(time_to_live=10, maxsize=0)
 async def get_user_premium(uid, none=0) -> int:
-    async with (await pool()).acquire() as conn:
-        return await conn.fetchval("select time from premium where uid=$1", uid) or none
+    u = await managers.premium.get(uid)
+    return u.time if u else none
 
 
 async def get_user_premmenu_setting(uid, setting, none) -> Any:
@@ -613,40 +604,24 @@ async def get_chat_command_level(chat_id, cmd, none) -> Any:
 
 
 async def get_user_messages(uid, chat_id, none=0) -> int:
-    async with (await pool()).acquire() as conn:
-        return (
-            await conn.fetchval(
-                "select messages from messages where chat_id=$1 and uid=$2",
-                chat_id,
-                uid,
-            )
-            or none
-        )
+    return await managers.messages.get_user_messages(uid, chat_id) or none
 
 
 async def add_user_xp(uid, addxp, checklvlbanned=True) -> None:
-    async with (await pool()).acquire() as conn:
-        if checklvlbanned:
-            if await conn.fetchval(
-                "select exists(select 1 from lvlbanned where uid=$1)", uid
-            ) or await conn.fetchval(
-                "select exists(select 1 from blocked where uid=$1 and type='user')", uid
-            ):
-                return
+    if checklvlbanned and (
+        await managers.blocked.get(uid, "user") or await managers.lvlbanned.exists(uid)
+    ):
+        return
     await managers.xp.add_user_xp(uid, addxp)
 
 
 async def add_user_coins(
     uid, addcoins, checklvlbanned=True, addlimit=False, bonus_peer_id=0
 ) -> None:
-    async with (await pool()).acquire() as conn:
-        if checklvlbanned:
-            if await conn.fetchval(
-                "select exists(select 1 from lvlbanned where uid=$1)", uid
-            ) or await conn.fetchval(
-                "select exists(select 1 from blocked where uid=$1 and type='user')", uid
-            ):
-                return
+    if checklvlbanned and (
+        await managers.blocked.get(uid, "user") or await managers.lvlbanned.exists(uid)
+    ):
+        return
     needed_message = await managers.xp.add_user_coins(
         uid,
         addcoins,
@@ -715,11 +690,8 @@ async def set_user_access_level(
 
 
 async def get_silence(chat_id) -> bool:
-    async with (await pool()).acquire() as conn:
-        return await conn.fetchval(
-            "select exists(select 1 from silencemode where chat_id=$1 and activated=True)",
-            chat_id,
-        )
+    mode = await managers.silencemode.get(chat_id)
+    return mode.activated if mode is not None else False
 
 
 @AsyncTTL(time_to_live=120, maxsize=0)
@@ -1082,14 +1054,15 @@ async def get_pool(chat_id, group) -> Optional[list[Any]]:
 
 
 async def get_silence_allowed(chat_id, custom: bool = False):
-    async with (await pool()).acquire() as conn:
-        lvls = await conn.fetchval(
-            f"select allowed{'_custom' if custom else ''} from silencemode where chat_id=$1",
-            chat_id,
-        )
-    if lvls is not None:
-        return literal_eval(lvls) + ([7, 8] if not custom else [])
-    return [7, 8] if not custom else []
+    default = [7, 8] if not custom else []
+    lvls = await managers.silencemode.get(chat_id)
+    if lvls is None:
+        return default
+    if custom:
+        lvls = lvls.allowed_custom
+    else:
+        lvls = lvls.allowed
+    return literal_eval(lvls) + default
 
 
 async def get_user_rep(uid):
@@ -1522,14 +1495,6 @@ async def is_higher(higher_id, lower_id, chat_id):
 async def set_premium_status(
     to_id: int, days: int, *, operation: Literal["add", "set"] = "set"
 ):
-    async with (await pool()).acquire() as conn:
-        if not await conn.fetchval(
-            f"update premium set time {'= time +' if operation == 'add' else '='} $1 where uid=$2 returning 1",
-            (time.time() if operation == "set" else 0) + days * 86400,
-            to_id,
-        ):
-            await conn.execute(
-                "insert into premium (uid, time) values ($1, $2)",
-                to_id,
-                time.time() + days * 86400,
-            )
+    if operation == "add":
+        return await managers.premium.add_premium(to_id, days * 86400)
+    return await managers.premium.set_premium(to_id, days * 86400)
