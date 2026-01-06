@@ -189,7 +189,7 @@ async def every10min(conn: asyncpg.Connection):
         row[0] for row in await conn.fetch("SELECT uid FROM premiumexpirenotified")
     }
     expiring = [i for i in await managers.premium.get_expiring() if i not in notified]
-    for (uid,) in expiring:
+    for uid in expiring:
         promo = None
         while not promo or await conn.fetchval(
             "SELECT EXISTS(SELECT 1 FROM prempromo WHERE promo = $1)", promo
