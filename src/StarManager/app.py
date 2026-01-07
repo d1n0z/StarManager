@@ -1,4 +1,5 @@
 import asyncio
+import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -11,7 +12,7 @@ from loguru import logger
 from starlette.middleware.sessions import SessionMiddleware
 
 from StarManager import scheduler
-from StarManager.core import managers, tables
+from StarManager.core import managers, redis, tables
 from StarManager.core.config import settings
 from StarManager.core.logging import setup_logs
 from StarManager.site.routes import router
@@ -25,6 +26,11 @@ setup_logs()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Lifespan startup: init DB and objects")
+
+    redis_manager = redis.RedisManager()
+    await redis_manager.init()
+    app.state.redis = redis_manager.redis
+
     await tables.init()
     await managers.initialize()
 
@@ -44,10 +50,6 @@ async def lifespan(app: FastAPI):
 
     app.state.bg_tasks = []
 
-    from StarManager.core.event_queue import event_queue
-
-    await event_queue.load_from_disk()
-
     await load_messages.load()
 
     tg_bot = TgBot()
@@ -55,26 +57,25 @@ async def lifespan(app: FastAPI):
     app.state.tg_bot = tg_bot
 
     async def _process_queued_events():
-        from StarManager.core.event_queue import event_queue
         from StarManager.site.routes import _vk_tasks, process_vk_event
 
-        try:
-            while True:
-                if len(_vk_tasks) < 50 and event_queue.qsize() > 0:
-                    data = await event_queue.get()
+        redis = app.state.redis
+        while True:
+            if len(_vk_tasks) < 50:
+                result = await redis.brpop("vk_events", timeout=1)
+                if result:
+                    _, data_str = result
+                    data = json.loads(data_str)
                     await process_vk_event(data, data.get("type"))
-                else:
-                    await asyncio.sleep(5)
-        except asyncio.CancelledError:
-            logger.info("Queue processor cancelled")
-            raise
+            else:
+                await asyncio.sleep(0.1)
 
     async def _monitor_tasks():
+        redis = app.state.redis
         try:
             while True:
                 await asyncio.sleep(60)
                 from StarManager.core.db import pool as get_pool
-                from StarManager.core.event_queue import event_queue
                 from StarManager.site.routes import _vk_tasks
 
                 try:
@@ -83,7 +84,7 @@ async def lifespan(app: FastAPI):
                 except Exception:
                     pool_info = "DB: ?"
                 logger.debug(
-                    f"VK tasks: {len(_vk_tasks)} | Queued: {event_queue.qsize()} | {pool_info}"
+                    f"VK tasks: {len(_vk_tasks)} | Queued: {await redis.llen('vk_events')} | {pool_info}"
                 )
         except asyncio.CancelledError:
             logger.info("Monitor task cancelled")
@@ -111,6 +112,8 @@ async def lifespan(app: FastAPI):
     finally:
         logger.info("Lifespan shutdown: stopping bg tasks and scheduler")
 
+        await app.state.redis.close()
+
         app.state.scheduler.shutdown(wait=False)
         logger.info("Scheduler stopped")
 
@@ -123,11 +126,7 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"Managers close error: {e}")
 
-        from StarManager.core.event_queue import event_queue
         from StarManager.site.routes import _vk_tasks
-
-        logger.info("Saving pending events to disk...")
-        await event_queue.save_to_disk()
 
         if _vk_tasks:
             logger.warning(f"Cancelling {len(_vk_tasks)} pending VK tasks")

@@ -23,7 +23,6 @@ from StarManager.core import managers, utils
 from StarManager.core.config import api as vkapi
 from StarManager.core.config import settings, sitedata
 from StarManager.core.db import smallpool as pool
-from StarManager.core.event_queue import event_queue
 from StarManager.site import enums, models
 from StarManager.site.utils import (
     check_tg_timings,
@@ -626,7 +625,7 @@ async def health(request: Request):
             "status": "ok" if (db_ok and scheduler_ok) else "degraded",
             "timestamp": time.time(),
             "vk_tasks": len(_vk_tasks),
-            "vk_queued": event_queue.qsize(),
+            "vk_queued": await request.app.state.redis.llen("vk_events"),
             "vk_tasks_completed": _vk_tasks_completed,
             "vk_tasks_timedout": await get_vk_timeouts_count(),
             "db": {
@@ -697,7 +696,6 @@ async def process_vk_event(data, data_type):
 @router.post("/api/listener/vk")
 async def vk(request: Request):
     data = await request.json()
-
     if (data_type := data.get("type")) is None:
         return PlainTextResponse('Error: no "type" field.')
     if data_type == "confirmation":
@@ -705,33 +703,8 @@ async def vk(request: Request):
     if data.get("secret") != settings.vk.callback_secret:
         return PlainTextResponse('Error: wrong "secret" key.')
 
-    if len(_vk_tasks) > 50:
-        queued_events = event_queue.qsize()
-        if queued_events >= 1000:
-            logger.warning(f"Queued {queued_events} events, dropping queue!")
-            await event_queue.drop_all()
-            queued_events = 0
-            for task in list(_vk_tasks):
-                try:
-                    task.cancel()
-                except Exception:
-                    pass
-            await asyncio.sleep(0)
-
-            return PlainTextResponse("ok")
-        else:
-            try:
-                await asyncio.wait_for(event_queue.put(data), timeout=0.5)
-            except asyncio.TimeoutError:
-                pass
-            if (queued_events + 1) % 100 == 0:
-                logger.warning(
-                    f"Queued {queued_events + 1} events, tasks: {len(_vk_tasks)}"
-                )
-
-            return PlainTextResponse("ok")
-
-    await process_vk_event(data, data_type)
+    redis = request.app.state.redis
+    await redis.lpush("vk_events", json.dumps(data))
     return PlainTextResponse("ok")
 
 
