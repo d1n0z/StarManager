@@ -636,12 +636,15 @@ async def gkick_hint():
 async def banlist(res, bancount):
     msg = await get("banlist", bancount=bancount)
     for k, i in enumerate(res):
-        nickname = await utils.get_user_nickname(i[0], i[1])
-        cause = literal_eval(i[2])[-1]
+        nickname = await utils.get_user_nickname(i.uid, i.chat_id)
+        if not i.last_bans_causes or not (
+            cause := literal_eval(i.last_bans_causes)[-1]
+        ):
+            cause = "Без указания причины"
         msg += (
-            f"[{k + 1}]. [id{i[0]}|{nickname or await utils.get_user_name(i[0])}] | "
-            f"{int((i[3] - time.time()) / 86400) + 1} дней | "
-            f"{cause if cause else 'Без указания причины'} | Выдал: {literal_eval(i[4])[-1]}\n"
+            f"[{k + 1}]. [id{i.uid}|{nickname or await utils.get_user_name(i.uid)}] | "
+            f"{int((i.ban - time.time()) / 86400) + 1} дней | "
+            f"{cause} | Выдал: {literal_eval(i.last_bans_names)[-1]}\n"
         )
     return msg
 
