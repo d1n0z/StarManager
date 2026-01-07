@@ -674,7 +674,7 @@ async def process_vk_event(data, data_type):
 
         try:
             async with _vk_semaphore:
-                await asyncio.wait_for(vkbot.process_event(data), timeout=60)
+                await asyncio.wait_for(vkbot.process_event(data), timeout=120)
                 async with _vk_tasks_completed_lock:
                     _vk_tasks_completed += 1
         except asyncio.TimeoutError:
