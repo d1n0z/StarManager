@@ -275,39 +275,27 @@ async def clear(message: Message):
     uid = message.from_id
 
     delete_from = await search_id_in_message(message.text, None)
-    if delete_from:
-        if await get_user_access_level(
-            delete_from, chat_id
-        ) > await get_user_access_level(uid, chat_id):
-            return await messagereply(
-                message, disable_mentions=1, message=await messages.clear_higher()
-            )
-        to_delete = [
-            (delete_from, i)
-            for i in await managers.chat_user_cmids.get_cmids(delete_from, chat_id)
-        ]
-    else:
-        to_delete: list[tuple[int, int]] = []
-        for i in (
-            (message.fwd_messages + [message.reply_message])
-            if message.reply_message
-            else message.fwd_messages
-        ):
-            to_delete.append((i.from_id, i.conversation_message_id))
-        if not to_delete:
-            return await messagereply(
-                message, disable_mentions=1, message=await messages.clear_hint()
-            )
-        to_delete = [
-            i
-            for i in to_delete
-            if await get_user_access_level(i[0], chat_id)
-            <= await get_user_access_level(uid, chat_id)
-        ]
-        if not to_delete:
-            return await messagereply(
-                message, disable_mentions=1, message=await messages.clear_higher()
-            )
+    to_delete: list[tuple[int, int]] = []
+    for i in (
+        (message.fwd_messages + [message.reply_message])
+        if message.reply_message
+        else message.fwd_messages
+    ):
+        to_delete.append((i.from_id, i.conversation_message_id))
+    if not to_delete:
+        return await messagereply(
+            message, disable_mentions=1, message=await messages.clear_hint()
+        )
+    to_delete = [
+        i
+        for i in to_delete
+        if await get_user_access_level(i[0], chat_id)
+        <= await get_user_access_level(uid, chat_id)
+    ]
+    if not to_delete:
+        return await messagereply(
+            message, disable_mentions=1, message=await messages.clear_higher()
+        )
 
     try:
         deleted = []

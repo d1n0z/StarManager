@@ -6,7 +6,6 @@ from .antitag import AntitagManager
 from .blocked import BlockedManager
 from .chat_settings import ChatSettingsManager
 from .chatlimit import ChatLimitManager
-from .chatusercmids import ChatUserCMIDsManager
 from .cmdnames import CommandNamesManager
 from .commands_cooldown import CommandsCooldownManager
 from .custom_access_level import CustomAccessLevelManager
@@ -35,7 +34,6 @@ managers = [
     blocked := BlockedManager(),
     chat_settings := ChatSettingsManager(),
     chatlimit := ChatLimitManager(),
-    chat_user_cmids := ChatUserCMIDsManager(),
     cmdnames := CommandNamesManager(),
     commands_cooldown := CommandsCooldownManager(),
     custom_access_level := CustomAccessLevelManager(),

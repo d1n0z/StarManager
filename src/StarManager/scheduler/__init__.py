@@ -430,7 +430,6 @@ async def everyday(conn: asyncpg.Connection):
         try:
             await conn.execute("UPDATE shop SET limits='[0, 0, 0, 0, 0]'")
             await managers.xp.nullify_xp_limit()
-            await managers.chat_user_cmids.clear()
         except asyncpg.exceptions.DeadlockDetectedError:
             if attempt == 12 - 1:
                 raise
