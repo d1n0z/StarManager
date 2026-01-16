@@ -114,10 +114,18 @@ def createStatsImage(
     )
 
     new = Image.new("RGBA", img.size, (255, 255, 255, 0))
+
+    center = img.size[0] // 2
+    half_text = (font.size * len(lvl_name)) // 2
+    max_half = img.size[0] // 4.5
+
+    left = max(center - half_text - 5, center - max_half)
+    right = min(center + half_text + 5, center + max_half)
+
     ImageDraw.Draw(new).rounded_rectangle(
         [
-            (img.size[0] // 2 - (font.size * len(lvl_name) // 2) - 5, 405.5),
-            (img.size[0] // 2 + (font.size * len(lvl_name) // 2) + 5, 440.5),
+            (left, 405.5),
+            (right, 440.5),
         ],
         fill=(0, 0, 0, 0),
         outline=color,

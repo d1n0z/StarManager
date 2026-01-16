@@ -108,13 +108,11 @@ async def message_handle(event: MessageNew) -> Any:
         chat_id, await get_chat_owner(chat_id), msg
     ):
         pnt = await managers.filters.filter_settings.get(chat_id)
-        if not pnt:
+        if not pnt or pnt.punishment == 0:
             return await delete_messages(
                 event.object.message.conversation_message_id, chat_id
             )
-        else:
-            pnt = pnt.punishment
-        if pnt == 1:
+        elif pnt.punishment == 1:
             mute_time = 315360000
             await managers.mute.mute(uid, chat_id, mute_time, "Фильтрация слов")
             await set_chat_mute(uid, chat_id)

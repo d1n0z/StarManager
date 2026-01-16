@@ -1,6 +1,7 @@
 import time
 
 from cache.async_ttl import AsyncTTL
+from vkbottle.bot import Message
 
 import StarManager.vkbot.messages as messages
 from StarManager.core import managers
@@ -96,9 +97,11 @@ async def getUChatLimit(msgtime, get_user_last_message_params, u_acc, chat_id) -
 
 
 async def checkCMD(
-    message, chat_id, fixing=False, accesstoalldevs=False, returncmd=False
+    message: Message, chat_id, fixing=False, accesstoalldevs=False, returncmd=False
 ) -> bool | str:
     uid = message.from_id
+    if message.action is not None:
+        return False
     if uid < 0:
         return False
     try:

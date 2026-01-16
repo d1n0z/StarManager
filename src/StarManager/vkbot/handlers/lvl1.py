@@ -144,13 +144,18 @@ async def mute(message: Message):
             message, disable_mentions=1, message=await messages.mute_myself()
         )
 
+    reason_pos = 0
     try:
-        if (mute_time := int(data[1 + (not message.reply_message)])) < 1:
+        if (mute_time := min(1000000, int(data[1 + (not message.reply_message)]))) < 1:
             raise Exception
     except Exception:
-        return await messagereply(
-            message, disable_mentions=1, message=await messages.mute_hint()
-        )
+        if (len(data) >= 3 and not data[2].isdigit()) or len(data) == 1 + (not message.reply_message):
+            mute_time = 1000000
+            reason_pos = -1
+        else:
+            return await messagereply(
+                message, disable_mentions=1, message=await messages.mute_hint()
+            )
 
     if mute_time == id:
         return await messagereply(
@@ -177,7 +182,7 @@ async def mute(message: Message):
         )
 
     u_name = await get_user_name(uid)
-    mute_cause = " ".join(data[2 + +(not message.reply_message) :])
+    mute_cause = " ".join(data[2 + +(not message.reply_message) + reason_pos:])
     await managers.mute.mute(
         id,
         chat_id,

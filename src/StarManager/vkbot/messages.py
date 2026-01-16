@@ -157,6 +157,7 @@ async def mute_hint():
 
 
 async def mute(name, nick, id, mutingname, mutingnick, mutingid, cause, time):
+    time = f"на {time} минут" if time < 1000000 else "навсегда"
     return await get(
         "mute",
         id=id,
@@ -421,9 +422,10 @@ async def mutelist(res, mutedcount):
             cause := literal_eval(item.last_mutes_causes)[-1]
         ):
             cause = "Без указания причины"
+        mins = int((item.mute - time.time()) / 60)
         msg += (
             f"[{ind + 1}]. [id{item.uid}|{nickname or await utils.get_user_name(item.uid)}]"
-            f" | {int((item.mute - time.time()) / 60)} минут | {cause}"
+            f" | {f'{mins} минут' if mins <= 999999 else 'навсегда'} | {cause}"
             f" | Выдал: {literal_eval(item.last_mutes_names)[-1]}\n"
         )
     return msg
@@ -2188,7 +2190,7 @@ async def check_mute(
         mutem=utils.pluralize_minutes(mute) if mute else "Отсутствует",
     )
     if mute:
-        msg += f"★ {mute_date} | {mute_from} | {utils.pluralize_minutes(mute_time)} | {mute_reason}"
+        msg += f"★ {mute_date} | {mute_from} | {utils.pluralize_minutes(mute_time) if mute_time // 60 < 1000000 else 'навсегда'} | {mute_reason}"
     return msg
 
 
