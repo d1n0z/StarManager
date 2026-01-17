@@ -199,7 +199,7 @@ class RewardsCollectedManager(BaseManager):
 
     async def turn(self, uid: int):
         u = await self.get(uid)
-        return self.cache.edit(
+        return await self.cache.edit(
             _make_cache_key(uid), deactivated=(not u.deactivated) if u else True
         )
 
