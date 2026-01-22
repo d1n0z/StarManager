@@ -573,7 +573,7 @@ async def transfer(message: Message):
                 )
             ]
         )
-    if (td + tcoins >= 500 and not u_prem) or (td + tcoins >= 1000 and not u_prem):
+    if (td + tcoins > 500 and not u_prem) or (td + tcoins > 1000 and not u_prem):
         return await messagereply(
             message, disable_mentions=1, message=await messages.transfer_limit(u_prem)
         )

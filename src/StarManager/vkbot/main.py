@@ -2,7 +2,6 @@ from loguru import logger
 from vkbottle import GroupEventType, GroupTypes, VKAPIError
 from vkbottle.framework.labeler import BotLabeler
 
-from StarManager.core import managers
 from StarManager.vkbot.bot import bot
 from StarManager.vkbot.comment_handlers import comment_handle
 from StarManager.vkbot.handlers import found_labelers
