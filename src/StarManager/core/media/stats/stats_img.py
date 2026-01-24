@@ -55,7 +55,7 @@ def createStatsImage(
 
     font = ImageFont.truetype(f"{settings.service.path}src/StarManager/core/media/fonts/statsimg_font_bold.ttf", 24)
     draw.text((107, 186), f"{messages}", font=font, fill=(255, 255, 255))
-    draw.text((107, 260), f"{starcoins}", font=font, fill=(255, 255, 255))
+    draw.text((107, 260), f"{int(starcoins)}", font=font, fill=(255, 255, 255))
     draw.text((107, 335), f"{last_activity}", font=font, fill=(255, 255, 255))
     draw.text(
         (107, 410),
