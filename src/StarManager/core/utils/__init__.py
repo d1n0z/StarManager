@@ -1203,15 +1203,28 @@ def generate_medium_problem():
 
 def generate_hard_problem():
     x = random.randint(12, 199)
-    if random.randint(0, 1):
-        a, b = random.randint(100, 1000), random.randint(100, 1000)
+    if random.choice([True, False]):
+        a = random.randint(100, 1000)
+        b = random.randint(100, 1000)
         return f"({a}X * {b} = {a * x * b}) → X = ?", x
     else:
-        a = random.randint(100, 1000)
-        b = random.randint(10, 1000)
-        while a % b != 0 or a == b:
+        for _ in range(100):
             b = random.randint(10, 1000)
-        return f"({a}X / {b} = {int(a * x / b)}) → X = ?", x
+            max_k = 1000 // b
+            min_k = max(2, (100 + b - 1) // b)
+            if max_k >= min_k:
+                k = random.randint(min_k, max_k)
+                a = b * k
+                if a != b:
+                    return f"({a}X / {b} = {a * x // b}) → X = ?", x
+
+        a = random.randint(100, 1000)
+        divs = [d for d in range(10, min(a, 1000) + 1) if a % d == 0 and d != a]
+        if divs:
+            b = random.choice(divs)
+            return f"({a}X / {b} = {a * x // b}) → X = ?", x
+
+        raise RuntimeError("Не удалось сгенерировать корректную задачу деления.")
 
 
 async def messagereply(
