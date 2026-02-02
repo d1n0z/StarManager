@@ -675,6 +675,13 @@ async def gsnick(message: Message):
                     chat_id,
                     nickname,
                 )
+            await conn.execute(
+                "insert into nicknamehistory (uid, chat_id, nickname, from_user) values ($1, $2, $3, $4) on conflict do nothing",
+                id,
+                chat_id,
+                nickname,
+                f"[id{uid}|{u_name}]",
+            )
 
         await send_message(
             peer_ids=chat_id + 2000000000,

@@ -149,7 +149,9 @@ async def mute(message: Message):
         if (mute_time := min(1000000, int(data[1 + (not message.reply_message)]))) < 1:
             raise Exception
     except Exception:
-        if (len(data) >= 3 and not data[2].isdigit()) or len(data) == 1 + (not message.reply_message):
+        if (len(data) >= 3 and not data[2].isdigit()) or len(data) == 1 + (
+            not message.reply_message
+        ):
             mute_time = 1000000
             reason_pos = -1
         else:
@@ -182,7 +184,7 @@ async def mute(message: Message):
         )
 
     u_name = await get_user_name(uid)
-    mute_cause = " ".join(data[2 + +(not message.reply_message) + reason_pos:])
+    mute_cause = " ".join(data[2 + +(not message.reply_message) + reason_pos :])
     await managers.mute.mute(
         id,
         chat_id,
@@ -382,6 +384,7 @@ async def snick(message: Message):
             message, disable_mentions=1, message=await messages.snick_higher()
         )
 
+    from_name = await get_user_name(uid)
     oldnickname = await get_user_nickname(id, chat_id)
     async with (await pool()).acquire() as conn:
         if not await conn.fetchval(
@@ -396,13 +399,20 @@ async def snick(message: Message):
                 chat_id,
                 nickname,
             )
+        await conn.execute(
+            "insert into nicknamehistory (uid, chat_id, nickname, from_user) values ($1, $2, $3, $4) on conflict do nothing",
+            id,
+            chat_id,
+            nickname,
+            f"[id{uid}|{from_name}]",
+        )
 
     await messagereply(
         message,
         disable_mentions=1,
         message=await messages.snick(
             uid,
-            await get_user_name(uid),
+            from_name,
             await get_user_nickname(uid, chat_id),
             id,
             await get_user_name(id),

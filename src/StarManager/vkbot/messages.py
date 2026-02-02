@@ -2210,6 +2210,21 @@ async def check_warn(
     return msg
 
 
+async def check_nickname(
+    id, name, nickname, nicknames: list[tuple[str, str, datetime]], page: int
+):
+    msg = await get(
+        "check_nickname",
+        id=id,
+        n=name,
+        lnh=len(nicknames),
+        current_nickname=f"\n➜ Активный никнейм : {nickname}" if nickname else "",
+    )
+    for nickname, from_user, created_at in nicknames[page * 15 : page * 15 + 15]:
+        msg += f"★ {created_at.strftime('%Y:%m:%d %H:%M:%S')} | Установил: {from_user} | Ник: {nickname}\n"
+    return msg
+
+
 async def check_history_ban(id, name, nickname, dates, names, times, causes):
     msg = await get("check_history_ban", id=id, n=nickname or name)
     for k in range(len(times)):

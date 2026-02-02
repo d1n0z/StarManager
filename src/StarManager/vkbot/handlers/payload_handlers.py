@@ -2299,6 +2299,22 @@ async def check(message: MessageEvent):
             message.conversation_message_id,
             keyboard.check_history(sender, id, "warn", len(u_warns_causes)),
         )
+    elif check == "nickname":
+        page = payload["page"]
+        async with (await pool()).acquire() as conn:
+            res = await conn.fetch("select nickname, from_user, created_at from nicknamehistory where uid=$1 and chat_id=$2", id, chat_id)
+        await utils.edit_message(
+            await messages.check_nickname(
+                id,
+                await utils.get_user_name(id),
+                await utils.get_user_nickname(id, chat_id),
+                res,
+                page
+            ),
+            peer_id,
+            message.conversation_message_id,
+            keyboard.check_paginate(sender, id, "nickname", page, len(res)),
+        )
 
 
 @bl.raw_event(
@@ -3037,6 +3053,7 @@ async def import_start(message: MessageEvent):
                         chatid,
                         *i,
                     )
+
         if settings["punishes"]:
             for i in await managers.warn.get_all(importchatid):
                 await managers.warn.cache._ensure_cached(

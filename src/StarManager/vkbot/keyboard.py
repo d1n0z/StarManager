@@ -1556,14 +1556,16 @@ def check(uid, id):
     kb = Keyboard(inline=True)
 
     kb.add(
-        Callback("Блокировки", {"cmd": "check", "uid": uid, "id": id, "check": "ban"})
+        Callback("⛔️ Блокировки", {"cmd": "check", "uid": uid, "id": id, "check": "ban"})
     )
     kb.add(
         Callback(
-            "Предупреждения", {"cmd": "check", "uid": uid, "id": id, "check": "warn"}
+            "⚠️ Варны", {"cmd": "check", "uid": uid, "id": id, "check": "warn"}
         )
     )
-    kb.add(Callback("Муты", {"cmd": "check", "uid": uid, "id": id, "check": "mute"}))
+    kb.row()
+    kb.add(Callback("🕒 Муты", {"cmd": "check", "uid": uid, "id": id, "check": "mute"}))
+    kb.add(Callback("📝 Никнеймы", {"cmd": "check", "uid": uid, "id": id, "check": "nickname", "page": 0}))
 
     return kb.get_json()
 
@@ -1587,6 +1589,22 @@ def check_history(uid, id, punishment, isempty):
             },
         )
     )
+
+    return kb.get_json()
+
+
+def check_paginate(uid, id, field, page, size):
+    if size < 15:
+        return None
+    kb = Keyboard(inline=True)
+
+    if page > 0:
+        kb.add(Callback("⏪", {"cmd": "check", "uid": uid, "id": id, "check": "nickname", "page": page - 1}))
+    kb.add(
+        Callback(f"[{page}/{size // 15 + bool(size % 15)}]", {"cmd": "_"})
+    )
+    if size > (15 * page) + 15:
+        kb.add(Callback("⏩", {"cmd": "check", "uid": uid, "id": id, "check": "nickname", "page": page + 1}))
 
     return kb.get_json()
 

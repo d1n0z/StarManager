@@ -816,6 +816,18 @@ class RewardsPool(Model):
         table = "rewardspool"
 
 
+class NicknameHistory(Model):
+    uid = fields.IntField()
+    chat_id = fields.IntField(db_index=True)
+    nickname = fields.TextField()
+    from_user = fields.TextField()
+    created_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        table = "nicknamehistory"
+        unique_together = (("uid", "chat_id", "nickname", "from_user"),)
+
+
 async def init() -> None:
     await Tortoise.init(config=database_config)
     await Tortoise.generate_schemas()
