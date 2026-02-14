@@ -14,9 +14,9 @@ from StarManager.core.managers.custom_access_level import CachedCustomAccessLeve
 
 
 @AsyncLRU(maxsize=0)
-async def get(key: str, **kwargs):
+async def get(key: str, **kwargs) -> str:
     async with (await pool()).acquire() as conn:
-        msg = await conn.fetchval("select text from botmessages where key=$1", key)
+        msg: str = await conn.fetchval("select text from botmessages where key=$1", key)
     if msg is None:
         raise Exception(f'unknown message key "{key}"')
     return msg.format(**kwargs)
@@ -3294,3 +3294,32 @@ async def event(cases_recieved, has_cases):
         cases=min(cases_recieved, 14),
         has_cases=f"❄️ Доступно кейсов: {has_cases}" if has_cases > 0 else "",
     )
+
+
+async def logs_help():
+    return await get("logs_help")
+
+
+async def logs_higher():
+    return await get("logs_higher")
+
+
+async def logs(uid, uname, unick, category, _logs):
+    return await get(
+        "logs",
+        uid=uid,
+        un=unick or uname,
+        cat={1: "пользователя", 2: "администратора"}.get(category),
+    ) + "\n".join(_logs)
+
+
+async def gnick_help():
+    return await get("gnick_help")
+
+
+async def gnick_none():
+    return await get("gnick_none")
+
+
+async def gnick(uid, u_name, nick):
+    return await get("gnick", uid=uid, uname=u_name, unick=nick)

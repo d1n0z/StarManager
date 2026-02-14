@@ -58,7 +58,7 @@ async def unmute(message: Message):
         message,
         disable_mentions=1,
         message=await messages.unmute(
-            await get_user_name(uid),
+            u_name := await get_user_name(uid),
             await get_user_nickname(uid, chat_id),
             uid,
             await get_user_name(id),
@@ -67,16 +67,22 @@ async def unmute(message: Message):
         ),
         keyboard=keyboard.deletemessages(uid, [message.conversation_message_id]),
     )
+    await managers.logs.add_log(
+        message.from_id, chat_id, 1, f"/unmute {' '.join(message.text.split()[1:])}"
+    )
+    await managers.logs.add_log(
+        id,
+        chat_id,
+        2,
+        "Снятие блокировки чата",
+        by_name=f"[id{message.from_id}|{u_name}]",
+    )
 
 
 @bl.chat_message(SearchCMD("mutelist"))
 async def mutelist(message: Message):
     now = time.time()
-    res = [
-        i
-        for i in await managers.mute.get_all(message.peer_id - 2000000000)
-        if i.mute > now
-    ]
+    res = [i for i in await managers.mute.get_all(message.chat_id) if i.mute > now]
     muted_count = len(res)
     res = sorted(
         res[:30],
@@ -89,6 +95,7 @@ async def mutelist(message: Message):
         message=await messages.mutelist(res, muted_count),
         keyboard=keyboard.mutelist(message.from_id, 0, muted_count),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/mutelist")
 
 
 @bl.chat_message(SearchCMD("unwarn"))
@@ -128,7 +135,7 @@ async def unwarn(message: Message):
         message,
         disable_mentions=1,
         message=await messages.unwarn(
-            await get_user_name(uid),
+            u_name := await get_user_name(uid),
             await get_user_nickname(uid, chat_id),
             uid,
             await get_user_name(id),
@@ -137,15 +144,21 @@ async def unwarn(message: Message):
         ),
         keyboard=keyboard.deletemessages(uid, [message.conversation_message_id]),
     )
+    await managers.logs.add_log(
+        message.from_id, chat_id, 1, f"/unwarn {' '.join(message.text.split()[1:])}"
+    )
+    await managers.logs.add_log(
+        id,
+        chat_id,
+        2,
+        "Снятие предупреждения",
+        by_name=f"[id{message.from_id}|{u_name}]",
+    )
 
 
 @bl.chat_message(SearchCMD("warnlist"))
 async def warnlist(message: Message):
-    res = [
-        i
-        for i in await managers.warn.get_all(message.peer_id - 2000000000)
-        if i and i.warns > 0
-    ]
+    res = [i for i in await managers.warn.get_all(message.chat_id) if i and i.warns > 0]
     count = len(res)
     res = sorted(res[:30], key=lambda i: i.uid, reverse=True)
     await messagereply(
@@ -154,6 +167,7 @@ async def warnlist(message: Message):
         message=await messages.warnlist(res, count),
         keyboard=keyboard.warnlist(message.from_id, 0, count),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/warnlist")
 
 
 @bl.chat_message(SearchCMD("setaccess"))
@@ -219,7 +233,7 @@ async def setaccess(message: Message):
         disable_mentions=1,
         message=await messages.setacc(
             uid,
-            await get_user_name(uid),
+            u_name := await get_user_name(uid),
             await get_user_nickname(uid, chat_id),
             acc,
             id,
@@ -227,6 +241,19 @@ async def setaccess(message: Message):
             await get_user_nickname(id, chat_id),
             await get_chat_access_name(chat_id, acc),
         ),
+    )
+    await managers.logs.add_log(
+        message.from_id,
+        chat_id,
+        1,
+        f"/setaccess {' '.join(data[1:])}",
+    )
+    await managers.logs.add_log(
+        id,
+        chat_id,
+        2,
+        f"Выдача уровня прав - {acc}",
+        by_name=f"[id{message.from_id}|{u_name}]",
     )
 
 
@@ -276,10 +303,23 @@ async def delaccess(message: Message):
         disable_mentions=1,
         message=await messages.delaccess(
             uid,
-            await get_user_name(uid),
+            u_name := await get_user_name(uid),
             await get_user_nickname(uid, chat_id),
             id,
             await get_user_name(id),
             await get_user_nickname(id, chat_id),
         ),
+    )
+    await managers.logs.add_log(
+        message.from_id,
+        chat_id,
+        1,
+        f"/delaccess {' '.join(message.text.split()[1:])}",
+    )
+    await managers.logs.add_log(
+        id,
+        chat_id,
+        2,
+        f"Снятие уровня прав - {ch_acc}",
+        by_name=f"[id{message.from_id}|{u_name}]",
     )

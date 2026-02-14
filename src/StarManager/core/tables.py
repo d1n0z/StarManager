@@ -762,13 +762,13 @@ class RaidMode(Model):
         table = "raidmode"
 
 
-class ChatUserCMIDs(Model):  # questionable solution, looking for a new one
-    chat_id = fields.IntField()
-    uid = fields.IntField()
-    cmid = fields.IntField()
+# class ChatUserCMIDs(Model):  # questionable solution, looking for a new one
+#     chat_id = fields.IntField()
+#     uid = fields.IntField()
+#     cmid = fields.IntField()
 
-    class Meta:
-        table = "chatusercmids"
+#     class Meta:
+#         table = "chatusercmids"
 
 
 class UpCommandLogs(Model):
@@ -826,6 +826,13 @@ class NicknameHistory(Model):
     class Meta:
         table = "nicknamehistory"
         unique_together = (("uid", "chat_id", "nickname", "from_user"),)
+
+
+class Log(Model):
+    uid = fields.IntField()
+    chat_id = fields.IntField(db_index=True)
+    category = fields.IntField()
+    logs = fields.TextField(null=True)
 
 
 async def init() -> None:

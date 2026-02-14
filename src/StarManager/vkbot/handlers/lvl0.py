@@ -61,14 +61,19 @@ bl = BotLabeler()
 @bl.chat_message(SearchCMD("test"))
 @bl.chat_message(SearchCMD("chatid"))
 async def test_handler(message: Message):
-    await messagereply(message, f"💬 ID данной беседы : {message.peer_id - 2000000000}")
+    chat_id = message.peer_id - 2000000000
+    await messagereply(message, f"💬 ID данной беседы : {chat_id}")
+    await managers.logs.add_log(message.from_id, chat_id, 1, "/test")
 
 
 @bl.chat_message(SearchCMD("id"))
 async def id(message: Message):
     id = await search_id_in_message(message.text, message.reply_message)
     if not id:
+        args = ""
         id = message.from_id
+    else:
+        args = f" {' '.join(message.text.split()[1:])}"
     if id < 0:
         return await messagereply(
             message, disable_mentions=1, message=await messages.id_group()
@@ -79,7 +84,8 @@ async def id(message: Message):
         return await messagereply(
             message, disable_mentions=1, message=await messages.id_deleted()
         )
-    last_message = await get_user_last_message(id, message.peer_id - 2000000000, None)
+    chat_id = message.peer_id - 2000000000
+    last_message = await get_user_last_message(id, chat_id, None)
     if isinstance(last_message, int):
         last_message = datetime.fromtimestamp(last_message).strftime("%d.%m.%Y / %H:%M")
     await messagereply(
@@ -93,6 +99,7 @@ async def id(message: Message):
             last_message,
         ),
     )
+    await managers.logs.add_log(message.from_id, chat_id, 1, f"/id{args}")
 
 
 @bl.chat_message(SearchCMD("q"))
@@ -116,22 +123,30 @@ async def q(message: Message):
             uid, await get_user_name(uid), await get_user_nickname(uid, chat_id)
         ),
     )
+    await managers.logs.add_log(message.from_id, chat_id, 1, "/q")
 
 
 @bl.chat_message(SearchCMD("premium"))
 async def premium(message: Message):
+    chat_id = message.peer_id - 2000000000
     await messagereply(
         message,
         disable_mentions=1,
         message=await messages.market(),
         keyboard=keyboard.market(),
     )
+    await managers.logs.add_log(message.from_id, chat_id, 1, "/premium")
 
 
 @bl.chat_message(SearchCMD("top"))
 async def top(message: Message):
     chat_id = message.peer_id - 2000000000
-    members = [i.member_id for i in (await api.messages.get_conversation_members(peer_id=message.peer_id)).items]
+    members = [
+        i.member_id
+        for i in (
+            await api.messages.get_conversation_members(peer_id=message.peer_id)
+        ).items
+    ]
     msgs = await managers.messages.top_in_chat_excluding(chat_id, members, limit=10)
     await messagereply(
         message,
@@ -139,6 +154,7 @@ async def top(message: Message):
         message=await messages.top(msgs),
         keyboard=keyboard.top(chat_id, message.from_id),
     )
+    await managers.logs.add_log(message.from_id, chat_id, 1, "/top")
 
 
 @bl.chat_message(SearchCMD("stats"))
@@ -147,7 +163,10 @@ async def stats(message: Message):
 
     id = await search_id_in_message(message.text, message.reply_message)
     if not id:
+        args = ""
         id = message.from_id
+    else:
+        args = f" {' '.join(message.text.split()[1:])}"
     if id < 0:
         return await messagereply(
             message, disable_mentions=1, message=await messages.id_group()
@@ -252,15 +271,17 @@ async def stats(message: Message):
     else:
         if reply and reply.conversation_message_id:
             await delete_messages(reply.conversation_message_id, chat_id)
+    await managers.logs.add_log(message.from_id, chat_id, 1, f"/stats{args}")
 
 
 @bl.chat_message(SearchCMD("help"))
 async def help(message: Message):
+    chat_id = message.peer_id - 2000000000
     uid = message.from_id
     async with (await pool()).acquire() as conn:
         cmds = await conn.fetch(
             "select cmd, lvl from commandlevels where chat_id=$1",
-            message.peer_id - 2000000000,
+            chat_id,
         )
     base = deepcopy(settings.commands.commands)
     for i in cmds:
@@ -271,6 +292,7 @@ async def help(message: Message):
         message=await messages.help(cmds=base),
         keyboard=keyboard.help(uid, u_prem=await get_user_premium(uid)),
     )
+    await managers.logs.add_log(message.from_id, chat_id, 1, "/help")
 
 
 @bl.chat_message(SearchCMD("bonus"))
@@ -326,16 +348,19 @@ async def bonus(message: Message):
         )
     except Exception:
         pass
+    await managers.logs.add_log(message.from_id, chat_id, 1, "/bonus")
 
 
 @bl.chat_message(SearchCMD("prefix"))
 async def prefix(message: Message):
+    chat_id = message.peer_id - 2000000000
     await messagereply(
         message,
         disable_mentions=1,
         message=await messages.prefix(),
         keyboard=keyboard.prefix(message.from_id),
     )
+    await managers.logs.add_log(message.from_id, chat_id, 1, "/prefix")
 
 
 @bl.chat_message(SearchCMD("cmd"))
@@ -444,6 +469,9 @@ async def cmd(message: Message):
             message=await messages.cmd_hint(),
             keyboard=keyboard.cmd(uid),
         )
+    await managers.logs.add_log(
+        message.from_id, chat_id, 1, f"/cmd {' '.join(data[1:])}"
+    )
 
 
 @bl.chat_message(SearchCMD("premmenu"))
@@ -453,6 +481,7 @@ async def premmenu(message: Message):
         return await messagereply(
             message, disable_mentions=1, message=await messages.no_prem()
         )
+    chat_id = message.peer_id - 2000000000
     menu_settings = await get_user_premmenu_settings(uid)
     await messagereply(
         message,
@@ -460,6 +489,7 @@ async def premmenu(message: Message):
         message=await messages.premmenu(menu_settings, prem),
         keyboard=keyboard.premmenu(uid, menu_settings, prem),
     )
+    await managers.logs.add_log(message.from_id, chat_id, 1, "/premmenu")
 
 
 @bl.chat_message(SearchCMD("duel"))
@@ -506,6 +536,9 @@ async def duel(message: Message):
         ),
         keyboard=keyboard.duel(uid, coins),
     )
+    await managers.logs.add_log(
+        message.from_id, chat_id, 1, f"/duel {' '.join(data[1:])}"
+    )
 
 
 @bl.chat_message(SearchCMD("transfer"))
@@ -533,15 +566,16 @@ async def transfer(message: Message):
             message, disable_mentions=1, message=await messages.user_lvlbanned()
         )
 
-    if (len(message.text.lower().split()) <= 2 and message.reply_message is None) or (
-        len(message.text.lower().split()) <= 1 and message.reply_message is not None
+    data = message.text.lower().split()
+    if (len(data) <= 2 and message.reply_message is None) or (
+        len(data) <= 1 and message.reply_message is not None
     ):
         return await messagereply(
             message, disable_mentions=1, message=await messages.transfer_hint()
         )
 
     try:
-        tcoins = int(message.text.split()[-1])
+        tcoins = int(data[-1])
     except Exception:
         return await messagereply(
             message, disable_mentions=1, message=await messages.transfer_hint()
@@ -620,6 +654,9 @@ async def transfer(message: Message):
         disable_mentions=1,
         message=await messages.transfer(uid, uname, id, name, comtcoins, com),
     )
+    await managers.logs.add_log(
+        message.from_id, chat_id, 1, f"/transfer {' '.join(data[1:])}"
+    )
 
 
 @bl.chat_message(SearchCMD("start"))
@@ -639,12 +676,16 @@ async def start(message: Message):
 
 @bl.chat_message(SearchCMD("anon"))
 async def anon(message: Message):
+    chat_id = message.peer_id - 2000000000
     await messagereply(message, await messages.anon_not_pm(), disable_mentions=1)
+    await managers.logs.add_log(message.from_id, chat_id, 1, "/anon")
 
 
 @bl.chat_message(SearchCMD("deanon"))
 async def deanon(message: Message):
+    chat_id = message.peer_id - 2000000000
     await messagereply(message, await messages.anon_not_pm(), disable_mentions=1)
+    await managers.logs.add_log(message.from_id, chat_id, 1, "/deanon")
 
 
 @bl.chat_message(SearchCMD("guess"))
@@ -677,6 +718,7 @@ async def guess(message: Message):
         return await messagereply(
             message, disable_mentions=1, message=await messages.guess_lose(data[1], num)
         )
+    chat_id = message.peer_id - 2000000000
     bet = int(data[1]) * 2.5
     has_comission = not (
         await get_user_premium(message.from_id)
@@ -689,6 +731,9 @@ async def guess(message: Message):
         message,
         disable_mentions=1,
         message=await messages.guess_win(int(bet), data[2], has_comission),
+    )
+    await managers.logs.add_log(
+        message.from_id, chat_id, 1, f"/guess {' '.join(data[1:])}"
     )
 
 
@@ -768,6 +813,9 @@ async def promo(message: Message):
             code[4],
         ),
     )
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/promo {' '.join(data[1:])}"
+    )
 
 
 @bl.chat_message(SearchCMD("rep"))
@@ -834,6 +882,9 @@ async def rep(message: Message):
             await get_rep_top(id),
         ),
     )
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/rep {' '.join(data[1:])}"
+    )
 
 
 @bl.chat_message(SearchCMD("short"))
@@ -867,6 +918,9 @@ async def short(message: Message):
                 )
             ).short_url,
         ),
+    )
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/short {' '.join(data[1:])}"
     )
 
 
@@ -912,7 +966,9 @@ async def rewards(message: Message):
                 datetime.fromtimestamp(collected.date).strftime("%d.%m.%Y"),
             ),
         )
-    await managers.rewardscollected.cache._ensure_cached(uid, {"date": int(time.time()), "deactivated": False})
+    await managers.rewardscollected.cache._ensure_cached(
+        uid, {"date": int(time.time()), "deactivated": False}
+    )
     await add_user_xp(uid, 10000)
     await messagereply(
         message,
@@ -926,6 +982,7 @@ async def rewards(message: Message):
             10000,
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/rewards")
 
 
 @bl.chat_message(SearchCMD("shop"))
@@ -936,6 +993,7 @@ async def shop(message: Message):
         message=await messages.shop(),
         keyboard=keyboard.shop(message.from_id),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/shop")
 
 
 @bl.chat_message(SearchCMD("rps"))
@@ -996,6 +1054,9 @@ async def rps(message: Message):
     await managers.rps.add_game(
         msg.conversation_message_id, message.peer_id, time.time(), message.from_id
     )
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/rps {' '.join(data[1:])}"
+    )
 
 
 @bl.chat_message(SearchCMD("up"))
@@ -1025,6 +1086,7 @@ async def up(message: Message):
                 message=await messages.up_chat_is_not_premium(),
             )
     await messagereply(message, disable_mentions=1, message=await messages.up())
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/up")
 
 
 @bl.chat_message(SearchCMD("chats"))
@@ -1055,6 +1117,7 @@ async def chats(message: Message):
         ),
         disable_mentions=1,
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/chats")
 
 
 @bl.chat_message(SearchCMD("event"))
@@ -1071,3 +1134,4 @@ async def event(message: Message):
         keyboard=keyboard.event(message.from_id) if hc > 0 else None,
         disable_mentions=1,
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/event")

@@ -48,10 +48,12 @@ async def gkick(message: Message):
 
     data = message.text.split()
     if message.reply_message is None:
-        kick_cause = " ".join(data[2:])
+        kick_cause_raw = " ".join(data[2:])
     else:
-        kick_cause = " ".join(data[1:])
+        kick_cause_raw = " ".join(data[1:])
+    kick_cause = kick_cause_raw
     if len(kick_cause) == 0:
+        kick_cause_raw = None
         kick_cause = "Причина не указана"
 
     if not (chats := await get_gpool(chat_id)):
@@ -59,22 +61,20 @@ async def gkick(message: Message):
             message, disable_mentions=1, message=await messages.chat_unbound()
         )
 
-    ch_name = await get_user_name(id)
-    u_name = await get_user_name(uid)
-    ch_nickname = await get_user_nickname(id, chat_id)
     edit = await messagereply(
         message,
         disable_mentions=1,
         message=await messages.gkick_start(
             uid,
-            u_name,
+            u_name := await get_user_name(uid),
             await get_user_nickname(uid, chat_id),
             id,
-            ch_name,
-            ch_nickname,
+            ch_name := await get_user_name(id),
+            ch_nickname := await get_user_nickname(id, chat_id),
             len(chats),
         ),
     )
+
     success = 0
     for chat_id in chats:
         if not await is_higher(uid, id, chat_id) or not await haveAccess(
@@ -98,6 +98,14 @@ async def gkick(message: Message):
             except Exception:
                 pass
             success += 1
+        await managers.logs.add_log(
+            id,
+            chat_id,
+            2,
+            "Кик из чата",
+            by_name=f"[id{message.from_id}|{u_name}]",
+            reason=kick_cause_raw,
+        )
 
     if edit is None:
         return
@@ -105,6 +113,9 @@ async def gkick(message: Message):
         peer_id=edit.peer_id,
         cmid=edit.conversation_message_id,
         msg=await messages.gkick(id, ch_name, ch_nickname, len(chats), success),
+    )
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/gkick {' '.join(data[1:])}"
     )
 
 
@@ -167,22 +178,20 @@ async def gban(message: Message):
             message, disable_mentions=1, message=await messages.chat_unbound()
         )
 
-    u_name = await get_user_name(uid)
-    ch_name = await get_user_name(id)
-    ch_nick = await get_user_nickname(id, chat_id)
     edit = await messagereply(
         message,
         disable_mentions=1,
         message=await messages.gban_start(
             uid,
-            u_name,
+            u_name := await get_user_name(uid),
             await get_user_nickname(uid, chat_id),
             id,
-            ch_name,
-            ch_nick,
+            ch_name := await get_user_name(id),
+            ch_nick := await get_user_nickname(id, chat_id),
             len(chats),
         ),
     )
+
     success = 0
     for chat_id in chats:
         if not await is_higher(uid, id, chat_id) or not await haveAccess(
@@ -204,13 +213,21 @@ async def gban(message: Message):
                     u_name,
                     await get_user_nickname(uid, chat_id),
                     id,
-                    ch_name,
                     await get_user_nickname(id, chat_id),
+                    ch_nick,
                     ban_cause,
                     ban_time // 86400,
                 ),
                 peer_ids=chat_id + 2000000000,
             )
+        await managers.logs.add_log(
+            id,
+            chat_id,
+            2,
+            f"Выдача блокировки на {ban_time // 86400} дней",
+            by_name=f"[id{message.from_id}|{u_name}]",
+            reason=ban_cause,
+        )
         success += 1
 
     if edit is None:
@@ -219,6 +236,9 @@ async def gban(message: Message):
         peer_id=edit.peer_id,
         cmid=edit.conversation_message_id,
         msg=await messages.gban(id, ch_name, ch_nick, len(chats), success),
+    )
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/gban {' '.join(data[1:])}"
     )
 
 
@@ -253,7 +273,7 @@ async def gunban(message: Message):
         disable_mentions=1,
         message=await messages.gunban_start(
             uid,
-            await get_user_name(uid),
+            u_name := await get_user_name(uid),
             await get_user_nickname(uid, chat_id),
             id,
             name,
@@ -271,6 +291,13 @@ async def gunban(message: Message):
             continue
         if await managers.ban.unban(id, chat_id):
             success += 1
+            await managers.logs.add_log(
+                id,
+                chat_id,
+                2,
+                "Снятие блокировки",
+                by_name=f"[id{message.from_id}|{u_name}]",
+            )
 
     if edit is None:
         return
@@ -278,6 +305,9 @@ async def gunban(message: Message):
         peer_id=edit.peer_id,
         cmid=edit.conversation_message_id,
         msg=await messages.gunban(id, name, nick, len(chats), success),
+    )
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/gunban {' '.join(data[1:])}"
     )
 
 
@@ -322,19 +352,16 @@ async def gmute(message: Message):
             message, disable_mentions=1, message=await messages.chat_unbound()
         )
 
-    u_name = await get_user_name(uid)
-    ch_name = await get_user_name(id)
-    ch_nick = await get_user_nickname(uid, chat_id)
     edit = await messagereply(
         message,
         disable_mentions=1,
         message=await messages.gmute_start(
             uid,
-            u_name,
+            u_name := await get_user_name(uid),
             await get_user_nickname(uid, chat_id),
             id,
-            ch_name,
-            ch_nick,
+            ch_name := await get_user_name(id),
+            ch_nick := await get_user_nickname(id, chat_id),
             len(chats),
         ),
     )
@@ -354,20 +381,31 @@ async def gmute(message: Message):
         )
 
         await set_chat_mute(id, chat_id, mute_time)
-        await send_message(
-            peer_ids=chat_id + 2000000000,
-            msg=await messages.mute(
-                u_name,
-                await get_user_nickname(uid, chat_id),
-                uid,
-                ch_name,
-                await get_user_nickname(id, chat_id),
-                id,
-                mute_cause,
-                int(mute_time / 60),
-            ),
-        )
+        try:
+            await send_message(
+                peer_ids=chat_id + 2000000000,
+                msg=await messages.mute(
+                    u_name,
+                    await get_user_nickname(uid, chat_id),
+                    uid,
+                    ch_name,
+                    await get_user_nickname(id, chat_id),
+                    id,
+                    mute_cause,
+                    int(mute_time / 60),
+                ),
+            )
+        except Exception:
+            pass
         success += 1
+        await managers.logs.add_log(
+            id,
+            chat_id,
+            2,
+            f"Блокировка чата на {mute_time // 60} минут",
+            by_name=f"[id{message.from_id}|{u_name}]",
+            reason=mute_cause,
+        )
 
     if edit is None:
         return
@@ -375,6 +413,9 @@ async def gmute(message: Message):
         peer_id=edit.peer_id,
         cmid=edit.conversation_message_id,
         msg=await messages.gmute(id, ch_name, ch_nick, len(chats), success),
+    )
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/gmute {' '.join(data[1:])}"
     )
 
 
@@ -402,22 +443,20 @@ async def gunmute(message: Message):
             message, disable_mentions=1, message=await messages.chat_unbound()
         )
 
-    u_name = await get_user_name(uid)
-    ch_name = await get_user_name(id)
-    ch_nick = await get_user_nickname(id, chat_id)
     edit = await messagereply(
         message,
         disable_mentions=1,
         message=await messages.gunmute_start(
             uid,
-            u_name,
+            u_name := await get_user_name(uid),
             await get_user_nickname(uid, chat_id),
             id,
-            ch_name,
-            ch_nick,
+            ch_name := await get_user_name(id),
+            ch_nick := await get_user_nickname(id, chat_id),
             len(chats),
         ),
     )
+
     success = 0
     for chat_id in chats:
         if not await is_higher(uid, id, chat_id) or not await haveAccess(
@@ -427,18 +466,28 @@ async def gunmute(message: Message):
         if not await managers.mute.unmute(id, chat_id):
             continue
         await set_chat_mute(id, chat_id, 0)
-        await send_message(
-            peer_ids=chat_id + 2000000000,
-            msg=await messages.unmute(
-                u_name,
-                await get_user_nickname(uid, chat_id),
-                uid,
-                ch_name,
-                await get_user_nickname(id, chat_id),
-                id,
-            ),
-        )
+        try:
+            await send_message(
+                peer_ids=chat_id + 2000000000,
+                msg=await messages.unmute(
+                    u_name,
+                    await get_user_nickname(uid, chat_id),
+                    uid,
+                    ch_name,
+                    await get_user_nickname(id, chat_id),
+                    id,
+                ),
+            )
+        except Exception:
+            pass
         success += 1
+        await managers.logs.add_log(
+            id,
+            chat_id,
+            2,
+            "Снятие блокировки чата",
+            by_name=f"[id{message.from_id}|{u_name}]",
+        )
 
     if edit is None:
         return
@@ -446,6 +495,9 @@ async def gunmute(message: Message):
         peer_id=edit.peer_id,
         cmid=edit.conversation_message_id,
         msg=await messages.gunmute(id, ch_name, ch_nick, len(chats), success),
+    )
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/gunmute {' '.join(data[1:])}"
     )
 
 
@@ -474,25 +526,28 @@ async def gwarn(message: Message):
         )
 
     if message.reply_message is None:
-        warn_cause = " ".join(data[2:])
+        warn_cause_raw = " ".join(data[2:])
     else:
-        warn_cause = " ".join(data[1:])
-    if not warn_cause:
+        warn_cause_raw = " ".join(data[1:])
+    if not warn_cause_raw:
         warn_cause = "Без указания причины"
+    else:
+        warn_cause = warn_cause_raw
 
-    u_name = await get_user_name(uid)
-    ch_name = await get_user_name(id)
-    ch_nick = await get_user_nickname(id, chat_id)
-    msg = await messages.gwarn_start(
-        uid,
-        u_name,
-        await get_user_nickname(uid, chat_id),
-        id,
-        ch_name,
-        ch_nick,
-        len(chats),
+    edit = await messagereply(
+        message,
+        disable_mentions=1,
+        message=await messages.gwarn_start(
+            uid,
+            u_name := await get_user_name(uid),
+            await get_user_nickname(uid, chat_id),
+            id,
+            ch_name := await get_user_name(id),
+            ch_nick := await get_user_nickname(id, chat_id),
+            len(chats),
+        ),
     )
-    edit = await messagereply(message, disable_mentions=1, message=msg)
+
     success = 0
     for chat_id in chats:
         if not await is_higher(uid, id, chat_id) or not await haveAccess(
@@ -507,8 +562,8 @@ async def gwarn(message: Message):
                 u_name,
                 await get_user_nickname(uid, chat_id),
                 uid,
-                ch_name,
                 await get_user_nickname(id, chat_id),
+                ch_nick,
                 id,
                 warn_cause,
             )
@@ -517,14 +572,22 @@ async def gwarn(message: Message):
                 u_name,
                 await get_user_nickname(uid, chat_id),
                 uid,
-                ch_name,
                 await get_user_nickname(id, chat_id),
+                ch_nick,
                 id,
                 warn_cause,
             )
 
         await send_message(msg=msg, peer_ids=chat_id + 2000000000)
         success += 1
+        await managers.logs.add_log(
+            id,
+            chat_id,
+            2,
+            "Выдача предупреждения",
+            by_name=f"[id{message.from_id}|{u_name}]",
+            reason=warn_cause_raw,
+        )
 
     if edit is None:
         return
@@ -532,6 +595,9 @@ async def gwarn(message: Message):
         peer_id=edit.peer_id,
         cmid=edit.conversation_message_id,
         msg=await messages.gwarn(id, ch_name, ch_nick, len(chats), success),
+    )
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/gwarn {' '.join(data[1:])}"
     )
 
 
@@ -559,22 +625,20 @@ async def gunwarn(message: Message):
             message, disable_mentions=1, message=await messages.chat_unbound()
         )
 
-    u_name = await get_user_name(uid)
-    ch_name = await get_user_name(id)
-    ch_nick = await get_user_nickname(id, chat_id)
     edit = await messagereply(
         message,
         disable_mentions=1,
         message=await messages.gunwarn_start(
             uid,
-            u_name,
+            u_name := await get_user_name(uid),
             await get_user_nickname(uid, chat_id),
             id,
-            ch_name,
-            ch_nick,
+            ch_name := await get_user_name(id),
+            ch_nick := await get_user_nickname(id, chat_id),
             len(chats),
         ),
     )
+
     success = 0
     for chat_id in chats:
         if not await is_higher(uid, id, chat_id) or not await haveAccess(
@@ -598,6 +662,13 @@ async def gunwarn(message: Message):
             ),
         )
         success += 1
+        await managers.logs.add_log(
+            id,
+            chat_id,
+            2,
+            "Снятие предупреждения",
+            by_name=f"[id{message.from_id}|{u_name}]",
+        )
 
     if edit is None:
         return
@@ -605,6 +676,9 @@ async def gunwarn(message: Message):
         peer_id=edit.peer_id,
         cmid=edit.conversation_message_id,
         msg=await messages.gunwarn(id, ch_name, ch_nick, len(chats), success),
+    )
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/gunwarn {' '.join(data[1:])}"
     )
 
 
@@ -638,22 +712,20 @@ async def gsnick(message: Message):
             message, disable_mentions=1, message=await messages.chat_unbound()
         )
 
-    u_name = await get_user_name(uid)
-    ch_name = await get_user_name(id)
-    ch_nick = await get_user_nickname(id, chat_id)
     edit = await messagereply(
         message,
         disable_mentions=1,
         message=await messages.gsnick_start(
             uid,
-            u_name,
+            u_name := await get_user_name(uid),
             await get_user_nickname(uid, chat_id),
             id,
-            ch_name,
-            ch_nick,
+            ch_name := await get_user_name(id),
+            ch_nick := await get_user_nickname(id, chat_id),
             len(chats),
         ),
     )
+
     success = 0
     for chat_id in chats:
         if not await haveAccess("gsnick", chat_id, uid):
@@ -697,12 +769,23 @@ async def gsnick(message: Message):
         )
         success += 1
 
+        await managers.logs.add_log(
+            id,
+            chat_id,
+            2,
+            f"Установлен никнйм - {nickname}",
+            by_name=f"[id{message.from_id}|{u_name}]",
+        )
+
     if edit is None:
         return
     await edit_message(
         peer_id=edit.peer_id,
         cmid=edit.conversation_message_id,
         msg=await messages.gsnick(id, ch_name, ch_nick, len(chats), success),
+    )
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/gsnick {' '.join(data[1:])}"
     )
 
 
@@ -769,6 +852,13 @@ async def grnick(message: Message):
                     "delete from nickname where chat_id=$1 and uid=$2", chat_id, id
                 )
             success += 1
+            await managers.logs.add_log(
+                id,
+                chat_id,
+                2,
+                f"Удалён никнейм - {ch_nickname}",
+                by_name=f"[id{message.from_id}|{u_name}]",
+            )
         except Exception:
             pass
 
@@ -778,6 +868,9 @@ async def grnick(message: Message):
         peer_id=edit.peer_id,
         cmid=edit.conversation_message_id,
         msg=await messages.grnick(id, ch_name, ch_nick, len(chats), success),
+    )
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/grnick {' '.join(data[1:])}"
     )
 
 
@@ -831,3 +924,4 @@ async def gzov(message: Message):
         cmid=edit.conversation_message_id,
         msg=await messages.gzov(uid, u_name, u_nick, len(chats), success),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/zov {' '.join(data[1:])}")

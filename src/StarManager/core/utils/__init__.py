@@ -1488,7 +1488,7 @@ def is_single_emoji(s: str) -> bool:
     return bool(_emoji_pattern.match(s))
 
 
-async def is_higher(higher_id, lower_id, chat_id):
+async def is_higher(higher_id, lower_id, chat_id) -> bool:
     h_acc = await managers.access_level.get(higher_id, chat_id)
     l_acc = await managers.access_level.get(lower_id, chat_id)
 

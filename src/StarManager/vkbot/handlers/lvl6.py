@@ -56,7 +56,7 @@ async def gdelaccess(message: Message):
         disable_mentions=1,
         message=await messages.gdelaccess_start(
             uid,
-            await get_user_name(uid),
+            u_name := await get_user_name(uid),
             await get_user_nickname(uid, chat_id),
             id,
             name,
@@ -74,7 +74,9 @@ async def gdelaccess(message: Message):
         if acc is None or acc.custom_level_name is None:
             await set_user_access_level(id, chat_id, 0)
             success += 1
+            await managers.logs.add_log(id, chat_id, 2, f"Снятие уровня прав - {acc}", by_name=f"[id{message.from_id}|{u_name}]")
 
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/gdelaccess {' '.join(message.text.split()[1:])}")
     if edit is None:
         return
     await api.messages.edit(
@@ -130,7 +132,7 @@ async def gsetaccess(message: Message):
         disable_mentions=1,
         message=await messages.gsetaccess_start(
             uid,
-            await get_user_name(uid),
+            u_name := await get_user_name(uid),
             await get_user_nickname(uid, chat_id),
             id,
             name,
@@ -148,7 +150,9 @@ async def gsetaccess(message: Message):
         if u_acc is None or u_acc.custom_level_name is None:
             await set_user_access_level(id, chat_id, acc)
             success += 1
+            await managers.logs.add_log(id, chat_id, 2, f"Выдача уровня прав - {acc}", by_name=f"[id{message.from_id}|{u_name}]")
 
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/gsetaccess {' '.join(data[1:])}")
     if edit is None:
         return
     await api.messages.edit(
@@ -172,6 +176,7 @@ async def demote(message: Message):
         message=await messages.demote_choose(),
         keyboard=keyboard.demote_choose(message.from_id, message.peer_id - 2000000000),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/demote")
 
 
 @bl.chat_message(SearchCMD("ssetaccess"))
@@ -215,7 +220,7 @@ async def ssetaccess(message: Message):
         disable_mentions=1,
         message=await messages.ssetaccess_start(
             uid,
-            await get_user_name(uid),
+            u_name := await get_user_name(uid),
             await get_user_nickname(uid, chat_id),
             id,
             name,
@@ -234,6 +239,9 @@ async def ssetaccess(message: Message):
         if u_acc is None or u_acc.custom_level_name is None:
             await set_user_access_level(id, chat_id, acc)
             success += 1
+            await managers.logs.add_log(id, chat_id, 2, f"Выдача уровня прав - {acc}", by_name=f"[id{message.from_id}|{u_name}]")
+
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/ssetaccess {' '.join(data[1:])}")
 
     if edit is None:
         return
@@ -284,7 +292,7 @@ async def sdelaccess(message: Message):
         disable_mentions=1,
         message=await messages.sdelaccess_start(
             uid,
-            await get_user_name(uid),
+            u_name := await get_user_name(uid),
             await get_user_nickname(uid, chat_id),
             id,
             name,
@@ -303,6 +311,9 @@ async def sdelaccess(message: Message):
         if acc is None or acc.custom_level_name is None:
             await set_user_access_level(id, chat_id, 0)
             success += 1
+            await managers.logs.add_log(id, chat_id, 2, f"Снятие уровня прав - {acc}", by_name=f"[id{message.from_id}|{u_name}]")
+
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/sdelaccess {' '.join(data[1:])}")
 
     if edit is None:
         return
@@ -359,6 +370,7 @@ async def ignore(message: Message):
             id, await get_user_name(id), await get_user_nickname(uid, chat_id)
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/ignore {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("unignore"))
@@ -395,6 +407,7 @@ async def unignore(message: Message):
             id, name, await get_user_nickname(uid, chat_id)
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/unignore {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("ignorelist"))
@@ -417,6 +430,7 @@ async def ignorelist(message: Message):
     await messagereply(
         message, disable_mentions=1, message=await messages.ignorelist(ids, names)
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/ignorelist")
 
 
 @bl.chat_message(SearchCMD("chatlimit"))
@@ -465,6 +479,7 @@ async def chatlimit(message: Message):
             lpos,
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/chatlimit {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("resetnick"))
@@ -477,6 +492,7 @@ async def resetnick(message: Message):
             message.from_id, message.peer_id - 2000000000
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/resetnick")
 
 
 @bl.chat_message(SearchCMD("resetaccess"))
@@ -497,6 +513,7 @@ async def resetaccess(message: Message):
             message.from_id, message.peer_id - 2000000000, data[1]
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/resetaccess {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("notif"))
@@ -547,6 +564,7 @@ async def notif(message: Message):
         message=await messages.notif(notifs, activenotifs),
         keyboard=keyboard.notif(uid),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/notif")
 
 
 @bl.chat_message(SearchCMD("purge"))
@@ -585,6 +603,7 @@ async def purge(message: Message):
         message.peer_id,
         edit.conversation_message_id,
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/purge")
 
 
 @bl.chat_message(SearchCMD("rename"))
@@ -616,6 +635,7 @@ async def rename(message: Message):
             await get_user_nickname(message.from_id, chat_id),
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/rename {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("raid"))
@@ -630,3 +650,4 @@ async def raid(message: Message):
         message=await messages.raid(),
         keyboard=keyboard.raid(message.from_id, status),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/raid")

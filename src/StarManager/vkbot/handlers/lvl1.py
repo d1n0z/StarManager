@@ -64,22 +64,36 @@ async def kick(message: Message):
             message, disable_mentions=1, message=await messages.kick_higher()
         )
 
-    kick_cause = " ".join(message.text.split()[1 + (not message.reply_message) :])
+    kicked = await kick_user(id, chat_id)
+    u_name = await get_user_name(uid)
+    reason = " ".join(message.text.split()[1 + (not message.reply_message) :])
     await messagereply(
         message,
         disable_mentions=1,
         message=await messages.kick(
-            await get_user_name(uid),
+            u_name,
             await get_user_nickname(uid, chat_id),
             uid,
             await get_user_name(id),
             await get_user_nickname(id, chat_id),
             id,
-            kick_cause if kick_cause else "Причина не указана",
+            reason if reason else "Причина не указана",
         )
-        if await kick_user(id, chat_id)
+        if kicked
         else await messages.kick_error(),
     )
+    await managers.logs.add_log(
+        uid, message.chat_id, 1, f"/kick {' '.join(message.text.split()[1:])}"
+    )
+    if kicked:
+        await managers.logs.add_log(
+            id,
+            message.chat_id,
+            2,
+            "Кик из чата",
+            by_name=f"[id{uid}|{u_name}]",
+            reason=reason,
+        )
 
 
 @bl.chat_message(SearchCMD("mkick"))
@@ -91,8 +105,9 @@ async def mkick(message: Message):
             message, disable_mentions=1, message=await messages.no_prem()
         )
 
+    data = message.text.split()
     ids = []
-    for i in message.text.split()[1:]:
+    for i in data[1:]:
         if id := await search_id_in_message(i, None, 1):
             ids.append(id)
     if not ids:
@@ -100,6 +115,7 @@ async def mkick(message: Message):
             message, disable_mentions=1, message=await messages.mkick_error()
         )
 
+    u_name = await get_user_name(uid)
     u_acc = await get_user_access_level(uid, chat_id)
     kick_res_count = 0
     msg = ""
@@ -113,16 +129,20 @@ async def mkick(message: Message):
             f"➖ [id{id}|{ch_nickname if ch_nickname else await get_user_name(id)}]\n"
         )
         kick_res_count += 1
+        await managers.logs.add_log(
+            id, message.chat_id, 2, "Кик из чата", by_name=f"[id{uid}|{u_name}]"
+        )
     if kick_res_count > 0:
         return await messagereply(
             message,
             disable_mentions=1,
-            message=f"💬 Пользователь [id{uid}|{await get_user_name(uid)}] исключил "
+            message=f"💬 Пользователь [id{uid}|{(await get_user_nickname(uid, chat_id)) or u_name}] исключил "
             f"следующих пользователей из данной беседы:\n" + msg,
         )
     await messagereply(
         message, disable_mentions=1, message=await messages.mkick_no_kick()
     )
+    await managers.logs.add_log(uid, message.chat_id, 1, f"/mkick {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("mute"))
@@ -184,12 +204,12 @@ async def mute(message: Message):
         )
 
     u_name = await get_user_name(uid)
-    mute_cause = " ".join(data[2 + +(not message.reply_message) + reason_pos :])
+    reason = " ".join(data[2 + +(not message.reply_message) + reason_pos :])
     await managers.mute.mute(
         id,
         chat_id,
         mute_time * 60,
-        mute_cause or "Без указания причины",
+        reason or "Без указания причины",
         f"[id{uid}|{u_name}]",
     )
     await set_chat_mute(id, chat_id, mute_time)
@@ -204,12 +224,22 @@ async def mute(message: Message):
             await get_user_name(id),
             await get_user_nickname(id, chat_id),
             id,
-            mute_cause,
+            reason,
             mute_time,
         ),
         keyboard=keyboard.punish_unpunish(
             uid, id, "mute", message.conversation_message_id
         ),
+    )
+
+    await managers.logs.add_log(uid, chat_id, 1, f"/mute {' '.join(data[1:])}")
+    await managers.logs.add_log(
+        id,
+        chat_id,
+        2,
+        f"Блокировка чата на {mute_time} минут",
+        by_name=f"[id{uid}|{u_name}]",
+        reason=reason,
     )
 
 
@@ -238,11 +268,13 @@ async def warn(message: Message):
             message, disable_mentions=1, message=await messages.warn_higher()
         )
 
-    warn_cause = " ".join(data[1 + (not message.reply_message) :])
-    if not warn_cause:
-        warn_cause = "Без указания причины"
+    reason_raw = " ".join(data[1 + (not message.reply_message) :])
+    if not reason_raw:
+        reason = "Без указания причины"
+    else:
+        reason = reason_raw
     u_name = await get_user_name(uid)
-    warns = await managers.warn.warn(id, chat_id, warn_cause, f"[id{uid}|{u_name}]")
+    warns = await managers.warn.warn(id, chat_id, reason, f"[id{uid}|{u_name}]")
 
     if warns >= 3:
         await kick_user(id, chat_id)
@@ -253,7 +285,7 @@ async def warn(message: Message):
             await get_user_name(id),
             await get_user_nickname(id, chat_id),
             id,
-            warn_cause,
+            reason,
         )
     else:
         msg = await messages.warn(
@@ -263,7 +295,7 @@ async def warn(message: Message):
             await get_user_name(id),
             await get_user_nickname(id, chat_id),
             id,
-            warn_cause,
+            reason,
         )
 
     await messagereply(
@@ -273,6 +305,15 @@ async def warn(message: Message):
         keyboard=keyboard.punish_unpunish(
             uid, id, "warn", message.conversation_message_id
         ),
+    )
+    await managers.logs.add_log(uid, chat_id, 1, f"/warn {' '.join(data[1:])}")
+    await managers.logs.add_log(
+        id,
+        chat_id,
+        2,
+        "Выдача предупреждения",
+        by_name=f"[id{uid}|{u_name}]",
+        reason=reason_raw,
     )
 
 
@@ -348,6 +389,7 @@ async def clear(message: Message):
             message=await messages.clear(deleted, uid, chat_id, delete_from),
             keyboard=keyboard.deletemessages(uid, [message.conversation_message_id]),
         )
+    await managers.logs.add_log(uid, chat_id, 1, "/clear")
 
 
 @bl.chat_message(SearchCMD("snick"))
@@ -420,6 +462,14 @@ async def snick(message: Message):
             nickname,
         ),
     )
+    await managers.logs.add_log(uid, chat_id, 1, f"/snick {' '.join(data[1:])}")
+    await managers.logs.add_log(
+        id,
+        chat_id,
+        2,
+        f"Установлен никнейм - {nickname}",
+        by_name=f"[id{uid}|{from_name}]",
+    )
 
 
 @bl.chat_message(SearchCMD("rnick"))
@@ -456,12 +506,18 @@ async def rnick(message: Message):
         disable_mentions=1,
         message=await messages.rnick(
             uid,
-            await get_user_name(uid),
+            u_name := await get_user_name(uid),
             await get_user_nickname(uid, chat_id),
             id,
             await get_user_name(id),
             ch_nickname,
         ),
+    )
+    await managers.logs.add_log(
+        uid, chat_id, 1, f"/rnick {' '.join(message.text.split()[1:])}"
+    )
+    await managers.logs.add_log(
+        id, chat_id, 2, f"Удалён никнейм - {ch_nickname}", by_name=f"[id{uid}|{u_name}]"
     )
 
 
@@ -489,6 +545,7 @@ async def nlist(message: Message):
         ),
         keyboard=keyboard.nlist(message.from_id, 0, count),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/nlist")
 
 
 @bl.chat_message(SearchCMD("getnick"))
@@ -520,6 +577,9 @@ async def getnick(message: Message):
     await messagereply(
         message, disable_mentions=1, message=await messages.getnick(res, query)
     )
+    await managers.logs.add_log(
+        message.from_id, chat_id, 1, f"/getnick {' '.join(data[1:])}"
+    )
 
 
 @bl.chat_message(SearchCMD("staff"))
@@ -541,6 +601,7 @@ async def staff(message: Message):
         ),
         keyboard=keyboard.staff(message.from_id),
     )
+    await managers.logs.add_log(message.from_id, chat_id, 1, "/staff")
 
 
 @bl.chat_message(SearchCMD("olist"))
@@ -571,6 +632,7 @@ async def olist(message: Message):
             dict(sorted(members_online.items(), key=lambda item: item[1]))
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/olist")
 
 
 @bl.chat_message(SearchCMD("check"))
@@ -598,6 +660,10 @@ async def check(message: Message):
     )
     kb = keyboard.check(message.from_id, id)
     await messagereply(message, disable_mentions=1, message=msg, keyboard=kb)
+
+    await managers.logs.add_log(
+        message.from_id, chat_id, 1, f"/check {' '.join(message.text.split()[1:])}"
+    )
 
 
 @bl.chat_message(SearchCMD("scan"))
@@ -635,6 +701,9 @@ async def scan(message: Message):
         disable_mentions=1,
         message="".join(scan_results),
     )
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/scan {' '.join(data[1:])}"
+    )
 
 
 @bl.chat_message(SearchCMD("invited"))
@@ -657,4 +726,78 @@ async def invited(message: Message):
             await get_user_nickname(id, message.chat_id),
             invites,
         ),
+    )
+    await managers.logs.add_log(
+        message.from_id,
+        message.chat_id,
+        1,
+        f"/invited {' '.join(message.text.split()[1:])}",
+    )
+
+
+@bl.chat_message(SearchCMD("logs"))
+async def logs(message: Message):
+    data = message.text.split()
+    if (
+        len(data) != 3
+        or not data[1].isdigit()
+        or (category := int(data[1])) not in (1, 2)
+        or not (
+            id := await search_id_in_message(
+                message.text, message.reply_message, place=3
+            )
+        )
+    ):
+        return await messagereply(
+            message, disable_mentions=1, message=await messages.logs_help()
+        )
+    if id != message.from_id and await get_user_access_level(id, message.chat_id) >= await get_user_access_level(
+        message.from_id, message.chat_id
+    ):
+        return await messagereply(
+            message, disable_mentions=1, message=await messages.logs_higher()
+        )
+    await messagereply(
+        message,
+        disable_mentions=1,
+        message=await messages.logs(
+            id,
+            await get_user_name(id),
+            await get_user_nickname(id, message.chat_id),
+            category,
+            await managers.logs.get_logs(id, message.chat_id, category),
+        ),
+    )
+    await managers.logs.add_log(
+        message.from_id,
+        message.chat_id,
+        1,
+        f"/logs {' '.join(message.text.split()[1:])}",
+    )
+
+
+@bl.chat_message(SearchCMD("gnick"))
+async def gnick(message: Message):
+    if not (id := await search_id_in_message(message.text, message.reply_message)):
+        return await messagereply(
+            message, disable_mentions=1, message=await messages.gnick_help()
+        )
+    if not (nick := await get_user_nickname(id, message.chat_id)):
+        return await messagereply(
+            message, disable_mentions=1, message=await messages.gnick_none()
+        )
+    await messagereply(
+        message,
+        disable_mentions=1,
+        message=await messages.gnick(
+            id,
+            await get_user_name(id),
+            nick
+        ),
+    )
+    await managers.logs.add_log(
+        message.from_id,
+        message.chat_id,
+        1,
+        f"/gnick {' '.join(message.text.split()[1:])}",
     )

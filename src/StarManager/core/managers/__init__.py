@@ -13,6 +13,7 @@ from .duel import DuelLockManager
 from .event import EventManager
 from .filters import FiltersManager
 from .lastmessagedate import LastMessageDateManager
+from .logs import LogManager
 from .lvlbanned import LvlBannedManager
 from .messages import MessagesManager
 from .prefix import PrefixesManager
@@ -41,6 +42,7 @@ managers = [
     event := EventManager(),
     filters := FiltersManager(),
     lastmessagedate := LastMessageDateManager(),
+    logs := LogManager(),
     lvlbanned := LvlBannedManager(),
     messages := MessagesManager(),
     prefixes := PrefixesManager(),

@@ -48,7 +48,7 @@ async def skick(message: Message):
         )
 
     try:
-        kick_cause = " ".join(data[3:])
+        kick_cause = kick_cause_raw = " ".join(data[3:])
         if kick_cause == str(id) or len(kick_cause) == 0:
             kick_cause = "Причина не указана"
     except Exception:
@@ -86,6 +86,14 @@ async def skick(message: Message):
                 ),
             )
             success += 1
+            await managers.logs.add_log(
+                id,
+                chat_id,
+                2,
+                "Кик из чата",
+                by_name=f"[id{message.from_id}|{u_name}]",
+                reason=kick_cause_raw,
+            )
 
     if edit is None:
         return
@@ -99,6 +107,9 @@ async def skick(message: Message):
             len(chats),
             success,
         ),
+    )
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/skick {' '.join(data[1:])}"
     )
 
 
@@ -183,7 +194,18 @@ async def sban(message: Message):
         if await kick_user(id, chat_id):
             await send_message(msg=msg, peer_ids=chat_id + 2000000000)
         success += 1
+        await managers.logs.add_log(
+            id,
+            chat_id,
+            2,
+            f"Выдача блокировки на {ban_time // 86400} дней",
+            by_name=f"[id{message.from_id}|{u_name}]",
+            reason=ban_cause,
+        )
 
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/sban {' '.join(data[1:])}"
+    )
     if edit is None:
         return
     await api.messages.edit(
@@ -228,7 +250,7 @@ async def sunban(message: Message):
         disable_mentions=1,
         message=await messages.sunban_start(
             uid,
-            await get_user_name(uid),
+            u_name := await get_user_name(uid),
             await get_user_nickname(uid, chat_id),
             id,
             await get_user_name(id),
@@ -247,7 +269,17 @@ async def sunban(message: Message):
             continue
         if await managers.ban.unban(id, chat_id):
             success += 1
+            await managers.logs.add_log(
+                id,
+                chat_id,
+                2,
+                "Снятие блокировки",
+                by_name=f"[id{message.from_id}|{u_name}]",
+            )
 
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/sunban {' '.join(data[1:])}"
+    )
     if edit is None:
         return
     await api.messages.edit(
@@ -352,7 +384,17 @@ async def ssnick(message: Message):
             await messages.snick(uid, u_name, u_nick, id, name, ch_nick, nickname),
         )
         success += 1
+        await managers.logs.add_log(
+            id,
+            chat_id,
+            2,
+            f"Установлен никнейм - {nickname}",
+            by_name=f"[id{message.from_id}|{u_name}]",
+        )
 
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/ssnick {' '.join(data[1:])}"
+    )
     if edit is None:
         return
     await api.messages.edit(
@@ -411,25 +453,35 @@ async def srnick(message: Message):
                 continue
         if not await haveAccess("srnick", chat_id, uid):
             continue
+        ch_nick = await get_user_nickname(id, chat_id)
+        if not ch_nick:
+            continue
         async with (await pool()).acquire() as conn:
-            if await conn.fetchval(
+            res = await conn.fetchval(
                 "delete from nickname where chat_id=$1 and uid=$2 returning 1",
                 chat_id,
                 id,
-            ):
-                await send_message(
-                    chat_id + 200000000,
-                    await messages.rnick(
-                        uid,
-                        u_name,
-                        await get_user_nickname(uid, chat_id),
-                        id,
-                        ch_name,
-                        await get_user_nickname(id, chat_id),
-                    ),
-                )
-                success += 1
+            )
+        if res:
+            await send_message(
+                chat_id + 200000000,
+                await messages.rnick(
+                    uid,
+                    u_name,
+                    await get_user_nickname(uid, chat_id),
+                    id,
+                    ch_name,
+                    ch_nick,
+                ),
+            )
+            success += 1
+        await managers.logs.add_log(
+            id, chat_id, 2, f"Удалён никнейм - {ch_nick}", by_name=f"[id{message.from_id}|{u_name}]"
+        )
 
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/srnick {' '.join(data[1:])}"
+    )
     if edit is None:
         return
     await api.messages.edit(
@@ -487,6 +539,7 @@ async def szov(message: Message):
         except Exception:
             pass
 
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/szov {' '.join(data[1:])}")
     if edit is None:
         return
     await api.messages.edit(
@@ -578,6 +631,7 @@ async def chat(message: Message):
         if not await haveAccess("settings", chat_id, message.from_id)
         else (keyboard.chat(message.from_id, public == "Открытый")),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/chat")
 
 
 @bl.chat_message(SearchCMD("antitag"))
@@ -607,13 +661,14 @@ async def antitag(message: Message):
             ),
         )
     await managers.antitag.remove(id, chat_id)
-    return await messagereply(
+    await messagereply(
         message,
         disable_mentions=1,
         message=await messages.antitag_del(
             id, await get_user_name(id), await get_user_nickname(id, chat_id)
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/antitag {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("pin"))
@@ -633,6 +688,7 @@ async def pin(message: Message):
         )
     else:
         await delete_messages(message.conversation_message_id, message.chat_id)
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/pin")
 
 
 @bl.chat_message(SearchCMD("unpin"))
@@ -655,3 +711,4 @@ async def unpin(message: Message):
         )
     else:
         await delete_messages(message.conversation_message_id, message.chat_id)
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/unpin")

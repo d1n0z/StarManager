@@ -41,12 +41,14 @@ async def getdev_handler(message: Message):
     uid = message.from_id
     if uid in settings.service.devs:
         await set_user_access_level(uid, message.peer_id - 2000000000, 8, clean=True)
+        await managers.logs.add_log(message.from_id, message.chat_id, 1, "/getdev")
 
 
 @bl.chat_message(SearchCMD("backup"))
 async def backup_handler(message: Message):
     await backup()
     await messagereply(message, "💚 Completed.")
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/backup")
 
 
 @bl.chat_message(SearchCMD("msg"))
@@ -79,6 +81,7 @@ async def msg(message: Message):
     msg = f"done {k}/{len(chats)}"
     print(msg)
     await messagereply(message, msg)
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/msg {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("addblack"))
@@ -110,6 +113,7 @@ async def addblack(message: Message):
         ),
     )
     await send_message(id, await messages.blacked(uid, dev_name, dev_nickname))
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/addblack {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("delblack"))
@@ -147,6 +151,7 @@ async def delblack(message: Message):
         ),
     )
     await send_message(id, await messages.delblacked(uid, dev_name, dev_nickname))
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/delblack {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("blacklist"))
@@ -160,6 +165,7 @@ async def blacklist(message: Message):
     for k, i in users.items():
         msg += f"➖ {i} : | [id{i}|{k}]\n"
     await messagereply(message, msg)
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/blacklist")
 
 
 @bl.chat_message(SearchCMD("setstatus"))
@@ -198,6 +204,7 @@ async def setstatus(message: Message):
             data[2],
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/setstatus {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("delstatus"))
@@ -224,6 +231,7 @@ async def delstatus(message: Message):
         ),
     )
     await send_message(id, await messages.udelStatus(uid, dev_name))
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/delstatus {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("statuslist"))
@@ -234,6 +242,7 @@ async def statuslist(message: Message):
         await messages.statuslist(prem),
         keyboard=keyboard.statuslist(message.from_id, 0, len(prem)),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/statuslist")
 
 
 @bl.chat_message(SearchCMD("setprem"))
@@ -249,6 +258,7 @@ async def setprem(message: Message):
     await send_message(
         chat_id + 2000000000, await messages.premchat(uid, await get_user_name(uid))
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/setprem {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("delprem"))
@@ -256,16 +266,16 @@ async def delprem(message: Message):
     chat_id = await search_id_in_message(message.text, message.reply_message)
     if chat_id <= 0:
         return await messagereply(message, await messages.delprem_hint())
-
     await managers.public_chats.edit_premium(chat_id, make_premium=False)
-
     await messagereply(message, await messages.delprem(chat_id))
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/delprem {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("premlist"))
 async def permlist(message: Message):
     prem = [chat[0] for chat in await managers.public_chats.get_premium_chats()]
     await messagereply(message, await messages.premlist(prem))
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/premlist")
 
 
 @bl.chat_message(SearchCMD("givexp"))
@@ -282,6 +292,7 @@ async def givexp(message: Message):
             uid, await get_user_name(uid), id, await get_user_name(id), data[2]
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/givexp {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("givecoins"))
@@ -298,6 +309,7 @@ async def givecoins(message: Message):
             uid, await get_user_name(uid), id, await get_user_name(id), data[2]
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/givecoins {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("resetlvl"))
@@ -314,6 +326,7 @@ async def resetlvl(message: Message):
     ):
         msgsent += "\n❗ Пользователю не удалось отправить сообщение"
     await messagereply(message, msgsent)
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/resetlvl {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("block"))
@@ -376,6 +389,7 @@ async def block(message: Message):
                 )
             await asyncio.sleep(0.3)
     await messagereply(message, await messages.block())
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/block {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("unblock"))
@@ -389,6 +403,7 @@ async def unblock(message: Message):
     if data[1] == "chat":
         await send_message(id + 2000000000, await messages.block_chatunblocked(id))
     await messagereply(message, await messages.unblock())
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/unblock {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("blocklist"))
@@ -402,6 +417,7 @@ async def blocklist(message: Message):
             + "\n"
         )
     await messagereply(message, msg, keyboard=keyboard.blocklist(message.from_id))
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/blocklist")
 
 
 @bl.chat_message(SearchCMD("cmdcount"))
@@ -422,6 +438,7 @@ async def cmdcount(message: Message):
             f"{i}: {statistics.mean(cmds[i])} секунд | использован {len(cmds[i])} раз\n"
         )
     await messagereply(message, disable_mentions=1, message=msg)
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/cmdcount")
 
 
 @bl.chat_message(SearchCMD("msgsaverage"))
@@ -436,6 +453,7 @@ async def msgsaverage(message: Message):
         disable_mentions=1,
         message=f"Среднее время обработки - {statistics.mean(msgs)} секунд",
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/msgsaverage")
 
 
 @bl.chat_message(SearchCMD("msgscount"))
@@ -508,6 +526,7 @@ async def msgscount(message: Message):
         f"{msgshour} сообщений за этот час\n"
         f"{msgsminute} сообщений за эту минуту",
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/msgscount")
 
 
 @bl.chat_message(SearchCMD("getlink"))
@@ -526,6 +545,7 @@ async def getlink(message: Message):
                 )
             ).link,
         )
+        await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/getlink {' '.join(data[1:])}")
     except Exception:
         await messagereply(message, "❌ Невозможно сгенерировать ссылку")
 
@@ -546,6 +566,7 @@ async def reboot(message: Message):
         )
     await messagereply(message, await messages.reboot())
     await asyncio.to_thread(os.system, settings.service.path + "startup.sh")
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/reboot {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("sudo"))
@@ -561,6 +582,7 @@ async def sudo(message: Message):
         lambda: os.popen(f"sudo {' '.join(message.text.split()[1:])}").read()
     )
     await messagereply(message, result)
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/sudo {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("getuserchats"))
@@ -592,6 +614,7 @@ async def getuserchats(message: Message):
             chu = 0
         msg += f"➖ {i[0]} | M: {i[1]} | C: {chu} | N: {await get_chat_name(i[0])} \n"
     await messagereply(message, msg)
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/getuserchats {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("getchats"))
@@ -618,11 +641,13 @@ async def getchats(message: Message):
             chu = 0
         msg += f"➖ {i[0]} | M: {i[1]} | C: {chu} | N: {await get_chat_name(i[0])}\n"
     await messagereply(message, msg)
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/getchats {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("helpdev"))
 async def helpdev(message: Message):
     await messagereply(message, await messages.helpdev())
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/helpdev {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("gettransferhistory"))
@@ -664,6 +689,7 @@ async def gettransferhistory(message: Message):
             f" {not bool(i[3])}"
         )
     await messagereply(message, msg)
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/gettransferhistory {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("lvlban"))
@@ -674,6 +700,7 @@ async def lvlban(message: Message):
         return await messagereply(message, await messages.lvlban_hint())
     await managers.lvlbanned.add(id)
     await messagereply(message, await messages.lvlban())
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/lvlban {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("lvlunban"))
@@ -685,6 +712,7 @@ async def lvlunban(message: Message):
     if not await managers.lvlbanned.remove(id):
         return await messagereply(message, await messages.lvlunban_noban())
     await messagereply(message, await messages.lvlunban())
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/lvlunban {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("lvlbanlist"))
@@ -694,6 +722,7 @@ async def lvlbanlist(message: Message):
     for user in lvlban:
         msg += f"➖ {user} : | [id{user}|{await get_user_name(user)}]\n"
     await messagereply(message, msg)
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/lvlbanlist {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("repban"))
@@ -708,6 +737,7 @@ async def repban(message: Message):
                 "insert into reportban (uid, time) values ($1, $2)", id, None
             )
     await messagereply(message, await messages.repban())
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/repban {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("repunban"))
@@ -722,6 +752,7 @@ async def repunban(message: Message):
         ):
             return await messagereply(message, await messages.repunban_noban())
     await messagereply(message, await messages.repunban())
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/repunban {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("repbanlist"))
@@ -732,6 +763,7 @@ async def repbanlist(message: Message):
     for user in repban:
         msg += f"➖ {user[0]} : | [id{user[0]}|{await get_user_name(user[0])}]\n"
     await messagereply(message, msg)
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/repbanlist {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("chatsstats"))
@@ -743,6 +775,7 @@ async def chatsstats(message: Message):
         f"🔢 Капча включена в: {pluralize_words(c or 0, ['беседе', 'беседах', 'беседах'])}"
     )
     await messagereply(message, msg)
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/chatsstats {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("linked"))
@@ -755,6 +788,7 @@ async def linked(message: Message):
         message,
         f"Связано с Telegram : {pluralize_words(c, ('аккаунт', 'аккаунта', 'аккаунтов'))}.",
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/linked {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("promocreate"))
@@ -817,6 +851,7 @@ async def promocreate(message: Message):
         message,
         await messages.promocreate(code, amount, counts, date, promo_type, sub_needed),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/promocreate {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("promodel"))
@@ -832,6 +867,7 @@ async def promodel(message: Message):
                 message, await messages.promodel_notfound(data[1])
             )
     await messagereply(message, await messages.promodel(data[1]))
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/promodel {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("promolist"))
@@ -845,6 +881,7 @@ async def promolist(message: Message):
     await messagereply(
         message, await messages.promolist({k: promos.count(k) for k in set(promos)})
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/promolist {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("allowinvite"))
@@ -865,6 +902,7 @@ async def allowinvite(message: Message):
                 "delete from referralbonus where chat_id=$1", message.chat_id
             )
         await messagereply(message, await messages.allowinvite_off())
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/allowinvite {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("prempromocreate"))
@@ -891,6 +929,7 @@ async def prempromocreate(message: Message):
             (date.timestamp() + 86399),
         )
     await messagereply(message, await messages.prempromocreate(data[1], data[2], date))
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/prempromocreate {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("prempromodel"))
@@ -906,6 +945,7 @@ async def prempromodel(message: Message):
                 message, await messages.prempromodel_notfound(data[1])
             )
     await messagereply(message, await messages.prempromodel(data[1]))
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/prempromodel {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("prempromolist"))
@@ -913,6 +953,7 @@ async def prempromolist(message: Message):
     async with (await pool()).acquire() as conn:
         promos = await conn.fetch('select promo, "end" from prempromo')
     await messagereply(message, await messages.prempromolist(promos))
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/prempromolist {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("bonuslist"))
@@ -930,6 +971,7 @@ async def bonuslist(message: Message):
             ]
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/bonuslist {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("rewardscount"))
@@ -939,6 +981,7 @@ async def rewardscount(message: Message):
         message,
         f"Число пользователей, активировавших /rewards: {len(users)}. Из них отписалось: {len([i for i in users if i.deactivated])}",
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/rewardscount {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("setlig"))
@@ -959,9 +1002,11 @@ async def setlig(message: Message):
         message,
         f'✅ Вы успешно установили лигу "{settings.leagues.leagues[int(data[2]) - 1]}" пользователю [id{id}|{await get_user_name(id)}]',
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/setlig {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("eventdroptasks"))
 async def eventdroptasks(message: Message):
     await managers.event.drop_tasks()
     await messagereply(message, "✅")
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/eventdroptasks {' '.join(message.text.split()[1:])}")

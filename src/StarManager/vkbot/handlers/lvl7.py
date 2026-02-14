@@ -54,6 +54,7 @@ async def asynch(message: Message):
             uid, await get_user_name(uid), await get_user_nickname(uid, chat_id)
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/async")
 
 
 @bl.chat_message(SearchCMD("delasync"))
@@ -84,6 +85,7 @@ async def delasync(message: Message):
             await get_chat_name(delchid),
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/delasync {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("creategroup"))
@@ -152,6 +154,7 @@ async def creategroup(message: Message):
             group_name,
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/creategroup {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("bind"))
@@ -201,6 +204,7 @@ async def bind(message: Message):
             group_name,
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/bind {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("unbind"))
@@ -242,6 +246,7 @@ async def unbind(message: Message):
             group_name,
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/unbind {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("bindlist"))
@@ -274,6 +279,7 @@ async def bindlist(message: Message):
             group_name, [(i[0], await get_chat_name(i[0])) for i in group[:15]]
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/bindlist {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("delgroup"))
@@ -307,6 +313,7 @@ async def delgroup(message: Message):
             group_name,
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/delgroup {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("mygroups"))
@@ -335,6 +342,7 @@ async def mygroups(message: Message):
     for k, (group, count) in enumerate(groups.items()):
         msg += f"➖ {k + 1} | {group} | Количество бесед : {count}\n"
     await messagereply(message, disable_mentions=1, message=msg)
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/mygroups")
 
 
 @bl.chat_message(SearchCMD("filteradd"))
@@ -369,6 +377,7 @@ async def filteradd(message: Message):
         message=msg,
         keyboard=keyboard.filteradd(uid, word, msg) if id else None,
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/filteradd {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("filterdel"))
@@ -406,6 +415,7 @@ async def filterdel(message: Message):
         message=msg,
         keyboard=kbd(uid, word, msg) if kbd is not None else None,
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/filterdel {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("filter"))
@@ -416,6 +426,7 @@ async def filter(message: Message):
         message=await messages.filter(),
         keyboard=keyboard.filter(message.from_id),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/filter")
 
 
 @bl.chat_message(SearchCMD("editlevel"))
@@ -480,6 +491,7 @@ async def editlevel(message: Message):
             given_lvl,
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/editlevel {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("giveowner"))
@@ -496,6 +508,7 @@ async def giveowner(message: Message):
         message=await messages.giveowner_ask(),
         keyboard=keyboard.giveowner(chat_id, id, message.from_id),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/giveowner {' '.join(message.text.split()[1:])}")
 
 
 @bl.chat_message(SearchCMD("levelname"))
@@ -545,6 +558,7 @@ async def levelname(message: Message):
             " ".join(data[2:]),
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/levelname {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("resetlevel"))
@@ -587,6 +601,7 @@ async def resetlevel(message: Message):
             settings.lvl_names[lvl],
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/resetlevel {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("settings"))
@@ -597,6 +612,7 @@ async def settings_(message: Message):
         message=await messages.settings_(),
         keyboard=keyboard.settings_(message.from_id),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/settings")
 
 
 @bl.chat_message(SearchCMD("listasync"))
@@ -622,6 +638,7 @@ async def listasync(message: Message):
         message=await messages.listasync(chats_info, total),
         keyboard=keyboard.listasync(uid, total),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/listasync")
 
 
 @bl.chat_message(SearchCMD("import"))
@@ -642,6 +659,7 @@ async def import_(message: Message):
         message=await messages.import_(importchatid, await get_chat_name(importchatid)),
         keyboard=keyboard.import_(message.from_id, importchatid),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/import {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("createlevel"))
@@ -700,6 +718,7 @@ async def createlevel(message: Message):
         message=await messages.createlevel(name, level.access_level),
         keyboard=keyboard.customlevel_to_settings(message.from_id, level.access_level),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/createlevel {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("levelmenu"))
@@ -712,6 +731,7 @@ async def levelmenu(message: Message):
         message=await messages.levelmenu(len(levels), len(activated)),
         keyboard=keyboard.levelmenu(message.from_id, levels),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/levelmenu")
 
 
 @bl.chat_message(SearchCMD("setlevel"))
@@ -787,6 +807,7 @@ async def setlevel(message: Message):
             await get_user_name(id),
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/setlevel {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("dellevel"))
@@ -840,3 +861,4 @@ async def dellevel(message: Message):
             await get_user_name(id),
         ),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/dellevel {' '.join(data[1:])}")

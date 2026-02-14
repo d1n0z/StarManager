@@ -33,6 +33,7 @@ async def timeout(message: Message):
         message=await messages.timeout(activated),
         keyboard=keyboard.timeout(message.from_id, activated),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/timeout")
 
 
 @bl.chat_message(SearchCMD("inactive"))
@@ -91,14 +92,14 @@ async def inactive(message: Message):
             ):
                 to_kick.append(member.id)
 
+    u_name = await get_user_name(uid)
     kicked = 0
     for user in to_kick:
-        try:
-            kicked += await kick_user(user, chat_id)
-        except Exception:
-            pass
-        else:
-            await asyncio.sleep(0.35)
+        kicked += await kick_user(user, chat_id)
+        await asyncio.sleep(0.35)
+        await managers.logs.add_log(
+            user, chat_id, 2, "Кик из чата", by_name=f"[id{message.from_id}|{u_name}]"
+        )
 
     if not kicked:
         return await messagereply(
@@ -109,8 +110,11 @@ async def inactive(message: Message):
         message,
         disable_mentions=1,
         message=await messages.inactive(
-            uid, await get_user_name(uid), await get_user_nickname(uid, chat_id), kicked
+            uid, u_name, await get_user_nickname(uid, chat_id), kicked
         ),
+    )
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/inactive {' '.join(data[1:])}"
     )
 
 
@@ -218,7 +222,17 @@ async def ban(message: Message):
             uid, id, "ban", message.conversation_message_id
         ),
     )
-    return
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/ban {' '.join(data[1:])}"
+    )
+    await managers.logs.add_log(
+        id,
+        message.chat_id,
+        2,
+        f"Выдача блокировки на {ban_time // 86400} дней",
+        by_name=f"[id{message.from_id}|{u_name}]",
+        reason=ban_cause,
+    )
 
 
 @bl.chat_message(SearchCMD("unban"))
@@ -260,7 +274,7 @@ async def unban(message: Message):
         message,
         disable_mentions=1,
         message=await messages.unban(
-            await get_user_name(uid),
+            u_name := await get_user_name(uid),
             await get_user_nickname(uid, chat_id),
             uid,
             await get_user_name(id),
@@ -268,6 +282,16 @@ async def unban(message: Message):
             id,
         ),
         keyboard=keyboard.deletemessages(uid, [message.conversation_message_id]),
+    )
+    await managers.logs.add_log(
+        message.from_id, message.chat_id, 1, f"/unban {' '.join(data[1:])}"
+    )
+    await managers.logs.add_log(
+        id,
+        message.chat_id,
+        2,
+        "Снятие блокировки",
+        by_name=f"[id{message.from_id}|{u_name}]",
     )
 
 
@@ -291,6 +315,7 @@ async def banlist(message: Message):
         message=await messages.banlist(res, count),
         keyboard=keyboard.banlist(message.from_id, 0, count),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/banlist")
 
 
 @bl.chat_message(SearchCMD("zov"))
@@ -317,6 +342,7 @@ async def zov(message: Message):
         ),
         disable_mentions=0,
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, f"/zov {' '.join(data[1:])}")
 
 
 @bl.chat_message(SearchCMD("kickmenu"))
@@ -327,3 +353,4 @@ async def kickmenu(message: Message):
         message=await messages.kickmenu(),
         keyboard=keyboard.kickmenu(message.from_id),
     )
+    await managers.logs.add_log(message.from_id, message.chat_id, 1, "/kickmenu")
