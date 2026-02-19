@@ -314,7 +314,7 @@ def createStatsImage(
     img.paste(ava, (511, 156), mask=mask)
 
     try:
-        lvl_icon = _load_icon("dot.png")
+        lvl_icon = _load_icon("dot.png").copy()
         img.paste(lvl_icon, mask=lvl_icon)
     except Exception:
         pass
@@ -333,7 +333,7 @@ def createStatsImage(
     draw.text((392, 284.5), league_name, font=font, fill=(255, 255, 255), anchor="ma")
 
     try:
-        rep = _load_icon("rep.png")
+        rep = _load_icon("rep.png").copy()
         img.paste(rep, (38, 382), mask=rep)
     except Exception:
         pass
@@ -346,7 +346,7 @@ def createStatsImage(
     )
 
     try:
-        coin = _load_icon("coin.png")
+        coin = _load_icon("coin.png").copy()
         img.paste(coin, (38, 231), mask=coin)
     except Exception:
         pass
