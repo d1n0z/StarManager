@@ -1,4 +1,5 @@
 import copy
+import heapq
 import time
 from dataclasses import dataclass
 from typing import (
@@ -272,31 +273,50 @@ class XPManager(BaseManager):
         return [(uid, copy.deepcopy(obj)) for uid, obj in top]
 
     async def get_coins_top(self, in_uids: List[int] | None = None, limit: int = 10):
+        in_uids_set = set(in_uids) if in_uids is not None else None
+
         async with self._lock:
-            top = sorted(
-                self.cache._cache.items(),
-                key=lambda i: i[1].coins,
-                reverse=True,
-            )
-        top = [
-            (uid, obj)
-            for uid, obj in top
-            if uid > 0 and (in_uids is None or uid in in_uids)
-        ][:100]
-        if not top:
+            items = [
+                (uid, obj)
+                for uid, obj in self.cache._cache.items()
+                if uid > 0 and (in_uids_set is None or uid in in_uids_set)
+            ]
+
+        if not items:
             return []
-        uids = {
-            u.id: u
-            for u in await api.users.get(
-                user_ids=[i[0] for i in top],
-                fields=["deactivated"],  # type: ignore
-            )
-        }
-        return [
-            (uid, copy.deepcopy(i))
-            for uid, i in top
-            if uids is None or (uid in uids and not uids[uid].deactivated)
-        ][:limit]
+
+        buffer = 100
+        k = min(len(items), max(limit, buffer))
+
+        top_k = heapq.nlargest(k, items, key=lambda it: it[1].coins)
+
+        user_ids = [uid for uid, _ in top_k]
+        vk_users_map: Dict[int, Any] = {}
+        chunk_size = 1000
+        try:
+            for i in range(0, len(user_ids), chunk_size):
+                chunk = user_ids[i : i + chunk_size]
+                resp = await api.users.get(user_ids=chunk, fields=["deactivated"])  # type: ignore
+                for u in resp:
+                    vk_users_map[u.id] = u
+        except Exception:
+            try:
+                from loguru import logger
+
+                logger.exception("VK API users.get failed in get_coins_top")
+            except Exception:
+                pass
+
+        result = []
+        for uid, obj in top_k:
+            user = vk_users_map.get(uid)
+            if user is not None and getattr(user, "deactivated", False):
+                continue
+            result.append((uid, copy.copy(obj)))
+            if len(result) >= limit:
+                break
+
+        return result
 
     async def add_user_xp(self, uid: int, addxp: float):
         """returns True on level up"""
