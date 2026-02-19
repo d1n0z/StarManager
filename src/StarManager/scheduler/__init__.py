@@ -25,14 +25,15 @@ from StarManager.core.utils import (
     generate_hard_problem,
     generate_medium_problem,
     get_user_name,
-    punish,
     send_message,
 )
-from StarManager.scheduler.update_chats import updateChats
 from StarManager.tgbot import keyboard as tgkeyboard
 from StarManager.tgbot.bot import bot as tgbot
 from StarManager.vkbot import keyboard, messages
 from StarManager.vkbot.checkers import getULvlBanned
+
+from .everyminute import everyminute
+from .update_chats import updateChats
 
 task_locks = defaultdict(asyncio.Lock)
 
@@ -139,9 +140,17 @@ async def updateUsers(conn: asyncpg.Connection):  # TODO: optimize
                 )
                 domain = u.domain or f"id{u.id}"
                 updates.append((full_name, domain, u.id))
-            await conn.executemany(
-                "update usernames set name = $1, domain = $2 where uid = $3", updates
-            )
+
+                params = []
+                rows = []
+                for name, domain, uid in updates:
+                    params.extend([name, domain, uid])
+                    rows.append(
+                        f"(${len(params) - 2}, ${len(params) - 1}, ${len(params)})"
+                    )
+                values_expr = ", ".join(rows)
+                query = f"update usernames as t set name = v.name, domain = v.domain from (values {values_expr}) as v(name, domain, uid) where t.uid = v.uid;"
+                await conn.execute(query, *params)
         except Exception:
             logger.exception("Users update exception:")
 
@@ -250,45 +259,6 @@ async def every10min(conn: asyncpg.Connection):
                 await managers.rewardscollected.turn(uid)
         except Exception:
             pass
-
-
-async def everyminute(conn: asyncpg.Connection):
-    now = time.time()
-
-    captchas = await conn.fetch(
-        "SELECT uid, chat_id FROM captcha WHERE exptime < $1", now
-    )
-    unique = set()
-    for uid, chat_id in captchas:
-        if (uid, chat_id) in unique:
-            continue
-        if await conn.fetchval(
-            "DELETE FROM typequeue WHERE chat_id = $1 AND uid = $2 AND type = 'captcha' RETURNING 1",
-            chat_id,
-            uid,
-        ):
-            unique.add((uid, chat_id))
-
-            if s := await managers.chat_settings.get(
-                chat_id, "captcha", ("id", "punishment")
-            ):
-                await punish(uid, chat_id, s[0])
-                await send_message(
-                    chat_id + 2000000000,
-                    await messages.captcha_punish(uid, await get_user_name(uid), s[1]),
-                )
-
-    await conn.execute("DELETE FROM captcha WHERE exptime < $1", now)
-
-    todelete = await conn.fetch(
-        "SELECT peerid, cmid FROM todelete WHERE delete_at < $1", now
-    )
-    if todelete:
-        await asyncio.gather(
-            *(delete_messages(cmid, peerid - 2000000000) for peerid, cmid in todelete),
-            return_exceptions=True,
-        )
-        await conn.execute("DELETE FROM todelete WHERE delete_at < $1", now)
 
 
 async def run_notifications(conn: asyncpg.Connection):
@@ -433,7 +403,7 @@ async def everyday(conn: asyncpg.Connection):
         except asyncpg.exceptions.DeadlockDetectedError:
             if attempt == 12 - 1:
                 raise
-            await asyncio.sleep(0.1 * min(2 ** attempt, 256))
+            await asyncio.sleep(0.1 * min(2**attempt, 256))
 
 
 async def drop_event_tasks():
