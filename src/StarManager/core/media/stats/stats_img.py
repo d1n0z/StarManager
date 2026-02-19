@@ -38,8 +38,7 @@ def _load_template(pss: str, imglvl: str, prem: bool) -> Image.Image:
         pss,
         f"{imglvl}_{prem_suffix}p.png",
     )
-    img = Image.open(template_path).convert("RGBA")
-    return img
+    return Image.open(template_path).convert("RGBA")
 
 
 @lru_cache(maxsize=16)
@@ -141,7 +140,7 @@ def createStatsImage(
         imglvl = "75+"
 
     try:
-        img = _load_template(pss, imglvl, prem > 0)
+        img = _load_template(pss, imglvl, prem > 0).copy()
     except FileNotFoundError:
         img = Image.new("RGBA", (1200, 600), (30, 30, 30, 255))
     draw = ImageDraw.Draw(img)
