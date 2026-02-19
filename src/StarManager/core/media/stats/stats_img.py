@@ -4,6 +4,7 @@ import uuid
 from ast import literal_eval
 from colorsys import hsv_to_rgb
 from functools import lru_cache
+from io import BytesIO
 from typing import Tuple
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
@@ -26,7 +27,7 @@ def _get_font(size: int) -> ImageFont.FreeTypeFont:
 
 
 @lru_cache(maxsize=64)
-def _load_template(pss: str, imglvl: str, prem: bool) -> Image.Image:
+def _load_template_bytes(pss: str, imglvl: str, prem: bool) -> bytes:
     prem_suffix = "" if prem else "n"
     template_path = os.path.join(
         settings.service.path,
@@ -38,11 +39,16 @@ def _load_template(pss: str, imglvl: str, prem: bool) -> Image.Image:
         pss,
         f"{imglvl}_{prem_suffix}p.png",
     )
-    return Image.open(template_path).convert("RGBA")
+    with open(template_path, "rb") as f:
+        return f.read()
+
+
+def _load_template(pss: str, imglvl: str, prem: bool) -> Image.Image:
+    return Image.open(BytesIO(_load_template_bytes(pss, imglvl, prem))).convert("RGBA")
 
 
 @lru_cache(maxsize=16)
-def _load_icon(name: str) -> Image.Image:
+def _load_icon_bytes(name: str) -> bytes:
     p = os.path.join(
         settings.service.path,
         "src",
@@ -53,7 +59,12 @@ def _load_icon(name: str) -> Image.Image:
         "icon",
         name,
     )
-    return Image.open(p).convert("RGBA")
+    with open(p, "rb") as f:
+        return f.read()
+
+
+def _load_icon(name: str) -> Image.Image:
+    return Image.open(BytesIO(_load_icon_bytes(name))).convert("RGBA")
 
 
 @lru_cache(maxsize=64)
@@ -140,7 +151,7 @@ def createStatsImage(
         imglvl = "75+"
 
     try:
-        img = _load_template(pss, imglvl, prem > 0).copy()
+        img = _load_template(pss, imglvl, prem > 0)
     except FileNotFoundError:
         img = Image.new("RGBA", (1200, 600), (30, 30, 30, 255))
     draw = ImageDraw.Draw(img)
@@ -314,7 +325,7 @@ def createStatsImage(
     img.paste(ava, (511, 156), mask=mask)
 
     try:
-        lvl_icon = _load_icon("dot.png").copy()
+        lvl_icon = _load_icon("dot.png")
         img.paste(lvl_icon, mask=lvl_icon)
     except Exception:
         pass
@@ -333,7 +344,9 @@ def createStatsImage(
     draw.text((392, 284.5), league_name, font=font, fill=(255, 255, 255), anchor="ma")
 
     try:
-        rep = _load_icon("rep.png").copy()
+        rep = _load_icon("rep.png")
+        draw.rectangle(((100, 390), (220, 410)), (29, 29, 29))
+        draw.rectangle(((40, 380), (100, 450)), (29, 29, 29))
         img.paste(rep, (38, 382), mask=rep)
     except Exception:
         pass
@@ -346,7 +359,9 @@ def createStatsImage(
     )
 
     try:
-        coin = _load_icon("coin.png").copy()
+        coin = _load_icon("coin.png")
+        draw.rectangle(((100, 390 - 151), (260, 410 - 151)), (29, 29, 29))
+        draw.rectangle(((40, 380 - 151), (100, 450 - 151)), (29, 29, 29))
         img.paste(coin, (38, 231), mask=coin)
     except Exception:
         pass
