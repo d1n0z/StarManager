@@ -65,10 +65,9 @@ def filter_vkbot_debug(record):
     return True
 
 
-def setup_logs():
+def setup_logs(enable_debug_logs: bool = True):
     logger.remove()
 
-    # Глушим сторонний шум
     logging.getLogger("apscheduler").setLevel(logging.WARNING)
     logging.getLogger("aiogram").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -83,16 +82,17 @@ def setup_logs():
 
     logger.add(sys.stderr, level="INFO", filter=filter_vk_api_error_spam)
 
-    logger.add(
-        LOG_DIR / "debug.log",
-        level="DEBUG",
-        filter=filter_vkbot_debug,
-        rotation="500 MB",
-        compression=compress_and_remove,
-        retention="7 days",
-        enqueue=True,
-        backtrace=True,
-        diagnose=True,
-    )
+    if enable_debug_logs:
+        logger.add(
+            LOG_DIR / "debug.log",
+            level="DEBUG",
+            filter=filter_vkbot_debug,
+            rotation="500 MB",
+            compression=compress_and_remove,
+            retention="7 days",
+            enqueue=True,
+            backtrace=True,
+            diagnose=True,
+        )
 
     logging.basicConfig(handlers=[InterceptHandler()], level=0)
