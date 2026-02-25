@@ -232,21 +232,14 @@ async def every10min(conn: asyncpg.Connection):
             cmid,
         )
 
-    deletes, updates = [], []
-    for row in await conn.fetch(
-        "SELECT id, time, streak from bonus WHERE time < $1 FOR UPDATE SKIP LOCKED",
+    await conn.fetch(
+        "UPDATE bonus SET time = time + 86400, streak = streak - 2 WHERE time < $1 AND streak > 2",
         now - 86400 * 2,
-    ):
-        if row[2] <= 2:
-            deletes.append((row[0],))
-            continue
-        updates.append((row[0],))
-    if updates:
-        await conn.executemany(
-            "UPDATE bonus SET time=time+86400, streak=streak-2 where id=$1", updates
-        )
-    if deletes:
-        await conn.executemany("DELETE FROM bonus WHERE id=$1", deletes)
+    )
+    await conn.fetch(
+        "DELETE FROM bonus WHERE time < $1 AND streak <= 2",
+        now - 86400 * 2,
+    )
 
     for chunk in chunks(await managers.rewardscollected.get_all_activated(), 499):
         try:
